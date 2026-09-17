@@ -1,0 +1,1330 @@
+
+=== src/app/api/bills/export/route.ts ===
+  [A] L14: * Columns: Kvitansiya | Kompaniya | Summa | To'langan | To'lanmagan |
+  [B] L31: const status = d.invoiceStatus || b.invoiceStatus || '—'
+  [B] L32: const amount = d.amount || '—'
+  [B] L35: const court = d.courtName || '—'
+  [B] L36: const issued = b.issued || '—'
+  [B] L37: const expiry = d.expiry || '—'
+  [B] L38: const caseNum = d.claimCaseNumber || '—'
+  [B] L39: const category = d.payCategory || d.description || '—'
+  [B] L42: 'Kvitansiya': b.number || '—',
+  [B] L43: 'Kompaniya': b.companyName || '—',
+  [A] L45: "To'langan": String(paid),
+  [A] L46: "To'lanmagan": String(unpaid),
+  [A] L47: 'Holati': status === 'PAID' ? "To'langan" : status === 'PARTIAL' ? "Qisman" : status === 'UNPAID' ? "To'lanmagan" : status,
+  [A] L66: const headers = ['Kvitansiya', 'Kompaniya', 'Summa', "To'langan", "To'lanmagan", 'Holati', 'Sud', 'Berilgan sana', 'Amal qilish', 'Ish raqami', 'Turi']
+  [A] L93: <sheets><sheet name="To'lovlar" sheetId="1" r:id="rId1"/></sheets>
+
+=== src/app/api/bills/route.ts ===
+  [B] L8: // Bill enrichment (60+ receipts × status fetch) can take 60-90s — a persistent
+  [A] L17: *     streams every enriched bill as NDJSON. The message union is the app's
+  [A] L47: return jsonFail("STIR aynan 9 ta raqamdan iborat bo'lishi kerak (Yuridik shaxs)", 'bad_request', 400)
+  [A] L58: // Stream phase events so the UI shows exactly what's happening.
+
+=== src/app/api/company/route.ts ===
+  [B] L29: // Search mode — return list of results
+
+=== src/app/api/company-info/route.ts ===
+  [B] L19: * change — errors[] finally reaches the client).
+  [A] L28: return jsonFail("STIR aynan 9 ta raqamdan iborat bo'lishi kerak", 'bad_request', 400)
+
+=== src/app/api/court-cases/route.ts ===
+  [A] L31: if (!ct.success) return jsonFail("courtType noto'g'ri", 'bad_request', 400)
+  [A] L38: return jsonFail(e instanceof Error ? e.message : "Ish tafsilotlarini olib bo'lmadi", 'upstream_error', 502)
+  [A] L47: if (!ct.success) return jsonFail("courtType noto'g'ri", 'bad_request', 400)
+  [A] L49: return jsonFail("mode noto'g'ri", 'bad_request', 400)
+  [A] L55: if (!v.success) return jsonFail("STIR aynan 9 ta raqamdan iborat bo'lishi kerak", 'bad_request', 400)
+  [A] L59: if (!v.success) return jsonFail("PINFL aynan 14 ta raqamdan iborat bo'lishi kerak", 'bad_request', 400)
+  [A] L76: return jsonFail(e instanceof Error ? e.message : "Sud ishlarini qidirib bo'lmadi", 'upstream_error', 502)
+
+=== src/app/api/court-hearings/route.ts ===
+  [B] L66: // Find matching court — either from courtId param (manual) or auto-match
+  [B] L89: // Scan date range — FUTURE ONLY (today + N days forward).
+
+=== src/app/api/mib-debt/route.ts ===
+  [A] L15: *   Phase 2: submit the form with the user's answer. Returns the debt result.
+
+=== src/app/api/settings/health/route.ts ===
+  [B] L5: * v163: Simplified — only returns pure CF Worker data (no proxies/direct).
+  [B] L6: * Removed "allSources" and pool labels — just aggregated worker stats.
+
+=== src/app/api/settings/update/route.ts ===
+  [B] L6: * Uses execFile (async, non-blocking) — does NOT block the event loop.
+  [A] L33: // Check we're on main branch
+  [A] L52: // Stash failed — try pull anyway, it might work if changes don't conflict
+  [B] L52: // Stash failed — try pull anyway, it might work if changes don't conflict
+  [B] L70: console.log('[update] Stash pop failed — changes remain in stash')
+
+=== src/app/api/settings/workers/route.ts ===
+  [B] L22: // GET — list all workers (merge workers.json + fallback/env)
+  [A] L33: // Add fallback workers that aren't already in workers.json
+  [B] L52: // POST — add a new worker
+  [B] L94: // DELETE — remove a worker
+
+=== src/app/api/stats/export/route.ts ===
+  [B] L16: *   already has the data on screen — export is now instant.
+  [B] L19: *   (Backward-compat fallback) — re-fetches stats via getCompanyStats(tin)
+  [A] L20: *   and filters by courtTypes. Kept for callers that don't have the data yet.
+  [A] L26: * Columns: Sud | Ish raqami | Da'vogar | Javobgar | Sana | Natija | Holat | Sud turi
+  [B] L50: * Shared Excel builder — takes a list of classified cases + a company name
+  [B] L53: * Used by both the POST handler (instant — case data POSTed by the client)
+  [A] L60: const headers = ['Sud', 'Ish raqami', "Da'vogar", 'Javobgar', 'Sana', 'Natija', 'Holat', 'Sud turi']
+  [A] L65: "Da'vogar": c.role === 'plaintiff' ? companyName : c.counterparty,
+  [A] L82: : "Ma'muriy",
+  [B] L144: // xl/styles.xml — style 0 = default, style 1 = header (bold white on black)
+  [B] L238: * Generates the .xlsx from the case data the client already has on screen —
+  [A] L255: { ok: false, error: "STIR aynan 9 ta raqamdan iborat bo'lishi kerak" },
+  [B] L287: * has the data — POST skips the 4-8s re-fetch.
+  [A] L301: { ok: false, error: "STIR aynan 9 ta raqamdan iborat bo'lishi kerak" },
+  [A] L309: () => resolve({ ok: false, error: "So'rov vaqti tugadi (30s). Qayta urinib ko'ring." }),
+
+=== src/app/api/stats/route.ts ===
+  [B] L20: * surface in `partial` — never silently dropped (arch guide A3).
+  [A] L31: return jsonFail(parsed.error.issues[0]?.message ?? "STIR 9 ta raqam bo'lishi kerak", 'bad_request', 400)
+  [A] L47: return jsonFail(`So'rov vaqti tugadi (${Math.round(config.resilience.defaultTimeoutMs / 1000)}s+). Qayta urinib ko'ring.`, 'timeout', 504)
+
+=== src/app/api/tor-install/route.ts ===
+  [A] L85: // Recursively search for the binary if it's not at the tor/ root
+
+=== src/app/api/tor-status/route.ts ===
+  [A] L19: *   Triggers `ensureTor()` which spawns the tor binary if it's found but not
+
+=== src/app/api/upcoming-hearings/route.ts ===
+  [B] L14: * hearings (criminal skipped for TINs — v121 rule preserved inside the
+  [A] L23: return jsonFail("STIR aynan 9 ta raqamdan iborat bo'lishi kerak", 'bad_request', 400)
+  [A] L30: return jsonFail(e instanceof Error ? e.message : "Majlislarni olib bo'lmadi", 'upstream_error', 502)
+
+=== src/app/globals.css ===
+  [B] L8: SUD — "MONOCHROME SIGNAL" DESIGN TOKENS  (v2 — redesign)
+  [B] L11: MONOCHROME. Color is not decoration — it is SIGNAL. Hue appears in exactly
+  [B] L20: /* 1. NEUTRAL RAMP — the monochrome spine (raw; do not use directly) */
+  [B] L35: --ramp-1000: #000000;   /* pure ink — the accent in light mode */
+  [B] L37: /* 2. SIGNAL HUES — raw status palette (do not use directly) */
+  [B] L58: /* 3. SEMANTIC ROLES — components consume these */
+  [B] L130: /* 5. SPACING — 4px base with dense half-steps */
+  [B] L146: /* 6. TYPOGRAPHY — Inter (Cyrillic) UI + JetBrains Mono for figures */
+  [B] L166: /* 7. ELEVATION — cards defined by SHADOW, not heavy borders */
+  [B] L175: /* 8. MOTION — restrained; motion explains state, never decorates */
+  [B] L225: * DARK MODE — pure-black canvas, white ink accent.
+  [B] L395: * BASE + THIN UTILITIES (tokens + utilities only — no component CSS)
+  [B] L437: /* Floating card — depth from shadow, never a hard border */
+  [B] L448: /* Glass — top header + command palette ONLY */
+
+=== src/app/layout.tsx ===
+  [B] L8: // Inter with Cyrillic subset — the UI face. JetBrains Mono — the figures face.
+  [A] L22: "Yuridik shaxslar uchun sud ma'lumotlarini yig'ish: to'lovlar, sud ishlari, majlislar, kompaniya profili va statistika.",
+
+=== src/app/page.tsx ===
+  [B] L4: * Sud Signal — app root.
+  [A] L6: * Views mirror the prototype's four surfaces: home (launcher), company
+  [B] L7: * workspace (context bar + section tabs), watchlist, settings — hosted on the
+  [A] L78: // E — export the active company's stats workbook
+  [B] L78: // E — export the active company's stats workbook
+  [A] L113: {/* Section tabs — the prototype's underline rail with number, icon, count */}
+  [B] L113: {/* Section tabs — the prototype's underline rail with number, icon, count */}
+  [B] L129: {/* Section content — lazy mount on first visit, then keep alive */}
+
+=== src/app/prototype.css ===
+  [B] L2: SUD SIGNAL — PROTOTYPE PARITY LAYER
+  [A] L8: app's semantic tokens; dark mode follows html[data-theme] automatically.
+
+=== src/components/company/context-bar.tsx ===
+  [A] L4: * Context bar — the prototype's company identity strip: 52px monogram tile,
+  [B] L4: * Context bar — the prototype's company identity strip: 52px monogram tile,
+  [A] L24: if (v.includes('тўхтатилган') || v.includes("to'xtatilgan") || v.includes('suspended')) return "To'xtatilgan"
+
+=== src/components/proto/drawer.tsx ===
+  [A] L4: * Proto drawer — the prototype's right-side sheet (.drawer) with scrim, used
+  [B] L4: * Proto drawer — the prototype's right-side sheet (.drawer) with scrim, used
+  [B] L45: // Esc closes (page-level handler also closes palette — guard here too)
+  [C] L64: "circ sm"
+
+=== src/components/proto/primitives.tsx ===
+  [B] L4: * Prototype primitives — the Sud Signal signature visuals ported 1:1 from
+  [B] L58: /** True after first client paint — drives the mount animations. */
+  [B] L70: /** Count-up number (eased, 750ms) — matches prototype countUp(). */
+  [B] L107: /** Segmented ring gauge (28 dashes) with count-up center — prototype ring(). */
+  [B] L149: /** Semi-circular dash gauge — prototype arcGauge(). */
+  [B] L196: /** Vertical bar chart with hover tooltip + hot column — prototype barChart(). */
+  [B] L245: /** Tiny sparkline — prototype .spark. */
+  [B] L257: /** KPI card — prototype .kpi (+ .ink variant). */
+  [B] L287: /** Segmented control — prototype .seg. */
+  [B] L308: /** Two-option pill toggle — prototype .toggle-pair. */
+  [B] L329: /** Empty state block — prototype .empty. */
+  [B] L341: /** Skeleton rows shaped like .lrow — prototype skRows(). */
+  [B] L359: /** Skeleton KPI grid — prototype skKpis(). */
+  [B] L379: /** Monogram initials — prototype initials(), hardened for live orginfo names:
+
+=== src/components/sections/bills-helpers.ts ===
+  [B] L4: * Bills helpers — bridges the shipped status maps to the status-family
+  [A] L5: * vocabulary. Status label resolution uses the lib's INVOICE_STATUSES.
+
+=== src/components/sections/bills.tsx ===
+  [A] L4: * Bills section — the prototype's To'lovlar: STIR/invoice toggle pair, the
+  [B] L4: * Bills section — the prototype's To'lovlar: STIR/invoice toggle pair, the
+  [A] L37: ['fetching', "Kvitansiyalar ro'yxati olinmoqda"],
+  [A] L62: /** Receipt drawer — shared with the Overview "So'nggi to'lovlar" strip. */
+  [B] L62: /** Receipt drawer — shared with the Overview "So'nggi to'lovlar" strip. */
+  [B] L68: ['To‘lovchi', <span className="v sans" key="payer">{d?.payer || '—'}</span>],
+  [C] L68: "v sans"
+  [B] L69: ['Sud', <span className="v sans" key="court">{d?.court || courtTypeLabel(d?.courtType) || '—'}</span>],
+  [C] L69: "v sans"
+  [B] L70: ['Instansiya', <span className="v sans" key="inst">{d?.instance || '—'}</span>],
+  [C] L70: "v sans"
+  [B] L71: ['Kategoriya', <span className="v sans" key="cat">{d?.payCategory ? categoryLabel(d.payCategory).label : '—'}</span>],
+  [C] L71: "v sans"
+  [B] L72: ['Ish raqami', <span className="v" key="case">{d?.claimCaseNumber || '—'}</span>],
+  [B] L74: ['Maqsad', <span className="v sans" key="purpose" style={{ maxWidth: '60%', textAlign: 'right' }}>{d?.purpose || d?.description || '—'}</span>],
+  [C] L74: "v sans"
+  [A] L81: rows.push(['Foyda tomonida', <span className="v sans" key="favor">{d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yo'q" : '—'}</span>])
+  [B] L81: rows.push(['Foyda tomonida', <span className="v sans" key="favor">{d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yo'q" : '—'}</span>])
+  [C] L81: "v sans"
+  [C] L110: "btn btn-outline btn-sm"
+  [C] L119: "btn btn-outline btn-sm"
+  [C] L159: "faint mono"
+  [B] L304: { key: 'stir', label: 'STIR — barcha to‘lovlar' },
+  [C] L322: "btn btn-primary btn-sm"
+  [A] L335: <Kpi label="To'langan" icon={<Check />} foot={<><span className="p-dot d-pos" />To&apos;liq</>}>
+  [C] L335: "p-dot d-pos"
+  [A] L338: <Kpi label="Qisman / Muddati o'tgan" icon={<Timer />} foot={<><span className="p-dot d-neg" />E&apos;tibor talab</>}>
+  [C] L338: "p-dot d-neg"
+  [C] L348: "p-card rise-c"
+  [A] L357: { key: 'paid', label: "To'langan" },
+  [A] L358: { key: 'overdue', label: "Muddati o'tgan" },
+  [C] L364: "btn btn-outline btn-sm"
+  [C] L369: "btn btn-outline btn-sm"
+  [C] L398: "btn btn-outline btn-sm"
+  [A] L404: <EmptyBlock icon={<Receipt />} title="Kvitansiyalar topilmadi" hint="Bu STIR bo'yicha billing.sud.uz da kvitansiya yo'q." />
+  [A] L406: <EmptyBlock icon={<Search />} title="Filtr bo'yicha natija yo'q" hint="Boshqa so'z bilan qidirib ko'ring." />
+  [B] L421: {d?.payCategory ? categoryLabel(d.payCategory).label : 'To‘lov'} · {d?.court || courtTypeLabel(d?.courtType) || '—'}
+
+=== src/components/sections/cases.tsx ===
+  [A] L4: * Cases section — the prototype's Sud ishlari: search + court-type seg + PDF
+  [B] L4: * Cases section — the prototype's Sud ishlari: search + court-type seg + PDF
+  [A] L6: * amount), and the detail drawer with the prototype's four detail sections:
+  [A] L28: { key: 'administrative', label: "Ma'muriy" },
+  [A] L41: return /ЎТКАЗИЛГАН|Якун|БЎЛИБ ЎТДИ|ўтказилган|yakun|bo'lib/i.test(s)
+  [B] L49: if (!name || name === '—') return <span className="faint">—</span>
+  [C] L68: "btn btn-ghost btn-xs"
+  [C] L92: "alert err"
+  [C] L130: "badge b-neu"
+  [B] L138: <div className="v">{g?.judge || '—'}</div>
+  [B] L142: <div className="v mono">{g?.claimAmount || '—'}</div>
+  [C] L142: "v mono"
+  [B] L146: <div className="v">{g?.court || '—'}</div>
+  [C] L157: "faint mono"
+  [C] L162: "faint mono"
+  [B] L175: <b>{h.date} · {h.time || '—'}</b>
+  [B] L176: <div className="m">{hearingEn(h.status) || h.status || '—'}{h.courtroom ? ` · ${h.courtroom}` : ''}</div>
+  [B] L192: <b>{dec!.date || '—'}</b>
+  [B] L193: <div className="sub" style={{ whiteSpace: 'normal' }}>{dec!.text || '—'}</div>
+  [C] L208: "badge b-neu"
+  [C] L208: "badge b-neu"
+  [A] L210: <div className="faint mono" style={{ fontSize: 12 }}>{inst.hasData ? `${inst.name.toLowerCase()} bo'yicha yozuvlar bor` : 'Yozuv topilmadi'}</div>
+  [C] L210: "faint mono"
+  [C] L216: "btn btn-outline"
+  [A] L243: return <EmptyBlock icon={<Gavel />} title={q ? "Filtr bo'yicha natija yo'q" : 'Ish topilmadi'} hint={q ? 'Boshqa so‘z bilan qidirib ko‘ring.' : 'Bu sud turida ish topilmadi.'} />
+  [B] L256: {c.courtName || '—'} · {c.judge || '—'}
+  [B] L257: {c.hearingDate && c.hearingDate !== '—' ? ` · ${c.hearingDate}` : ''}
+  [B] L262: {c.claimAmount || '—'}
+  [C] L295: "p-card rise-c"
+  [C] L304: "btn btn-outline btn-sm"
+
+=== src/components/sections/hearings.tsx ===
+  [A] L4: * Hearings section — the prototype's Majlislar: the "Kelgusi majlislar" card
+  [B] L4: * Hearings section — the prototype's Majlislar: the "Kelgusi majlislar" card
+  [C] L107: "btn btn-outline btn-sm"
+  [A] L117: title="Majlis yo'q"
+  [C] L125: "p-card rise-c"
+
+=== src/components/sections/overview.tsx ===
+  [A] L4: * Overview section — the prototype's Umumiy: headline KPIs (win-rate ink),
+  [B] L4: * Overview section — the prototype's Umumiy: headline KPIs (win-rate ink),
+  [B] L33: /** Bills-cache version (primitive snapshot — safe for useSyncExternalStore). */
+  [A] L38: /** Integer so'm formatting for the KPI cards (prototype shows "142 400 000"). */
+  [A] L41: /** Decision-row metadata — the prototype's CASE_META (icon/label/band/text). */
+  [B] L41: /** Decision-row metadata — the prototype's CASE_META (icon/label/band/text). */
+  [A] L43: win: { icon: <Trophy />, label: 'Yutgan', band: 'positive', text: "Da'vo to'liq qanoatlantirildi" },
+  [A] L44: lose: { icon: <CircleX />, label: 'Yutqazgan', band: 'negative', text: "Da'vo qanoatlantirilmadi" },
+  [A] L45: pending: { icon: <Clock />, label: 'Jarayonda', band: 'warning', text: "Ko'rib chiqilmoqda" },
+  [A] L77: label: k === 'economic' ? 'Iqtisodiy' : k === 'civil' ? 'Fuqarolik' : k === 'administrative' ? "Ma'muriy" : k,
+  [C] L115: "faint mono"
+  [B] L126: {rating ? <span className={`badge ${bandOf(letterBand(rating)) === 'pos' ? 'b-pos' : bandOf(letterBand(rating)) === 'warn' ? 'b-warn' : 'b-neg'}`}>{rating}</span> : <span className="faint">—</span>}
+  [B] L128: <div className="kv"><span className="k">Holat</span><span>{status || '—'}</span></div>
+  [C] L157: "alert err"
+  [C] L177: "btn btn-ghost btn-sm"
+  [B] L199: <p>Avval boshqa kompaniyalarni oching — so&apos;ng ularni solishtirish mumkin.</p>
+  [C] L214: "sub mono"
+  [B] L236: // Bills cache (written by the Bills section stream) — prototype KPIs 3–4
+  [A] L289: label="To'langan boj"
+  [A] L291: foot={bt.loaded ? <>{bt.paidCount} kvitansiya</> : "To'lovlar bo'limida yuklanadi"}
+  [B] L293: <span style={{ fontSize: 18 }}>{bt.loaded ? fmtSumShort(bt.totalPaid) : '—'}</span>
+  [A] L296: label="Muddati o'tgan"
+  [A] L298: foot={bt.overdue > 0 ? 'BPI orqali undiruv' : "Qarzdorlik yo'q"}
+  [B] L301: {bt.loaded ? fmtSumShort(bt.overdue) : '—'}
+  [C] L307: "p-card rise-c"
+  [C] L312: "badge b-neu"
+  [B] L319: onBarClick={(_, v, l) => toast(`${l} — ${v} ish`)}
+  [B] L322: Ustunni bosing — o&apos;sha oydagi ishlar
+  [C] L325: "p-card rise-c"
+  [C] L352: "p-card rise-c"
+  [C] L358: "btn btn-outline btn-sm"
+  [C] L363: "p-card rise-c"
+  [C] L371: "datecard now"
+  [B] L381: <span>Ish {(nextHearing.caseNumber as string) || '—'}</span>
+  [B] L388: {nextHearing.judge ? ` — sudya ${nextHearing.judge as string}` : ''}
+  [A] L392: <EmptyBlock icon={<CalendarDays />} title="Majlis yo'q" />
+  [B] L399: <span className="faint" style={{ fontSize: 12 }}>— to&apos;lovlar va qarorlar</span>
+  [C] L402: "p-card rise-c"
+  [C] L407: "btn btn-ghost btn-xs"
+  [B] L414: To&apos;lovlar hali yuklanmagan — To&apos;lovlar bo&apos;limini oching.
+  [B] L427: {d?.payCategory ? categoryLabel(d.payCategory).label : 'To‘lov'} · {d?.court || courtTypeLabel(d?.courtType) || '—'}
+  [C] L436: "p-card rise-c"
+  [C] L441: "btn btn-ghost btn-xs"
+  [C] L505: "btn btn-outline btn-sm"
+  [A] L512: return <EmptyBlock icon={<Gavel />} title="Ma'lumot topilmadi" hint="Bu STIR bo'yicha sud ishlari topilmadi yoki manbalar javob bermadi." />
+
+=== src/components/sections/profile.tsx ===
+  [A] L4: * Profile section — the prototype's Profil: data strips (Manzil/Direktor,
+  [B] L4: * Profile section — the prototype's Profil: data strips (Manzil/Direktor,
+  [A] L5: * Ro'yxat/Kapital/Telefon/Email/OKED), quick-action buttons, and the Chamber
+  [B] L7: * MIB debt check stays parked (redesign §13.1) — as in the prototype.
+  [C] L62: "btn btn-outline btn-sm"
+  [A] L69: return <EmptyBlock icon={<Building2 />} title="Profil topilmadi" hint="orginfo.uz va chamber.uz da bu STIR bo'yicha ma'lumot yo'q." />
+  [A] L79: { key: 'bills', label: "To'lovlar", icon: <Receipt /> },
+  [B] L92: <div className="v">{c?.address || '—'}</div>
+  [B] L96: <div className="v">{c?.director || '—'}</div>
+  [B] L103: <div className="v mono">{c?.registeredDate || '—'}</div>
+  [C] L103: "v mono"
+  [B] L107: <div className="v mono">{c?.charterCapital || '—'}</div>
+  [C] L107: "v mono"
+  [B] L111: <div className="v mono">{c?.phone || '—'}</div>
+  [C] L111: "v mono"
+  [B] L115: <div className="v mono">{c?.email || '—'}</div>
+  [C] L115: "v mono"
+  [B] L120: {rating?.okedCode ? `${rating.okedCode} — ` : ''}
+  [B] L121: {rating?.okedName || c?.ifut || '—'}
+  [C] L130: "btn btn-outline btn-sm"
+  [C] L139: "p-card rise-c"
+  [C] L158: "badge b-neu"
+  [B] L160: <div className="faint" style={{ fontSize: 12 }}>{c?.thsht || '—'}</div>
+  [B] L169: <div className="av">{initials(f.name || '—')}</div>
+  [B] L170: <b style={{ flex: 1, fontSize: 13 }}>{f.name || '—'}</b>
+  [B] L171: <span className="mono faint">{f.share || '—'}</span>
+  [C] L171: "mono faint"
+
+=== src/components/shared/formatters.ts ===
+  [B] L2: * Shared formatters — v150 P2 extraction from page.tsx.
+  [A] L3: * These are used by multiple tabs and don't depend on any server-only code.
+  [B] L7: if (t == null || isNaN(t)) return '—'
+  [B] L17: if (ts == null || isNaN(ts)) return '—'
+  [A] L45: if (['BBB', 'BB', 'B'].includes(type)) return "O'rta"
+  [A] L48: return "Noma'lum"
+
+=== src/components/shell/app-shell.tsx ===
+  [A] L4: * App shell — the prototype's floating shell: rounded frame on the canvas,
+  [B] L4: * App shell — the prototype's floating shell: rounded frame on the canvas,
+  [C] L125: "badge b-warn"
+  [C] L148: "ni b-warn"
+  [B] L153: {(a.name || a.stir).slice(0, 18)} — majlis {d} {MONTHS[m - 1]}
+  [B] L194: // Tor status — poll lightly, refresh on demand
+  [A] L225: else toast.warning("Tor o'chiq — to'lovlar so'rovlari cheklangan bo'lishi mumkin")
+  [B] L225: else toast.warning("Tor o'chiq — to'lovlar so'rovlari cheklangan bo'lishi mumkin")
+  [A] L235: const torText = torState === 'active' ? 'Tor faol' : torState === 'inactive' ? "Tor o'chiq" : 'Tor…'
+  [B] L277: {/* CSS-driven swap — no hydration mismatch */}
+  [C] L310: "circ solid"
+
+=== src/components/shell/command-palette.tsx ===
+  [A] L4: * Command palette — the prototype's ⌘K / ⌘F / "/" surface: mode chip (STIR ·
+  [B] L4: * Command palette — the prototype's ⌘K / ⌘F / "/" surface: mode chip (STIR ·
+  [B] L10: * State lives in an inner component mounted only while open — closing the
+  [A] L29: if (v.includes('тўхтатилган') || v.includes("to'xtatilgan") || v.includes('suspended')) return "To'xtatilgan"
+  [B] L102: // Live orginfo lookup for free-text (name) queries — debounced, abortable
+  [A] L186: sub: "STIR bo'yicha ish maydoni",
+
+=== src/components/ui/accordion.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/alert-dialog.tsx ===
+  [C] L1: "use client"
+  [C] L102: "text-lg font-semibold"
+  [C] L115: "text-muted-foreground text-sm"
+
+=== src/components/ui/alert.tsx ===
+  [C] L11: "bg-card text-card-foreground"
+  [C] L42: "col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight"
+
+=== src/components/ui/aspect-ratio.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/avatar.tsx ===
+  [C] L1: "use client"
+  [C] L16: "relative flex size-8 shrink-0 overflow-hidden rounded-full"
+  [C] L31: "aspect-square size-full"
+
+=== src/components/ui/breadcrumb.tsx ===
+  [C] L28: "inline-flex items-center gap-1.5"
+  [C] L59: "text-foreground font-normal"
+  [C] L92: "flex size-9 items-center justify-center"
+
+=== src/components/ui/calendar.tsx ===
+  [C] L1: "use client"
+  [C] L49: "flex flex-col w-full gap-4"
+  [C] L77: "absolute bg-popover inset-0 opacity-0"
+  [C] L81: "select-none font-medium"
+  [C] L87: "w-full border-collapse"
+  [C] L93: "flex w-full mt-2"
+  [C] L107: "rounded-l-md bg-accent"
+  [C] L111: "rounded-r-md bg-accent"
+  [C] L121: "text-muted-foreground opacity-50"
+
+=== src/components/ui/card.tsx ===
+  [C] L35: "leading-none font-semibold"
+  [C] L45: "text-muted-foreground text-sm"
+
+=== src/components/ui/carousel.tsx ===
+  [C] L1: "use client"
+  [C] L165: "min-w-0 shrink-0 grow-0 basis-full"
+  [C] L188: "absolute size-8 rounded-full"
+  [C] L190: "top-1/2 -left-12 -translate-y-1/2"
+  [C] L218: "absolute size-8 rounded-full"
+  [C] L220: "top-1/2 -right-12 -translate-y-1/2"
+
+=== src/components/ui/chart.tsx ===
+  [C] L1: "use client"
+  [C] L181: "grid gap-1.5"
+  [C] L225: "flex flex-1 justify-between leading-none"
+  [C] L229: "grid gap-1.5"
+  [C] L236: "text-foreground font-mono font-medium tabular-nums"
+  [C] L273: "flex items-center justify-center gap-4"
+
+=== src/components/ui/checkbox.tsx ===
+  [C] L1: "use client"
+  [C] L24: "flex items-center justify-center text-current transition-none"
+
+=== src/components/ui/collapsible.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/command.tsx ===
+  [C] L1: "use client"
+  [C] L52: "overflow-hidden p-0"
+  [C] L70: "flex h-9 items-center gap-2 border-b px-3"
+  [C] L72: "size-4 shrink-0 opacity-50"
+  [C] L107: "py-6 text-center text-sm"
+  [C] L136: "bg-border -mx-1 h-px"
+  [C] L166: "text-muted-foreground ml-auto text-xs tracking-widest"
+
+=== src/components/ui/context-menu.tsx ===
+  [C] L1: "use client"
+  [C] L179: "size-2 fill-current"
+  [C] L214: "bg-border -mx-1 my-1 h-px"
+  [C] L228: "text-muted-foreground ml-auto text-xs tracking-widest"
+
+=== src/components/ui/dialog.tsx ===
+  [C] L1: "use client"
+  [C] L113: "text-lg leading-none font-semibold"
+  [C] L126: "text-muted-foreground text-sm"
+
+=== src/components/ui/drawer.tsx ===
+  [C] L1: "use client"
+  [C] L92: "mt-auto flex flex-col gap-2 p-4"
+  [C] L105: "text-foreground font-semibold"
+  [C] L118: "text-muted-foreground text-sm"
+
+=== src/components/ui/dropdown-menu.tsx ===
+  [C] L1: "use client"
+  [C] L138: "size-2 fill-current"
+  [C] L173: "bg-border -mx-1 my-1 h-px"
+  [C] L187: "text-muted-foreground ml-auto text-xs tracking-widest"
+  [C] L220: "ml-auto size-4"
+
+=== src/components/ui/form.tsx ===
+  [C] L1: "use client"
+  [C] L83: "grid gap-2"
+  [C] L132: "text-muted-foreground text-sm"
+  [C] L150: "text-destructive text-sm"
+
+=== src/components/ui/hover-card.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/input-otp.tsx ===
+  [C] L1: "use client"
+  [C] L33: "flex items-center"
+  [C] L62: "animate-caret-blink bg-foreground h-4 w-px duration-1000"
+
+=== src/components/ui/label.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/menubar.tsx ===
+  [C] L1: "use client"
+  [C] L156: "size-2 fill-current"
+  [C] L191: "bg-border -mx-1 my-1 h-px"
+  [C] L205: "text-muted-foreground ml-auto text-xs tracking-widest"
+  [C] L238: "ml-auto h-4 w-4"
+
+=== src/components/ui/navigation-menu.tsx ===
+  [C] L40: "group flex flex-1 list-none items-center justify-center gap-1"
+  [C] L109: "absolute top-full left-0 isolate z-50 flex justify-center"
+
+=== src/components/ui/pagination.tsx ===
+  [C] L17: "mx-auto flex w-full justify-center"
+  [C] L30: "flex flex-row items-center gap-1"
+  [C] L110: "flex size-9 items-center justify-center"
+
+=== src/components/ui/popover.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/progress.tsx ===
+  [C] L1: "use client"
+  [C] L24: "bg-primary h-full w-full flex-1 transition-all"
+
+=== src/components/ui/radio-group.tsx ===
+  [C] L1: "use client"
+  [C] L16: "grid gap-3"
+  [C] L37: "relative flex items-center justify-center"
+
+=== src/components/ui/resizable.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/scroll-area.tsx ===
+  [C] L1: "use client"
+  [C] L41: "flex touch-none p-px transition-colors select-none"
+  [C] L43: "h-full w-2.5 border-l border-l-transparent"
+  [C] L45: "h-2.5 flex-col border-t border-t-transparent"
+  [C] L52: "bg-border relative flex-1 rounded-full"
+
+=== src/components/ui/select.tsx ===
+  [C] L1: "use client"
+  [C] L47: "size-4 opacity-50"
+  [C] L95: "text-muted-foreground px-2 py-1.5 text-xs"
+  [C] L115: "absolute right-2 flex size-3.5 items-center justify-center"
+  [C] L132: "bg-border pointer-events-none -mx-1 my-1 h-px"
+  [C] L146: "flex cursor-default items-center justify-center py-1"
+  [C] L164: "flex cursor-default items-center justify-center py-1"
+
+=== src/components/ui/separator.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/sheet.tsx ===
+  [C] L1: "use client"
+  [C] L88: "flex flex-col gap-1.5 p-4"
+  [C] L98: "mt-auto flex flex-col gap-2 p-4"
+  [C] L111: "text-foreground font-semibold"
+  [C] L124: "text-muted-foreground text-sm"
+
+=== src/components/ui/sidebar.tsx ===
+  [C] L1: "use client"
+  [C] L50: "useSidebar must be used within a SidebarProvider."
+  [C] L202: "flex h-full w-full flex-col"
+  [C] L312: "bg-background relative flex w-full flex-1 flex-col"
+  [C] L329: "bg-background h-8 w-full shadow-none"
+  [C] L340: "flex flex-col gap-2 p-2"
+  [C] L351: "flex flex-col gap-2 p-2"
+  [C] L365: "bg-sidebar-border mx-2 w-auto"
+  [C] L390: "relative flex w-full min-w-0 flex-col p-2"
+  [C] L448: "w-full text-sm"
+  [C] L459: "flex w-full min-w-0 flex-col gap-1"
+  [C] L470: "group/menu-item relative"
+  [C] L486: "h-8 text-sm"
+  [C] L487: "h-7 text-xs"
+  [C] L618: "flex h-8 items-center gap-2 rounded-md px-2"
+  [C] L623: "size-4 rounded-md"
+  [C] L663: "group/menu-sub-item relative"
+
+=== src/components/ui/skeleton.tsx ===
+  [C] L7: "bg-accent animate-pulse rounded-md"
+
+=== src/components/ui/slider.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/sonner.tsx ===
+  [C] L1: "use client"
+  [C] L12: "toaster group"
+
+=== src/components/ui/switch.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/table.tsx ===
+  [C] L1: "use client"
+  [C] L11: "relative w-full overflow-x-auto"
+  [C] L15: "w-full caption-bottom text-sm"
+  [C] L101: "text-muted-foreground mt-4 text-sm"
+
+=== src/components/ui/tabs.tsx ===
+  [C] L1: "use client"
+  [C] L15: "flex flex-col gap-2"
+  [C] L60: "flex-1 outline-none"
+
+=== src/components/ui/toast.tsx ===
+  [C] L1: "use client"
+  [C] L32: "border bg-background text-foreground"
+  [C] L109: "text-sm opacity-90"
+
+=== src/components/ui/toaster.tsx ===
+  [C] L1: "use client"
+  [C] L21: "grid gap-1"
+
+=== src/components/ui/toggle-group.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/toggle.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui/tooltip.tsx ===
+  [C] L1: "use client"
+
+=== src/components/ui-custom/button.tsx ===
+  [B] L2: * Unified Button component — v146 §3.
+
+=== src/components/ui-custom/case-ref-row.tsx ===
+  [B] L2: * CaseRefRow — v147 §3 shared primitive.
+  [A] L4: * One row pattern for "here's a related case — here's its status — go view it."
+  [B] L4: * One row pattern for "here's a related case — here's its status — go view it."
+  [B] L10: *  - Status is a dot + text (not a bordered chip) — reads as metadata, not a button
+  [A] L38: amountLabel = "so'm",
+  [C] L59: "case-ref-number mono"
+  [C] L64: "case-ref-amount mono"
+
+=== src/components/ui-custom/data-strip.tsx ===
+  [B] L2: * DataStrip — shared primitive for displaying a row of labeled fields.
+  [A] L16: *     <DataField label="To'langan" icon={CheckCheck} value={...} tone="paid" />
+  [A] L32: /** Sub-text shown under the value (e.g. "so'm") */
+  [B] L46: ? '—'
+
+=== src/components/ui-custom/kpi.tsx ===
+  [B] L4: * KPI stat card (redesign §6.5) — the finance-reference pattern:
+  [B] L12: /** SVG ring gauge — mono track; fill is a status family only when the value IS a status. */
+  [C] L32: "relative inline-flex items-center justify-center"
+  [C] L48: "absolute inset-0 flex items-center justify-center"
+  [C] L76: "min-w-0 flex-1"
+  [C] L77: "t-caption text-fg-3 truncate"
+  [C] L80: "mt-1 t-body-sm text-fg-3 truncate"
+  [C] L84: "mono t-caption-plain font-semibold text-fg-2"
+
+=== src/components/ui-custom/receipt-view.tsx ===
+  [B] L2: * ReceiptView — stylized cheque/receipt rendering for bill usage history.
+  [B] L4: * v147 §1.1: Fixed duplicate case bug — claim case number and history items
+  [A] L6: * it's marked as "Asosiy" (primary) instead of being duplicated.
+  [B] L8: * v147 §3: Uses CaseRefRow for each case reference — one shared row pattern
+  [A] L50: // If it doesn't exist, prepend it as a new primary row.
+  [C] L70: "receipt-edge receipt-edge-top"
+  [A] L78: <div className="receipt-sub">Sud to'lov hujjati</div>
+  [C] L101: "receipt-meta-value mono"
+  [C] L113: "receipt-meta-value receipt-meta-value-wrap"
+  [C] L116: "receipt-meta-row receipt-amount-row"
+  [C] L118: "receipt-amount mono"
+  [A] L119: <span className="receipt-amount-unit">so'm</span>
+  [B] L139: caseNumber={h.caseNumber || (h.caseId ? `#${h.caseId}` : '—')}
+  [C] L158: "receipt-edge receipt-edge-bottom"
+
+=== src/components/ui-custom/segmented-control.tsx ===
+  [B] L2: * SegmentedControl — v146 §6 extraction.
+
+=== src/components/ui-custom/states.tsx ===
+  [B] L4: * Section state components (redesign §7.3) — every data view renders from
+  [C] L30: "t-h3 text-fg"
+  [C] L31: "mt-1 t-body-sm text-fg-3 max-w-md"
+  [C] L41: "flex items-start gap-2"
+  [C] L42: "size-4 mt-0.5 text-negative shrink-0"
+  [C] L43: "text-negative t-body-sm break-words"
+  [C] L59: "size-4 mt-0.5 text-warning shrink-0"
+  [C] L60: "min-w-0 flex-1"
+  [C] L61: "t-caption-plain font-semibold text-warning"
+  [B] L65: <span className="font-medium">{e.source}</span> — {e.error}
+  [C] L71: "gap-1.5 shrink-0 text-warning"
+  [B] L79: /** Skeleton shaped like the real content — table rows by default. */
+  [C] L82: "space-y-2 p-1"
+  [C] L84: "grid gap-3"
+  [C] L96: "grid gap-4"
+  [C] L98: "card-k p-4 space-y-2"
+  [C] L99: "h-3 w-24 rounded-full"
+  [C] L100: "h-7 w-32 rounded-md"
+
+=== src/components/ui-custom/status.tsx ===
+  [B] L4: * The status vocabulary (redesign §4, §6.6) — ONE badge component + a dot +
+  [B] L96: /** Signed micro-figure: ▲ +N (positive) / ▼ −N (negative). Never invented — only rendered when a real prior exists. */
+
+=== src/components/views/launcher.tsx ===
+  [A] L4: * Home / Launcher — the prototype's home view: eyebrow + display headline,
+  [B] L4: * Home / Launcher — the prototype's home view: eyebrow + display headline,
+  [A] L27: if (v.includes('тўхтатилган') || v.includes('to‘xtatilgan') || v.includes("to'xtatilgan") || v.includes('suspended'))
+  [A] L28: return "To'xtatilgan"
+  [A] L35: !!s && /тўхтатилган|тугатилган|to'xtatilgan|to‘xtatilgan|tugatilgan|suspended|liquidat/i.test(s)
+  [C] L50: "hearing-pill b-warn"
+  [C] L57: "hearing-pill b-neu"
+  [B] L83: <b>{meta?.cases ?? '—'}</b>
+  [B] L103: // hydration via useSyncExternalStore — no setState-in-effect).
+  [B] L122: // Nearest known hearing across listed companies (prototype: "Eng yaqini — 16 Sen")
+  [A] L160: toast.info('Ish raqami bilan qidiring', { description: `Sud ishlari bo'limida «${raw}» ni kiriting.` })
+  [A] L174: toast.warning('Topilmadi', { description: `«${raw}» bo'yicha kompaniya topilmadi.` })
+  [B] L194: STIR (9 raqam), kvitansiya (12 raqam) yoki ish raqamini kiriting — to&apos;lovlar, sud ishlari, majlislar va
+  [C] L212: "btn btn-primary"
+  [B] L219: {recentList.length === 0 && <span className="faint" style={{ fontSize: 12 }}>— hali qidiruv yo&apos;q</span>}
+  [A] L240: <Kpi label="Kompaniyalar" icon={<Users />} ink foot="Kuzatuv + so'nggi">
+  [C] L248: "p-dot d-pos"
+  [C] L260: "p-dot d-warn"
+  [B] L262: ? `Eng yaqini — ${(() => {
+  [B] L306: <p>STIR kiriting yoki kompaniya nomi bo&apos;yicha qidiring — natijalar shu yerda yig&apos;iladi.</p>
+
+=== src/components/views/settings-view.tsx ===
+  [A] L4: * Settings — the prototype's full settings VIEW (not a dialog): hero + the
+  [B] L4: * Settings — the prototype's full settings VIEW (not a dialog): hero + the
+  [A] L94: http_4xx: "Xato so'rov (4xx)",
+  [A] L97: wrong_shape: "Noto'g'ri format",
+  [C] L137: "p-card rise-c"
+  [C] L142: "badge b-pos"
+  [C] L144: "badge b-neu"
+  [B] L145: {kv('Git SHA', <span className="mono">{info?.local.sha || '—'}</span>)}
+  [A] L147: {kv("Ish daraxti", <span className="faint">{info ? (info.local.dirty ? "O'zgarishlar bor" : "Toza (o'zgarishsiz)") : '—'}</span>)}
+  [B] L147: {kv("Ish daraxti", <span className="faint">{info ? (info.local.dirty ? "O'zgarishlar bor" : "Toza (o'zgarishsiz)") : '—'}</span>)}
+  [C] L149: "p-card rise-c"
+  [B] L154: {kv('SHA', <span className="mono">{info?.remote?.sha?.slice(0, 7) || '—'}</span>)}
+  [B] L155: {kv('Commit', <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: '60%' }}>{info?.remote?.message || '—'}</span>)}
+  [B] L156: {kv('Muallif', <span>{info?.remote?.author || '—'}</span>)}
+  [B] L157: {kv('Sana', <span className="mono faint">{info?.remote?.date || '—'}</span>)}
+  [C] L157: "mono faint"
+  [C] L158: "btn btn-outline"
+  [C] L163: "p-card rise-c"
+  [A] L168: <h3>{info?.updateAvailable ? 'Yangilanish mavjud' : "Eng so'nggi versiyada"}</h3>
+  [B] L171: 'GitHub‘da yangi commit bor — yangilash tugmasi orqali oling.'
+  [C] L183: "btn btn-outline btn-sm"
+  [B] L236: toast.success(`${url}: OK · ${result.responseMs ?? '—'}ms${result.caseCount ? ` · ${result.caseCount} ish` : ''}`)
+  [C] L238: "alert info"
+  [B] L243: {result.responseMs ?? '—'}ms{result.caseCount ? ` · ${result.caseCount} ta ish topildi` : ''}
+  [C] L251: "alert warn"
+  [A] L285: invalid_url: "URL noto'g'ri. HTTPS bo'lishi kerak",
+  [A] L301: toast(`${url} o'chirildi`)
+  [A] L304: toast.error("O'chirib bo'lmadi")
+  [C] L314: "p-card rise-c"
+  [C] L316: "badge b-neu"
+  [C] L320: "btn btn-outline btn-sm"
+  [B] L322: void navigator.clipboard?.writeText('// proxy.js — cloudflare-worker/proxy.js faylini ko‘ring')
+  [A] L346: ? `So'nggi test: OK`
+  [A] L347: : `So'nggi test: xato — ${w.lastTestDetail || ''}`
+  [B] L347: : `So'nggi test: xato — ${w.lastTestDetail || ''}`
+  [C] L352: "badge b-pos"
+  [C] L354: "badge b-neg"
+  [C] L356: "btn btn-ghost btn-sm"
+  [A] L360: <button className="kebab" onClick={() => void removeWorker(w.url)} aria-label="O'chirish">
+  [C] L368: "p-card rise-c"
+  [C] L382: "btn btn-outline"
+  [C] L386: "btn btn-primary"
+  [B] L392: <span className="mono">{src}</span> ga saqlanadi — qayta ishga tushirish shart emas.
+  [B] L442: if (!ws.length) return { data: [0], labels: ['—'] }
+  [C] L459: "badge b-neu"
+  [A] L460: <span className={`badge ${w.status === 'alive' ? 'b-pos' : 'b-neg'}`} style={{ height: 28 }}>{w.status === 'alive' ? 'Faol' : "O'lik"}</span>
+  [C] L467: "mono faint"
+  [C] L469: "mono faint"
+  [C] L469: "badge b-neg"
+  [C] L483: "btn btn-outline"
+  [C] L497: "btn btn-outline btn-sm"
+  [A] L504: <button onClick={() => toast("Vaqt oralig'i o'zgartirildi")}>7 kun</button>
+  [A] L505: <button onClick={() => toast("Vaqt oralig'i o'zgartirildi")}>30 kun</button>
+  [A] L506: <button onClick={() => toast("Vaqt oralig'i o'zgartirildi")}>Barcha</button>
+  [C] L516: "p-card rise-c"
+  [A] L521: <span className={`badge ${rate >= 80 ? 'b-pos' : 'b-warn'}`}>{rate >= 80 ? "Sog'lom" : 'Beqaror'}</span>
+  [A] L524: <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label="Muvaffaqiyat darajasi · so'nggi 24 soat" />
+  [C] L553: "p-card rise-c"
+  [A] L560: <BarChart data={vol.data} labels={vol.labels} hotIdx={hotVol} unit=" so'rov" />
+  [B] L569: <span className="faint" style={{ fontSize: 12 }}>kartani bosing — so&apos;rovlar tarixi</span>
+  [B] L576: <p>Workerlar bo&apos;limidan qo&apos;shing — holat shu yerda ko&apos;rinadi.</p>
+  [A] L588: <span className={`badge ${r >= 90 ? 'b-pos' : r >= 60 ? 'b-warn' : 'b-neg'}`}>{r >= 90 ? "Sog'lom" : r >= 60 ? 'Sekin' : "O'lik"}</span>
+  [B] L601: <b className="mono" style={{ fontSize: 13 }}>{w.lastResponseTimeMs != null ? `${w.lastResponseTimeMs}ms` : '—'}</b>
+  [B] L622: document.title = 'Sozlamalar — Sud Signal'
+
+=== src/components/views/watchlist.tsx ===
+  [A] L4: * Watchlist — the prototype's Kuzatuv surface: hero, the imminent-hearings
+  [B] L4: * Watchlist — the prototype's Kuzatuv surface: hero, the imminent-hearings
+  [A] L27: if (v.includes('тўхтатилган') || v.includes("to'xtatilgan") || v.includes('suspended')) return "To'xtatilgan"
+  [B] L82: <b>{meta?.cases ?? '—'}</b>
+  [C] L89: "hearing-pill b-warn"
+  [C] L96: "hearing-pill b-neu"
+  [B] L119: // Staggered enrichment — mirrors the shipped watchlist optimization; results
+  [B] L227: <p>Belgilangan kompaniyalar bo&apos;yicha yaqinlashayotgan majlislar, yutuq va reyting — bir qarashda.</p>
+  [C] L231: "alert warn"
+  [B] L239: return `${(a.name || a.stir).slice(0, 16)} — ${p.d} ${p.m}`
+  [C] L251: "p-card rise-c"
+  [A] L253: <EmptyBlock icon={<CalendarDays />} title="Majlis yo'q" hint="Kuzatuvdagi kompaniyalar bo'yicha rejalashtirilgan majlis topilmadi." />
+  [B] L269: Ish {h.caseNumber || '—'}
+  [C] L286: "btn btn-outline btn-sm"
+
+=== src/core/__tests__/classify.test.ts ===
+  [B] L18: test('Cyrillic input lowercases and strips quotes (Latin-only expansion — lib-true behavior)', () => {
+  [A] L41: // (mas'uliyati cheklangan jamiyati) alone satisfy the ≥2-word rule, so two
+  [B] L43: // practice, so this only affects which SIDE is picked — preserved for parity.
+  [A] L56: expect(classifyOutcome('defendant', "Da'vo to'liq qanoatlantirildi")).toBe('win')
+  [B] L78: expect(classifyOutcome('defendant', '—')).toBe('pending')
+
+=== src/core/__tests__/status.test.ts ===
+  [B] L49: test('hearings — due ≤7 days is warning', () => {
+
+=== src/core/billing-format.ts ===
+  [B] L6: * re-exports these — one source of truth, zero behavior change.
+  [A] L87: ADMINISTRATIVE: { uz: "Ma'muriy sud", ru: 'Administrativnyy sud', en: 'Administrative court' },
+  [B] L93: if (!type) return '—'
+  [A] L98: CREATED: { uz: "To'lanmagan", ru: 'Ne oplacheno', en: 'Not paid' },
+  [C] L128: "davlat boji / pochta / other"
+
+=== src/core/classify.ts ===
+  [B] L2: * PURE classification / matching / dedup logic — P1 of the rebuild blueprint.
+  [A] L8: *   - To'liq / Qisman qanoatlantirilgan                    → WIN (either role)
+  [A] L9: *   - Rad etilgan / Qaytarilgan / Ko'rmasdan qoldirilgan /
+  [A] L25: .replace(/\bmchj\b/g, "mas'uliyati cheklangan jamiyati")
+  [A] L27: .replace(/\booo\b/g, "mas'uliyati cheklangan jamiyati")
+  [A] L57: /** Classify an Uzbek (Cyrillic or Latin) case outcome from the company's role. */
+  [B] L64: if (!r || r === '—' || r === '-') return 'pending'
+  [A] L66: const full = r.includes('тўлиқ') || r.includes("to'liq") || r.includes('toliq')
+  [B] L68: // "Rad etilgan" / "Rad qilingan" — match the key word "rad" alone.
+  [A] L72: r.includes('кўрмасдан') || r.includes("ko'rmasdan") || r.includes('kormasdan')
+  [B] L73: // Terminated without ruling — treated as rejection.
+  [A] L84: * v149 rule: re-map a case's court type from its case-number prefix.
+
+=== src/core/envelope.ts ===
+  [B] L2: * Unified result envelope (blueprint §4.3) — the single contract every API
+  [A] L18: /** A single source's failure inside a partial (or full) failure. */
+
+=== src/core/schemas/index.ts ===
+  [B] L7: * they name what already ships — they do not change it.
+  [A] L13: export const StirQuery = z.string().trim().regex(/^\d{9}$/, "STIR aynan 9 ta raqamdan iborat bo'lishi kerak")
+  [A] L14: export const PinflQuery = z.string().trim().regex(/^\d{14}$/, "PINFL aynan 14 ta raqamdan iborat bo'lishi kerak")
+
+=== src/core/search-mode.ts ===
+  [B] L21: return { mode: 'stir', normalized: digits, hint: 'STIR — korxonalar bo‘yicha qidirilmoqda' }
+  [B] L24: return { mode: 'pinfl', normalized: digits, hint: 'PINFL — jismoniy shaxs bo‘yicha qidirilmoqda' }
+
+=== src/core/status.ts ===
+  [B] L2: * Status → family mapping (redesign guide §4.3) — the pure brain behind the
+  [B] L6: * Do not change domain logic here — this is a lookup, not classification.
+  [A] L60: s.includes('ўтказилган') || s.includes("o'tkazilgan") || s.includes('провед') ||
+
+=== src/hooks/use-resource.ts ===
+  [B] L4: * useResource — the single fetch state machine (arch guide §3.3, A2).
+  [B] L11: * own the AbortController (cancel on new call / unmount — fixes A7), and
+
+=== src/hooks/use-stream.ts ===
+  [B] L4: * useStream — the bills streaming hook (arch guide §3.3).
+  [B] L7: * progressive items, exactly like the shipped Bills tab did — but through one
+
+=== src/hooks/use-toast.ts ===
+  [C] L1: "use client"
+  [A] L97: // but I'll keep it here for simplicity
+
+=== src/infra/cache.ts ===
+  [B] L2: * CacheStore — the single cache abstraction (blueprint §4.5).
+
+=== src/infra/logger.ts ===
+  [B] L2: * Structured, levelled logger — P2 of the rebuild blueprint (§3.8).
+
+=== src/infra/metrics.ts ===
+  [B] L2: * Per-source metrics — P2 of the rebuild blueprint (§3.8).
+
+=== src/infra/resilience.ts ===
+  [B] L2: * Resilience toolkit — P2 of the rebuild blueprint (§5.2).
+  [B] L126: super(`Circuit breaker "${name}" is open — backing off`)
+
+=== src/lib/api-client.ts ===
+  [B] L2: * The typed API client (arch guide §3.2) — the ONLY module allowed to fetch.
+  [B] L141: } catch { /* stream content-type — ignore */ }
+
+=== src/lib/billing.ts ===
+  [B] L22: // v144: CF Worker fallback list — MOVED HERE (was at line 912, after the code
+  [B] L36: *  v144: CF Workers ONLY — no other proxies. If env is empty, uses FALLBACK_WORKERS. */
+  [B] L46: // CF_WORKER_URL (single, backward compat) — add if not already in list
+  [B] L67: * a row is marked "dead" for 60 seconds and skipped — so we stop wasting
+  [B] L77: * The worker code is in `cloudflare-worker/proxy.js` — deploy it in 2 minutes
+  [A] L78: * at https://dash.cloudflare.com → Workers. The worker runs on Cloudflare's
+  [A] L79: * edge network (200+ locations) so it's fast and rarely IP-blocked.
+  [B] L120: /** Get the next alive proxy — prefers ones that have succeeded before
+  [A] L121: *  (so once proxy.cors.sh proves it works, it's tried FIRST, not round-robined
+  [B] L135: // All proxies dead — revive the one with the oldest failure (best chance).
+  [B] L141: console.log(`[billing] all proxies dead — reviving ${oldest.label} (oldest failure)`)
+  [B] L144: // PRIORITY: proxies with successes > 0 are "known working" — try them first.
+  [C] L144: "known working"
+  [B] L150: // No known-working proxies yet — try untested ones (successes=0, failures=0)
+  [B] L156: // All alive proxies have failed at least once — try the one with fewest failures.
+  [B] L204: // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins removed).
+  [B] L216: // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins, corsproxy.io,
+  [A] L233: // When billing.sud.uz's origin goes down (sustained 521), ALL bills fail.
+  [B] L245: // Cooldown expired — reset and try again
+  [B] L246: console.log(`[billing] circuit breaker cooldown expired — resuming requests`)
+  [B] L256: console.log(`[billing] ⚠ CIRCUIT BREAKER TRIPPED — ${this.consecutive521} consecutive 521s. Pausing all billing requests for ${this.COOLDOWN_MS / 1000}s. The origin (billing.sud.uz) is down.`)
+  [B] L268: console.log(`[billing] circuit breaker tripped — waiting ${Math.ceil(waitMs / 1000)}s for origin recovery…`)
+  [A] L299: // This is kept so fetchJsonWithRetry's existing code doesn't break.
+  [B] L307: if (!proxy) return url // no proxies available — try direct (will likely fail)
+  [B] L320: * existing consumer keeps working — zero behavior change.
+  [A] L380: // P0 type-hardening: the SDK's current typings require a `model` field the
+  [B] L381: // runtime does not need (server injects the default). Type-only cast — the
+  [A] L425: // Captcha API: fewer retries, shorter backoff (it's fast & reliable).
+  [A] L442: // For captcha: use first worker (captcha isn't rate-limited).
+  [B] L475: // 4xx — the server responded, parse the body (billing returns usable JSON on 4xx)
+  [A] L478: // BUT: 422 captcha-fail has requestStatus but no content — that's valid.
+  [B] L478: // BUT: 422 captcha-fail has requestStatus but no content — that's valid.
+  [A] L654: // networks. Log the error clearly but don't crash — the billing search
+  [B] L654: // networks. Log the error clearly but don't crash — the billing search
+  [A] L691: // On 521 (origin down): retry the SEARCH with the SAME token — don't waste
+  [B] L691: // On 521 (origin down): retry the SEARCH with the SAME token — don't waste
+  [A] L699: onPhase?.('searching', tokenAttempt === 0 ? `STIR ${inn} uchun to'lovlar qidirilmoqda…` : `Yangi captcha bilan qayta urinilmoqda (${tokenAttempt + 1}-urinish)…`)
+  [A] L717: // Don't regenerate captcha — the token is valid, the origin is just flaky.
+  [B] L717: // Don't regenerate captcha — the token is valid, the origin is just flaky.
+  [B] L729: // Empty result — the token may have been rejected (422 turned into
+  [B] L732: console.log(`[billing] search returned 0 results — regenerating captcha (attempt ${tokenAttempt + 2})`)
+  [B] L735: return result // last attempt — return empty
+  [A] L740: // Retry the search with the SAME token (don't regenerate captcha).
+  [B] L743: console.log(`[billing] search failed (origin down) — retrying with SAME token in 2s (retry ${searchRetry + 2}/${MAX_SEARCH_RETRIES})`)
+  [B] L744: onPhase?.('searching', `Manba vaqtincha ishlamayapti — qayta urinilmoqda (${searchRetry + 2}/${MAX_SEARCH_RETRIES})…`)
+  [B] L748: // Exhausted search retries — try a new captcha as last resort
+  [B] L750: console.log(`[billing] search exhausted ${MAX_SEARCH_RETRIES} retries — regenerating captcha`)
+  [B] L754: // 422/captcha-fail or other error — regenerate captcha
+  [B] L756: console.log(`[billing] search failed (${msg}) — regenerating captcha`)
+  [A] L781: // bills — well under billing.sud.uz's ~50-request rate limit.
+  [B] L781: // bills — well under billing.sud.uz's ~50-request rate limit.
+  [B] L794: /** Get the next proxy to try (round-robin among CF Workers only — NEVER direct).
+  [B] L799: // No workers configured — use hardcoded fallback (NOT direct, NOT cors.sh)
+  [B] L811: /** Build fallback list: all CF Workers + cors.sh (NEVER direct — protects server IP). */
+  [B] L846: console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: HTTP ${res.status} — trying next`)
+  [B] L848: httpErrorCount = 0 // reset — 521 is transient (origin down), not bill-specific
+  [B] L852: console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: HTTP ${res.status} — trying next`)
+  [B] L856: // is returning a definitive error for THIS bill — no point trying the
+  [A] L857: // remaining 2 methods (they'll get the same response). This prevents
+  [B] L860: console.log(`[billing] checkStatus ${invoiceNumber}: ${httpErrorCount} consecutive HTTP errors — bailing early (permanent failure)`)
+  [B] L867: console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: invalid — trying next`)
+  [A] L875: // Don't log "PERMANENT:" errors again (already logged above)
+  [B] L908: // NO bill limit — process ALL bills. The ProxyPool + retry loop below
+  [B] L914: // Higher concurrency (6, was 4) — the permanent-fail bail (3 consecutive
+  [B] L937: // Shorter delay (150ms, was 300ms) — the ProxyPool already paces requests
+  [B] L944: // Retry loop: re-fetch failed bills. Only 1 round — retry only TRANSIENT failures.
+  [B] L945: // Bills that got HTTP 500/404 from the origin (not proxy errors) are permanent —
+  [A] L946: // the origin returns a definitive error for that invoice, retrying won't help.
+  [A] L966: onPhase?.('enriching', `Muvaffaqiyatsiz ${transientBills.length} ta to'lov qayta urinilmoqda (${retryRound + 1}-bosqich)…`)
+
+=== src/lib/bills-cache.ts ===
+  [B] L4: * Bills cache — session-scoped, in-memory mirror of the last bills stream per
+  [A] L6: * for the prototype's "To'langan boj" / "Muddati o'tgan" KPIs and the
+  [A] L7: * "So'nggi to'lovlar" strip without re-streaming billing.sud.uz.
+
+=== src/lib/cache.ts ===
+  [A] L24: * `sb-cache-v*:` entries from previous versions so they don't waste quota.
+  [A] L47: * or if we're not in a browser environment.
+  [A] L64: * read-time (getCached), so callers don't need to pass it here.
+  [B] L71: // Quota exceeded / private mode — silently ignore.
+  [B] L87: /** Cache key builders — keep them centralized so callers stay consistent. */
+
+=== src/lib/cf-worker-pool.ts ===
+  [B] L16: // P0/blueprint §3.2: NO stranger fallback workers ship anymore — routing
+  [A] L17: // citizens' legal queries through unknown people's Cloudflare accounts is a
+  [B] L77: // proxies that have failed repeatedly — proven to cut a 60-bill lookup from
+  [C] L79: "pick one proxy, retry on fail"
+  [B] L87: // for jadvalapi.sud.uz but blocked by jadval.sud.uz, or vice versa — health is
+  [B] L104: // Consecutive (resets on success) — drives dead/cooldown
+  [B] L110: // v158: Totals (never reset) — for the dashboard
+  [B] L172: *  returns an empty array — see class doc for the fail-open rationale. */
+  [B] L185: console.log(`[${this.poolLabel}] all ${workerUrls.length} workers were in cooldown for ${originKey} — reviving all for this lookup`)
+  [B] L190: /** Call when a worker successfully reaches the origin — including a clean
+  [C] L191: "not found"
+
+=== src/lib/chamber.ts ===
+  [B] L2: * chamber.uz — Chamber of Commerce contractor rating API client.
+  [B] L7: * No authentication required — completely free.
+  [B] L46: // no rating — as long as ANY worker reaches chamber.uz within 10s, we win.
+  [B] L100: console.log(`[chamber] TIN ${cleanTin} — worker ${workerLabel} succeeded`)
+  [B] L107: type: data.type || '—',
+  [A] L152: 'BBB': "O'rta",
+  [A] L153: 'BB': "O'rta",
+  [A] L154: 'B': "O'rta",
+
+=== src/lib/court-case-types.ts ===
+  [B] L97: // field (which holds the Latin-Uzbek label) — never the raw Cyrillic key.
+  [B] L102: // Cyrillic keys — match API responses
+  [A] L104: 'Кўриб чиқилмоқда': { en: "Ko'rib chiqilmoqda", color: '#2563a8' },
+  [A] L106: 'Тўхтатилган': { en: "To'xtatilgan", color: '#c47d0e' },
+  [B] L112: // Latin keys — match synthetic / Latin API responses
+  [A] L114: "Ko'rib chiqilmoqda": { en: "Ko'rib chiqilmoqda", color: '#2563a8' },
+  [A] L116: "To'xtatilgan": { en: "To'xtatilgan", color: '#c47d0e' },
+  [B] L125: // Cyrillic keys — match API responses
+  [A] L128: 'Ўтказилган': { en: "O'tkazilgan", color: '#10b981' },
+  [B] L131: // Latin keys — match synthetic / Latin API responses
+  [A] L134: "O'tkazilgan": { en: "O'tkazilgan", color: '#10b981' },
+  [B] L140: // English-locale tabs). The Cyrillic forms are NOT stored here — they come
+  [A] L146: administrative: { uz: "Ma'muriy ishlar", en: 'Administrative Courts' },
+
+=== src/lib/court-case.ts ===
+  [B] L14: * Fix: On Windows, explicitly use C:\Windows\System32\curl.exe — the
+  [B] L27: // Try System32 curl (Schannel TLS) — this is what jadval.sud.uz accepts
+  [B] L33: // Fall back to PATH lookup (may find MSYS2 curl — not ideal)
+  [B] L50: * 1. jadval.sud.uz — older API, returns case list data
+  [B] L51: * 2. jadvalapi.sud.uz — newer API, returns monitoring data with hearings
+  [B] L53: * Neither requires authentication or captcha — they are public endpoints!
+  [B] L56: * Case number format: "4-1001-2605/14720" — the "/" is replaced with "@"
+  [A] L68: // in this process. See OriginHealthPool's doc comment in cf-worker-pool.ts.
+  [B] L100: // ---- API calls (NO auth, NO captcha needed — these are public endpoints) ----
+  [A] L105: * Problem: jadval.sud.uz does TLS fingerprinting (JA3/JA4). Node.js's fetch
+  [A] L111: * CRITICAL — why spawn works and execSync doesn't (learned the hard way
+  [B] L111: * CRITICAL — why spawn works and execSync doesn't (learned the hard way
+  [A] L116: *   ACCEPTS Schannel's TLS fingerprint and returns real case data.
+  [A] L119: *   REJECTS OpenSSL curl's TLS fingerprint -> 559-byte error HTML page.
+  [B] L125: * execSync — v156 reverts to spawn.
+  [A] L127: * This is ONLY used for jadval.sud.uz (not jadvalapi.sud.uz, which doesn't
+  [A] L152: // OpenSSL curl that Git Bash's PATH would otherwise find.
+  [B] L191: * v156: Helper — run curlFetch + JSON parse + map to CourtCase[].
+  [A] L193: * Includes diagnostic logging: if the response isn't valid JSON, logs the
+  [C] L195: "parse failed"
+  [B] L206: console.error(`[court-case] curl got ${text.length} bytes from ${url} but JSON.parse failed — first 300 chars: ${preview}`)
+  [A] L216: * the SAME 3 calls. The Watchlist tab fires them too. Without caching, that's
+  [B] L217: * 9 identical fetches to jadvalapi.sud.uz within seconds — each taking 5-15s.
+  [B] L234: * fetch/cache entry — calling both for the same TIN never double-fetches.
+  [B] L244: // v140: Check server-side cache first — deduplicates concurrent calls
+  [B] L301: * need to know whether the result may be INCOMPLETE — i.e. some underlying
+  [A] L303: * "couldn't reach the source" rather than "confirmed no cases" — should use
+  [B] L303: * "couldn't reach the source" rather than "confirmed no cases" — should use
+  [C] L303: "confirmed no cases"
+  [A] L320: * indistinguishable from a genuine "no cases", so the Stats tab's own
+  [C] L320: "no cases"
+  [B] L322: * unreachable — the user just saw a too-low total with no explanation.
+  [B] L334: * Internal fetch logic — uses PARALLEL RACE to fetch from all proxies
+  [B] L353: // sequential failover delay — if ANY proxy is alive, we get data in 1-3s.
+  [B] L358: // v154: Only race workers not currently in cooldown against THIS origin —
+  [A] L377: // Record a worker's outcome. A confirmed "not found" counts as a SUCCESS —
+  [B] L377: // Record a worker's outcome. A confirmed "not found" counts as a SUCCESS —
+  [C] L377: "not found"
+  [A] L379: // Only transport-level failures count against a worker's health.
+  [A] L408: // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
+  [B] L408: // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
+  [B] L434: // v140: BEST-OF strategy — wait for all proxies to settle, then take the
+  [B] L436: // 6 cases and another returns 100 (jadvalapi is inconsistent — sometimes
+  [B] L443: console.log(`[court-case] ${url} — definitive not-found, returning []`)
+  [B] L454: // All failed — retry
+  [B] L455: console.log(`[court-case] ${url} — all ${proxyUrls.length} proxies failed (health: ${workerHealth.stats(originKey)}), retrying with 15s timeout...`)
+  [A] L479: // v140: Don't treat text 'not found' as definitive (IP blocking issue)
+  [A] L492: // v156: Also retry curl for jadval.sud.uz in tier 2 (curl wasn't retried
+  [B] L493: // before — if it failed transiently in tier 1, the jadval.sud.uz data
+  [B] L511: console.log(`[court-case] ${url} — retry failed (health: ${workerHealth.stats(originKey)}), final attempt with 20s timeout...`)
+  [B] L513: // v154: Re-check candidates — a worker marked dead during this same
+  [A] L534: // v140: Don't treat text 'not found' as definitive (IP blocking issue)
+  [B] L557: console.log(`[court-case] ${url} — final retry got ${finalSuccesses[0].length} cases`)
+  [B] L562: // This is a genuine fetch FAILURE, not a confirmed "zero cases" — flag
+  [C] L562: "zero cases"
+  [B] L564: console.log(`[court-case] ${url} — all retries failed (health: ${workerHealth.stats(originKey)}), marking as incomplete`)
+  [B] L570: console.log(`[court-case] ${url} — retry got ${retrySuccesses[0].length} cases (best of ${retrySuccesses.length})`)
+  [B] L574: // v140: BEST-OF — take the result with the MOST cases, not just the first.
+  [B] L578: console.log(`[court-case] ${url} — got ${best.length} cases (best of ${successes.length} successful proxies, health: ${workerHealth.stats(originKey)})`)
+  [B] L597: console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed after all retries' : ''}`)
+  [B] L630: // CIVIL findByTin — verified working (returns civil cases by TIN with
+  [B] L694: caseNumber: raw.casenumber || raw.caseNumber || '—',
+  [B] L695: caseType: raw.category || raw.sub_category || '—',
+  [B] L696: caseStatus: raw.status_name || raw.instance || '—',
+  [B] L697: result: raw.result || '—',
+  [B] L698: courtName: raw.court || '—',
+  [B] L699: dateFiled: raw.reg_date || raw.hearing_date || '—',
+  [B] L701: plaintiff: raw.claiment || raw.claimant || raw.plaintiff || '—',
+  [B] L702: defendant: raw.defendant || '—',
+  [B] L703: claimAmount: raw.claim_amount || raw.amount || '—',
+  [B] L712: caseNumber: raw.casenumber || raw.caseNumber || '—',
+  [B] L713: caseType: raw.category || raw.sub_category || '—',
+  [B] L714: caseStatus: raw.status_name || raw.instance || '—',
+  [B] L715: result: raw.result || '—',
+  [B] L716: courtName: raw.court || '—',
+  [B] L717: dateFiled: raw.reg_date || '—',
+  [B] L718: plaintiff: raw.claimant || raw.claiment || raw.plaintiff || '—',
+  [B] L719: defendant: raw.defendant || '—',
+  [B] L720: claimAmount: raw.claim_amount || raw.amount || '—',
+  [B] L746: // Prefer jadval.sud.uz for BOTH parties and hearings — it returns the real
+  [A] L748: // jadvalapi's findByNumber returns 400 for most court types.
+  [B] L775: // Normalise empty strings back to '—' for display consistency.
+  [B] L777: date: h.date || '—',
+  [B] L778: time: h.time || '—',
+  [B] L779: status: h.status || '—',
+  [B] L782: judge: h.judge || '—',
+  [B] L790: caseType: d.category || '—',
+  [B] L791: caseStatus: d.status_name || d.instance || '—',
+  [B] L792: court: d.court || '—',
+  [B] L793: judge: d.responsible || '—',
+  [B] L794: secretary: '—',
+  [B] L795: plaintiff: d.claiment || d.claimant || d.plaintiff || '—',
+  [B] L796: plaintiffTin: '—',
+  [B] L797: defendant: d.defendant || '—',
+  [B] L798: defendantTin: '—',
+  [B] L799: thirdParty: '—',
+  [B] L800: claimSubject: d.sub_category || d.category || '—',
+  [B] L801: claimAmount: d.claim_amount || d.amount || '—',
+  [B] L802: applicationDate: d.reg_date || '—',
+  [B] L803: initiatedDate: d.reg_date || '—',
+  [B] L804: deadlineDate: '—',
+  [B] L805: stateDuty: '—',
+  [B] L806: representative: d.representing_org || d.representor || '—',
+  [B] L807: prosecutor: '—',
+  [B] L812: date: d.reg_date || '—',
+  [B] L813: text: d.result || '—',
+  [B] L814: type: d.result || '—',
+  [B] L815: awardedAmount: '—',
+  [B] L816: stateDutyRecovered: '—',
+  [B] L817: enforcedDate: '—',
+  [B] L818: appealDeadline: '—',
+  [B] L833: * Cyrillic lowercase fragments "apellyatsiya" / "kassatsiya" — those are the
+  [B] L849: date: review.hearing_date || '—',
+  [B] L850: time: review.hearing_time || '—',
+  [B] L851: status: review.status_name || review.instance || '—',
+  [B] L854: judge: review.responsible || '—',
+  [B] L858: const reviewDecision = review.result && review.result !== '—' ? {
+  [B] L859: date: review.reg_date || '—',
+  [B] L860: text: review.result || '—',
+  [B] L861: type: review.result || '—',
+  [B] L862: awardedAmount: '—',
+  [B] L863: stateDutyRecovered: '—',
+  [B] L864: enforcedDate: '—',
+  [B] L865: appealDeadline: '—',
+  [A] L877: // Map court types to jadvalapi's expected names:
+  [A] L883: CRIMINAL: '', // jadvalapi doesn't support criminal — skip
+  [B] L883: CRIMINAL: '', // jadvalapi doesn't support criminal — skip
+  [B] L896: // Guard against non-200 responses — jadvalapi returns 400 Bad Request for
+  [B] L898: // NOT be treated as a valid hearings array (it would produce phantom '—' rows).
+  [B] L950: // The jadval.sud.uz and jadvalapi.sud.uz endpoints are public — no captcha needed.
+  [B] L957: // Not needed — jadval APIs are public
+
+=== src/lib/court-map.ts ===
+  [B] L5: * This replaces the 10-ILOVA from lex.uz — no need to fetch it every time.
+  [A] L52: // Qoraqalpog'iston
+  [A] L114: // Farg'ona
+  [A] L155: { keywords: ["bo'ston", 'boston', 'бўстон', 'бостон'], courtId: 'boztfsud' },
+  [A] L157: { keywords: ["qo'rg'ontepa", 'qorgontepa', 'қўрғонтепа', 'хонобод', 'xonobod'], courtId: 'kteptfsud' },
+  [A] L158: { keywords: ["xo'jaobod", 'xojaobod', 'хўжаобод'], courtId: 'xojaotfsud' },
+  [A] L165: { keywords: ["g'ijduvon", 'gijduvon', 'ғиждувон'], courtId: 'gijdutfsud' },
+  [A] L167: { keywords: ["qorako'l", 'qorakol', 'қоракўл'], courtId: 'kkultfsud' },
+  [A] L172: { keywords: ["g'allaorol", 'gallaorol', 'ғаллаорол'], courtId: 'galortfsud' },
+  [A] L181: { keywords: ["g'uzor", 'guzor', 'ғузор'], courtId: 'guzortfsud' },
+  [D] L188: { keywords: ["yakkabog'", 'yakkabog', 'яккабоғ'], courtId: 'yakbogtfsud' },
+  [A] L191: // Qoraqalpog'iston
+  [A] L194: { keywords: ["qo'ng'irot", 'qongirot', 'қўнғирот'], courtId: 'kungtfsud' },
+  [A] L213: { keywords: ["uchqo'rg'on", 'uchqurgon', 'учқўрғон'], courtId: 'uchkurtfsud' },
+  [A] L215: { keywords: ["yangiqo'rg'on", 'yangiqurgon', 'янгиқўрғон'], courtId: 'yankurtfsud' },
+  [A] L219: { keywords: ["toraqo'rg'on", 'toraqurgon', 'торақўрғон'], courtId: 'namtfsud' },
+  [A] L225: { keywords: ["kattaqo'rg'on", 'kattaqurgon', 'каттақўрғон'], courtId: 'kkurgtfsud' },
+  [A] L228: { keywords: ["pastdarg'om", 'pastdargon', 'пастдарғом'], courtId: 'pstrconvtfsud' },
+  [A] L246: { keywords: ["qumqo'rg'on", 'qumqurgon', 'қумқўрғон'], courtId: 'kumkgtfsud' },
+  [A] L254: { keywords: ["jarqo'rg'on", 'jarqurgon', 'жарқўрғон'], courtId: 'kumkgtfsud' },
+  [A] L260: { keywords: ["o'rtachirchiq", 'ortachirchiq', 'ўртачирчиқ'], courtId: 'urtchtfsud' },
+  [A] L263: { keywords: ["yangiyo'l", 'yangiyul', 'янгийўл'], courtId: 'yangiyultgsud' },
+  [A] L282: // Farg'ona
+  [A] L283: { keywords: ["qo'qon", 'qoqon', 'қўқон'], courtId: 'kokantfsud' },
+  [A] L284: { keywords: ["marg'ilon", 'margilon', 'марғилон'], courtId: 'margiltfsud' },
+  [A] L286: { keywords: ["so'x", 'sox', 'сўх'], courtId: 'suxtfsud' },
+  [A] L288: { keywords: ["farg'ona sh", 'fargona sh', 'фарғона ш', 'фарғона шаҳар'], courtId: 'fargtfsud' },
+  [A] L289: { keywords: ["farg'ona tuman", 'fargona tuman', 'фарғона туман'], courtId: 'fargtfsud' },
+  [A] L296: { keywords: ["bog'ot", 'bogot', 'боғот'], courtId: 'bogottfsud' },
+  [A] L304: { keywords: ["qo'shko'pir", 'qoshkopir', 'қўшкўпир'], courtId: 'shovtfsud' },
+
+=== src/lib/domain/company.ts ===
+  [B] L2: * The Company domain model — the keystone (arch guide §3.1, A1).
+  [B] L6: * every section reads identity from the store — no per-tab STIR inputs.
+  [B] L9: /** 9-digit tax id — THE identity. */
+
+=== src/lib/health-registry.ts ===
+  [B] L8: * new pool instances. The registry is idempotent on label — if a pool with
+  [A] L9: * the same label already exists, it's replaced. This means stats reset on
+  [B] L23: * Register a health pool. Idempotent on label — re-registering with the
+
+=== src/lib/jadval2.ts ===
+  [B] L2: * jadval2.sud.uz — Court hearing schedule API client.
+  [A] L6: * even in courts that don't support TIN-based search.
+  [B] L56: // Known Uzbekistan court holidays (court offices closed — no hearings
+  [A] L63: '03-08', // Women's Day
+  [A] L68: '10-01', // Teacher's Day
+  [B] L77: * @param courtId — court ID from the court map (e.g. "andtfsud")
+  [B] L78: * @param dateStr — date in DDMMYYYY format (e.g. "09072026")
+  [B] L79: * @param type — court type: "CIVIL", "ECONOMIC", "CONFLICT"
+  [B] L113: * @param courtId — court ID
+  [B] L114: * @param courtName — court display name
+  [B] L115: * @param companyName — company name to search for (case-insensitive)
+  [B] L116: * @param startDate — Date object
+  [B] L117: * @param endDate — Date object
+  [B] L118: * @param type — court type
+  [B] L119: * @param onProgress — callback for progress updates
+  [B] L126: * @param courtId — court ID
+  [B] L127: * @param courtName — court display name
+  [B] L128: * @param companyName — company name to search for (case-insensitive)
+  [B] L129: * @param startDate — Date object
+  [B] L130: * @param endDate — Date object
+  [B] L131: * @param onProgress — callback for progress updates
+  [B] L139: _type?: 'CIVIL' | 'ECONOMIC' | 'CONFLICT', // ignored — we always scan all types
+  [B] L146: // Sundays: courts are closed. Holidays: same — no hearings will be returned,
+  [B] L167: // For each date in batch, fetch all 3 types — all in parallel
+
+=== src/lib/local-lists.ts ===
+  [B] L2: * Unified localStorage list helpers — v150 P2 extraction from page.tsx.
+  [C] L5: "named localStorage list"
+  [B] L30: // Quota exceeded / private mode — silently ignore
+
+=== src/lib/mib.ts ===
+  [B] L2: * mib.uz — Majburiy Ijro Byurosi (Bureau of Compulsory Enforcement) client.
+  [B] L25: * Direct fetch to mib.uz — no proxy, no external dependencies.
+  [A] L26: * Uses Node's native fetch(). mib.uz may geo-block foreign IPs, but we try
+  [B] L60: // Set-Cookie is special — Headers.forEach may not capture all of them.
+  [A] L89: /** Total debt amount in so'm (present when hasDebt=true). */
+  [A] L91: /** Active debt amount in so'm (present when hasDebt=true). */
+  [B] L99: /** Enforcement case number (Ижро иши рақами), e.g. "10072617684501" — used for monitoring lookup */
+  [A] L109: /** Debt amount in so'm (Қарздорлик миқдори), e.g. 10210467.75 */
+  [B] L116: // No external API needed — works 100% offline.
+  [B] L184: // Find the inn input — get its id
+  [A] L199: // Find the last <form> tag BEFORE the inn input — that's the parent form
+  [B] L199: // Find the last <form> tag BEFORE the inn input — that's the parent form
+  [B] L341: status: statusMatch?.[1]?.trim() ?? '—',
+  [B] L342: subject: subjectMatch?.[1]?.trim() ?? '—',
+  [B] L343: department: deptMatch?.[1]?.trim() ?? '—',
+  [B] L344: collector: collectorMatch?.[1]?.trim() ?? '—',
+  [B] L373: // ---- HTML parser (for "direct mode" — user pastes mib.uz result HTML) ----
+  [C] L373: "direct mode"
+  [C] L377: "direct mode"
+  [C] L388: "no debt"
+  [C] L400: "debt exists"
+  [B] L440: status: statusMatch?.[1]?.trim() ?? '—',
+  [B] L441: subject: subjectMatch?.[1]?.trim() ?? '—',
+  [B] L442: department: deptMatch?.[1]?.trim() ?? '—',
+  [B] L443: collector: collectorMatch?.[1]?.trim() ?? '—',
+  [B] L463: * Phase 1: Prepare MIB check — fetch page, parse form, download captcha.
+  [A] L540: * Phase 2: Submit the form with the user's captcha answer.
+
+=== src/lib/orginfo.ts ===
+  [B] L2: * orginfo.uz — Company information lookup service.
+  [B] L9: * The site is server-rendered HTML — no API, no auth, no captcha needed.
+  [B] L100: // 24h cache hit — return the cached CompanyInfo immediately. This makes
+  [B] L131: // Check the first-batch results in original order — return the first match
+  [A] L145: // First batch didn't match — fall through to remaining candidates sequentially
+  [B] L145: // First batch didn't match — fall through to remaining candidates sequentially
+  [B] L167: * This is FAST (1 HTTP request) — it only fetches the search results page,
+  [A] L179: .replace(/MAS'ULIYATI CHEKLANGAN JAMIYAT/i, '')
+  [B] L193: // Single HTTP request — the search page contains the TIN in the card HTML
+  [B] L218: if (!result.tin || result.tin === '—' || !/^\d{9}$/.test(result.tin)) continue
+  [B] L230: const firstWithTin = results.find(r => r.tin && r.tin !== '—' && /^\d{9}$/.test(r.tin))
+  [A] L250: .replace(/MAS'ULIYATI CHEKLANGAN JAMIYAT/i, '')
+  [A] L302: // Bonus: if TIN is present and valid, it's likely a real company
+  [B] L303: const tinBonus = result.tin && result.tin !== '—' && /^\d{9}$/.test(result.tin) ? 0.1 : 0
+  [B] L385: : '—'
+  [B] L389: const tin = tinMatch ? tinMatch[1] : '—'
+  [B] L393: const date = dateMatch ? dateMatch[1] : '—'
+  [B] L397: const region = regionMatch ? regionMatch[1].trim() : '—'
+  [B] L415: // Find ALL occurrences of the field name — the first ones are in meta/title tags,
+  [B] L453: // Found the actual "Telefon raqami" label — extract phone number
+  [A] L485: const foundersHtml = html.match(/Ta'sischilar.*?(?=<region|<div class="col-12|<section)/s)?.[0] || ''
+  [A] L486: const founderMatches = foundersHtml.matchAll(/>([A-Z][^<]{5,80}(?:OGLI|O'G'LI|QIZI)?)<.*?>([\d.]+)\s*%/g) || []
+  [A] L528: registeredDate: extractField(html, "Ro'yxatdan o'tgan sana"),
+  [A] L530: registeringAuthority: extractField(html, "Ro'yxatdan o'tkazuvchi organ"),
+
+=== src/lib/registry.ts ===
+  [B] L2: * One company registry keyed by STIR (arch guide §3.6, A6) — replaces the
+  [C] L4: "a company"
+  [B] L13: /** Visited (recents) — timestamp of last search. */
+  [C] L15: "saved companies"
+  [B] L17: /** Watched — the multi-company monitoring list. */
+  [B] L24: /** Display meta cached from previous visits — feeds home cards / KPIs / badges. */
+  [B] L37: /** Billing aggregates (tiyins) written by the Bills stream — feeds the
+  [B] L67: // quota / private mode — best-effort
+
+=== src/lib/stats.ts ===
+  [B] L2: * Stats workflow — aggregates all court cases (economic + civil + administrative)
+  [A] L4: * based on the company's role (plaintiff vs defendant) and the case outcome.
+  [B] L6: * Data flow (all fetches routed through CF workers — NEVER direct):
+  [B] L17: * attached for the failed one — the request never fails wholesale.
+  [A] L39: counterparty: string       // the OTHER party's name
+  [A] L79: *  - expand "MChJ" → "mas'uliyati cheklangan jamiyati" (Latin) and
+  [C] L82: "aktsiyadorlik jamiyati"
+  [B] L83: *    Cyrillic, but orginfo.uz + chamber.uz sometimes return Latin — we cover
+  [A] L92: .replace(/\bmchj\b/g, "mas'uliyati cheklangan jamiyati")
+  [A] L94: .replace(/\booo\b/g, "mas'uliyati cheklangan jamiyati")
+  [A] L121: // Match if >=2 of the company's words appear in the party field
+  [A] L135: * / PENDING, based on the company's role.
+  [A] L137: * Per user's rule (Interpretation A from STATS-TAB-SPEC.md):
+  [A] L138: *   - To'liq qanoatlantirilgan / Qisman qanoatlantirilgan → WIN (both roles)
+  [A] L139: *   - Rad etilgan / Qaytarilgan / Ko'rmasdan qoldirilgan
+  [B] L154: if (!r || r === '—' || r === '-') return 'pending'
+  [A] L156: const full = r.includes('тўлиқ') || r.includes("to'liq") || r.includes('toliq')
+  [B] L158: // "Rad etilgan" and "Rad qilingan" are both rejection outcomes — match on
+  [A] L163: r.includes('кўрмасдан') || r.includes("ko'rmasdan") || r.includes('kormasdan')
+  [B] L164: // "Ish yuritishdan tugatilgan" — case terminated without ruling. Treat the
+  [B] L190: * independently — one might get 51 cases, the other 28 (if some CF Workers
+  [B] L211: * 1. Lookup company on orginfo.uz (worker-routed) — gives us the canonical
+  [A] L219: * identifier (matching will be looser but the workflow won't fail). If a court
+  [B] L227: // v139: Check server-side cache first — deduplicates concurrent calls
+  [A] L239: // Clean up old entries (sweep — don't let the map grow unbounded)
+  [B] L239: // Clean up old entries (sweep — don't let the map grow unbounded)
+  [B] L250: /** Internal fetch logic — called once per TIN, cached by getCompanyStats. */
+  [B] L256: // Previously orginfo was awaited first — if it timed out (30s), the entire
+  [B] L265: // v153: searchCourtCasesDetailed (not searchCourtCases) — also reports
+  [B] L271: // Process orginfo result (non-blocking — fallback to chamber.uz, then TIN)
+  [B] L294: // orginfo failed — try chamber.uz for the company name (it returns the
+  [A] L319: // v153: A source failed on every proxy + retry (couldn't confirm
+  [B] L320: // real case count) — surface it instead of staying silent. This is
+  [A] L322: // was unreachable from the user's network: the total just looked low,
+  [A] L327: error: "Ba'zi manbalarga ulanib bo'lmadi — natija to'liq bo'lmasligi mumkin (qayta urinib ko'ring)",
+  [B] L327: error: "Ba'zi manbalarga ulanib bo'lmadi — natija to'liq bo'lmasligi mumkin (qayta urinib ko'ring)",
+  [B] L352: //    and jadvalapi.sud.uz for economic — searchCourtCases already dedupes
+  [A] L395: * Determines the company's role (plaintiff or defendant) by name-matching the
+  [A] L396: * company name (from orginfo) against the case's plaintiff and defendant fields.
+  [A] L397: * If orginfo failed and we don't have a company name, fall back to matching the
+  [B] L407: if (!raw || !raw.caseNumber || raw.caseNumber === '—') return null
+  [A] L422: // TIN-guaranteed match — default to plaintiff when we can't determine role
+  [B] L422: // TIN-guaranteed match — default to plaintiff when we can't determine role
+  [B] L438: counterparty: counterparty || '—',
+
+=== src/lib/store/app-store.ts ===
+  [B] L4: * The app store (zustand) — the no-routing interim the guides allow
+  [A] L23: { key: 'bills', label: "To'lovlar" },
+
+=== src/lib/tor.ts ===
+  [B] L20: *        - ./tor/tor.exe   (Windows — downloaded by the user)
+  [B] L124: console.error('[tor] no tor binary found — searched:', TOR_BINARY_CANDIDATES)
+  [B] L160: console.log('[tor] bootstrapped ✓ — SOCKS proxy on 127.0.0.1:' + SOCKS_PORT)
+  [A] L172: * - Returns false if tor isn't available (caller should fall back to direct).
+  [B] L179: // Tor died — reset and respawn.
+  [A] L203: /** Get the SOCKS proxy agent (or null if tor isn't available). */
+  [B] L210: * This forces Tor to build a new circuit with a DIFFERENT exit node —
+  [B] L233: // Spawn a fresh tor process — it will build a new circuit.
+  [B] L238: console.log('[tor] circuit rotated — new exit node active ✓')
+  [A] L257: * response object so it's a drop-in replacement for `fetch` in billing.ts.
+
+=== src/lib/use-registry.ts ===
+  [B] L4: * Registry reactivity — a version counter that bumps whenever the localStorage
+  [B] L7: * honest. Starts at 0 on the server pass — hydrate-gated listings stay
+
+=== src/lib/version-server.ts ===
+  [B] L3: * This file MUST NOT be imported by client components — it uses child_process.
+  [A] L50: * change during normal dev but don't block git pull.
+  [A] L61: // Filter out auto-generated files that don't block git pull
+
+=== src/lib/workers-config.ts ===
+  [B] L7: * the next request — no restart needed.
+  [A] L64: * Returns null if the file doesn't exist or is invalid.
+  [A] L109: * Returns empty array if file doesn't exist.
+  [A] L138: * v164: If workers.json doesn't exist yet, seed it with the current fallback/env
+  [A] L150: // v164: If workers.json doesn't exist or is empty, seed with current
+  [A] L151: // fallback/env workers so they're not lost when the first custom worker
+
+=== src/server/config.ts ===
+  [B] L2: * Central, typed configuration surface — P0 of the rebuild blueprint.
+  [B] L32: console.warn(`[config] ${name} is empty in ${env} — set it in the environment.`)
+  [B] L42: console.warn(`[config] ${name}="${raw}" is not an integer — using ${fallback}`)
+  [A] L76: /** Auth for the app's own API routes (blueprint §3.7). Empty = open (dev only). */
+  [B] L98: /** Resilience knobs — were hardcoded in court-case.ts / billing.ts (blueprint §5.2). */
+  [A] L106: /** Default per-request timeout when a caller doesn't specify one (ms). */
+  [B] L123: /** Captcha/VLM solver (blueprint §3.7 — this key was committed in .z-ai-config). */
+  [C] L137: "hearings due soon"
+
+=== src/server/envelope.ts ===
+  [B] L2: * Envelope helpers for route handlers — the single response contract
+
+=== src/server/middleware.ts ===
+  [B] L2: * API middleware chain — P4 of the rebuild blueprint (§5.4):
+  [B] L9: *    job — the fix that lets reactStrictMode turn back on without doubling
+  [A] L29: { ok: false, error: "Ruxsat yo'q — APP_API_TOKEN sozlanmagan. Klient token yuborishi kerak.", code: 'unauthorized' },
+  [B] L29: { ok: false, error: "Ruxsat yo'q — APP_API_TOKEN sozlanmagan. Klient token yuborishi kerak.", code: 'unauthorized' },
+  [A] L63: { ok: false, error: "Juda ko'p so'rovlar — birozdan so'ng qayta urinib ko'ring.", code: 'rate_limited' },
+  [B] L63: { ok: false, error: "Juda ko'p so'rovlar — birozdan so'ng qayta urinib ko'ring.", code: 'rate_limited' },
+  [B] L75: * Results are NOT cached — each awaiter gets the same live response for this
+
+=== src/sources/index.ts ===
+  [B] L2: * Source registry — one adapter per portal (blueprint §3.1, P3).
+  [B] L210: if (!c.hearingDate || c.hearingDate === '—' || c.hearingDate === 'null') continue
+
+=== src/sources/types.ts ===
+  [B] L2: * SourceAdapter pattern (blueprint §4.2) — the seam between the server layer
+
+TOTALS: A=279 B=505 C=287 D=1

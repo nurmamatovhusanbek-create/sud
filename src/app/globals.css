@@ -1,0 +1,517 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark mode is driven by [data-theme='dark'] (next-themes attribute mode). */
+@custom-variant dark (&:is([data-theme='dark'] *));
+
+/* ============================================================================
+   SUD — "MONOCHROME SIGNAL" DESIGN TOKENS  (v2 — redesign)
+   ----------------------------------------------------------------------------
+   From sud-rebuild-kit/sud-design-tokens.css. CORE IDEA: the chrome stays
+   MONOCHROME. Color is not decoration — it is SIGNAL. Hue appears in exactly
+   three places and nowhere else:
+       1. status pills / badges          (paid vs overdue, win vs lose)
+       2. status dots + micro-deltas     (▲ +12  /  ▼ −3)
+       3. gauge/ring fills that encode a status value
+   Components never hardcode hex; they read the semantic role tokens.
+   ============================================================================ */
+
+:root {
+  /* 1. NEUTRAL RAMP — the monochrome spine (raw; do not use directly) */
+  --ramp-0:    #FFFFFF;
+  --ramp-25:   #FBFCFD;
+  --ramp-50:   #F6F7F9;
+  --ramp-100:  #EEF0F3;
+  --ramp-150:  #E6E9ED;
+  --ramp-200:  #DCE0E6;
+  --ramp-300:  #C6CCD4;
+  --ramp-400:  #A6AEB9;
+  --ramp-500:  #838C99;
+  --ramp-600:  #616a76;
+  --ramp-700:  #454d58;
+  --ramp-800:  #2b323b;
+  --ramp-900:  #171b21;
+  --ramp-950:  #0d1014;
+  --ramp-1000: #000000;   /* pure ink — the accent in light mode */
+
+  /* 2. SIGNAL HUES — raw status palette (do not use directly) */
+  --signal-positive-500: #1a854e;
+  --signal-positive-600: #146b3f;
+  --signal-positive-tint:#e7f4ec;
+  --signal-positive-line:#bce0cb;
+
+  --signal-negative-500: #c4362f;
+  --signal-negative-600: #a5271f;
+  --signal-negative-tint:#fbeae8;
+  --signal-negative-line:#f0c4c0;
+
+  --signal-warning-500: #b7791f;
+  --signal-warning-600: #8a5712;
+  --signal-warning-tint:#fbf1dd;
+  --signal-warning-line:#ead79f;
+
+  --signal-info-500: #2563c9;
+  --signal-info-600: #1d4fa6;
+  --signal-info-tint:#e8effb;
+  --signal-info-line:#c1d4f2;
+
+  /* 3. SEMANTIC ROLES — components consume these */
+  --bg-canvas:        var(--ramp-50);
+  --bg-sunken:        var(--ramp-100);
+  --surface:          var(--ramp-0);
+  --surface-raised:   var(--ramp-0);
+  --surface-overlay:  var(--ramp-0);
+  --surface-inset:    var(--ramp-50);
+  --surface-hover:    var(--ramp-50);
+  --surface-active:   var(--ramp-100);
+
+  --text-1:  var(--ramp-900);
+  --text-2:  var(--ramp-600);
+  --text-3:  var(--ramp-500);
+  --text-disabled: var(--ramp-400);
+  --text-inverse:  var(--ramp-0);
+
+  --border-subtle:  var(--ramp-150);
+  --border-default: var(--ramp-200);
+  --border-strong:  var(--ramp-300);
+  --border-focus:   var(--accent);
+
+  --accent:          var(--ramp-1000);
+  --accent-hover:    var(--ramp-800);
+  --accent-pressed:  var(--ramp-900);
+  --accent-contrast: var(--ramp-0);
+  --accent-soft:     rgba(0,0,0,0.05);
+  --accent-ring:     rgba(0,0,0,0.16);
+
+  --status-positive-solid: var(--signal-positive-500);
+  --status-positive-on:    #ffffff;
+  --status-positive-soft:  var(--signal-positive-tint);
+  --status-positive-text:  var(--signal-positive-600);
+  --status-positive-line:  var(--signal-positive-line);
+  --status-positive-base:  var(--signal-positive-500);
+
+  --status-negative-solid: var(--signal-negative-500);
+  --status-negative-on:    #ffffff;
+  --status-negative-soft:  var(--signal-negative-tint);
+  --status-negative-text:  var(--signal-negative-600);
+  --status-negative-line:  var(--signal-negative-line);
+  --status-negative-base:  var(--signal-negative-500);
+
+  --status-warning-solid: var(--signal-warning-500);
+  --status-warning-on:    #241500;
+  --status-warning-soft:  var(--signal-warning-tint);
+  --status-warning-text:  var(--signal-warning-600);
+  --status-warning-line:  var(--signal-warning-line);
+  --status-warning-base:  var(--signal-warning-500);
+
+  --status-info-solid: var(--signal-info-500);
+  --status-info-on:    #ffffff;
+  --status-info-soft:  var(--signal-info-tint);
+  --status-info-text:  var(--signal-info-600);
+  --status-info-line:  var(--signal-info-line);
+  --status-info-base:  var(--signal-info-500);
+
+  --status-neutral-solid: var(--ramp-700);
+  --status-neutral-on:    var(--ramp-0);
+  --status-neutral-soft:  var(--ramp-100);
+  --status-neutral-text:  var(--ramp-600);
+  --status-neutral-line:  var(--ramp-200);
+  --status-neutral-base:  var(--ramp-400);
+
+  /* 4. RADIUS */
+  --radius-pill: 999px;
+  --radius-xl:   20px;
+  --radius-lg:   16px;
+  --radius-md:   12px;
+  --radius-sm:   9px;
+  --radius-xs:   6px;
+  --radius-dot:  50%;
+
+  /* 5. SPACING — 4px base with dense half-steps */
+  --space-0:    0;
+  --space-0-5:  2px;
+  --space-1:    4px;
+  --space-1-5:  6px;
+  --space-2:    8px;
+  --space-3:    12px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-8:    32px;
+  --space-10:   40px;
+  --space-12:   48px;
+  --space-16:   64px;
+  --space-20:   80px;
+
+  /* 6. TYPOGRAPHY — Inter (Cyrillic) UI + JetBrains Mono for figures */
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+
+  --type-display-size: 32px;  --type-display-lh: 1.08; --type-display-w: 700; --type-display-tr: -0.02em;
+  --type-h1-size: 22px;       --type-h1-lh: 1.2;       --type-h1-w: 680;     --type-h1-tr: -0.01em;
+  --type-h2-size: 18px;       --type-h2-lh: 1.25;      --type-h2-w: 650;     --type-h2-tr: -0.006em;
+  --type-h3-size: 15px;       --type-h3-lh: 1.3;       --type-h3-w: 620;     --type-h3-tr: 0;
+  --type-body-size: 14px;     --type-body-lh: 1.5;     --type-body-w: 450;   --type-body-tr: 0;
+  --type-body-sm-size: 13px;  --type-body-sm-lh: 1.45; --type-body-sm-w: 450;
+  --type-label-size: 12px;    --type-label-lh: 1.3;    --type-label-w: 560;
+  --type-caption-size: 11px;  --type-caption-lh: 1.3;  --type-caption-w: 600; --type-caption-tr: 0.06em;
+  --type-mono-size: 13px;     --type-mono-lh: 1.4;     --type-mono-w: 500;    --type-mono-tr: 0.01em;
+  --type-mono-lg-size: 15px;  --type-mono-lh-lg: 1.3;  --type-mono-w-lg: 600;
+
+  --weight-regular: 450;
+  --weight-medium:  500;
+  --weight-semibold:600;
+  --weight-bold:    700;
+
+  /* 7. ELEVATION — cards defined by SHADOW, not heavy borders */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
+  --elev-2: 0 2px 4px -2px rgba(16,24,40,0.05), 0 4px 8px -2px rgba(16,24,40,0.07);
+  --elev-3: 0 4px 8px -4px rgba(16,24,40,0.06), 0 12px 24px -6px rgba(16,24,40,0.10);
+  --elev-4: 0 8px 16px -8px rgba(16,24,40,0.10), 0 24px 48px -12px rgba(16,24,40,0.18);
+  --elev-focus: 0 0 0 3px var(--accent-ring);
+  --elev-focus-danger: 0 0 0 3px rgba(196,54,47,0.22);
+
+  /* 8. MOTION — restrained; motion explains state, never decorates */
+  --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit:       cubic-bezier(0.4, 0, 1, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 460ms;
+
+  /* 9. LAYOUT / DENSITY */
+  --rail-width:            72px;
+  --rail-width-expanded:   248px;
+  --header-height:         60px;
+  --contextbar-height:     56px;
+  --content-max:           1440px;
+  --content-gutter:        32px;
+  --card-pad:              20px;
+  --card-pad-compact:      16px;
+  --row-height:            44px;
+  --row-height-compact:    36px;
+  --control-height:        38px;
+  --control-height-sm:     30px;
+  --icon-sm: 14px;
+  --icon-md: 18px;
+  --icon-lg: 22px;
+  --icon-xl: 28px;
+
+  /* Overlays & side panels */
+  --drawer-width:  560px;
+  --overlay-scrim: rgba(10,12,15,0.42);
+  --scrim-blur:    3px;
+  --z-sticky:   30;
+  --z-rail:     40;
+  --z-pop:      80;
+  --z-scrim:    90;
+  --z-drawer:   95;
+  --z-overlay: 100;
+  --z-toast:   200;
+
+  /* Glass: ONLY the top header + command palette */
+  --glass-bg:   rgba(255,255,255,0.72);
+  --glass-blur: 14px;
+  --glass-line: rgba(16,24,40,0.06);
+
+  --skeleton-base: var(--ramp-100);
+  --skeleton-sheen: var(--ramp-150);
+  --selection: rgba(0,0,0,0.12);
+}
+
+/* ====================================================================== *
+ * DARK MODE — pure-black canvas, white ink accent.
+ * ====================================================================== */
+[data-theme='dark'] {
+  --ramp-0:    #0f1216;
+  --ramp-25:   #14181d;
+  --ramp-50:   #171b21;
+  --ramp-100:  #1d222a;
+  --ramp-150:  #232932;
+  --ramp-200:  #2c333d;
+  --ramp-300:  #3a424e;
+  --ramp-400:  #59616d;
+  --ramp-500:  #7d8794;
+  --ramp-600:  #9aa3b0;
+  --ramp-700:  #b8bfc9;
+  --ramp-800:  #d6dbe1;
+  --ramp-900:  #eef1f4;
+  --ramp-950:  #f7f9fb;
+  --ramp-1000: #ffffff;
+
+  --bg-canvas:       #0a0c0f;
+  --bg-sunken:       #070809;
+  --surface:         var(--ramp-0);
+  --surface-raised:  var(--ramp-25);
+  --surface-overlay: var(--ramp-50);
+  --surface-inset:   var(--ramp-50);
+  --surface-hover:   rgba(255,255,255,0.04);
+  --surface-active:  rgba(255,255,255,0.08);
+
+  --text-1: var(--ramp-900);
+  --text-2: var(--ramp-600);
+  --text-3: var(--ramp-500);
+  --text-disabled: var(--ramp-400);
+  --text-inverse:  #0a0c0f;
+
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong:  rgba(255,255,255,0.16);
+
+  --accent:          var(--ramp-1000);
+  --accent-hover:    var(--ramp-800);
+  --accent-pressed:  var(--ramp-700);
+  --accent-contrast: #0a0c0f;
+  --accent-soft:     rgba(255,255,255,0.08);
+  --accent-ring:     rgba(255,255,255,0.22);
+
+  --status-positive-solid: #2fae6a;
+  --status-positive-on:    #06120b;
+  --status-positive-soft:  rgba(52,199,123,0.14);
+  --status-positive-text:  #55d68f;
+  --status-positive-line:  rgba(52,199,123,0.30);
+  --status-positive-base:  #34c77b;
+
+  --status-negative-solid: #e0554c;
+  --status-negative-on:    #170606;
+  --status-negative-soft:  rgba(242,107,98,0.15);
+  --status-negative-text:  #ff8f85;
+  --status-negative-line:  rgba(242,107,98,0.32);
+  --status-negative-base:  #f26b62;
+
+  --status-warning-solid: #cf9a34;
+  --status-warning-on:    #150f02;
+  --status-warning-soft:  rgba(224,166,58,0.15);
+  --status-warning-text:  #f0be5c;
+  --status-warning-line:  rgba(224,166,58,0.32);
+  --status-warning-base:  #e0a63a;
+
+  --status-info-solid: #4a8bf0;
+  --status-info-on:    #04101f;
+  --status-info-soft:  rgba(91,155,245,0.15);
+  --status-info-text:  #86b6ff;
+  --status-info-line:  rgba(91,155,245,0.32);
+  --status-info-base:  #5b9bf5;
+
+  --status-neutral-solid: var(--ramp-600);
+  --status-neutral-on:    #0a0c0f;
+  --status-neutral-soft:  rgba(255,255,255,0.07);
+  --status-neutral-text:  var(--ramp-600);
+  --status-neutral-line:  rgba(255,255,255,0.12);
+  --status-neutral-base:  var(--ramp-500);
+
+  --elev-1: 0 1px 2px rgba(0,0,0,0.40), inset 0 0 0 1px rgba(255,255,255,0.04);
+  --elev-2: 0 2px 8px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.05);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.06);
+  --elev-4: 0 16px 48px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(255,255,255,0.07);
+
+  --glass-bg:   rgba(15,18,22,0.72);
+  --glass-line: rgba(255,255,255,0.08);
+
+  --skeleton-base: var(--ramp-100);
+  --skeleton-sheen: var(--ramp-200);
+  --selection: rgba(255,255,255,0.16);
+}
+
+/* ====================================================================== *
+ * TAILWIND v4 + shadcn BINDINGS
+ * ====================================================================== */
+@theme inline {
+  --color-background: var(--bg-canvas);
+  --color-foreground: var(--text-1);
+
+  --color-canvas:       var(--bg-canvas);
+  --color-sunken:       var(--bg-sunken);
+  --color-surface:      var(--surface);
+  --color-surface-inset:var(--surface-inset);
+  --color-fg:           var(--text-1);
+  --color-fg-2:         var(--text-2);
+  --color-fg-3:         var(--text-3);
+  --color-line:         var(--border-default);
+  --color-line-subtle:  var(--border-subtle);
+  --color-accent-ink:   var(--accent);
+
+  --color-positive:        var(--status-positive-text);
+  --color-positive-solid:  var(--status-positive-solid);
+  --color-positive-soft:   var(--status-positive-soft);
+  --color-positive-line:   var(--status-positive-line);
+  --color-negative:        var(--status-negative-text);
+  --color-negative-solid:  var(--status-negative-solid);
+  --color-negative-soft:   var(--status-negative-soft);
+  --color-negative-line:   var(--status-negative-line);
+  --color-warning:         var(--status-warning-text);
+  --color-warning-solid:   var(--status-warning-solid);
+  --color-warning-soft:    var(--status-warning-soft);
+  --color-warning-line:    var(--status-warning-line);
+  --color-info:            var(--status-info-text);
+  --color-info-solid:      var(--status-info-solid);
+  --color-info-soft:       var(--status-info-soft);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* shadcn variable repoint (keeps Dialog/Sonner/Command/etc. on-system) */
+  --color-primary:               var(--accent);
+  --color-primary-foreground:    var(--accent-contrast);
+  --color-secondary:             var(--surface-inset);
+  --color-secondary-foreground:  var(--text-1);
+  --color-muted:                 var(--surface-inset);
+  --color-muted-foreground:      var(--text-2);
+  --color-accent:                var(--surface-hover);
+  --color-accent-foreground:     var(--text-1);
+  --color-destructive:           var(--status-negative-solid);
+  --color-destructive-foreground:var(--status-negative-on);
+  --color-border:                var(--border-default);
+  --color-input:                 var(--border-strong);
+  --color-ring:                  var(--accent);
+  --color-card:                  var(--surface);
+  --color-card-foreground:       var(--text-1);
+  --color-popover:               var(--surface-overlay);
+  --color-popover-foreground:    var(--text-1);
+  --color-chart-1: var(--accent);
+  --color-chart-2: var(--ramp-400);
+  --color-chart-3: var(--status-positive-base);
+  --color-chart-4: var(--status-negative-base);
+  --color-chart-5: var(--status-warning-base);
+
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text-1);
+  --color-sidebar-primary: var(--accent);
+  --color-sidebar-primary-foreground: var(--accent-contrast);
+  --color-sidebar-accent: var(--surface-hover);
+  --color-sidebar-accent-foreground: var(--text-1);
+  --color-sidebar-border: var(--border-subtle);
+  --color-sidebar-ring: var(--accent-ring);
+}
+
+/* ====================================================================== *
+ * BASE + THIN UTILITIES (tokens + utilities only — no component CSS)
+ * ====================================================================== */
+@layer base {
+  * {
+    border-color: var(--border-default);
+  }
+  html {
+    background: var(--bg-canvas);
+  }
+  body {
+    background: var(--bg-canvas);
+    color: var(--text-1);
+    font-family: var(--font-sans);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-lh);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--selection);
+  }
+  /* Keyboard-first tool: focus is mandatory, ink halo */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--elev-focus);
+    border-radius: var(--radius-sm);
+  }
+  /* Slim, neutral scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--ramp-300);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  [data-theme='dark'] ::-webkit-scrollbar-thumb {
+    background: var(--ramp-300);
+    background-clip: content-box;
+  }
+}
+
+@layer utilities {
+  /* Floating card — depth from shadow, never a hard border */
+  .card-k {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-1);
+    transition: box-shadow var(--dur-2) var(--ease-standard);
+  }
+  .card-k-hover:hover {
+    box-shadow: var(--elev-2);
+  }
+
+  /* Glass — top header + command palette ONLY */
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+    box-shadow: 0 1px 0 var(--glass-line);
+  }
+
+  /* Keyboard keycap */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    min-width: 20px;
+    padding: 0 5px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* Figures */
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .mono-group {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Typography roles */
+  .t-display { font-size: var(--type-display-size); line-height: var(--type-display-lh); font-weight: var(--type-display-w); letter-spacing: var(--type-display-tr); }
+  .t-h1 { font-size: var(--type-h1-size); line-height: var(--type-h1-lh); font-weight: var(--type-h1-w); letter-spacing: var(--type-h1-tr); }
+  .t-h2 { font-size: var(--type-h2-size); line-height: var(--type-h2-lh); font-weight: var(--type-h2-w); letter-spacing: var(--type-h2-tr); }
+  .t-h3 { font-size: var(--type-h3-size); line-height: var(--type-h3-lh); font-weight: var(--type-h3-w); }
+  .t-label { font-size: var(--type-label-size); line-height: var(--type-label-lh); font-weight: var(--type-label-w); }
+  .t-caption { font-size: var(--type-caption-size); line-height: var(--type-caption-lh); font-weight: var(--type-caption-w); letter-spacing: var(--type-caption-tr); text-transform: uppercase; }
+  .t-caption-plain { font-size: var(--type-caption-size); line-height: var(--type-caption-lh); font-weight: var(--type-caption-w); letter-spacing: 0; }
+  .t-body-sm { font-size: var(--type-body-sm-size); line-height: var(--type-body-sm-lh); font-weight: var(--type-body-sm-w); }
+
+  /* Skeleton shimmer */
+  .skeleton-shimmer {
+    background: linear-gradient(100deg, var(--skeleton-base) 40%, var(--skeleton-sheen) 50%, var(--skeleton-base) 60%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite linear;
+  }
+  @keyframes shimmer {
+    to { background-position: -200% 0; }
+  }
+
+  /* Theme icon swap driven by html[data-theme] (set pre-hydration) */
+  [data-theme='dark'] .theme-icon-light { display: none; }
+  html:not([data-theme='dark']) .theme-icon-dark { display: none; }
+
+  /* Motion discipline: reduced motion gets complete static states */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
