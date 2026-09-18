@@ -63,6 +63,10 @@ function writeStore(store: Record<string, CompanyRecord>): void {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(REGISTRY_KEY, JSON.stringify(store))
+    // v204 (P-E): broadcast so every mounted view (watchlist grid, home KPIs)
+    // re-reads the registry immediately — previously setWatched/unwatch and
+    // meta patches mutated silently and other views updated only on remount.
+    window.dispatchEvent(new CustomEvent('sud:registry-changed'))
   } catch {
     // quota / private mode — best-effort
   }

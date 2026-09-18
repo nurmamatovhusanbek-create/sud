@@ -7,14 +7,16 @@
  * detail drawer.
  */
 
-import { useEffect } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, FileSpreadsheet } from 'lucide-react'
 import { EmptyBlock, SkRows } from '@/components/proto/primitives'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
-import { getUpcomingHearings } from '@/lib/api-client'
+import { getUpcomingHearings, exportHearingsXlsx } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
+import { ListPagination, PageSizeSelect, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
+import { toast } from 'sonner'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
 
@@ -48,6 +50,10 @@ function docketParts(isoDate: string): Omit<DocketPart, 'isoDate' | 'caseNumber'
 export function HearingsSection() {
   const company = useAppStore((s) => s.activeCompany)
   const setCounts = useTabCounts((s) => s.set)
+  // v204 (P-D): pagination + per-page; v204 (P-C): Excel export button
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [exporting, setExporting] = useState(false)
   const { state, refetch } = useResource<UpcomingHearingsData>((signal) => getUpcomingHearings(company?.stir || '', signal), {
     cacheKey: company ? `upcoming:${company.stir}` : undefined,
     enabled: !!company,
@@ -63,6 +69,14 @@ export function HearingsSection() {
   const loaded = view.status === 'success' || view.status === 'partial'
   const hearings = loaded ? (view.data.hearings as unknown as Record<string, unknown>[]) : []
   const hearingsCount = loaded ? view.data.count ?? hearings.length : undefined
+
+  // v204 (P-D): slice for the current page — nearest hearing across ALL pages
+  // is what gets the .now highlight, so compute the overall nearest first.
+  const paged = useMemo(
+    () => hearings.slice((clampPage(page, hearings.length, pageSize) - 1) * pageSize, clampPage(page, hearings.length, pageSize) * pageSize),
+    [hearings, page, pageSize],
+  )
+  const safePage = clampPage(page, hearings.length, pageSize)
 
   useEffect(() => {
     if (loaded) setCounts({ hearings: hearingsCount })
@@ -130,12 +144,35 @@ export function HearingsSection() {
           <h3>Kelgusi majlislar</h3>
           <div className="sp" />
           <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
+          <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} />
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true)
+              void (async () => {
+                try {
+                  await exportHearingsXlsx(company.stir)
+                  toast.success('Excel yuklab olindi')
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Eksport xatosi')
+                } finally {
+                  setExporting(false)
+                }
+              })()
+            }}
+          >
+            {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
+            <span>Excel</span>
+          </button>
         </div>
         <div className="datecards" style={{ flexDirection: 'column' }}>
-          {hearings.map((h, i) => {
+          {paged.map((h, i) => {
             const iso = h.isoDate as string
             const p = docketParts(iso)
-            const near = i === 0
+            // v204 (P-D): highlight the OVERALL nearest hearing (index 0 of the
+            // full list), not just the first row of the current page
+            const near = i === 0 && safePage === 1
             return (
               <div
                 key={`${(h.caseNumber as string) || 'h'}-${i}`}
@@ -159,6 +196,12 @@ export function HearingsSection() {
             )
           })}
         </div>
+        <ListPagination
+          page={safePage}
+          pageSize={pageSize}
+          total={hearings.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   )

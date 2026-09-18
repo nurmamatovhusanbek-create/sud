@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCompanyStats, type CaseWithClassification, type StatsCourtType } from '@/lib/stats'
-import JSZip from 'jszip'
+import { buildXlsx, xlsxResponse } from '@/lib/xlsx'
 import { guard } from '@/server/middleware'
 
 export const dynamic = 'force-dynamic'
@@ -27,24 +27,8 @@ export const maxDuration = 60
  */
 
 // ---- XML helpers ----
-function esc(s: string): string {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-// Convert column index (0-based) to Excel letter (A, B, ..., Z, AA, AB, ...)
-function colLetter(idx: number): string {
-  let s = ''
-  let n = idx
-  while (n >= 0) {
-    s = String.fromCharCode(65 + (n % 26)) + s
-    n = Math.floor(n / 26) - 1
-  }
-  return s
-}
+// v204 (P-C): the hand-rolled JSZip/XML builder moved to src/lib/xlsx.ts
+// (shared with api/bills/export and the new court-cases/hearings exports).
 
 /**
  * Shared Excel builder — takes a list of classified cases + a company name
@@ -82,145 +66,13 @@ function buildExcelBuffer(
           : "Maʼmuriy",
   }))
 
-  // ---- Build shared strings table ----
-  // All string cells reference this table by index. Numbers are written inline.
-  const strings: string[] = []
-  const strIdx = new Map<string, number>()
-  function s(v: string): number {
-    if (strIdx.has(v)) return strIdx.get(v)!
-    const i = strings.length
-    strings.push(v)
-    strIdx.set(v, i)
-    return i
-  }
-
-  // Add header strings
-  const headerIdx = headers.map((h) => s(h))
-
-  // Add row string values
-  const rowData = rows.map((r) =>
-    headers.map((h) => s(String(r[h as keyof typeof r] ?? ''))),
-  )
-
-  // ---- Build XML parts ----
-
-  // [Content_Types].xml
-  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-</Types>`
-
-  // _rels/.rels
-  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>`
-
-  // xl/workbook.xml
-  const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Statistika" sheetId="1" r:id="rId1"/></sheets>
-</workbook>`
-
-  // xl/_rels/workbook.xml.rels
-  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`
-
-  // xl/sharedStrings.xml
-  const sharedStrings = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${strings.length}" uniqueCount="${strings.length}">
-${strings.map((str) => `<si><t xml:space="preserve">${esc(str)}</t></si>`).join('')}
-</sst>`
-
-  // xl/styles.xml — style 0 = default, style 1 = header (bold white on black)
-  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="2">
-<font><sz val="11"/><name val="Calibri"/></font>
-<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-</fonts>
-<fills count="3">
-<fill><patternFill patternType="none"/></fill>
-<fill><patternFill patternType="gray125"/></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FF0A0A0A"/><bgColor indexed="64"/></patternFill></fill>
-</fills>
-<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
-<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="2">
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-</cellXfs>
-<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-</styleSheet>`
-
-  // xl/worksheets/sheet1.xml
-  const colsXml = colWidths
-    .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
-    .join('')
-
-  const headerRow =
-    `<row r="1">` +
-    headerIdx
-      .map((idx, i) => `<c r="${colLetter(i)}1" t="s" s="1"><v>${idx}</v></c>`)
-      .join('') +
-    `</row>`
-
-  const dataRows = rowData
-    .map(
-      (rowVals, ri) =>
-        `<row r="${ri + 2}">` +
-        rowVals
-          .map((idx, ci) => `<c r="${colLetter(ci)}${ri + 2}" t="s"><v>${idx}</v></c>`)
-          .join('') +
-        `</row>`,
-    )
-    .join('')
-
-  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<cols>${colsXml}</cols>
-<sheetData>${headerRow}${dataRows}</sheetData>
-</worksheet>`
-
-  // ---- Assemble the ZIP ----
-  const zip = new JSZip()
-  zip.file('[Content_Types].xml', contentTypes)
-  zip.folder('_rels')!.file('.rels', rootRels)
-  const xl = zip.folder('xl')!
-  xl.file('workbook.xml', workbook)
-  xl.folder('_rels')!.file('workbook.xml.rels', workbookRels)
-  xl.file('sharedStrings.xml', sharedStrings)
-  xl.file('styles.xml', styles)
-  xl.folder('worksheets')!.file('sheet1.xml', sheet)
-
-  return zip.generateAsync({
-    type: 'nodebuffer',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 6 },
-  })
+  return buildXlsx('Statistika', headers, rows, colWidths)
 }
 
 /** Build the standard NextResponse that triggers a browser download. */
 function excelResponse(buf: Buffer, tin: string): NextResponse {
   const filename = `statistika-${tin}-${new Date().toISOString().slice(0, 10)}.xlsx`
-  return new NextResponse(new Uint8Array(buf), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(buf.byteLength),
-      'Access-Control-Allow-Origin': '*',
-    },
-  })
+  return xlsxResponse(buf, filename)
 }
 
 /** Shape of the POST body sent by the client (matches StatsCase on the client). */

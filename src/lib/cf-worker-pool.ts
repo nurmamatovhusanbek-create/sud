@@ -12,13 +12,14 @@
 
 import { getWorkerUrls, getWorkerSource } from './workers-config'
 import { registerHealthPool } from './health-registry'
+import { DEFAULT_WORKERS } from './worker-defaults'
 
-// P0/blueprint §3.2: NO stranger fallback workers ship anymore — routing
-// citizens' legal queries through unknown people's Cloudflare accounts is a
-// privacy/reliability risk. The operator configures their OWN workers via the
-// Workers settings UI (workers.json) or CF_WORKER_URLS. The mechanism (adding
-// and health-ranking workers) is unchanged; only the hardcoded strangers are.
-export const FALLBACK_WORKERS: string[] = []
+// v204 (P-A): unified worker resolution. FALLBACK_WORKERS now aliases the one
+// DEFAULT_WORKERS list (src/lib/worker-defaults.ts) so a fresh install has a
+// working pool out of the box, and workers.json / CF_WORKER_URLS still override.
+// This file is the ONLY resolver (getCfWorkerUrls) — no other module may keep
+// its own copy of the list or the parsing.
+export const FALLBACK_WORKERS: string[] = DEFAULT_WORKERS
 
 /**
  * Parse CF_WORKER_URLS (comma-separated) + CF_WORKER_URL (single, backward compat).

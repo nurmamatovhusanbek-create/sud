@@ -16,9 +16,11 @@ import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
 import { setCachedBills, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
 import { exportBillsXlsx, getBillDetail } from '@/lib/api-client'
+import { printHtml, esc } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
 import { billStatusFamilySafe } from './bills-helpers'
+import { ListPagination, PageSizeSelect, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import {
   formatSum,
   formatDate,
@@ -57,6 +59,38 @@ function Barcode({ seed }: { seed: string }) {
       ))}
     </div>
   )
+}
+
+/** v204 (P-C): real print sheet for the receipt (user picks "Save as PDF"). */
+function printReceipt(b: EnrichedBill) {
+  const d = (b.detail || null) as CheckStatusResponse | null
+  const status = d?.invoiceStatus ?? b.invoiceStatus
+  const kv = (
+    pairs: [string, string][],
+  ) =>
+    pairs
+      .map(
+        ([k, v]) =>
+          `<div class="kv"><span>${esc(k)}</span><span>${esc(v)}</span></div>`,
+      )
+      .join('')
+  const html =
+    `<h1>Kvitansiya ${esc(b.number)}</h1>` +
+    `<div class="muted">billing.sud.uz · ${esc(statusLabel(status))} · ${esc(formatDate(b.issued))}</div>` +
+    kv([
+      ['Toʻlovchi', d?.payer || '-'],
+      ['Sud', d?.court || courtTypeLabel(d?.courtType) || '-'],
+      ['Instansiya', d?.instance || '-'],
+      ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : '-'],
+      ['Ish raqami', d?.claimCaseNumber || '-'],
+      ['Maqsad', d?.purpose || d?.description || '-'],
+      ['Toʻlangan', `${formatSum(d?.paidAmount)} soʻm`],
+      ['Balans', `${formatSum(d?.balance)} soʻm`],
+      ['Foydasiga', d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yoʻq" : '-'],
+    ]) +
+    `<div class="total"><span>Jami summa</span><span>${esc(formatSum(d?.amount))} soʻm</span></div>`
+  const ok = printHtml(`Kvitansiya ${b.number}`, html)
+  if (!ok) toast.error("Pop-up oynasi bloklandi — brauzerda ruxsat bering")
 }
 
 /** Receipt drawer — shared with the Overview "Soʻnggi toʻlovlar" strip. */
@@ -109,7 +143,7 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
         <button
           className="btn btn-outline btn-sm"
           style={{ flex: 1 }}
-          onClick={() => toast.success('PDF yuklab olindi')}
+          onClick={() => printReceipt(b)}
         >
           <Download />
           <span>PDF</span>
@@ -194,6 +228,9 @@ export function BillsSection() {
   const [seg, setSeg] = useState<'all' | 'paid' | 'overdue'>('all')
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // v204 (P-D): pagination + per-page (restores the old app's billPageSize)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   const stir = company?.stir
 
@@ -261,6 +298,13 @@ export function BillsSection() {
     }
     return list
   }, [items, seg, filter])
+
+  // v204 (P-D): reset to the first page whenever the filter result changes
+  useEffect(() => {
+    setPage(1)
+  }, [filter, seg, stir])
+  const safePage = clampPage(page, filtered.length, pageSize)
+  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const checkInvoice = async () => {
     const v = invoice.replace(/\D/g, '')
@@ -361,6 +405,7 @@ export function BillsSection() {
                 onChange={(k) => setSeg(k as typeof seg)}
               />
               <div style={{ flex: 1 }} />
+              <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} />
               <button className="btn btn-outline btn-sm" onClick={() => stir && stream.start(stir)}>
                 <Bolt />
                 <span>Oqimni koʻrsatish</span>
@@ -406,7 +451,7 @@ export function BillsSection() {
               <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz bilan qidirib koʻring." />
             ) : (
               <div className="list">
-                {filtered.map((b, i) => {
+                {paged.map((b, i) => {
                   const d = b.detail
                   const status = d?.invoiceStatus ?? b.invoiceStatus
                   const fam = billStatusFamilySafe(status)
@@ -435,6 +480,14 @@ export function BillsSection() {
                 })}
               </div>
             )}
+            {!streaming && filtered.length > 0 ? (
+              <ListPagination
+                page={safePage}
+                pageSize={pageSize}
+                total={filtered.length}
+                onPageChange={setPage}
+              />
+            ) : null}
           </div>
         </>
       )}

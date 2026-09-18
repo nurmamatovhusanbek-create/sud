@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-17T12:32:49.129Z",
+  "workers": [
+    {
+      "url": "https://broad-field-f2b0.uzwebfox.workers.dev/",
+      "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    },
+    {
+      "url": "https://wild-hall-04ae.uzwebfox.workers.dev/",
+      "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    },
+    {
+      "url": "https://orange-darkness-8843.najimsheikh071.workers.dev/",
+      "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    },
+    {
+      "url": "https://wandering-wind-1d3d.najimsheikh071.workers.dev/",
+      "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    },
+    {
+      "url": "https://shiny-darkness-4a1f.nurmamatovhusanbek.workers.dev/",
+      "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    }
+  ]
+}

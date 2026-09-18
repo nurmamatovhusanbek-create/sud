@@ -162,3 +162,34 @@ Work Log:
 - Release: APP_VERSION v201->v202, package.json 0.3.0->0.3.1; git commit + tag sud-signal-v202; packed sud-billing-lookup-v202.zip into download/
 
 Stage Summary: all UI copy reads native Uzbek with correct ʻ/ʼ/«»/· typography; matching needles and upstream data untouched; release v202 zipped and versioned
+
+---
+Task ID: 12 (v204 — P-A..P-E brief implementation)
+Agent: main (Super Z)
+Task: Five-part fix brief — unify worker resolution, worker-test route, real exports, pagination, watchlist card properties
+
+Work Log:
+- P-A: src/lib/worker-defaults.ts (4 DEFAULT_WORKERS); cf-worker-pool FALLBACK_WORKERS = DEFAULT_WORKERS; workers-config seeding imports it; billing.ts local list+resolver deleted, imports shared getCfWorkerUrls; settings workers GET dedupes via normalizeWorkerUrl
+- P-B: POST /api/settings/workers/test — classified results into UI REASON_LABELS, persists via updateWorkerTestResult
+- P-D: ListPagination + PageSizeSelect (ui-custom/list-pagination.tsx) on bills/cases/hearings; page resets on filter changes; hearings .now marks overall nearest
+- P-C: src/lib/print.ts printHtml (popup-blocked -> toast); bills receipt PDF + case detail PDF + cases list PDF real; src/lib/xlsx.ts buildXlsx — bills/export + stats/export refactored onto it; GET /api/court-cases/export + /api/upcoming-hearings/export; Excel buttons on cases + hearings; api-client downloadGet + exportCasesXlsx/exportHearingsXlsx
+- P-E: stats.ts threads chamber rating (score+category) into CompanyStats.rating; CompanyStatsSchema/StatsResponseSchema extended (zod was stripping rating); watchlist enrichment patchMeta rating/score; RemovableCard 4 metrics + per-card Yangilash (enrichCompany extracted); registry writeStore broadcasts sud:registry-changed
+
+Stage Summary: implemented and released (was lost with the sandbox reset — see Task 13; user's GitHub never received it)
+
+---
+Task ID: 13 (v205 — sandbox-loss recovery + guide §5/§6 scraper engine)
+Agent: main (Super Z)
+Task: After mid-session workspace reset wiped the tree (only GitHub clone @v203 survived), rebuild v204 work from context + implement the scraper brief's remaining sections: Postgres docket index + crawler (§5) and name-discovery wiring (§6)
+
+Work Log:
+- RECOVERY: sandbox reset wiped /home/z/my-project mid-task (fresh scaffold, history gone; download zips + upload briefs lost). Restored by cloning github.com/nurmamatovhusanbek-create/sud (user had pushed v203). Salvaged in-flight §5 seeds. Reconstructed ALL Task-12 (v204) changes from context (guide paste-ready code + worklog records) on the v203 baseline.
+- LIVE SCRAPER GROUND TRUTH (curl through real workers): vka endpoint /vka/{TYPE}/{courtId}/{DDMMYYYY} REJECTS PAST DATES with 400 "Нотўғри сана белгиланган" — only today/future servable (guide's 90-day backfill window is impossible via vka). Economic court ids = {region}.t pattern, 12 ids verified live with real docket rows (toshkent.t 304 rows, qarshi.t 175, namangan.t 50...). CONFLICT ids match neither .t nor civil ids (left as documented TODO). Row shape confirmed: casenumber/hearing_date(DD.MM.YYYY)/hearing_time/responsible/claiment(API typo=plaintiff)/defendant/case_id.
+- §5: bun add pg @types/pg; migrations/001_docket.sql (pg_trgm, case_docket, crawl_state); src/lib/db/pool.ts (db() + docketEnabled() hardened to require postgres:// URLs — sandbox .env ships a file: placeholder); src/lib/name-match.ts normalizeName/nameKey (+ fixed guide quirk: legal-form strip runs AFTER Cyrillic fold, added ooo/qq Latin forms) + 6 tests; src/lib/db/docket-repo.ts (upsertDocketRows transactional, findCasesByName trigram+TIN-confirm, docketMatchToCourtCase); src/lib/crawler/{vka,court-list,index,scheduler}.ts — FUTURE window (today→+CRAWLER_FUTURE_DAYS=35d, weekends/holidays skipped, 10-way concurrency, ETag-aware, per-job try/catch), retention 90d so index accumulates history from daily future-crawls; instrumentation.ts register() -> startCrawler (only when CRAWLER_ENABLED=true); POST /api/admin/crawl (guarded; 501 + Uzbek message when index disabled)
+- §6: src/lib/court-aggregate.ts getCompanyCases = live TIN (3 types, Promise.allSettled) + name discovery (best-effort, skipped without DB) merged by caseNumber, TIN wins; returns {cases:AggCase[], partial:CourtType[]} (honesty invariant); GET /api/company-cases (guard+coalesce+StirQuery); api-client getCompanyCases + AggCaseData
+- UI: cases.tsx one merged useResource (rows carry courtType; source='name' badged "Nomdan topildi"; partial mapped into PartialBanner; pagination + PDF print list + Excel); bills.tsx receipt printHtml + pagination; hearings.tsx pagination (overall-nearest .now preserved) + Excel button
+- PROBE TARGET: workers/test switched chamber -> jadvalapi ECONOMIC findByTin/302678824 (chamber gave intermittent CF 525 via workers on 2026-09; jadvalapi stable all session, gives real caseCount)
+- Gates: tsc --noEmit CLEAN; eslint 0; 36/36 tests (30 core + 6 name-match); endpoint smokes: workers list 4 defaults fresh-install, workers/test OK 2215ms caseCount 31 + not_https classification, admin/crawl clean 501 without DB, company-cases 59 TIN cases partial=[], court-cases/hearings exports valid Excel 2007+, stats/export regression 404-empty ok; browser E2E: cases 28 rows + pager page-2 + zero Nomdan badges (DB-free correct), watchlist cards show Gʻalaba/Ishlar/Reyting slots + refresh buttons, no page errors
+- Release: APP_VERSION v203->v205 (v204 never shipped to user — skipped), package.json 0.3.2->0.3.4; git commit + tag sud-signal-v205; packed sud-billing-lookup-v205.zip (now includes migrations/ + instrumentation.ts)
+
+Stage Summary: user's repo jumps v203->v205 with all brief fixes + name-discovery engine; vka past-date 400 documented as design constraint (crawl future, retain 90d); graceful no-Postgres path verified

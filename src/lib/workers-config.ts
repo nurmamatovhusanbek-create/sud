@@ -15,6 +15,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { DEFAULT_WORKERS } from './worker-defaults'
 
 export interface WorkerEntry {
   url: string
@@ -151,13 +152,9 @@ export function addWorker(url: string): WorkerEntry | null {
   // fallback/env workers so they're not lost when the first custom worker
   // is added.
   if (workers.length === 0) {
-    // Inline the fallback worker list to avoid circular dependency
-    const FALLBACK = [
-      'https://broad-field-f2b0.uzwebfox.workers.dev/',
-      'https://wild-hall-04ae.uzwebfox.workers.dev/',
-      'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-      'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-    ]
+    // v204 (P-A): seed from the ONE shared defaults list (worker-defaults.ts)
+    // so the seed can never drift from the pool again.
+    const FALLBACK = DEFAULT_WORKERS
     // Also check env for custom workers
     const envWorkers: string[] = []
     const multi = process.env.CF_WORKER_URLS

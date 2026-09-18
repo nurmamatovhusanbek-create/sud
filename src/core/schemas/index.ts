@@ -113,6 +113,15 @@ export const CompanyStatsSchema = z.object({
     asDefendant: z.number(),
   }),
   errors: z.array(z.object({ courtType: StatsCourtTypeQuery, error: z.string() })),
+  // v204 (P-E): chamber rating must be part of the schema — zod strips unknown
+  // keys, which is exactly what made the rating vanish between stats.ts and UI.
+  rating: z
+    .object({
+      score: z.number(),
+      category: z.string(),
+    })
+    .nullable()
+    .optional(),
 })
 
 export const StatsResponseSchema = z.object({
@@ -121,6 +130,7 @@ export const StatsResponseSchema = z.object({
   cases: CompanyStatsSchema.shape.cases,
   summary: CompanyStatsSchema.shape.summary,
   errors: CompanyStatsSchema.shape.errors,
+  rating: CompanyStatsSchema.shape.rating,
 })
 
 // ---- Bills ------------------------------------------------------------------

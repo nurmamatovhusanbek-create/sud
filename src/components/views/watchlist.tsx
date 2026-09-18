@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CalendarDays, Eye, Plus, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, Ring, bandOf, familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
@@ -46,14 +46,40 @@ function RatingBadge({ rating }: { rating?: string | null }) {
   return <span className={`badge ${familyBadgeClass(band)}`}>Reyting {rating}</span>
 }
 
-function RemovableCard({ rec, onUnwatch }: { rec: CompanyRecord; onUnwatch: (stir: string) => void }) {
+function RemovableCard({
+  rec,
+  onUnwatch,
+  onRefresh,
+}: {
+  rec: CompanyRecord
+  onUnwatch: (stir: string) => void
+  onRefresh: (stir: string) => void
+}) {
   const openCompany = useAppStore((s) => s.openCompany)
   const meta = rec.meta
   const wr = meta?.winRate
   const iso = meta?.nextHearingIso
   const inactive = !!meta?.status && !isKnownActive(meta.status) && /тўхтатилган|тугатилган|tugatilgan|suspended|liquidat/i.test(meta.status)
+  // v204 (P-E): numeric rating restored — "93 · AA" when both parts known
+  const ratingVal =
+    meta?.score != null
+      ? meta?.rating
+        ? `${meta.score} · ${meta.rating}`
+        : String(meta.score)
+      : (meta?.rating ?? null)
   return (
     <div className="ccard" onClick={() => openCompany(rec.stir, { name: rec.name })}>
+      <button
+        className="ccard-x"
+        style={{ right: 44 }}
+        title="Yangilash"
+        onClick={(e) => {
+          e.stopPropagation()
+          onRefresh(rec.stir)
+        }}
+      >
+        <RefreshCw />
+      </button>
       <button
         className="ccard-x"
         title="Kuzatuvdan olib tashlash"
@@ -76,17 +102,29 @@ function RemovableCard({ rec, onUnwatch }: { rec: CompanyRecord; onUnwatch: (sti
         <span className="stir">{grp(rec.stir)}</span>
         {meta?.status && <span className="faint" style={{ fontSize: 11 }}>· {statusLabel(meta.status)}</span>}
       </div>
+      {/* v204 (P-E): the old app's 4 metrics restored — win-rate keeps the
+          Monochrome-Signal ring but the numeric % is shown again */}
       <div className="ccard-foot">
-        <Ring pct={wr ?? 0} size={52} band={wr === undefined ? 'neu' : bandOf(wr)} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Ring pct={wr ?? 0} size={52} band={wr === undefined ? 'neu' : bandOf(wr)} />
+          <div className="mini">
+            <b>{wr != null ? `${wr}%` : '—'}</b>
+            <span>Gʻalaba</span>
+          </div>
+        </div>
         <div className="mini">
           <b>{meta?.cases ?? '-'}</b>
           <span>Ishlar</span>
+        </div>
+        <div className="mini">
+          <b style={{ fontSize: meta?.score != null ? 15 : undefined }}>{ratingVal ?? '—'}</b>
+          <span>Reyting</span>
         </div>
         {iso && !inactive ? (
           (() => {
             const [, m, d] = iso.split('-').map(Number)
             return (
-              <span className="hearing-pill b-warn">
+              <span className="hearing-pill b-warn" title="Keyingi majlis">
                 <CalendarDays />
                 {`${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}`}
               </span>
@@ -119,6 +157,42 @@ export function WatchlistView() {
   // Staggered enrichment — mirrors the shipped watchlist optimization; results
   // land in registry meta so every surface (home, bell) benefits. Each company
   // is enriched once per mount (no fetch loop from registry-change bumps).
+  // v204 (P-E): extracted as enrichCompany() so the per-card refresh button
+  // can re-run it for one company (after clearing its one-shot guard).
+  const enrichCompany = (stir: string) => {
+    void (async () => {
+      try {
+        const [stats, hearings] = await Promise.allSettled([getStats(stir), getUpcomingHearings(stir)])
+        if (stats.status === 'fulfilled' && stats.value.ok) {
+          const s = stats.value.data
+          patchMeta(stir, {
+            cases: s.summary.total,
+            winRate: s.summary.total ? Math.round((s.summary.win / s.summary.total) * 100) : 0,
+            status: s.company?.status,
+            // v204 (P-E): chamber rating finally surfaces (stats.ts threads it)
+            rating: s.rating?.category ?? null,
+            score: s.rating?.score ?? null,
+          })
+        }
+        if (hearings.status === 'fulfilled' && hearings.value.ok) {
+          const h = hearings.value.data.hearings[0] as Record<string, unknown> | undefined
+          if (h?.isoDate) {
+            patchMeta(stir, {
+              nextHearingIso: h.isoDate as string,
+              nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
+              nextHearingCase: (h.caseNumber as string) || undefined,
+              nextHearingTime: (h.hearingTime as string) || undefined,
+              nextHearingJudge: (h.judge as string) || undefined,
+            })
+          }
+        }
+        setTick((t) => t + 1)
+      } catch {
+        /* best-effort enrichment */
+      }
+    })()
+  }
+
   useEffect(() => {
     if (!hydrated) return
     const list = watched()
@@ -126,41 +200,16 @@ export function WatchlistView() {
     list.forEach((w, idx) => {
       if (enrichedRef.current.has(w.stir)) return
       enrichedRef.current.add(w.stir)
-      timers.push(
-        setTimeout(() => {
-          void (async () => {
-            try {
-              const [stats, hearings] = await Promise.allSettled([getStats(w.stir), getUpcomingHearings(w.stir)])
-              if (stats.status === 'fulfilled' && stats.value.ok) {
-                const s = stats.value.data
-                patchMeta(w.stir, {
-                  cases: s.summary.total,
-                  winRate: s.summary.total ? Math.round((s.summary.win / s.summary.total) * 100) : 0,
-                  status: s.company?.status,
-                })
-              }
-              if (hearings.status === 'fulfilled' && hearings.value.ok) {
-                const h = hearings.value.data.hearings[0] as Record<string, unknown> | undefined
-                if (h?.isoDate) {
-                  patchMeta(w.stir, {
-                    nextHearingIso: h.isoDate as string,
-                    nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-                    nextHearingCase: (h.caseNumber as string) || undefined,
-                    nextHearingTime: (h.hearingTime as string) || undefined,
-                    nextHearingJudge: (h.judge as string) || undefined,
-                  })
-                }
-              }
-              setTick((t) => t + 1)
-            } catch {
-              /* best-effort enrichment */
-            }
-          })()
-        }, idx * 350),
-      )
+      timers.push(setTimeout(() => enrichCompany(w.stir), idx * 350))
     })
     return () => timers.forEach(clearTimeout)
   }, [hydrated, items.length])
+
+  // v204 (P-E): per-card refresh — clear the one-shot guard and re-enrich
+  const refreshOne = (stir: string) => {
+    enrichedRef.current.delete(stir)
+    enrichCompany(stir)
+  }
 
   const alerts = useMemo(() => {
     const out: HearingRow[] = []
@@ -295,7 +344,7 @@ export function WatchlistView() {
       </div>
       <div className="ccards">
         {items.map((c) => (
-          <RemovableCard key={c.stir} rec={c} onUnwatch={unwatch} />
+          <RemovableCard key={c.stir} rec={c} onUnwatch={unwatch} onRefresh={refreshOne} />
         ))}
         {items.length === 0 && (
           <div className="empty" style={{ gridColumn: '1/-1' }}>

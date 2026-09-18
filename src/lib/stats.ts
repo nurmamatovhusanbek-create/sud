@@ -68,6 +68,9 @@ export interface CompanyStats {
   cases: CaseWithClassification[]
   summary: CompanyStatsSummary
   errors: CourtTypeError[]
+  /** v204 (P-E): chamber.uz rating, threaded from the already-fetched
+   *  getCompanyRating(tin) result (null when chamber failed/no data). */
+  rating: { score: number; category: string } | null
 }
 
 // ---- Name normalization + matching -----------------------------------
@@ -381,11 +384,22 @@ async function fetchCompanyStatsInternal(
     (errors.length ? ` · ${errors.length} court-type errors` : ''),
   )
 
+  // v204 (P-E): surface the chamber rating (score 0-100 + category band) that
+  // is already fetched in parallel — previously it was fetched and dropped.
+  const rating =
+    chamberResult.status === 'fulfilled' && chamberResult.value
+      ? {
+          score: typeof chamberResult.value.criteriaAll === 'number' ? chamberResult.value.criteriaAll : 0,
+          category: chamberResult.value.type || '',
+        }
+      : null
+
   return {
     company,
     cases: deduped,
     summary,
     errors,
+    rating,
   }
 }
 

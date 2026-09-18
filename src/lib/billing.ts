@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import ZAI from 'z-ai-web-dev-sdk'
+import { getCfWorkerUrls } from './cf-worker-pool'
 
 /**
  * Sud Billing (billing.sud.uz) integration service.
@@ -19,38 +20,10 @@ const SITE_KEY = 'site_bbdb0625df8a200e73f37ebccf0c62ac'
 const CAPTCHA_API = 'https://recaptcha.sud.uz'
 const BILLING_API = 'https://billing.sud.uz'
 
-// v144: CF Worker fallback list — MOVED HERE (was at line 912, after the code
-// that uses it, causing "Cannot access 'FALLBACK_WORKERS' before initialization"
-// ReferenceError at module load time). Must be defined BEFORE buildCaptchaPool().
-//
-// v144: Removed all non-worker proxies (cors.sh, allorigins, corsproxy.io,
-// codetabs, thingproxy). User requested: ONLY CF Workers, no other proxies.
-const FALLBACK_WORKERS = [
-  'https://broad-field-f2b0.uzwebfox.workers.dev/',
-  'https://wild-hall-04ae.uzwebfox.workers.dev/',
-  'https://orange-darkness-8843.najimsheikh071.workers.dev/',
-  'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
-]
-
-/** Build the list of CF Worker URLs from env (supports multiple + backward compat).
- *  v144: CF Workers ONLY — no other proxies. If env is empty, uses FALLBACK_WORKERS. */
-function getCfWorkerUrls(): string[] {
-  const urls: string[] = []
-  // CF_WORKER_URLS (comma-separated, preferred)
-  const multi = process.env.CF_WORKER_URLS
-  if (multi) {
-    for (const u of multi.split(',').map(s => s.trim()).filter(Boolean)) {
-      urls.push(u.endsWith('/') ? u : u + '/')
-    }
-  }
-  // CF_WORKER_URL (single, backward compat) — add if not already in list
-  const single = process.env.CF_WORKER_URL
-  if (single) {
-    const normalized = single.endsWith('/') ? single : single + '/'
-    if (!urls.includes(normalized)) urls.push(normalized)
-  }
-  return urls.length > 0 ? urls : FALLBACK_WORKERS
-}
+// v204 (P-A): billing no longer keeps its own worker list or URL resolver.
+// The shared getCfWorkerUrls() (cf-worker-pool.ts) is the single resolver:
+// workers.json -> CF_WORKER_URLS/CF_WORKER_URL -> DEFAULT_WORKERS. UI-added
+// workers therefore take effect for bills immediately.
 
 /**
  * billing.sud.uz blocks many IPs (including Tor exit nodes). We route billing
@@ -795,11 +768,8 @@ let requestCounter = 0
  *  Using direct exposes the server IP and gets it blocked by billing.sud.uz. */
 function nextProxyUrl(targetUrl: string): { url: string; label: string } {
   const workers = getCfWorkerUrls()
-  if (workers.length === 0) {
-    // No workers configured — use hardcoded fallback (NOT direct, NOT cors.sh)
-    const fb = FALLBACK_WORKERS[requestCounter % FALLBACK_WORKERS.length]
-    return { url: fb + targetUrl, label: 'fallback' }
-  }
+  // v204 (P-A): the shared resolver is never empty (DEFAULT_WORKERS tail), so
+  // the old empty-list fallback branch is dead code — removed.
   const methods: { url: string; label: string }[] = workers.map((w, i) => ({
     url: w + targetUrl, label: `worker${i + 1}`,
   }))
