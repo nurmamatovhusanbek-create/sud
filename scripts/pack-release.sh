@@ -2,10 +2,12 @@
 # Pack the rebuilt Sud Billing Lookup system into one versioned zip.
 set -e
 cd /home/z/my-project
-VER="v205"
-OUT="download/sud-billing-lookup-${VER}.zip"
+VER="${VER:-$(sed -n "s/^export const APP_VERSION = '\(v[0-9]*\)'/\1/p" src/lib/version.ts)}"
+[ -n "$VER" ] || VER="v208"
+OUTDIR="download/zip files"
+OUT="${OUTDIR}/sud-billing-lookup-${VER}.zip"
 STAGE=$(mktemp -d)/sud-billing-lookup-${VER}
-mkdir -p "$STAGE"
+mkdir -p "$STAGE" "$OUTDIR"
 
 # Source tree + config (no node_modules/.next/logs/screenshots)
 rsync -a \
@@ -13,27 +15,25 @@ rsync -a \
   --exclude '.git' --exclude 'download' --exclude 'upload' --exclude 'tool-results' \
   --exclude 'sud-billing-lookup' --exclude '.z-ai-config' --exclude '*.db' \
   --exclude 'examples' --exclude 'Caddyfile' --exclude 'components.json' \
-  src public scripts mini-services cloudflare-worker tests docs migrations \
+  src public scripts mini-services cloudflare-worker tests docs \
   package.json bun.lock tsconfig.json next.config.ts tailwind.config.ts \
-  postcss.config.mjs eslint.config.mjs .env.example worklog.md instrumentation.ts \
+  postcss.config.mjs eslint.config.mjs .env.example worklog.md \
   "$STAGE"/ 2>/dev/null || true
 
 # Restore the two files the broad rsync call may have skipped
-mkdir -p "$STAGE/src" "$STAGE/public" "$STAGE/scripts" "$STAGE/mini-services" "$STAGE/cloudflare-worker" "$STAGE/tests" "$STAGE/migrations"
+mkdir -p "$STAGE/src" "$STAGE/public" "$STAGE/scripts" "$STAGE/mini-services" "$STAGE/cloudflare-worker" "$STAGE/tests"
 cp -r src/. "$STAGE/src/"
 cp -r public/. "$STAGE/public/"
 cp -r scripts/. "$STAGE/scripts/"
 cp -r mini-services/. "$STAGE/mini-services/"
 cp -r cloudflare-worker/. "$STAGE/cloudflare-worker/"
 cp -r tests/. "$STAGE/tests/" 2>/dev/null || true
-cp -r migrations/. "$STAGE/migrations/"
-cp package.json bun.lock tsconfig.json next.config.ts tailwind.config.ts postcss.config.mjs eslint.config.mjs .env.example worklog.md instrumentation.ts "$STAGE"/
-# v205: delivery docs live in the repo root now
-cp README-DELIVERY.md "$STAGE/README-DELIVERY.md" 2>/dev/null || true
-cp P0-RUNBOOK.md "$STAGE/P0-RUNBOOK.md" 2>/dev/null || true
+cp package.json bun.lock tsconfig.json next.config.ts tailwind.config.ts postcss.config.mjs eslint.config.mjs .env.example worklog.md "$STAGE"/
+cp download/README-DELIVERY.md "$STAGE/README-DELIVERY.md"
+cp upload/sud-rebuild-kit/P0-RUNBOOK.md "$STAGE/P0-RUNBOOK.md"
 
-mkdir -p download
+mkdir -p "$OUTDIR"
 rm -f "$OUT"
-( cd "$(dirname "$STAGE")" && zip -qr /home/z/my-project/"$OUT" "sud-billing-lookup-${VER}" )
+( cd "$(dirname "$STAGE")" && zip -qr "/home/z/my-project/$OUT" "sud-billing-lookup-${VER}" )
 echo "Packed: $OUT"
 unzip -l "$OUT" | tail -3

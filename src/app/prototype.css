@@ -245,6 +245,16 @@ html, body { height: 100%; }
 .ccard:hover .ccard-x { opacity: 1; }
 .ccard-x:hover { background: var(--surface-active); color: var(--neg-text); }
 .ccard-x svg { width: 14px; height: 14px; }
+/* v206: watchlist card actions — in-flow header tools instead of absolute
+   overlays (they used to cover the rating badge). Hover-reveal kept. */
+.ccard-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.ccard-act { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: .15s; flex: 0 0 auto; }
+.ccard:hover .ccard-act { opacity: 1; }
+.ccard-act:hover { background: var(--surface-active); color: var(--text-1); }
+.ccard-act-danger:hover { color: var(--neg-text); }
+.ccard-act svg { width: 14px; height: 14px; }
+.ccard-tools .badge { margin-right: 2px; }
+@media (hover: none) { .ccard-act { opacity: .75; } } /* touch: keep actions visible */
 
 /* ---------- context bar + tabs ---------- */
 .ctxbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -433,8 +443,13 @@ html, body { height: 100%; }
   box-shadow: var(--elev-3) !important; font-size: 13px; font-weight: 600;
 }
 [data-sonner-toast] [data-icon] { color: inherit; }
-[data-sonner-toast][data-type='error'] { background: var(--neg-solid) !important; color: #fff !important; }
-[data-sonner-toast][data-type='warning'] { background: var(--warn-solid) !important; color: var(--status-warning-on) !important; }
+/* v208: use the canonical --status-*-solid vars — the old --warn-solid alias
+   never existed, so warning toasts computed background:initial = transparent
+   (the "invisible popup"), and every plain toast fell back to the ink accent
+   pill (the "black popup"). */
+[data-sonner-toast][data-type='success'] { background: var(--status-positive-solid) !important; color: #fff !important; }
+[data-sonner-toast][data-type='error'] { background: var(--status-negative-solid) !important; color: #fff !important; }
+[data-sonner-toast][data-type='warning'] { background: var(--status-warning-solid) !important; color: var(--status-warning-on) !important; }
 
 /* ---------- gauges ---------- */
 .gseg { opacity: 0; }

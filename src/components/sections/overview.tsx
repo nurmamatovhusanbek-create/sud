@@ -14,6 +14,7 @@ import { Kpi, Ring, BarChart, SkKpis, EmptyBlock, bandOf, grp, initials, familyB
 import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
+import { clearCached } from '@/lib/cache'
 import type { CompanyStats } from '@/lib/api-types'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import { useAppStore } from '@/lib/store/app-store'
@@ -464,11 +465,13 @@ function OverviewBody({ data, stir }: { data: CompanyStats; stir: string }) {
   )
 }
 
-function OverviewView({ stir }: { stir: string }) {
+function OverviewView({ stir, force = false }: { stir: string; force?: boolean }) {
   const patchCompany = useAppStore((s) => s.patchCompany)
   const setCasesCount = useTabCounts((s) => s.set)
+  // v208: force=true (Yangilash) skips the server-side stats/court caches too —
+  // before, a forced refresh only re-fetched what the client had already dropped.
   const { state, refetch } = useResource<CompanyStats>(
-    (signal) => getStats(stir, { signal }),
+    (signal) => getStats(stir, { signal, force }),
     { cacheKey: `stats:${stir}`, isEmpty: (d) => d.cases.length === 0 && Object.keys(d.company || {}).length === 0 },
   )
 
@@ -513,7 +516,7 @@ function OverviewView({ stir }: { stir: string }) {
 
   return (
     <div>
-      {view.status === 'partial' && <PartialBanner errors={view.partialErrors} onRetry={() => void refetch()} />}
+      {view.status === 'partial' && <PartialBanner errors={view.partialErrors} onRetry={() => window.dispatchEvent(new CustomEvent('sud:force-section'))} />}
       <OverviewBody data={view.data} stir={stir} />
     </div>
   )
@@ -524,12 +527,21 @@ export function OverviewSection() {
   const [forceKey, setForceKey] = useState(0)
 
   useEffect(() => {
-    const handler = () => setForceKey((k) => k + 1)
+    const handler = () => {
+      // v208: Yangilash must bypass BOTH caches — drop the client-side
+      // localStorage entries, then remount with force=1 so the server also
+      // re-scrapes instead of replaying its 60s/10min memoized results.
+      if (company) {
+        clearCached(`stats:${company.stir}`)
+        clearCached(`upcoming:${company.stir}`)
+      }
+      setForceKey((k) => k + 1)
+    }
     window.addEventListener('sud:force-section', handler)
     return () => window.removeEventListener('sud:force-section', handler)
-  }, [])
+  }, [company])
 
   if (!company) return null
 
-  return <OverviewView key={`${company.stir}-${forceKey}`} stir={company.stir} />
+  return <OverviewView key={`${company.stir}-${forceKey}`} stir={company.stir} force={forceKey > 0} />
 }

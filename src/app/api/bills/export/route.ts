@@ -13,7 +13,15 @@ export const maxDuration = 30
  * Generates an .xlsx file from the provided bill data (client-side POST).
  * Columns: Kvitansiya | Kompaniya | Summa | Toʻlangan | Toʻlanmagan |
  *          Holat | Sud | Berilgan sana | Amal qilish | Ish raqami | Turi
+ *
+ * v204 (P-C): the hand-rolled JSZip XML assembly was extracted into
+ * lib/xlsx.ts (buildXlsx) — shared with stats/court-cases/hearings exports.
+ * No behavior change.
  */
+
+const HEADERS = ['Kvitansiya', 'Kompaniya', 'Summa', "Toʻlangan", "Toʻlanmagan", 'Holati', 'Sud', 'Berilgan sana', 'Amal qilish', 'Ish raqami', 'Turi']
+const COL_WIDTHS = [22, 35, 15, 15, 15, 12, 40, 14, 14, 22, 18]
+
 async function POST_impl(req: NextRequest) {
   try {
     const body = await req.json()
@@ -38,25 +46,22 @@ async function POST_impl(req: NextRequest) {
       const caseNum = d.claimCaseNumber || '-'
       const category = d.payCategory || d.description || '-'
 
-      return {
-        'Kvitansiya': b.number || '-',
-        'Kompaniya': b.companyName || '-',
-        'Summa': String(amount),
-        "Toʻlangan": String(paid),
-        "Toʻlanmagan": String(unpaid),
-        'Holati': status === 'PAID' ? "Toʻlangan" : status === 'PARTIAL' ? "Qisman" : status === 'UNPAID' ? "Toʻlanmagan" : status,
-        'Sud': court,
-        'Berilgan sana': issued,
-        'Amal qilish': expiry,
-        'Ish raqami': caseNum,
-        'Turi': category,
-      }
+      return [
+        b.number || '-',
+        b.companyName || '-',
+        String(amount),
+        String(paid),
+        String(unpaid),
+        status === 'PAID' ? "Toʻlangan" : status === 'PARTIAL' ? "Qisman" : status === 'UNPAID' ? "Toʻlanmagan" : String(status),
+        String(court),
+        String(issued),
+        String(expiry),
+        String(caseNum),
+        String(category),
+      ]
     })
 
-    // v204 (P-C): shared minimal .xlsx builder (was a duplicated JSZip block)
-    const headers = ['Kvitansiya', 'Kompaniya', 'Summa', "Toʻlangan", "Toʻlanmagan", 'Holati', 'Sud', 'Berilgan sana', 'Amal qilish', 'Ish raqami', 'Turi']
-    const colWidths = [22, 35, 15, 15, 15, 12, 40, 14, 14, 22, 18]
-    const buf = await buildXlsx('Toʻlovlar', headers, rows, colWidths)
+    const buf = await buildXlsx('Toʻlovlar', HEADERS, rows, COL_WIDTHS)
     const filename = `tolovlar-${new Date().toISOString().slice(0, 10)}.xlsx`
     return xlsxResponse(buf, filename)
   } catch (e) {

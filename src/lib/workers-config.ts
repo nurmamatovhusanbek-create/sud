@@ -152,10 +152,8 @@ export function addWorker(url: string): WorkerEntry | null {
   // fallback/env workers so they're not lost when the first custom worker
   // is added.
   if (workers.length === 0) {
-    // v204 (P-A): seed from the ONE shared defaults list (worker-defaults.ts)
-    // so the seed can never drift from the pool again.
-    const FALLBACK = DEFAULT_WORKERS
-    // Also check env for custom workers
+    // v204 (P-A): seed from the shared DEFAULT_WORKERS list in
+    // worker-defaults.ts (previously an inline copy that drifted).
     const envWorkers: string[] = []
     const multi = process.env.CF_WORKER_URLS
     if (multi) {
@@ -168,7 +166,7 @@ export function addWorker(url: string): WorkerEntry | null {
       const normalized = single.endsWith('/') ? single : single + '/'
       if (!envWorkers.includes(normalized)) envWorkers.push(normalized)
     }
-    const currentWorkers = envWorkers.length > 0 ? envWorkers : FALLBACK
+    const currentWorkers = envWorkers.length > 0 ? envWorkers : DEFAULT_WORKERS
     const now = new Date().toISOString()
     workers = currentWorkers.map(w => ({
       url: w,

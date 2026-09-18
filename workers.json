@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-09-17T12:32:49.129Z",
+  "updatedAt": "2026-09-18T13:35:36.450Z",
   "workers": [
     {
       "url": "https://broad-field-f2b0.uzwebfox.workers.dev/",
@@ -29,6 +29,12 @@
     {
       "url": "https://shiny-darkness-4a1f.nurmamatovhusanbek.workers.dev/",
       "addedAt": "2026-09-17T12:32:49.129Z",
+      "lastTestedAt": null,
+      "lastTestResult": null
+    },
+    {
+      "url": "https://blue-haze-3834.nurmamatovhusanbek.workers.dev/",
+      "addedAt": "2026-09-18T13:35:36.450Z",
       "lastTestedAt": null,
       "lastTestResult": null
     }

@@ -39,12 +39,11 @@ export interface ChamberRating {
 
 // ---- CF Worker proxy helper ----------------------------------------------
 
-// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic.
-// chamber-fix: Import getCfWorkerUrls to fire ALL workers in PARALLEL
-// (Promise.allSettled race) instead of round-robin picking just one.
-// A single slow/dead worker can no longer cause the Company tab to show
-// no rating — as long as ANY worker reaches chamber.uz within 10s, we win.
-import { getCfWorkerUrls } from './cf-worker-pool'
+// v206 (rate-limit fix): chamber no longer fires ALL workers in parallel.
+// One hedged call through the shared scheduler (`net/worker-fetch`) — best
+// worker first, second only after hedgeMs, capped at maxAttempts. A dead
+// worker is still covered by the failover; we just stop paying 6× per call.
+import { fetchViaWorkers } from './net/worker-fetch'
 
 // ---- API -----------------------------------------------------------------
 
@@ -54,80 +53,78 @@ import { getCfWorkerUrls } from './cf-worker-pool'
  * GET https://admin.chamber.uz/api/GetCompanyCriteries/{STIR}
  * Returns rating score, category, taxpayer type, region, industry info.
  *
- * chamber-fix: Fires ALL CF Workers in PARALLEL (Promise.allSettled) and
- * takes the first successful response. Mirrors the resilient strategy
- * already used in court-case.ts: if one worker is slow/dead, the others
- * still deliver. 10s timeout per request, same ChamberRating | null return.
+ * v206: single hedged scheduler call, same ChamberRating | null return.
  */
 export async function getCompanyRating(tin: string): Promise<ChamberRating | null> {
   const cleanTin = tin.trim()
   if (!/^\d{9}$/.test(cleanTin)) return null
 
   const targetUrl = `https://admin.chamber.uz/api/GetCompanyCriteries/${cleanTin}`
-  const workers = getCfWorkerUrls()
 
-  console.log(`[chamber] fetching rating for TIN ${cleanTin} via ${workers.length} workers in parallel`)
-
-  // Fire ALL workers simultaneously. 10s timeout per request. Each promise
-  // resolves with { workerUrl, data } on success or rejects on any failure
-  // (timeout, HTTP error, parse error, no data.tin). The first fulfilled
-  // result with valid data wins; the rest are ignored.
-  const results = await Promise.allSettled(
-    workers.map(async (workerUrl) => {
-      const proxiedUrl = workerUrl + targetUrl
-      const res = await fetch(proxiedUrl, {
-        signal: AbortSignal.timeout(10_000),
-        headers: { Accept: 'application/json' },
-      })
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
-      const data = await res.json()
-      // Check if we got actual company data (not an error/empty response)
-      if (!data || !data.tin) {
-        throw new Error('no data')
-      }
-      return { workerUrl, data }
-    }),
-  )
-
-  // Take the FIRST successful response with valid data.
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      const { workerUrl, data } = r.value
-      let workerLabel = workerUrl
-      try { workerLabel = new URL(workerUrl).hostname } catch { /* keep raw URL */ }
-      console.log(`[chamber] TIN ${cleanTin} — worker ${workerLabel} succeeded`)
-      return {
-        tin: data.tin,
-        name: data.name || data.nameUz || '',
-        nameRu: data.nameRu || '',
-        nameLat: data.nameLat || data.nameUz || '',
-        criteriaAll: data.criteriaAll ?? 0,
-        type: data.type || '-',
-        taxpayerType: data.taxpayerType ?? 0,
-        taxpayername: data.taxpayername || data.taxpayer_name_uz_latn || '',
-        regionNameUz: data.regionNameUz || '',
-        regionNameLat: data.regionNameLat || '',
-        districtNameUz: data.districtNameUz || '',
-        districtNameLat: data.districtNameLat || '',
-        okedCode: data.okedDetail?.code || '',
-        okedName: data.okedDetail?.name_uz_latn || data.okedDetail?.name || '',
-        okedNameRu: data.okedDetail?.name_ru || '',
-        okedSection: data.okedDetail?.section || '',
-        okedShortName: data.okedDetail?.name_short_ru || '',
-        employeeLimitMf: data.okedDetail?.employee_limit_mf ?? 0,
-        employeeLimitLf: data.okedDetail?.employee_limit_lf ?? 0,
-      }
+  let data: {
+    tin?: string
+    name?: string
+    nameUz?: string
+    nameRu?: string
+    nameLat?: string
+    criteriaAll?: number
+    type?: string
+    taxpayerType?: number
+    taxpayername?: string
+    taxpayer_name_uz_latn?: string
+    regionNameUz?: string
+    regionNameLat?: string
+    districtNameUz?: string
+    districtNameLat?: string
+    okedDetail?: {
+      code?: string
+      name_uz_latn?: string
+      name?: string
+      name_ru?: string
+      section?: string
+      name_short_ru?: string
+      employee_limit_mf?: number
+      employee_limit_lf?: number
     }
+  } | null = null
+  try {
+    const res = await fetchViaWorkers(targetUrl, {
+      originKey: 'admin.chamber.uz',
+      timeoutMs: 10_000,
+      hedgeMs: 700,
+      maxAttempts: 3,
+      headers: { Accept: 'application/json' },
+    })
+    if (res.ok) data = await res.json()
+  } catch {
+    /* all workers failed */
   }
-
-  // All workers failed (timeout, HTTP error, or no data).
-  const reasons = results
-    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-    .map(r => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
-  console.log(`[chamber] all ${workers.length} workers failed for TIN ${cleanTin}: ${reasons.join(', ')}`)
-  return null
+  if (!data || !data.tin) {
+    console.log(`[chamber] no rating data for TIN ${cleanTin} (workers exhausted or empty body)`)
+    return null
+  }
+  console.log(`[chamber] TIN ${cleanTin} — rating via scheduler (admin.chamber.uz)`)
+  return {
+    tin: data.tin,
+    name: data.name || data.nameUz || '',
+    nameRu: data.nameRu || '',
+    nameLat: data.nameLat || data.nameUz || '',
+    criteriaAll: data.criteriaAll ?? 0,
+    type: data.type || '-',
+    taxpayerType: data.taxpayerType ?? 0,
+    taxpayername: data.taxpayername || data.taxpayer_name_uz_latn || '',
+    regionNameUz: data.regionNameUz || '',
+    regionNameLat: data.regionNameLat || '',
+    districtNameUz: data.districtNameUz || '',
+    districtNameLat: data.districtNameLat || '',
+    okedCode: data.okedDetail?.code || '',
+    okedName: data.okedDetail?.name_uz_latn || data.okedDetail?.name || '',
+    okedNameRu: data.okedDetail?.name_ru || '',
+    okedSection: data.okedDetail?.section || '',
+    okedShortName: data.okedDetail?.name_short_ru || '',
+    employeeLimitMf: data.okedDetail?.employee_limit_mf ?? 0,
+    employeeLimitLf: data.okedDetail?.employee_limit_lf ?? 0,
+  }
 }
 
 /**

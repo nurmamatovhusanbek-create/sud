@@ -19,60 +19,31 @@ export const maxDuration = 60
  *   (Backward-compat fallback) — re-fetches stats via getCompanyStats(tin)
  *   and filters by courtTypes. Kept for callers that donʼt have the data yet.
  *
- * The .xlsx is built MANUALLY using jszip (no Excel library dependency).
- * An .xlsx file is just a ZIP archive of XML files (Office Open XML format).
- * This avoids all Turbopack/bundler resolution issues with heavy Excel libs.
+ * v204 (P-C): the XML assembly moved into the shared lib/xlsx.ts buildXlsx()
+ * (was a duplicated hand-rolled JSZip block). No behavior change.
  *
  * Columns: Sud | Ish raqami | Daʼvogar | Javobgar | Sana | Natija | Holat | Sud turi
  */
 
-// ---- XML helpers ----
-// v204 (P-C): the hand-rolled JSZip/XML builder moved to src/lib/xlsx.ts
-// (shared with api/bills/export and the new court-cases/hearings exports).
+const HEADERS = ['Sud', 'Ish raqami', "Daʼvogar", 'Javobgar', 'Sana', 'Natija', 'Holat', 'Sud turi']
+const COL_WIDTHS = [40, 22, 35, 35, 12, 25, 10, 12]
 
-/**
- * Shared Excel builder — takes a list of classified cases + a company name
- * and returns a Node Buffer containing the .xlsx file.
- *
- * Used by both the POST handler (instant — case data POSTed by the client)
- * and the GET fallback (re-fetches stats first, then calls this).
- */
-function buildExcelBuffer(
-  cases: CaseWithClassification[],
-  companyName: string,
-): Promise<Buffer> {
-  const headers = ['Sud', 'Ish raqami', "Daʼvogar", 'Javobgar', 'Sana', 'Natija', 'Holat', 'Sud turi']
-  const colWidths = [40, 22, 35, 35, 12, 25, 10, 12]
-  const rows = cases.map((c) => ({
-    Sud: c.court,
-    'Ish raqami': c.caseNumber,
-    "Daʼvogar": c.role === 'plaintiff' ? companyName : c.counterparty,
-    Javobgar: c.role === 'defendant' ? companyName : c.counterparty,
-    Sana: c.regDate,
-    Natija: c.result,
-    Holat:
-      c.classification === 'win'
-        ? 'Yutdi'
-        : c.classification === 'lose'
-          ? 'Yutqazdi'
-          : c.classification === 'neutral'
-            ? 'Neitral'
-            : 'Kutilmoqda',
-    'Sud turi':
-      c.courtType === 'economic'
-        ? 'Iqtisodiy'
-        : c.courtType === 'civil'
-          ? 'Fuqarolik'
-          : "Maʼmuriy",
-  }))
-
-  return buildXlsx('Statistika', headers, rows, colWidths)
+function caseRows(cases: CaseWithClassification[], companyName: string): string[][] {
+  return cases.map((c) => [
+    c.court || '-',
+    c.caseNumber || '-',
+    c.role === 'plaintiff' ? companyName || '-' : c.counterparty || '-',
+    c.role === 'defendant' ? companyName || '-' : c.counterparty || '-',
+    c.regDate || '-',
+    c.result || '-',
+    c.classification === 'win' ? 'Yutdi' : c.classification === 'lose' ? 'Yutqazdi' : c.classification === 'neutral' ? 'Neitral' : 'Kutilmoqda',
+    c.courtType === 'economic' ? 'Iqtisodiy' : c.courtType === 'civil' ? 'Fuqarolik' : "Maʼmuriy",
+  ])
 }
 
 /** Build the standard NextResponse that triggers a browser download. */
-function excelResponse(buf: Buffer, tin: string): NextResponse {
-  const filename = `statistika-${tin}-${new Date().toISOString().slice(0, 10)}.xlsx`
-  return xlsxResponse(buf, filename)
+function excelResponse(buf: Buffer, tin: string) {
+  return xlsxResponse(buf, `statistika-${tin}-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 /** Shape of the POST body sent by the client (matches StatsCase on the client). */
@@ -127,7 +98,7 @@ async function POST_impl(req: NextRequest) {
   }
 
   const companyName = body.companyName || tin
-  const buf = await buildExcelBuffer(cases, companyName)
+  const buf = await buildXlsx('Statistika', HEADERS, caseRows(cases, companyName), COL_WIDTHS)
   return excelResponse(buf, tin)
 }
 
@@ -188,7 +159,7 @@ async function GET_impl(req: NextRequest) {
   }
 
   const companyName = result.company?.name || tin
-  const buf = await buildExcelBuffer(cases, companyName)
+  const buf = await buildXlsx('Statistika', HEADERS, caseRows(cases, companyName), COL_WIDTHS)
   return excelResponse(buf, tin)
 }
 

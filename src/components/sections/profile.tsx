@@ -31,6 +31,13 @@ export function ProfileSection() {
     },
   )
 
+  // v208: Yangilash previously did NOTHING on this section (no listener).
+  useEffect(() => {
+    const handler = () => void refetch()
+    window.addEventListener('sud:force-section', handler)
+    return () => window.removeEventListener('sud:force-section', handler)
+  }, [refetch])
+
   // Hydrate identity into the active company (context bar fills instantly)
   useEffect(() => {
     if (state.status === 'success' || state.status === 'partial') {

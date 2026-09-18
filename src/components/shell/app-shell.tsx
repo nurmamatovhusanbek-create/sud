@@ -66,6 +66,12 @@ function computeAlerts(): Notif[] {
   return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate))
 }
 
+const noopSubscribe = () => () => {}
+/** Hydration probe — false on the server + first client render, true after. */
+function useHydrated(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false)
+}
+
 function RailNav({
   active,
   label,
@@ -92,7 +98,12 @@ function BellPopover() {
   const openCompany = useAppStore((s) => s.openCompany)
   const [open, setOpen] = useState(false)
   const rv = useRegistryVersion()
-  const alerts = useMemo(() => computeAlerts(), [rv])
+  // v206: hydration gate — computeAlerts() reads the localStorage registry.
+  // During hydration it produced different HTML than the server pass (badge
+  // present client-side, absent server-side) → React hydration error.
+  // Server snapshot: no badge; the badge appears right after hydration.
+  const hydrated = useHydrated()
+  const alerts = useMemo(() => (hydrated ? computeAlerts() : []), [rv, hydrated])
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Outside click closes the popover (prototype behavior)
@@ -212,20 +223,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const checkTor = () => {
     if (torState === 'active') {
-      toast('Tor allaqachon faol')
+      toast.success('Tor allaqachon faol')
       return
     }
     setTorState('checking')
-    toast("Tor holati tekshirilmoqda…")
+    // v208: one toast for the whole check — the loading toast is REPLACED by
+    // the result toast via the shared id (two stacked popups looked broken).
+    toast.loading('Tor holati tekshirilmoqda…', { id: 'tor-check', duration: 20_000 })
     void (async () => {
       try {
         const res = await getTorStatus()
         setTorState(res.ok && res.data.running ? 'active' : 'inactive')
-        if (res.ok && res.data.running) toast.success('Tor faol')
-        else toast.warning("Tor oʻchiq. Toʻlovlar soʻrovlari cheklangan boʻlishi mumkin")
+        if (res.ok && res.data.running) toast.success('Tor faol', { id: 'tor-check' })
+        else toast.warning("Tor oʻchiq. Toʻlovlar soʻrovlari cheklangan boʻlishi mumkin", { id: 'tor-check' })
       } catch {
         setTorState('inactive')
-        toast.error('Tor holatini olib boʻlmadi')
+        toast.error('Tor holatini olib boʻlmadi', { id: 'tor-check' })
       }
     })()
   }
@@ -261,13 +274,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Settings />
         </RailNav>
         <div className="rail-sep" />
-        <button className="rail-mini" title="Tor holati" onClick={checkTor}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 3v18M3.5 9h17M3.5 15h17" />
-          </svg>
-          <span className="tor-dot" style={{ background: torColor }} />
-        </button>
+        {/* v206: the duplicate rail Tor button is gone — the topbar badge
+            (dot + «Tor faol/oʻchiq» text) is the single Tor control. */}
         <button
           className="rail-mini"
           title="Mavzu"

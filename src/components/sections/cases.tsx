@@ -1,32 +1,35 @@
 'use client'
 
 /**
- * Cases section — the prototypeʼs Sud ishlari: search + court-type seg + PDF/
- * Excel row in one card, case rows as list rows, and the detail drawer with
- * the prototypeʼs four detail sections.
+ * Cases section — the prototypeʼs Sud ishlari: search + court-type seg + PDF
+ * row in one card, case rows as list rows (lead icon, mono number, badge,
+ * amount), and the detail drawer with the prototypeʼs four detail sections:
+ * Umumiy strip, Tomonlar (cross-company party links), Majlislar tarixi
+ * timeline, Qarorlar, Instansiyalar. No documents section (parked §13.1).
  *
- * v204 (P-D): ONE merged, filtered case list in the parent (no per-court child
- * fetches) + pagination with a per-page selector; rows carry their own
- * courtType (fixes the "all" seg opening cases under the wrong type).
- * v205 (§6.5): the merged list comes from /api/company-cases — live TIN results
- * PLUS name-discovered rows from the docket index (badged "Nomdan topildi").
- * v204 (P-C): PDF buttons use real print sheets; Excel exports via
- * /api/court-cases/export.
+ * v204 (P-D): the three per-court useResource fetches are lifted INTO the
+ * parent, which holds ONE merged, filtered case list across the selected
+ * court types — enabling pagination (page + per-page) and the Excel export.
+ * Rows carry their own courtType, so «Barchasi» mode now opens each case in
+ * the court type it actually came from (was hardcoded 'economic').
+ *
+ * v204 (P-C): the toolbar PDF opens a real print dialog via lib/print.ts and
+ * a new Excel button downloads a server-built .xlsx (court-cases/export).
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { Download, Gavel, Scale, Search, User, Wallet, Link2, FileSpreadsheet } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
+import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
-import { getCaseDetail, getCompanyCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
-import type { AggCaseData } from '@/lib/api-client'
-import { printHtml, esc } from '@/lib/print'
+import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
+import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
-import type { CourtType, FullCaseData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
+import type { CourtType, CourtCase, FullCaseData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
+import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
-import { ListPagination, PageSizeSelect, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { toast } from 'sonner'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -36,11 +39,7 @@ const COURT_SEG: { key: string; label: string }[] = [
   { key: 'administrative', label: "Maʼmuriy" },
 ]
 
-const SUD_TURI: Record<string, string> = {
-  economic: 'Iqtisodiy',
-  civil: 'Fuqarolik',
-  administrative: "Maʼmuriy",
-}
+const COURT_TYPES: CourtType[] = ['economic', 'civil', 'administrative']
 
 function statusEn(s: string | null | undefined): string {
   if (!s) return ''
@@ -53,6 +52,116 @@ function hearingEn(s: string | null | undefined): string {
 function hearingDone(s: string | null | undefined): boolean {
   if (!s) return false
   return /ЎТКАЗИЛГАН|Якун|БЎЛИБ ЎТДИ|ўтказилган|yakun|bo'lib/i.test(s)
+}
+
+type CaseRow = CourtCase & { hearingTime?: string }
+
+// ---- Print helpers (v204 P-C) ----------------------------------------------------
+
+function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
+  const g = d.general
+  const fi = d.firstInstance
+  const ap = d.appellate
+  const ca = d.cassation
+  const kv = (k: string, v: string | undefined | null) =>
+    `<div class="pr-kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v || '-')}</span></div>`
+
+  const allHearings = [
+    ...(fi?.hearings ?? []),
+    ...(ap?.hearings ?? []),
+    ...(ca?.hearings ?? []),
+  ].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+
+  const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
+
+  const parties = `
+    <div class="pr-sec">Tomonlar</div>
+    ${kv('Daʼvogar', g?.plaintiff)}${g?.plaintiffTin ? kv('Daʼvogar STIR', g.plaintiffTin) : ''}
+    ${kv('Javobgar', g?.defendant)}${g?.defendantTin ? kv('Javobgar STIR', g.defendantTin) : ''}`
+
+  const hearingsSec = allHearings.length
+    ? `<div class="pr-sec">Majlislar tarixi</div>
+       <table class="pr-table"><thead><tr><th>Sana</th><th>Vaqt</th><th>Holat</th><th>Zal</th></tr></thead><tbody>
+       ${allHearings
+         .map(
+           (h) =>
+             `<tr><td>${escapeHtml(h.date || '-')}</td><td>${escapeHtml(h.time || '-')}</td><td>${escapeHtml(
+               hearingEn(h.status) || h.status || '-',
+             )}</td><td>${escapeHtml(h.courtroom || '-')}</td></tr>`,
+         )
+         .join('')}
+       </tbody></table>`
+    : ''
+
+  const decisionsSec = decisions.length
+    ? `<div class="pr-sec">Qarorlar</div>
+       <table class="pr-table"><thead><tr><th>Sana</th><th>Mazmun</th></tr></thead><tbody>
+       ${decisions.map((dec) => `<tr><td style="white-space:nowrap">${escapeHtml(dec!.date || '-')}</td><td>${escapeHtml(dec!.text || '-')}</td></tr>`).join('')}
+       </tbody></table>`
+    : ''
+
+  const instances = [
+    { name: 'Birinchi instansiya', d: fi },
+    { name: 'Apellyatsiya', d: ap },
+    { name: 'Kassatsiya', d: ca },
+  ]
+    .map((inst) => {
+      const has = (inst.d?.hearings.length ?? 0) > 0 || !!inst.d?.decision
+      const outcome = inst.d?.decision?.text ? 'Koʻrib chiqilgan' : inst.d?.appellateOutcome || (has ? 'Yozuvlar bor' : "Maʼlumot yoʻq")
+      return kv(inst.name, outcome)
+    })
+    .join('')
+
+  return `
+    <div class="pr-head">
+      <div>
+        <div class="pr-eyebrow">Ish tafsiloti</div>
+        <div class="pr-title">${escapeHtml(caseNumber)}</div>
+      </div>
+      <div class="pr-meta">
+        ${g?.caseStatus ? `<div><span class="pr-badge">${escapeHtml(statusEn(g.caseStatus) || g.caseStatus)}</span></div>` : ''}
+        ${g?.court ? `<div style="margin-top:4px">${escapeHtml(g.court)}</div>` : ''}
+      </div>
+    </div>
+    <div class="pr-sec">Umumiy maʼlumot</div>
+    ${kv('Sudya', g?.judge)}
+    ${kv('Daʼvo summasi', g?.claimAmount)}
+    ${kv('Sud', g?.court)}
+    ${kv('Ish turi', g?.caseType)}
+    ${parties}
+    ${hearingsSec}
+    ${decisionsSec}
+    <div class="pr-sec">Instansiyalar</div>
+    ${instances}`
+}
+
+function caseListHtml(
+  title: string,
+  rows: { caseNumber: string; courtName?: string; judge?: string; claimAmount?: string; caseStatus?: string; date?: string }[],
+): string {
+  return `
+    <div class="pr-head">
+      <div>
+        <div class="pr-eyebrow">Sud ishlari</div>
+        <div class="pr-title">${escapeHtml(title)}</div>
+      </div>
+      <div class="pr-meta">${rows.length} ta ish</div>
+    </div>
+    <table class="pr-table">
+      <thead><tr><th>Ish raqami</th><th>Sud</th><th>Sudya</th><th>Summa</th><th>Holat</th><th>Sana</th></tr></thead>
+      <tbody>
+        ${rows
+          .map(
+            (r) =>
+              `<tr><td class="mono">${escapeHtml(r.caseNumber || '-')}</td><td>${escapeHtml(r.courtName || '-')}</td><td>${escapeHtml(
+                r.judge || '-',
+              )}</td><td>${escapeHtml(r.claimAmount || '-')}</td><td>${escapeHtml(statusEn(r.caseStatus) || r.caseStatus || '-')}</td><td>${escapeHtml(
+                r.date || '-',
+              )}</td></tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>`
 }
 
 // ---- Case detail drawer --------------------------------------------------------
@@ -134,48 +243,12 @@ function openCaseDetail(caseNumber: string, courtType: CourtType) {
       { name: 'Kassatsiya', badge: ca?.decision?.text ? 'Koʻrib chiqilgan' : ca?.appellateOutcome, hasData: (ca?.hearings.length ?? 0) > 0 || !!ca?.decision },
     ]
 
-    // v204 (P-C): real print sheet for the case detail
-    const printDetail = () => {
-      const kv = (pairs: [string, string][]) =>
-        pairs
-          .map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${esc(v)}</span></div>`)
-          .join('')
-      const hearingsHtml = allHearings.length
-        ? `<table><thead><tr><th>Sana</th><th>Vaqt</th><th>Holat</th><th>Zal</th></tr></thead><tbody>${allHearings
-            .map(
-              (h) =>
-                `<tr><td>${esc(h.date)}</td><td>${esc(h.time || '-')}</td><td>${esc(
-                  hearingEn(h.status) || h.status || '-',
-                )}</td><td>${esc(h.courtroom || '-')}</td></tr>`,
-            )
-            .join('')}</tbody></table>`
-        : ''
-      const decisionsHtml = decisions.length
-        ? `<h2>Qarorlar</h2>${decisions
-            .map((dec) => `<div class="kv"><span>${esc(dec!.date || '-')}</span><span>${esc(dec!.text || '-')}</span></div>`)
-            .join('')}`
-        : ''
-      const html =
-        `<h1>Ish ${esc(caseNumber)}</h1>` +
-        `<div class="muted">${esc(SUD_TURI[courtType] || courtType)}</div>` +
-        `<h2>Umumiy maʼlumot</h2>` +
-        kv([
-          ['Sudya', g?.judge || '-'],
-          ['Daʼvo summasi', g?.claimAmount || '-'],
-          ['Sud', g?.court || '-'],
-          ['Holat', statusEn(g?.caseStatus) || g?.caseStatus || '-'],
-        ]) +
-        `<h2>Tomonlar</h2>` +
-        kv([
-          ['Daʼvogar', g?.plaintiff || '-'],
-          ['Daʼvogar STIR', g?.plaintiffTin || '-'],
-          ['Javobgar', g?.defendant || '-'],
-          ['Javobgar STIR', g?.defendantTin || '-'],
-        ]) +
-        (hearingsHtml ? `<h2>Majlislar tarixi</h2>${hearingsHtml}` : '') +
-        decisionsHtml
-      const ok = printHtml(`Ish ${caseNumber}`, html)
-      if (!ok) toast.error('Pop-up oynasi bloklandi — brauzerda ruxsat bering')
+    const printCase = () => {
+      try {
+        printHtml(`Ish ${caseNumber}`, caseDetailHtml(caseNumber, d))
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Chop etib boʻlmadi')
+      }
     }
 
     openProtoDrawer(
@@ -269,7 +342,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType) {
           </div>
         </div>
 
-        <button className="btn btn-outline" style={{ width: '100%' }} onClick={printDetail}>
+        <button className="btn btn-outline" style={{ width: '100%' }} onClick={printCase}>
           <Download />
           <span>Ish tafsilotini PDF qilish</span>
         </button>
@@ -279,24 +352,24 @@ function openCaseDetail(caseNumber: string, courtType: CourtType) {
   })()
 }
 
-// ---- section --------------------------------------------------------------------
+// ---- section (v204: merged list held HERE, not per court) ------------------------
+
+interface MergedRow {
+  c: CourtCase
+  courtType: CourtType
+}
 
 export function CasesSection() {
   const company = useAppStore((s) => s.activeCompany)
-  const stir = company?.stir
   const [courtFilter, setCourtFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
   const [exporting, setExporting] = useState(false)
-  // v204 (P-D): pagination + per-page (restores the old app's casePageSize)
+  const [printing, setPrinting] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
-  // v205 (§6.5): ONE merged fetch (live TIN across all three types + name
-  // discovery from the docket index when configured)
-  const { state, refetch } = useResource<{ cases: AggCaseData[]; partial: string[] }>(
-    (signal) => getCompanyCases(stir!, signal),
-    { cacheKey: `company-cases:${stir}`, enabled: !!stir },
-  )
+  const stir = company?.stir || ''
+  const courts: CourtType[] = courtFilter === 'all' ? COURT_TYPES : [courtFilter as CourtType]
 
   // sud:open-case → open the detail drawer from anywhere
   useEffect(() => {
@@ -308,59 +381,118 @@ export function CasesSection() {
     return () => window.removeEventListener('sud:open-case', openCase)
   }, [])
 
-  // v204 (P-D): reset to the first page whenever the filter result changes
-  useEffect(() => {
-    setPage(1)
-  }, [query, courtFilter, stir])
+  // v204 (P-D): one useResource per court type, lifted into the parent.
+  // Only the SELECTED court types fetch (matches the old per-court mounting);
+  // results merge into a single list for filtering, pagination and export.
+  const econ = useResource<{ cases: CourtCase[] }>(
+    (signal) => searchCases({ courtType: 'economic', mode: 'tin', value: stir }, signal),
+    { cacheKey: `court:economic:tin:${stir}`, enabled: !!company && courts.includes('economic') },
+  )
+  const civ = useResource<{ cases: CourtCase[] }>(
+    (signal) => searchCases({ courtType: 'civil', mode: 'tin', value: stir }, signal),
+    { cacheKey: `court:civil:tin:${stir}`, enabled: !!company && courts.includes('civil') },
+  )
+  const adm = useResource<{ cases: CourtCase[] }>(
+    (signal) => searchCases({ courtType: 'administrative', mode: 'tin', value: stir }, signal),
+    { cacheKey: `court:administrative:tin:${stir}`, enabled: !!company && courts.includes('administrative') },
+  )
 
-  const all: AggCaseData[] = useMemo(
+  const views = useMemo(
     () =>
-      state.status === 'success' || state.status === 'partial'
-        ? state.data.cases
+      [
+        { courtType: 'economic' as CourtType, view: econ.state as ResourceState<{ cases: CourtCase[] }>, refetch: econ.refetch },
+        { courtType: 'civil' as CourtType, view: civ.state as ResourceState<{ cases: CourtCase[] }>, refetch: civ.refetch },
+        { courtType: 'administrative' as CourtType, view: adm.state as ResourceState<{ cases: CourtCase[] }>, refetch: adm.refetch },
+      ].filter((v) => courts.includes(v.courtType)),
+    [econ.state, civ.state, adm.state, courtFilter],
+  )
+  const refetchEnabled = () => {
+    if (courts.includes('economic') && econ.state.status === 'error') econ.refetch()
+    if (courts.includes('civil') && civ.state.status === 'error') civ.refetch()
+    if (courts.includes('administrative') && adm.state.status === 'error') adm.refetch()
+  }
+
+  // v208: Yangilash previously did NOTHING on this section (no listener).
+  // Refetch every enabled court — refetch() drops the client cache entry first.
+  const refetchAll = useCallback(() => {
+    if (courts.includes('economic')) econ.refetch()
+    if (courts.includes('civil')) civ.refetch()
+    if (courts.includes('administrative')) adm.refetch()
+  }, [econ.refetch, civ.refetch, adm.refetch, courts.join(',')])
+
+  useEffect(() => {
+    const handler = () => refetchAll()
+    window.addEventListener('sud:force-section', handler)
+    return () => window.removeEventListener('sud:force-section', handler)
+  }, [refetchAll])
+
+  const anyLoading = views.some((v) => v.view.status === 'idle' || v.view.status === 'loading')
+  const allError = views.length > 0 && views.every((v) => v.view.status === 'error')
+  const partialErrors = views.flatMap((v) =>
+    v.view.status === 'partial'
+      ? v.view.partialErrors
+      : v.view.status === 'error'
+        ? [{ source: v.courtType, error: v.view.error }]
         : [],
-    [state],
+  )
+
+  const merged: MergedRow[] = useMemo(
+    () =>
+      views.flatMap((v) =>
+        v.view.status === 'success' || v.view.status === 'partial'
+          ? (v.view.data.cases || []).map((c) => ({ c, courtType: v.courtType }))
+          : [],
+      ),
+    [views],
   )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return all.filter(
-      (c) =>
-        (courtFilter === 'all' || c.courtType === courtFilter) &&
-        (!q ||
-          Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q))),
+    if (!q) return merged
+    return merged.filter(({ c }) =>
+      Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)),
     )
-  }, [all, query, courtFilter])
+  }, [merged, query])
+
+  // Reset to page 1 whenever the list-shaping inputs change
+  useEffect(() => {
+    setPage(1)
+  }, [query, courtFilter, stir])
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
+  if (!company) return null
+
   const printList = () => {
-    const rows = filtered
-      .map(
-        (c) =>
-          `<tr><td>${esc(c.caseNumber)}</td><td>${esc(c.courtName)}</td><td>${esc(
-            c.plaintiff,
-          )}</td><td>${esc(c.defendant)}</td><td>${esc(c.hearingDate || c.dateFiled || '-')}</td><td>${esc(
-            SUD_TURI[c.courtType] || c.courtType,
-          )}</td></tr>`,
+    setPrinting(true)
+    try {
+      printHtml(
+        `Sud ishlari · ${company.name || stir}`,
+        caseListHtml(
+          company.name || `STIR ${grpSafe(stir)}`,
+          filtered.map(({ c }) => ({
+            caseNumber: c.caseNumber,
+            courtName: c.courtName,
+            judge: c.judge,
+            claimAmount: c.claimAmount,
+            caseStatus: c.caseStatus,
+            date: c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? c.hearingDate : c.dateFiled,
+          })),
+        ),
       )
-      .join('')
-    const ok = printHtml(
-      `Sud ishlari — ${company?.name || company?.stir || ''}`,
-      `<h1>Sud ishlari</h1><div class="muted">${esc(company?.name || '')} · STIR ${esc(
-        company?.stir || '',
-      )} · ${filtered.length} ta ish</div>
-      <table><thead><tr><th>Ish raqami</th><th>Sud</th><th>Daʼvogar</th><th>Javobgar</th><th>Sana</th><th>Sud turi</th></tr></thead>
-      <tbody>${rows}</tbody></table>`,
-    )
-    if (!ok) toast.error('Pop-up oynasi bloklandi — brauzerda ruxsat bering')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Chop etib boʻlmadi')
+    } finally {
+      setPrinting(false)
+    }
   }
 
   const exportExcel = () => {
     setExporting(true)
     void (async () => {
       try {
-        await exportCasesXlsx(stir!)
+        await exportCasesXlsx({ tin: stir, courtTypes: courts })
         toast.success('Excel yuklab olindi')
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Eksport xatosi')
@@ -369,10 +501,6 @@ export function CasesSection() {
       }
     })()
   }
-
-  if (!company) return null
-
-  const view = state
 
   return (
     <div className="p-card rise-c">
@@ -383,91 +511,80 @@ export function CasesSection() {
         </div>
         <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
         <div style={{ flex: 1 }} />
-        <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} />
-        <button className="btn btn-outline btn-sm" onClick={printList} disabled={filtered.length === 0}>
-          <Download />
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={printing || filtered.length === 0}
+          onClick={printList}
+        >
+          {printing ? <span className="spinner" /> : <Download />}
           <span>PDF</span>
         </button>
-        <button className="btn btn-outline btn-sm" onClick={exportExcel} disabled={exporting || all.length === 0}>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={exporting || filtered.length === 0}
+          onClick={exportExcel}
+        >
           {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
           <span>Excel</span>
         </button>
       </div>
 
-      {view.status === 'idle' || view.status === 'loading' ? (
+      {anyLoading ? (
         <SkRows n={6} />
-      ) : view.status === 'error' ? (
-        <ErrorState error={view.error} onRetry={() => void refetch()} />
-      ) : view.status === 'empty' ? (
-        <EmptyBlock icon={<Gavel />} title="Ish topilmadi" hint="Bu STIR boʻyicha sud ishlari topilmadi." />
+      ) : allError ? (
+        <ErrorState
+          error={(views.find((v) => v.view.status === 'error')?.view as { error: string } | undefined)?.error || 'Xatolik'}
+          onRetry={refetchEnabled}
+        />
+      ) : merged.length === 0 ? (
+        <EmptyBlock icon={<Gavel />} title="Ish topilmadi" hint="Tanlangan sud turlarida bu STIR boʻyicha ish topilmadi." />
+      ) : filtered.length === 0 ? (
+        <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz bilan qidirib koʻring." />
       ) : (
         <>
-          {/* v205: honest partial reporting from the merged endpoint */}
-          {view.status === 'partial' ? (
-            <PartialBanner errors={view.partialErrors} onRetry={() => void refetch()} />
-          ) : (view.data.partial?.length ?? 0) > 0 ? (
-            <PartialBanner
-              errors={view.data.partial.map((t) => ({
-                source: SUD_TURI[t] || t,
-                error: 'bu sud turiga ulanib boʻlmadi — natija toʻliq boʻlmasligi mumkin',
-              }))}
-              onRetry={() => void refetch()}
-            />
-          ) : null}
-
-          {all.length === 0 ? (
-            <EmptyBlock icon={<Gavel />} title="Ish topilmadi" hint="Bu STIR boʻyicha sud ishlari topilmadi." />
-          ) : filtered.length === 0 ? (
-            <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz bilan qidirib koʻring." />
-          ) : (
-            <div className="list">
-              {paged.map((c, i) => (
-                <div
-                  className="lrow"
-                  key={c.caseNumber || i}
-                  data-case={c.caseNumber}
-                  onClick={() => openCaseDetail(c.caseNumber, (c.courtType as CourtType) || 'economic')}
-                >
-                  <div className="lead">
-                    <Gavel />
-                  </div>
-                  <div className="main-c">
-                    <b className="mono">
-                      {c.caseNumber}
-                      {c.source === 'name' ? (
-                        <span className="badge b-neu" style={{ marginLeft: 8, fontSize: 10, height: 18 }} title="Docket indeksidan nom boʻyicha topildi (TIN yozilmagan)">
-                          Nomdan topildi
-                        </span>
-                      ) : null}
-                    </b>
-                    <div className="sub">
-                      {c.courtName || '-'} · {c.judge || '-'}
-                      {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}
-                    </div>
-                  </div>
-                  {c.caseStatus ? <span className={`badge ${familyBadgeClass('neutral')}`}>{statusEn(c.caseStatus) || c.caseStatus}</span> : null}
-                  <div className="amt">
-                    {c.claimAmount || '-'}
-                    <small>{c.hearingDate || c.dateFiled || ''}</small>
-                  </div>
-                  <span className="chev">›</span>
+          <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
+          <div className="list">
+            {paged.map(({ c, courtType }, i) => (
+              <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType)}>
+                <div className="lead">
+                  <Gavel />
                 </div>
-              ))}
-            </div>
-          )}
-          {filtered.length > 0 ? (
-            <ListPagination
-              page={safePage}
-              pageSize={pageSize}
-              total={filtered.length}
-              onPageChange={setPage}
-            />
-          ) : null}
+                <div className="main-c">
+                  <b className="mono">{c.caseNumber}</b>
+                  <div className="sub">
+                    {c.courtName || '-'} · {c.judge || '-'}
+                    {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}
+                  </div>
+                </div>
+                {c.caseStatus ? <span className={`badge ${familyBadgeClass('neutral')}`}>{statusEn(c.caseStatus) || c.caseStatus}</span> : null}
+                <div className="amt">
+                  {c.claimAmount || '-'}
+                  <small>{c.hearingDate || c.dateFiled || ''}</small>
+                </div>
+                <span className="chev">›</span>
+              </div>
+            ))}
+          </div>
+          <ListPagination
+            page={safePage}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPage={setPage}
+            onPageSize={(n) => {
+              setPageSize(n)
+              setPage(1)
+            }}
+          />
         </>
       )}
     </div>
   )
 }
 
+/** STIR pretty-print that never leaks DOM deps into the print path. */
+function grpSafe(stir: string): string {
+  return stir.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')
+}
+
 // keep the type imports referenced for API surface completeness
-export type { FullCaseGeneral, FullCaseData }
+export type { FullCaseGeneral }

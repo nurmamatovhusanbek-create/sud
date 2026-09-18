@@ -60,35 +60,37 @@ function resolveCurlBinary(): string {
 const JADVAL_API = 'https://jadval.sud.uz'
 const JADVALAPI = 'https://jadvalapi.sud.uz'
 
-// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
-import { createWorkerPool, getCfWorkerUrls as _getCfWorkerUrls, OriginHealthPool } from './cf-worker-pool'
-const _workerPool = createWorkerPool()
-
-// v154: Health-tracked worker selection, shared across all court-case lookups
-// in this process. See OriginHealthPool's doc comment in cf-worker-pool.ts.
-const workerHealth = new OriginHealthPool('court-case')
-
-// v144: Removed all public CORS proxies. User requested: ONLY CF Workers.
-const PUBLIC_CORS_PROXIES: { prefix: string; needsEncoding: boolean }[] = []
+/**
+ * v207: jadval.sud.uz fake-empty / throttle detection.
+ *
+ * Measured behavior (TIN 200248856 investigation): the jadval search service
+ * rate-limits per source IP with recovery. When throttled it answers in ~1s
+ * with a plain-text fake-empty ("Ишлар топилмади", HTTP 200, not JSON) or just
+ * hangs; when healthy it answers JSON in 1.8-21s. Such a response is a
+ * retryable glitch, never a definitive answer. Shared by the search and the
+ * details paths.
+ */
+function isFakeEmptyText(t: string): boolean {
+  return t.includes('топилмади') || t.includes('мавжуд эмас')
+}
 
 /**
- * Build the full list of proxy URLs to try for a given target URL.
- * v150: Uses shared cf-worker-pool.ts for CF Worker URL parsing.
+ * v207: jadval.sud.uz DNS has a single A record (45.150.25.203), but the
+ * sibling machine behind jadvalapi.sud.uz (94.158.54.73) serves the same
+ * Express app and answers jadval.sud.uz requests correctly (SNI/Host intact).
+ * The search service rate-limits per source IP — alternating between the two
+ * machines samples two independent throttle buckets, roughly doubling the
+ * odds a retry lands on a healthy one. Env-overridable in case upstream
+ * changes: JADVAL_RESOLVE_IP (empty string disables the pin).
  */
-function buildProxyChain(targetUrl: string): { url: string; label: string }[] {
-  const chain: { url: string; label: string }[] = []
-  const workers = _getCfWorkerUrls()
-  for (const w of workers) {
-    chain.push({ url: w + targetUrl, label: 'CF Worker' })
-  }
-  // Direct fetch as last resort in the parallel race
-  chain.push({ url: targetUrl, label: 'direct' })
-  return chain
-}
+const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
+  ? process.env.JADVAL_RESOLVE_IP
+  : '94.158.54.73'
 
-function getCfWorkerUrl(url: string): string {
-  return _workerPool.nextProxyUrl(url)
-}
+// v206: all worker fan-out goes through the shared hedged scheduler —
+// court-case no longer builds its own worker list or health pool (the
+// scheduler records per-worker health for the Settings dashboard).
+import { fetchViaWorkers } from './net/worker-fetch'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -127,11 +129,13 @@ export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case
  * This is ONLY used for jadval.sud.uz (not jadvalapi.sud.uz, which doesn't
  * do TLS fingerprinting and works fine via CF Workers).
  */
-function curlFetch(url: string): Promise<string> {
+function curlFetch(url: string, altIp?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       '--silent', '--show-error',
-      '--max-time', '15',
+      // v207: real full-history searches on jadval.sud.uz measured at 6.6-21s;
+      // 15s truncated some good responses (exit 28). 25s covers observed nodes.
+      '--max-time', '25',
       '--compressed',
       '-H', 'Accept: application/json, text/plain, */*',
       '-H', 'Accept-Language: en-GB,en;q=0.5',
@@ -144,6 +148,9 @@ function curlFetch(url: string): Promise<string> {
       '-H', 'sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"',
       '-H', 'sec-ch-ua-mobile: ?0',
       '-H', 'sec-ch-ua-platform: "Windows"',
+      // v207: optional IP pin (curl still sends SNI/Host for jadval.sud.uz, so
+      // the sibling machine serves the right vhost — TLS cert validates too).
+      ...(altIp ? ['--resolve', `jadval.sud.uz:443:${altIp}`] : []),
       '--', url,
     ]
 
@@ -152,7 +159,7 @@ function curlFetch(url: string): Promise<string> {
     // OpenSSL curl that Git Bash's PATH would otherwise find.
     const curlBin = resolveCurlBinary()
     const child = spawn(curlBin, args, {
-      timeout: 18000,
+      timeout: 28000,
       windowsHide: true,
     })
 
@@ -194,8 +201,8 @@ function curlFetch(url: string): Promise<string> {
  * first 300 chars so we can see what jadval.sud.uz actually returned
  * (error page, captcha, rate-limit, etc.) instead of just "parse failed".
  */
-async function curlFetchCases(url: string, mapper: (raw: any) => CourtCase): Promise<CourtCase[]> {
-  const text = await curlFetch(url)
+async function curlFetchCases(url: string, mapper: (raw: any) => CourtCase, altIp?: string): Promise<CourtCase[]> {
+  const text = await curlFetch(url, altIp)
   try {
     const data = JSON.parse(text)
     const items = Array.isArray(data) ? data : (data.data || [])
@@ -226,7 +233,11 @@ interface CourtCaseCacheEntry {
   ts: number
 }
 const courtCaseCache = new Map<string, CourtCaseCacheEntry>()
-const COURT_CASE_CACHE_TTL = 60 * 1000 // 60 seconds
+// v207: 60s was burning the jadval.sud.uz per-TIN token bucket on every
+// re-view (watchlist refresh, tab revisits, stats re-aggregation). The full
+// archive on jadval changes slowly; 10 minutes of server-side memoization
+// keeps the per-TIN quota intact. Watchlist Yangilash (force) still bypasses.
+const COURT_CASE_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
 /**
  * v153: Shared cache-lookup + fetch, used by both searchCourtCases and
@@ -331,8 +342,18 @@ export async function searchCourtCasesDetailed(
 }
 
 /**
- * Internal fetch logic — uses PARALLEL RACE to fetch from all proxies
- * simultaneously. First valid response wins.
+ * Internal fetch logic — v206: HEDGED racing through the shared worker
+ * scheduler (`net/worker-fetch`), NOT fire-all.
+ *
+ * Was: for each endpoint, fire ALL CF Workers + direct in parallel across a
+ * 3-tier 10/15/20s retry ladder → ~6 requests per endpoint per lookup, ~30+
+ * on a single company open, which is exactly what tripped the rate limits.
+ *
+ * Now: ONE hedged call per endpoint (best worker first; second worker only
+ * after hedgeMs; capped at maxAttempts). A dead/slow worker is still covered
+ * by the hedge + failover. The 3-tier ladder is gone — the scheduler's
+ * hedging + failover replaces it. Union-across-endpoints, dedupe-by-caseNumber
+ * and the "definitive 404 = empty" semantics are unchanged.
  */
 async function searchCourtCasesInternal(
   courtType: CourtType,
@@ -345,238 +366,83 @@ async function searchCourtCasesInternal(
 
   console.log(`[court-case] searching ${courtType} by ${mode}=${value}`)
 
-  // v150 P3: Use shared cf-worker-pool instead of inline duplicate parsing
-  const allWorkers = _getCfWorkerUrls()
+  // v206: for each apiConfig entry, a single hedged scheduler call.
+  //
+  // v207 (TIN 200248856 investigation): jadval.sud.uz's search service runs a
+  // TOKEN BUCKET PER TIN — hammer a TIN and it answers a fake-empty plain-text
+  // "Ишлар топилмади" (HTTP 200, not JSON) or hangs for ~10-30 min, regardless
+  // of source IP (verified: a never-queried TIN succeeded from a burnt IP;
+  // the burnt TIN failed from four different CF-worker egress IPs). So the
+  // strategy is SPEND FEW QUERIES, NOT MORE RETRIES: scheduler samples 2
+  // workers, then 2 spaced direct-curl samples alternating the two backend
+  // machines (per-machine bucket variance). One healthy sample wins and the
+  // result is memoized. jadvalapi.sud.uz keeps its proven fast semantics.
 
-  // v140: For each API endpoint, fire ALL proxies in PARALLEL.
-  // First valid response wins (Promise.any). This eliminates the 12-48s
-  // sequential failover delay — if ANY proxy is alive, we get data in 1-3s.
   const promises = apiConfig.map(async ({ url, mapper }) => {
-    let originKey: string
-    try { originKey = new URL(url).hostname } catch { originKey = url }
+    const origin = (() => {
+      try { return new URL(url).hostname } catch { return url }
+    })()
+    const isJadvalSudUz = origin.includes('jadval.sud.uz')
 
-    // v154: Only race workers not currently in cooldown against THIS origin —
-    // see OriginHealthPool doc comment. Always non-empty (fails open).
-    const raceWorkers = workerHealth.getRaceCandidates(originKey, allWorkers)
-
-    // Build all proxy URLs for this endpoint
-    const proxyUrls: { url: string; label: string; worker: string | null }[] = []
-    for (const w of raceWorkers) {
-      proxyUrls.push({ url: w + url, label: 'CF Worker', worker: w })
-    }
-    for (const p of PUBLIC_CORS_PROXIES) {
-      const proxiedUrl = p.needsEncoding ? p.prefix + encodeURIComponent(url) : p.prefix + url
-      proxyUrls.push({ url: proxiedUrl, label: 'CORS proxy', worker: null })
-    }
-    // Direct fetch as last resort in the parallel race
-    proxyUrls.push({ url, label: 'direct', worker: null })
-
-    // v149: For jadval.sud.uz, ALSO add curl-based fetch (bypasses TLS fingerprinting)
-    const isJadvalSudUz = url.includes('jadval.sud.uz')
-
-    // Record a worker's outcome. A confirmed "not found" counts as a SUCCESS —
-    // it proves the worker reached the origin fine, it just found no data.
-    // Only transport-level failures count against a worker's health.
-    // v158: Now tracks response time and failure reason for the dashboard.
-    function recordOutcome(worker: string | null, ok: boolean, msg?: string, responseMs?: number) {
-      if (!worker) return
-      if (ok || msg?.startsWith('DEFINITIVE_NOT_FOUND')) {
-        workerHealth.recordSuccess(originKey, worker, responseMs || 0)
-      } else {
-        const reason = msg || 'unknown'
-        workerHealth.recordFailure(originKey, worker, responseMs || 0, reason.slice(0, 100))
-      }
-    }
-
-    // v140: PARALLEL RACE with BEST-OF fallback.
-    // Fire ALL proxies simultaneously. Take the first valid response.
-    // 10s timeout per request.
-    const fetchPromises = proxyUrls.map(async ({ url: proxyUrl, label, worker }) => {
-      const startTime = Date.now()
-      try {
-        const res = await fetch(proxyUrl, {
-          headers: {
-            Accept: 'application/json, text/plain, */*',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-            'Origin': 'https://my.sud.uz',
-            'Referer': 'https://my.sud.uz/',
-          },
-          signal: AbortSignal.timeout(10000),
-        })
-        const responseMs = Date.now() - startTime
-        if (!res.ok) {
-          // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
-          // as definitive. Only treat 404 as definitive for non-CONFLICT URLs.
-          const isConflict = url.includes('CONFLICT')
-          if ((res.status === 404 || res.status === 410) && !isConflict) {
-            throw new Error(`DEFINITIVE_NOT_FOUND:${res.status}`)
-          }
-          throw new Error(`HTTP ${res.status}`)
-        }
-        const text = await res.text()
-        const data = JSON.parse(text)
-        const items = Array.isArray(data) ? data : (data.data || [])
-        recordOutcome(worker, true, undefined, responseMs)
-        return items.map(mapper)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        const responseMs = Date.now() - startTime
-        recordOutcome(worker, false, msg, responseMs)
-        throw new Error(msg)
-      }
-    })
-
-    // v149/v156: For jadval.sud.uz, ALSO try curl (bypasses TLS fingerprinting)
-    if (isJadvalSudUz) {
-      fetchPromises.push(curlFetchCases(url, mapper))
-    }
-
-    // v140: BEST-OF strategy — wait for all proxies to settle, then take the
-    // result with the MOST cases. This handles the case where one proxy returns
-    // 6 cases and another returns 100 (jadvalapi is inconsistent — sometimes
-    // returns partial results due to rate limiting).
-    const allSettled = await Promise.allSettled(fetchPromises)
-
-    // Check for definitive not-found (overrides everything)
-    for (const r of allSettled) {
-      if (r.status === 'rejected' && r.reason?.message?.startsWith('DEFINITIVE_NOT_FOUND')) {
-        console.log(`[court-case] ${url} — definitive not-found, returning []`)
-        return { items: [] as CourtCase[], failed: false }
-      }
-    }
-
-    // Collect all successful results
-    const successes: CourtCase[][] = allSettled
-      .filter((r): r is PromiseFulfilledResult<CourtCase[]> => r.status === 'fulfilled')
-      .map(r => r.value)
-
-    if (successes.length === 0) {
-      // All failed — retry
-      console.log(`[court-case] ${url} — all ${proxyUrls.length} proxies failed (health: ${workerHealth.stats(originKey)}), retrying with 15s timeout...`)
-      await new Promise(r => setTimeout(r, 500))
-
-      const retryPromises = proxyUrls.map(async ({ url: proxyUrl, worker }) => {
-        const startTime = Date.now()
+    // jadval.sud.uz direct-curl ladder: 2 samples, alternating machines
+    // (alt-IP pin first — the DNS record is the historically flakier one),
+    // 6s apart. Each attempt self-validates (curlFetchCases rejects
+    // fake-empty / non-JSON). Under a drained per-TIN bucket extra attempts
+    // are pure quota burn — 2 is the sweet spot.
+    const ladderIps = [JADVAL_ALT_IP || undefined, undefined]
+    const curlLadder = async (): Promise<{ items: CourtCase[]; failed: boolean }> => {
+      if (!isJadvalSudUz) return { items: [] as CourtCase[], failed: true }
+      for (let i = 0; i < ladderIps.length; i++) {
+        if (i > 0) await new Promise(r => setTimeout(r, 6_000))
         try {
-          const res = await fetch(proxyUrl, {
-            headers: {
-              Accept: 'application/json, text/plain, */*',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-              'Origin': 'https://my.sud.uz',
-              'Referer': 'https://my.sud.uz/',
-            },
-            signal: AbortSignal.timeout(15000),
-          })
-          const responseMs = Date.now() - startTime
-          if (!res.ok) {
-            const isConflict = url.includes('CONFLICT')
-            if ((res.status === 404 || res.status === 410) && !isConflict) {
-              throw new Error('DEFINITIVE_NOT_FOUND')
-            }
-            throw new Error(`HTTP ${res.status}`)
-          }
-          const text = await res.text()
-          // v140: Don't treat text 'not found' as definitive (IP blocking issue)
-          const data = JSON.parse(text)
-          const items = Array.isArray(data) ? data : (data.data || [])
-          recordOutcome(worker, true, undefined, responseMs)
-          return items.map(mapper)
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          const responseMs = Date.now() - startTime
-          recordOutcome(worker, false, msg, responseMs)
-          throw new Error(msg)
-        }
-      })
-
-      // v156: Also retry curl for jadval.sud.uz in tier 2 (curl wasn't retried
-      // before — if it failed transiently in tier 1, the jadval.sud.uz data
-      // was lost entirely. Now curl gets 3 chances across all tiers.)
-      if (isJadvalSudUz) {
-        retryPromises.push(curlFetchCases(url, mapper))
+          return { items: await curlFetchCases(url, mapper, ladderIps[i]), failed: false }
+        } catch { /* throttled/bad node — next sample */ }
       }
+      return { items: [] as CourtCase[], failed: true }
+    }
 
-      const retrySettled = await Promise.allSettled(retryPromises)
-      for (const r of retrySettled) {
-        if (r.status === 'rejected' && r.reason?.message?.startsWith('DEFINITIVE_NOT_FOUND')) {
+    try {
+      const res = await fetchViaWorkers(url, {
+        originKey: origin,
+        // v207: jadval real searches measured at 1.8-21s — 12s killed winners;
+        // 20s + curl fallback covers the tail without stalling the request.
+        timeoutMs: isJadvalSudUz ? 20_000 : 12_000,
+        hedgeMs: 800,
+        // v207: per-TIN token bucket — 2 worker samples, not 3.
+        maxAttempts: 2,
+      })
+      if (!res.ok) {
+        // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
+        // as definitive. Only treat 404/410 as definitive for non-CONFLICT URLs.
+        const isConflict = url.includes('CONFLICT')
+        if ((res.status === 404 || res.status === 410) && !isConflict) {
+          console.log(`[court-case] ${url} — definitive not-found, returning []`)
           return { items: [] as CourtCase[], failed: false }
         }
-      }
-      const retrySuccesses: CourtCase[][] = retrySettled
-        .filter((r): r is PromiseFulfilledResult<CourtCase[]> => r.status === 'fulfilled')
-        .map(r => r.value)
-
-      if (retrySuccesses.length === 0) {
-        // Final retry with 20s timeout
-        console.log(`[court-case] ${url} — retry failed (health: ${workerHealth.stats(originKey)}), final attempt with 20s timeout...`)
-        await new Promise(r => setTimeout(r, 500))
-        // v154: Re-check candidates — a worker marked dead during this same
-        // request (e.g. timed out in the 10s tier) is excluded here too,
-        // unless everything is dead, in which case we fail open and try all.
-        const finalWorkers = workerHealth.getRaceCandidates(originKey, allWorkers)
-        const finalPromises = finalWorkers.map(async (w) => {
-          const startTime = Date.now()
-          try {
-            const res = await fetch(w + url, {
-              headers: {
-                Accept: 'application/json, text/plain, */*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
-                'Origin': 'https://my.sud.uz',
-                'Referer': 'https://my.sud.uz/',
-              },
-              signal: AbortSignal.timeout(20000),
-            })
-            const responseMs = Date.now() - startTime
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status}`)
-            }
-            const text = await res.text()
-            // v140: Don't treat text 'not found' as definitive (IP blocking issue)
-            const data = JSON.parse(text)
-            const items = Array.isArray(data) ? data : (data.data || [])
-            recordOutcome(w, true, undefined, responseMs)
-            return items.map(mapper)
-          } catch (e) {
-            const responseMs = Date.now() - startTime
-            const msg = e instanceof Error ? e.message : String(e)
-            recordOutcome(w, false, msg, responseMs)
-            throw e
-          }
-        })
-        // v156: Also try curl in the final tier for jadval.sud.uz
-        if (isJadvalSudUz) {
-          finalPromises.push(curlFetchCases(url, mapper))
-        }
-        const finalSettled = await Promise.allSettled(finalPromises)
-        const finalSuccesses: CourtCase[][] = finalSettled
-          .filter((r): r is PromiseFulfilledResult<CourtCase[]> => r.status === 'fulfilled')
-          .map(r => r.value)
-        if (finalSuccesses.length > 0) {
-          // Take the best (most cases)
-          finalSuccesses.sort((a, b) => b.length - a.length)
-          console.log(`[court-case] ${url} — final retry got ${finalSuccesses[0].length} cases`)
-          return { items: finalSuccesses[0], failed: false }
-        }
-        // v153: Every proxy failed across the initial race AND both retry
-        // tiers (10s + 15s + 20s timeouts, all CF Workers + direct + curl).
-        // This is a genuine fetch FAILURE, not a confirmed "zero cases" — flag
-        // it so stats.ts can warn the user instead of silently under-reporting.
-        console.log(`[court-case] ${url} — all retries failed (health: ${workerHealth.stats(originKey)}), marking as incomplete`)
+        if (isJadvalSudUz) return await curlLadder()
+        console.log(`[court-case] ${url} — HTTP ${res.status} after hedged attempts, marking as incomplete`)
         return { items: [] as CourtCase[], failed: true }
       }
-
-      // Take the best (most cases)
-      retrySuccesses.sort((a, b) => b.length - a.length)
-      console.log(`[court-case] ${url} — retry got ${retrySuccesses[0].length} cases (best of ${retrySuccesses.length})`)
-      return { items: retrySuccesses[0], failed: false }
+      const text = await res.text()
+      // v207: fake-empty from a bad LB node is a retryable glitch, NOT a
+      // definitive answer — a fast response here is almost always fake.
+      if (isFakeEmptyText(text)) {
+        console.log(`[court-case] ${origin} — fake-empty from flaky node, trying curl ladder`)
+        if (isJadvalSudUz) return await curlLadder()
+        return { items: [] as CourtCase[], failed: true }
+      }
+      const data = JSON.parse(text)
+      const items = (Array.isArray(data) ? data : (data.data || [])).map(mapper)
+      console.log(`[court-case] ${origin} — got ${items.length} cases via scheduler`)
+      return { items, failed: false }
+    } catch {
+      // All workers failed at transport level → jadval.sud.uz gets the curl
+      // ladder (its TLS bypass + LB roulette sampling), everything else marks
+      // the endpoint incomplete (honesty invariant — v153).
+      if (isJadvalSudUz) return await curlLadder()
+      console.log(`[court-case] ${url} — all worker attempts failed, marking as incomplete`)
+      return { items: [] as CourtCase[], failed: true }
     }
-
-    // v140: BEST-OF — take the result with the MOST cases, not just the first.
-    // This handles the case where one proxy returns 6 cases and another returns 100.
-    successes.sort((a, b) => b.length - a.length)
-    const best = successes[0]
-    console.log(`[court-case] ${url} — got ${best.length} cases (best of ${successes.length} successful proxies, health: ${workerHealth.stats(originKey)})`)
-    return { items: best, failed: false }
   })
 
   const results = await Promise.all(promises)
@@ -594,7 +460,7 @@ async function searchCourtCasesInternal(
     }
   }
 
-  console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed after all retries' : ''}`)
+  console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed' : ''}`)
   return { cases: merged, incomplete }
 }
 
@@ -886,12 +752,14 @@ async function fetchJadvalApiDetails(courtTypeUpper: string, encodedNumber: stri
   if (!apiType) return null // Criminal cases are only on jadval.sud.uz
 
   const url = `${JADVALAPI}/online-monitoring/${apiType}/findByNumber/${encodedNumber}`
-  // Route through CF Worker to avoid IP blocking
-  const workerUrl = getCfWorkerUrl(url)
+  // v206: routed through the shared hedged scheduler (was round-robin single worker)
   try {
-    const res = await fetch(workerUrl, {
+    const res = await fetchViaWorkers(url, {
+      originKey: 'jadvalapi.sud.uz',
+      timeoutMs: 8_000,
+      hedgeMs: 800,
+      maxAttempts: 2,
       headers: { Accept: 'application/json, text/plain, */*', 'Origin': 'https://my.sud.uz', 'Referer': 'https://my.sud.uz/' },
-      signal: AbortSignal.timeout(8000),
     })
     // Guard against non-200 responses — jadvalapi returns 400 Bad Request for
     // most court types' findByNumber, and the body `{message, statusCode}` must
@@ -922,26 +790,42 @@ async function fetchJadvalDetails(courtType: CourtType, encodedNumber: string): 
   else if (courtType === 'administrative') endpoint = `${JADVAL_API}/case/findByAdmNumber/${encodedNumber}`
   else return null
 
-  // Route through CF Worker to avoid IP blocking
-  const workerUrl = getCfWorkerUrl(endpoint)
+  // v206: routed through the shared hedged scheduler (was round-robin single worker)
+  // v207: jadval.sud.uz is the flaky LB pool (see searchCourtCasesInternal) —
+  // 8s killed slow-good node answers; one scheduler pass + one curl retry.
   try {
-    const res = await fetch(workerUrl, {
+    const res = await fetchViaWorkers(endpoint, {
+      originKey: 'jadval.sud.uz',
+      timeoutMs: 20_000,
+      hedgeMs: 800,
+      maxAttempts: 2,
       headers: { Accept: 'application/json, text/plain, */*', 'Origin': 'https://my.sud.uz', 'Referer': 'https://my.sud.uz/' },
-      signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) {
       console.log(`[court-case] jadval details HTTP ${res.status} for ${endpoint}`)
-      return null
+    } else {
+      const text = await res.text()
+      if (!isFakeEmptyText(text)) {
+        const data = JSON.parse(text)
+        if (!data || (typeof data === 'object' && !Array.isArray(data) && data.message && data.statusCode)) {
+          return null
+        }
+        return Array.isArray(data) ? data : [data]
+      }
+      console.log(`[court-case] jadval details fake-empty from flaky node for ${endpoint}`)
     }
-    const text = await res.text()
-    if (text === 'Иш топилмади' || text.includes('топилмади')) return null
-    const data = JSON.parse(text)
-    if (!data || (typeof data === 'object' && !Array.isArray(data) && data.message && data.statusCode)) {
-      return null
-    }
-    return Array.isArray(data) ? data : [data]
   } catch (e) {
     console.log(`[court-case] jadval details failed: ${e instanceof Error ? e.message : e}`)
+  }
+  // v207: one direct-curl retry — pinned to the sibling machine so it samples
+  // a different throttle bucket than the worker pass.
+  try {
+    const text = await curlFetch(endpoint, JADVAL_ALT_IP || undefined)
+    if (isFakeEmptyText(text)) return null
+    const data = JSON.parse(text)
+    return Array.isArray(data) ? data : [data]
+  } catch (e2) {
+    console.log(`[court-case] jadval details curl retry failed: ${e2 instanceof Error ? e2.message : e2}`)
     return null
   }
 }

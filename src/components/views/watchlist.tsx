@@ -46,53 +46,51 @@ function RatingBadge({ rating }: { rating?: string | null }) {
   return <span className={`badge ${familyBadgeClass(band)}`}>Reyting {rating}</span>
 }
 
-function RemovableCard({
-  rec,
-  onUnwatch,
-  onRefresh,
-}: {
-  rec: CompanyRecord
-  onUnwatch: (stir: string) => void
-  onRefresh: (stir: string) => void
-}) {
+function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUnwatch: (stir: string) => void; onRefresh: (stir: string) => Promise<void> }) {
   const openCompany = useAppStore((s) => s.openCompany)
   const meta = rec.meta
   const wr = meta?.winRate
   const iso = meta?.nextHearingIso
+  const score = meta?.score
+  const ratingCat = meta?.rating
   const inactive = !!meta?.status && !isKnownActive(meta.status) && /тўхтатилган|тугатилган|tugatilgan|suspended|liquidat/i.test(meta.status)
-  // v204 (P-E): numeric rating restored — "93 · AA" when both parts known
-  const ratingVal =
-    meta?.score != null
-      ? meta?.rating
-        ? `${meta.score} · ${meta.rating}`
-        : String(meta.score)
-      : (meta?.rating ?? null)
+  const [refreshing, setRefreshing] = useState(false)
+  const refresh = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (refreshing) return
+    setRefreshing(true)
+    void onRefresh(rec.stir)
+      .catch(() => toast.error('Yangilashda xatolik — manbalar javob bermadi'))
+      .finally(() => setRefreshing(false))
+  }
   return (
     <div className="ccard" onClick={() => openCompany(rec.stir, { name: rec.name })}>
-      <button
-        className="ccard-x"
-        style={{ right: 44 }}
-        title="Yangilash"
-        onClick={(e) => {
-          e.stopPropagation()
-          onRefresh(rec.stir)
-        }}
-      >
-        <RefreshCw />
-      </button>
-      <button
-        className="ccard-x"
-        title="Kuzatuvdan olib tashlash"
-        onClick={(e) => {
-          e.stopPropagation()
-          onUnwatch(rec.stir)
-        }}
-      >
-        <X />
-      </button>
+      {/* v206: actions live IN the header row (no more absolute overlays that
+          covered the rating badge) — hover still reveals them. */}
       <div className="ccard-top">
         <div className="mono-tile">{initials(rec.name || '')}</div>
-        <RatingBadge rating={meta?.rating} />
+        <div className="ccard-tools">
+          <RatingBadge rating={ratingCat} />
+          <button
+            className="ccard-act"
+            title="Yangilash"
+            aria-label="Yangilash"
+            onClick={refresh}
+          >
+            {refreshing ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
+          </button>
+          <button
+            className="ccard-act ccard-act-danger"
+            title="Kuzatuvdan olib tashlash"
+            aria-label="Kuzatuvdan olib tashlash"
+            onClick={(e) => {
+              e.stopPropagation()
+              onUnwatch(rec.stir)
+            }}
+          >
+            <X />
+          </button>
+        </div>
       </div>
       <h3>{rec.name || `STIR ${grp(rec.stir)}`}</h3>
       <div className="p-row" style={{ gap: 8 }}>
@@ -102,29 +100,28 @@ function RemovableCard({
         <span className="stir">{grp(rec.stir)}</span>
         {meta?.status && <span className="faint" style={{ fontSize: 11 }}>· {statusLabel(meta.status)}</span>}
       </div>
-      {/* v204 (P-E): the old app's 4 metrics restored — win-rate keeps the
-          Monochrome-Signal ring but the numeric % is shown again */}
+      {/* v204 (P-E): four metrics restored — win% ring, ishlar, numeric reyting, keyingi majlis */}
       <div className="ccard-foot">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span title="Gʻalaba darajasi">
           <Ring pct={wr ?? 0} size={52} band={wr === undefined ? 'neu' : bandOf(wr)} />
-          <div className="mini">
-            <b>{wr != null ? `${wr}%` : '—'}</b>
-            <span>Gʻalaba</span>
-          </div>
+        </span>
+        <div className="mini">
+          <b>{wr !== undefined ? `${wr}%` : '-'}</b>
+          <span>Gʻalaba</span>
         </div>
         <div className="mini">
           <b>{meta?.cases ?? '-'}</b>
           <span>Ishlar</span>
         </div>
-        <div className="mini">
-          <b style={{ fontSize: meta?.score != null ? 15 : undefined }}>{ratingVal ?? '—'}</b>
-          <span>Reyting</span>
+        <div className="mini" title={ratingCat ? `Reyting toifasi: ${ratingCat}` : undefined}>
+          <b>{score != null ? score : '-'}</b>
+          <span>Reyting{ratingCat && ratingCat !== '-' ? ` · ${ratingCat}` : ''}</span>
         </div>
         {iso && !inactive ? (
           (() => {
             const [, m, d] = iso.split('-').map(Number)
             return (
-              <span className="hearing-pill b-warn" title="Keyingi majlis">
+              <span className="hearing-pill b-warn">
                 <CalendarDays />
                 {`${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}`}
               </span>
@@ -157,26 +154,39 @@ export function WatchlistView() {
   // Staggered enrichment — mirrors the shipped watchlist optimization; results
   // land in registry meta so every surface (home, bell) benefits. Each company
   // is enriched once per mount (no fetch loop from registry-change bumps).
-  // v204 (P-E): extracted as enrichCompany() so the per-card refresh button
-  // can re-run it for one company (after clearing its one-shot guard).
-  const enrichCompany = (stir: string) => {
-    void (async () => {
-      try {
-        const [stats, hearings] = await Promise.allSettled([getStats(stir), getUpcomingHearings(stir)])
-        if (stats.status === 'fulfilled' && stats.value.ok) {
-          const s = stats.value.data
+  // v204 (P-E): extracted into enrichCompany() so the per-card refresh button
+  // can re-run it for ONE company; also stores the chamber rating (score +
+  // category) that getStats already fetches.
+  // v206: `force` — the per-card refresh passes force=true so the server
+  // bypasses its 60s caches (stats route clears the court-case cache for the
+  // TIN; statsCache itself is skipped). Forced runs go SEQUENTIAL (stats →
+  // hearings) so the hearings read sees the freshly-cleared court cache.
+  // Both sources failing now THROWS so the card can toast the error —
+  // before, failures were swallowed and the button looked dead.
+  const enrichCompany = useRef(async (stir: string, force = false): Promise<void> => {
+    if (!force && enrichedRef.current.has(stir)) return
+    enrichedRef.current.add(stir)
+    let statsOk = false
+    let hearingsOk = false
+    try {
+      const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
+        if (res.ok) {
+          statsOk = true
+          const s = res.data
           patchMeta(stir, {
             cases: s.summary.total,
             winRate: s.summary.total ? Math.round((s.summary.win / s.summary.total) * 100) : 0,
             status: s.company?.status,
-            // v204 (P-E): chamber rating finally surfaces (stats.ts threads it)
             rating: s.rating?.category ?? null,
             score: s.rating?.score ?? null,
           })
         }
-        if (hearings.status === 'fulfilled' && hearings.value.ok) {
-          const h = hearings.value.data.hearings[0] as Record<string, unknown> | undefined
+      }
+      const applyHearings = (res: Awaited<ReturnType<typeof getUpcomingHearings>>) => {
+        if (res.ok) {
+          const h = res.data.hearings[0] as Record<string, unknown> | undefined
           if (h?.isoDate) {
+            hearingsOk = true
             patchMeta(stir, {
               nextHearingIso: h.isoDate as string,
               nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
@@ -184,31 +194,43 @@ export function WatchlistView() {
               nextHearingTime: (h.hearingTime as string) || undefined,
               nextHearingJudge: (h.judge as string) || undefined,
             })
+          } else {
+            hearingsOk = true
           }
         }
-        setTick((t) => t + 1)
-      } catch {
-        /* best-effort enrichment */
       }
-    })()
-  }
+      if (force) {
+        applyStats(await getStats(stir, { force: true }).catch(() => ({ ok: false } as Awaited<ReturnType<typeof getStats>>)))
+        applyHearings(await getUpcomingHearings(stir).catch(() => ({ ok: false } as Awaited<ReturnType<typeof getUpcomingHearings>>)))
+      } else {
+        const [stats, hearings] = await Promise.allSettled([getStats(stir), getUpcomingHearings(stir)])
+        if (stats.status === 'fulfilled') applyStats(stats.value)
+        if (hearings.status === 'fulfilled') applyHearings(hearings.value)
+      }
+    } catch {
+      /* best-effort enrichment */
+    } finally {
+      setTick((t) => t + 1)
+    }
+    if (!statsOk && !hearingsOk) {
+      throw new Error('enrichment failed: both sources unavailable')
+    }
+  }).current
 
   useEffect(() => {
     if (!hydrated) return
     const list = watched()
     const timers: ReturnType<typeof setTimeout>[] = []
     list.forEach((w, idx) => {
-      if (enrichedRef.current.has(w.stir)) return
-      enrichedRef.current.add(w.stir)
-      timers.push(setTimeout(() => enrichCompany(w.stir), idx * 350))
+      timers.push(setTimeout(() => void enrichCompany(w.stir), idx * 350))
     })
     return () => timers.forEach(clearTimeout)
-  }, [hydrated, items.length])
+  }, [hydrated, items.length, enrichCompany])
 
-  // v204 (P-E): per-card refresh — clear the one-shot guard and re-enrich
-  const refreshOne = (stir: string) => {
+  /** Per-card refresh: forget the one-shot guard and re-enrich with fresh data. */
+  const refreshCompany = (stir: string): Promise<void> => {
     enrichedRef.current.delete(stir)
-    enrichCompany(stir)
+    return enrichCompany(stir, true)
   }
 
   const alerts = useMemo(() => {
@@ -344,7 +366,7 @@ export function WatchlistView() {
       </div>
       <div className="ccards">
         {items.map((c) => (
-          <RemovableCard key={c.stir} rec={c} onUnwatch={unwatch} onRefresh={refreshOne} />
+          <RemovableCard key={c.stir} rec={c} onUnwatch={unwatch} onRefresh={refreshCompany} />
         ))}
         {items.length === 0 && (
           <div className="empty" style={{ gridColumn: '1/-1' }}>

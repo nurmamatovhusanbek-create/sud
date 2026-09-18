@@ -1,6 +1,5 @@
 import crypto from 'crypto'
 import ZAI from 'z-ai-web-dev-sdk'
-import { getCfWorkerUrls } from './cf-worker-pool'
 
 /**
  * Sud Billing (billing.sud.uz) integration service.
@@ -20,269 +19,23 @@ const SITE_KEY = 'site_bbdb0625df8a200e73f37ebccf0c62ac'
 const CAPTCHA_API = 'https://recaptcha.sud.uz'
 const BILLING_API = 'https://billing.sud.uz'
 
-// v204 (P-A): billing no longer keeps its own worker list or URL resolver.
-// The shared getCfWorkerUrls() (cf-worker-pool.ts) is the single resolver:
-// workers.json -> CF_WORKER_URLS/CF_WORKER_URL -> DEFAULT_WORKERS. UI-added
-// workers therefore take effect for bills immediately.
+// v204 (P-A): billing no longer carries its own worker list or resolver.
+// v206 (rate-limit fix): billing no longer carries its own ProxyPool either —
+// every request below (PoW/captcha POSTs, search, per-bill checkStatus) goes
+// through the shared hedged scheduler in net/worker-fetch, so the 60-receipt
+// enrichment queues under the shared per-origin cap + spacing for
+// billing.sud.uz instead of stampeding it. That shared cap is exactly what
+// stops the rate-limit wall.
+import { fetchViaWorkers } from './net/worker-fetch'
 
 /**
- * billing.sud.uz blocks many IPs (including Tor exit nodes). We route billing
- * requests through free CORS proxies that run on unblocked datacenter IPs.
- * The captcha API (recaptcha.sud.uz) is NOT blocked, so it connects directly.
- *
- * Multiple proxies are used with rotation so if one rate-limits or goes down,
- * the app automatically switches to another.
- *
- * ## ProxyPool with health tracking
- *
- * Instead of blindly round-robining through all proxies on every request, the
- * pool tracks per-proxy success/failure counts. A proxy that fails 3 times in
- * a row is marked "dead" for 60 seconds and skipped — so we stop wasting
- * ~15s per bill retrying known-dead proxies (corsproxy.io paid plan, allorigins
- * empty responses). This cuts 60-bill lookup time from ~800s to ~150s.
- *
- * ### Optional: self-hosted Cloudflare Worker proxy
- *
- * proxy.cors.sh rate-limits after ~30 requests/min. For companies with many
- * bills (100+), deploy your own free Cloudflare Worker proxy (unlimited, no
- * rate limits). Set `CF_WORKER_URL` in .env:
- *   CF_WORKER_URL=https://your-worker.your-subdomain.workers.dev
- * The worker code is in `cloudflare-worker/proxy.js` — deploy it in 2 minutes
- * at https://dash.cloudflare.com → Workers. The worker runs on Cloudflare's
- * edge network (200+ locations) so it's fast and rarely IP-blocked.
+ * billing.sud.uz sits behind its own Cloudflare and blocks many IPs
+ * (including Tor exit nodes), so ALL billing/recaptcha traffic is routed
+ * through the operator's CF workers (proxy.js forwards method + body).
+ * The scheduler adds: health-ordered worker selection, hedged escalation,
+ * per-worker (NET_PER_WORKER_MAX) and per-origin (NET_PER_ORIGIN_MAX)
+ * concurrency caps plus minimum origin spacing (NET_ORIGIN_SPACING_MS).
  */
-
-// ---- ProxyPool: health-tracked CORS proxy rotation --------------------
-
-interface ProxyState {
-  url: string
-  label: string
-  needsEncoding: boolean // allorigins needs encodeURIComponent
-  failures: number
-  successes: number
-  lastFailureAt: number
-  deadUntil: number // 0 = alive; timestamp = retry allowed after this time
-}
-
-class ProxyPool {
-  private states: ProxyState[]
-  private nextIndex = 0
-  private static readonly DEAD_THRESHOLD = 2 // mark dead after 2 consecutive failures (was 3)
-  private static readonly DEAD_COOLDOWN_MS = 60_000 // skip dead proxies for 60s
-
-  constructor(proxies: { url: string; needsEncoding?: boolean }[]) {
-    this.states = proxies.map((p) => ({
-      url: p.url,
-      label: this.labelFor(p.url),
-      needsEncoding: p.needsEncoding ?? false,
-      failures: 0,
-      successes: 0,
-      lastFailureAt: 0,
-      deadUntil: 0,
-    }))
-  }
-
-  private labelFor(url: string): string {
-    try {
-      return new URL(url).hostname
-    } catch {
-      return url.substring(0, 30)
-    }
-  }
-
-  /** Get the next alive proxy — prefers ones that have succeeded before
-   *  (so once proxy.cors.sh proves it works, it's tried FIRST, not round-robined
-   *  with 4 dead proxies that each waste 8s on timeout). */
-  next(): ProxyState | null {
-    const now = Date.now()
-    // Revive proxies whose cooldown has expired (give them another chance).
-    for (const s of this.states) {
-      if (s.deadUntil > 0 && s.deadUntil < now) {
-        s.deadUntil = 0
-        s.failures = 0
-        console.log(`[billing] proxy ${s.label} revived after cooldown`)
-      }
-    }
-    const alive = this.states.filter((s) => s.deadUntil === 0)
-    if (alive.length === 0) {
-      // All proxies dead — revive the one with the oldest failure (best chance).
-      const oldest = this.states.reduce((a, b) =>
-        a.lastFailureAt < b.lastFailureAt ? a : b,
-      )
-      oldest.deadUntil = 0
-      oldest.failures = 0
-      console.log(`[billing] all proxies dead — reviving ${oldest.label} (oldest failure)`)
-      return oldest
-    }
-    // PRIORITY: proxies with successes > 0 are "known working" — try them first.
-    // Among known-working ones, round-robin to spread load.
-    const knownWorking = alive.filter((s) => s.successes > 0)
-    if (knownWorking.length > 0) {
-      return knownWorking[this.nextIndex++ % knownWorking.length]
-    }
-    // No known-working proxies yet — try untested ones (successes=0, failures=0)
-    // before ones that have already failed.
-    const untested = alive.filter((s) => s.failures === 0)
-    if (untested.length > 0) {
-      return untested[this.nextIndex++ % untested.length]
-    }
-    // All alive proxies have failed at least once — try the one with fewest failures.
-    return alive.reduce((a, b) => (a.failures <= b.failures ? a : b))
-  }
-
-  markSuccess(proxy: ProxyState): void {
-    proxy.successes++
-    proxy.failures = 0
-    proxy.deadUntil = 0
-  }
-
-  markFailed(proxy: ProxyState): void {
-    proxy.failures++
-    proxy.lastFailureAt = Date.now()
-    if (proxy.failures >= ProxyPool.DEAD_THRESHOLD && proxy.deadUntil === 0) {
-      proxy.deadUntil = Date.now() + ProxyPool.DEAD_COOLDOWN_MS
-      console.log(
-        `[billing] proxy ${proxy.label} marked DEAD for ${ProxyPool.DEAD_COOLDOWN_MS / 1000}s ` +
-          `(${proxy.failures} consecutive failures)`,
-      )
-    }
-  }
-
-  aliveCount(): number {
-    return this.states.filter((s) => s.deadUntil === 0).length
-  }
-
-  /** Human-readable stats for debugging. */
-  stats(): string {
-    return this.states
-      .map(
-        (s) =>
-          `${s.label}: ${s.successes}✓/${s.failures}✗ ${s.deadUntil > Date.now() ? 'DEAD' : 'alive'}`,
-      )
-      .join(' | ')
-  }
-}
-
-// Build the proxy list. Order = priority (first = preferred).
-//
-// IMPORTANT: billing.sud.uz sits behind its OWN Cloudflare, which BLOCKS
-// Cloudflare Worker IPs (HTTP 521 origin_down) for the /api/invoice/* endpoints.
-// However, recaptcha.sud.uz (the captcha API) does NOT block CF Workers.
-// So we use TWO pools:
-//  - captchaPool: CF Worker first (fast, unlimited), fallback to cors.sh
-//  - billingPool: proxy.cors.sh first (the only one that works for billing),
-//    CF Worker is EXCLUDED from billing (it always gets 521)
-function buildCaptchaPool(): { url: string; needsEncoding?: boolean }[] {
-  const list: { url: string; needsEncoding?: boolean }[] = []
-  // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins removed).
-  const urls = getCfWorkerUrls()
-  for (const u of urls) {
-    list.push({ url: u })
-  }
-  if (list.length > 0) {
-    console.log(`[billing] ${list.length} CF Worker(s) enabled for captcha API`)
-  }
-  return list
-}
-
-function buildBillingPool(): { url: string; needsEncoding?: boolean }[] {
-  // v144: CF Workers ONLY — no other proxies (cors.sh, allorigins, corsproxy.io,
-  // codetabs, thingproxy all removed per user request).
-  const list: { url: string; needsEncoding?: boolean }[] = []
-  const urls = getCfWorkerUrls()
-  for (const u of urls) {
-    list.push({ url: u })
-  }
-  if (list.length > 0) {
-    console.log(`[billing] ${list.length} CF Worker(s) enabled for billing API`)
-  }
-  return list
-}
-
-const captchaPool = new ProxyPool(buildCaptchaPool())
-const billingPool = new ProxyPool(buildBillingPool())
-
-// ---- Global circuit breaker for billing.sud.uz origin outages -----------------
-// When billing.sud.uz's origin goes down (sustained 521), ALL bills fail.
-// Without a circuit breaker, 60 bills × 6 retries × 6 concurrency = 2160 requests
-// hammer a dead origin. This breaker detects sustained 521 and pauses ALL billing
-// requests for 30s, giving the origin time to recover.
-const circuitBreaker = {
-  consecutive521: 0,
-  trippedUntil: 0, // 0 = not tripped; timestamp = resume allowed after this
-  TRIP_THRESHOLD: 5, // trip after 5 consecutive 521s
-  COOLDOWN_MS: 30_000, // pause all billing requests for 30s when tripped
-  isTripped(): boolean {
-    if (this.trippedUntil > 0 && Date.now() < this.trippedUntil) return true
-    if (this.trippedUntil > 0 && Date.now() >= this.trippedUntil) {
-      // Cooldown expired — reset and try again
-      console.log(`[billing] circuit breaker cooldown expired — resuming requests`)
-      this.trippedUntil = 0
-      this.consecutive521 = 0
-    }
-    return false
-  },
-  record521(): void {
-    this.consecutive521++
-    if (this.consecutive521 >= this.TRIP_THRESHOLD && this.trippedUntil === 0) {
-      this.trippedUntil = Date.now() + this.COOLDOWN_MS
-      console.log(`[billing] ⚠ CIRCUIT BREAKER TRIPPED — ${this.consecutive521} consecutive 521s. Pausing all billing requests for ${this.COOLDOWN_MS / 1000}s. The origin (billing.sud.uz) is down.`)
-    }
-  },
-  recordSuccess(): void {
-    if (this.consecutive521 > 0) {
-      this.consecutive521 = 0
-    }
-  },
-  /** Wait until the circuit breaker is no longer tripped. */
-  async waitForRecovery(): Promise<void> {
-    while (this.isTripped()) {
-      const waitMs = Math.min(this.trippedUntil - Date.now(), 5000)
-      console.log(`[billing] circuit breaker tripped — waiting ${Math.ceil(waitMs / 1000)}s for origin recovery…`)
-      await new Promise((r) => setTimeout(r, Math.max(waitMs, 1000)))
-    }
-  },
-}
-
-/** Select the right pool based on the target URL.
- *  recaptcha.sud.uz → captchaPool (CF Worker works)
- *  billing.sud.uz → billingPool (proxy.cors.sh works, CF Worker gets 521) */
-function poolFor(url: string): ProxyPool {
-  return url.includes('recaptcha.sud.uz') ? captchaPool : billingPool
-}
-
-/** @deprecated Use poolFor(url) instead. Kept for backward compat. */
-const proxyPool = billingPool
-
-/** Get a human-readable label for the current proxy (for logging). */
-function getCurrentProxyLabel(): string {
-  const p = proxyPool.next()
-  return p ? p.label : 'none'
-}
-
-// Legacy functions kept for backward compatibility with fetchJsonWithRetry
-// (which uses proxyBillingUrl + rotateProxy for the search endpoint).
-function getCurrentProxy(): string {
-  const p = proxyPool.next()
-  return p ? p.url : 'https://proxy.cors.sh/'
-}
-
-function rotateProxy(): string {
-  // In the new pool system, rotation happens automatically via next().
-  // This is kept so fetchJsonWithRetry's existing code doesn't break.
-  return getCurrentProxy()
-}
-
-/** Wrap a billing.sud.uz URL with the current CORS proxy (uses billing pool). */
-function proxyBillingUrl(url: string): string {
-  if (!url.startsWith(BILLING_API)) return url
-  const proxy = billingPool.next()
-  if (!proxy) return url // no proxies available — try direct (will likely fail)
-  if (proxy.needsEncoding) {
-    return proxy.url + encodeURIComponent(url)
-  }
-  return proxy.url + url
-}
 
 // ---- Types -------------------------------------------------------------
 
@@ -381,11 +134,12 @@ async function solveMathImage(imageBase64: string): Promise<number> {
 /**
  * Fetch a JSON response with exponential-backoff retries.
  *
- * Two profiles:
- * - **Captcha API** (recaptcha.sud.uz): direct connection, 2 retries, short backoff.
- * - **Billing API** (billing.sud.uz): routed through CORS proxy (proxy.cors.sh)
- *   because billing.sud.uz blocks many IPs including Tor exit nodes. 6 retries,
- *   longer backoff. No Tor needed - the proxy runs on an unblocked datacenter IP.
+ * v206: each attempt goes through the shared hedged scheduler
+ * (`fetchViaWorkers`) — health-ordered worker selection + hedge + per-origin
+ * caps/spacing for recaptcha.sud.uz and billing.sud.uz. The outer retry loop
+ * and backoff profiles stay (captcha: 2 retries, short backoff; billing: 3,
+ * longer backoff). POST bodies (PoW/analyze/solve) pass through — the worker
+ * proxy.js forwards method + body.
  */
 async function fetchJsonWithRetry<T>(
   url: string,
@@ -399,45 +153,30 @@ async function fetchJsonWithRetry<T>(
   // Billing API: 3 retries for transient network blips.
   const effectiveRetries = isCaptchaUrl ? Math.min(retries, 2) : Math.min(retries, 3)
 
-  // HYBRID: For billing URLs, try DIRECT first (fast, ~400ms), then CF Worker
-  // (slower but different IP). For captcha, use CF Worker (works reliably).
-  // This spreads load across 2 IP ranges so neither gets rate-blocked.
-  const cfWorkerUrl = process.env.CF_WORKER_URL
-  const cfProxy = cfWorkerUrl
-    ? (cfWorkerUrl.endsWith('/') ? cfWorkerUrl : cfWorkerUrl + '/')
-    : 'https://proxy.cors.sh/'
+  const method = typeof init.method === 'string' ? init.method : 'GET'
+  const body = typeof init.body === 'string' ? init.body : undefined
+  const headers = (init.headers || {}) as Record<string, string>
 
   let lastErr: unknown = null
   for (let attempt = 0; attempt <= effectiveRetries; attempt++) {
     const startTime = Date.now()
     try {
-      // For billing: round-robin through direct + all workers.
-      // For captcha: use first worker (captcha isn't rate-limited).
-      let currentFetchUrl = url
-      let proxyLabel = 'direct'
-      if (isCaptchaUrl) {
-        // Captcha: use first CF Worker (works reliably, no rate limit)
-        const workers = getCfWorkerUrls()
-        if (workers.length > 0) {
-          currentFetchUrl = workers[0] + url
-          proxyLabel = 'worker1'
-        }
-      } else if (isBillingUrl) {
-        // Billing: round-robin through direct + all workers
-        const method = nextProxyUrl(url)
-        currentFetchUrl = method.url
-        proxyLabel = method.label
-      }
-      const timeoutMs = isCaptchaUrl ? 10000 : 8000
-      const res = await fetch(currentFetchUrl, {
-        ...init,
-        signal: AbortSignal.timeout(timeoutMs),
+      const res = await fetchViaWorkers(url, {
+        originKey: isCaptchaUrl ? 'recaptcha.sud.uz' : 'billing.sud.uz',
+        method,
+        body,
+        headers,
+        timeoutMs: isCaptchaUrl ? 10_000 : 8_000,
+        hedgeMs: 900,
+        maxAttempts: 2,
       })
       const elapsed = Date.now() - startTime
       const label = url.split('/').pop()?.split('?')[0] ?? url
-      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via ${proxyLabel})`)
+      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via scheduler)`)
 
-      // 521/522/523 = origin down. Try the OTHER method on next attempt.
+      // 521/522/523 = origin down. The scheduler already hedges to another
+      // worker (>=500 counts as a worker/origin failure) — if we still see it,
+      // back off and let the outer loop retry.
       if (res.status === 521 || res.status === 522 || res.status === 523) {
         throw new Error(`HTTP ${res.status} (origin down)`)
       }
@@ -451,7 +190,7 @@ async function fetchJsonWithRetry<T>(
       // BUT: 422 captcha-fail has requestStatus but no content — that's valid.
       if (isBillingUrl && parsed && typeof parsed === 'object' && !Array.isArray((parsed as any).content)) {
         if (!(parsed as any).requestStatus) {
-          throw new Error(`Invalid search response from ${proxyLabel}`)
+          throw new Error('Invalid search response')
         }
       }
       return parsed
@@ -749,46 +488,15 @@ export async function searchBillsByInn(
   }
 }
 
-// ---- Multi-proxy router: rotates through direct + multiple CF Workers --------
-// With 4 CF Workers + direct = 5 different IPs. Each handles only ~12 of 60
-// bills — well under billing.sud.uz's ~50-request rate limit.
+// ---- Per-bill status (v206: through the shared scheduler) --------------------
 //
-// Workers are configured in .env via CF_WORKER_URLS (comma-separated).
-// Falls back to CF_WORKER_URL (single, for backward compat) then proxy.cors.sh.
-//
-// The router round-robins: direct → worker1 → worker2 → worker3 → worker4 →
-// direct → worker1... so no single IP gets hammered.
-let requestCounter = 0
+// Was: a hand-rolled method list (primary + all workers + cors.sh) retried
+// per bill — with 60 bills × 6 concurrency that stampeded billing.sud.uz.
+// Now: each checkStatus is ONE hedged scheduler call (max 3 worker attempts,
+// hedge 900ms) and the shared per-origin cap (NET_PER_ORIGIN_MAX) + spacing
+// (NET_ORIGIN_SPACING_MS) pace the whole enrichment across all callers.
 
-// v144: FALLBACK_WORKERS + getCfWorkerUrls moved to top of file (before
-// buildCaptchaPool) to fix "Cannot access before initialization" ReferenceError.
-// The duplicate definitions that were here have been removed.
-
-/** Get the next proxy to try (round-robin among CF Workers only — NEVER direct).
- *  Using direct exposes the server IP and gets it blocked by billing.sud.uz. */
-function nextProxyUrl(targetUrl: string): { url: string; label: string } {
-  const workers = getCfWorkerUrls()
-  // v204 (P-A): the shared resolver is never empty (DEFAULT_WORKERS tail), so
-  // the old empty-list fallback branch is dead code — removed.
-  const methods: { url: string; label: string }[] = workers.map((w, i) => ({
-    url: w + targetUrl, label: `worker${i + 1}`,
-  }))
-  const method = methods[requestCounter % methods.length]
-  requestCounter++
-  return method
-}
-
-/** Build fallback list: all CF Workers + cors.sh (NEVER direct — protects server IP). */
-function getAllProxyUrls(targetUrl: string): { url: string; label: string }[] {
-  const workers = getCfWorkerUrls()
-  const methods: { url: string; label: string }[] = workers.map((w, i) => ({
-    url: w + targetUrl, label: `worker${i + 1}`,
-  }))
-  methods.push({ url: 'https://proxy.cors.sh/' + targetUrl, label: 'cors.sh' })  // last resort
-  return methods
-}
-
-/** Get the detailed status of one bill using multi-proxy rotation. */
+/** Get the detailed status of one bill using the shared hedged scheduler. */
 export async function getBillStatus(invoiceNumber: string, lang = 'ru'): Promise<CheckStatusResponse> {
   const params = new URLSearchParams({ invoice: invoiceNumber, lang })
   const url = `${BILLING_API}/api/invoice/checkStatus?${params.toString()}`
@@ -799,34 +507,26 @@ export async function getBillStatus(invoiceNumber: string, lang = 'ru'): Promise
     Referer: `${BILLING_API}/invoice/${invoiceNumber}`,
   }
 
-  // Primary proxy (round-robin) + all fallbacks
-  const primary = nextProxyUrl(url)
-  const allMethods = getAllProxyUrls(url)
-  // Put primary first, then the rest (deduplicated)
-  const methods = [primary, ...allMethods.filter(m => m.url !== primary.url)]
-
   let lastErr: unknown = null
-  let httpErrorCount = 0 // count consecutive HTTP 500/404 (origin-level, not proxy)
-  for (let i = 0; i < methods.length; i++) {
-    const { url: fetchUrl, label } = methods[i]
+  let httpErrorCount = 0 // count origin-level 429/4xx responses (bill might be broken)
+  // Up to 2 scheduler hops; each hop already hedges across up to 3 workers.
+  for (let hop = 0; hop < 2; hop++) {
     try {
-      const res = await fetch(fetchUrl, { headers, signal: AbortSignal.timeout(6000) })
-      // 521/522/523 = origin down. Try next proxy (transient).
-      if (res.status === 521 || res.status === 522 || res.status === 523) {
-        console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: HTTP ${res.status} — trying next`)
+      const res = await fetchViaWorkers(url, {
+        originKey: 'billing.sud.uz',
+        timeoutMs: 8_000,
+        hedgeMs: 900,
+        maxAttempts: 3,
+        headers,
+      })
+      // 429/4xx = the origin answered on a worker. 5xx/521 never get here —
+      // the scheduler treats them as failures and throws/hedges internally.
+      if (res.status === 429 || res.status >= 400) {
+        httpErrorCount++
         lastErr = new Error(`HTTP ${res.status}`)
-        httpErrorCount = 0 // reset — 521 is transient (origin down), not bill-specific
-        continue
-      }
-      if (res.status === 429 || res.status >= 500) {
-        console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: HTTP ${res.status} — trying next`)
-        lastErr = new Error(`HTTP ${res.status}`)
-        httpErrorCount++ // count origin-level errors (500/404 = bill might be broken)
-        // BAIL EARLY: if 3+ methods all return the same HTTP 500/429, the origin
-        // is returning a definitive error for THIS bill — no point trying the
-        // remaining 2 methods (they'll get the same response). This prevents
-        // wasting 15+ seconds on a permanently-broken bill.
-        if (httpErrorCount >= 3) {
+        // BAIL EARLY: if 2 hops both return the same HTTP error, the origin
+        // is giving a definitive answer for THIS bill — no point retrying.
+        if (httpErrorCount >= 2) {
           console.log(`[billing] checkStatus ${invoiceNumber}: ${httpErrorCount} consecutive HTTP errors — bailing early (permanent failure)`)
           throw new Error(`PERMANENT: HTTP ${res.status}`)
         }
@@ -834,20 +534,18 @@ export async function getBillStatus(invoiceNumber: string, lang = 'ru'): Promise
       }
       const body = (await res.json()) as CheckStatusResponse
       if (!body || typeof body !== 'object' || !body.requestStatus) {
-        console.log(`[billing] checkStatus ${invoiceNumber} via ${label}: invalid — trying next`)
-        lastErr = new Error(`Invalid response from ${label}`)
+        console.log(`[billing] checkStatus ${invoiceNumber}: invalid body — retrying`)
+        lastErr = new Error('Invalid response')
         continue
       }
       return body
     } catch (e) {
       lastErr = e
       const msg = e instanceof Error ? e.message : String(e)
-      // Don't log "PERMANENT:" errors again (already logged above)
-      if (!msg.startsWith('PERMANENT:')) {
-        console.log(`[billing] checkStatus ${invoiceNumber} via ${label} failed: ${msg}`)
-      }
-      // If this was a permanent bail, re-throw immediately
       if (msg.startsWith('PERMANENT:')) throw e
+      // AggregateError = every worker attempt failed at transport level —
+      // loop to the next hop (the scheduler has already re-ordered workers).
+      console.log(`[billing] checkStatus ${invoiceNumber} hop ${hop + 1} failed: ${msg.slice(0, 120)}`)
     }
   }
 

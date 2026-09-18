@@ -46,12 +46,12 @@ const ALL_TYPES: ('CIVIL' | 'ECONOMIC' | 'CONFLICT')[] = ['CIVIL', 'ECONOMIC', '
 
 // ---- CF Worker proxy helper (same as court-case.ts) ----------------------
 
-// v150 P3: Uses shared cf-worker-pool.ts instead of duplicate logic
-import { createWorkerPool } from './cf-worker-pool'
-const _workerPool = createWorkerPool()
-function getCfWorkerUrl(url: string): string {
-  return _workerPool.nextProxyUrl(url)
-}
+// v206 (rate-limit fix): the date-range scan is BACKGROUND work — it must
+// yield to live user lookups. Each fetch goes through the shared scheduler
+// with priority:'background' (lane capped at NET_BACKGROUND_MAX=3) so a
+// 90-request batch can't drown a TIN search, while still respecting the same
+// per-worker / per-origin caps and spacing as everything else.
+import { fetchViaWorkers } from './net/worker-fetch'
 
 // Known Uzbekistan court holidays (court offices closed — no hearings
 // scheduled). Stored as MM-DD strings so we can compare against any year.
@@ -84,12 +84,21 @@ export async function fetchHearingsForDate(
   type: 'CIVIL' | 'ECONOMIC' | 'CONFLICT' = 'CIVIL',
 ): Promise<Jadval2Hearing[]> {
   const url = `${JADVALAPI_BASE}/${type}/${encodeURIComponent(courtId)}/${dateStr}`
-  const proxiedUrl = getCfWorkerUrl(url)
 
   try {
-    const res = await fetch(proxiedUrl, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { Accept: 'application/json' },
+    // v206: background lane through the shared scheduler (was round-robin
+    // worker + plain fetch, 30×3 parallel per batch).
+    const res = await fetchViaWorkers(url, {
+      originKey: 'jadvalapi.sud.uz',
+      priority: 'background',
+      timeoutMs: FETCH_TIMEOUT_MS,
+      hedgeMs: 1_200,
+      maxAttempts: 2,
+      headers: {
+        Accept: 'application/json',
+        Origin: 'https://jadval2.sud.uz',
+        Referer: 'https://jadval2.sud.uz/',
+      },
     })
     if (!res.ok) {
       console.log(`[jadval2] ${courtId} ${dateStr}: HTTP ${res.status}`)

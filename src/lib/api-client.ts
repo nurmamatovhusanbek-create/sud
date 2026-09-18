@@ -185,31 +185,29 @@ export async function exportStatsXlsx(payload: unknown): Promise<void> {
   await downloadPost('/api/stats/export', payload)
 }
 
-// ---- v205 (§6.5): merged company-cases (live TIN + name discovery) ------------
-
-export interface AggCaseData extends CourtCase {
-  source: 'tin' | 'name'
-  courtType: string
-  matchScore?: number
+/** v204 (P-C): cases-list export — server re-fetches, client just downloads. */
+export async function exportCasesXlsx(params: { tin: string; courtTypes?: string[] }): Promise<void> {
+  const q = new URLSearchParams({ tin: params.tin })
+  if (params.courtTypes?.length) q.set('courtTypes', params.courtTypes.join(','))
+  await downloadGet(`/api/court-cases/export?${q}`)
 }
 
-export interface CompanyCasesData {
-  cases: AggCaseData[]
-  partial: string[]
+/** v204 (P-C): upcoming-hearings export — server re-fetches, client downloads. */
+export async function exportHearingsXlsx(params: { tin: string }): Promise<void> {
+  await downloadGet(`/api/upcoming-hearings/export?tin=${encodeURIComponent(params.tin)}`)
 }
 
-export function getCompanyCases(tin: string, signal?: AbortSignal) {
-  return request<CompanyCasesData>(`/api/company-cases?tin=${tin}`, signal)
-}
-
-// ---- v204 (P-C): GET-based xlsx exports (cases + hearings) --------------------
-
-export async function exportCasesXlsx(tin: string): Promise<void> {
-  await downloadGet(`/api/court-cases/export?tin=${tin}`)
-}
-
-export async function exportHearingsXlsx(tin: string): Promise<void> {
-  await downloadGet(`/api/upcoming-hearings/export?tin=${tin}`)
+async function saveBlob(res: Response, fallbackName: string): Promise<void> {
+  const blob = await res.blob()
+  const cd = res.headers.get('content-disposition') || ''
+  const m = cd.match(/filename="([^"]+)"/)
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = m?.[1] || fallbackName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(a.href)
 }
 
 async function downloadGet(url: string): Promise<void> {
@@ -222,16 +220,7 @@ async function downloadGet(url: string): Promise<void> {
     } catch { /* binary */ }
     throw new Error(msg)
   }
-  const blob = await res.blob()
-  const cd = res.headers.get('content-disposition') || ''
-  const m = cd.match(/filename="([^"]+)"/)
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = m?.[1] || 'export.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(a.href)
+  await saveBlob(res, 'export.xlsx')
 }
 
 async function downloadPost(url: string, body: unknown): Promise<void> {
@@ -248,14 +237,5 @@ async function downloadPost(url: string, body: unknown): Promise<void> {
     } catch { /* binary */ }
     throw new Error(msg)
   }
-  const blob = await res.blob()
-  const cd = res.headers.get('content-disposition') || ''
-  const m = cd.match(/filename="([^"]+)"/)
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = m?.[1] || 'export.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(a.href)
+  await saveBlob(res, 'export.xlsx')
 }

@@ -13,14 +13,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
+import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
+import { printHtml, escapeHtml } from '@/lib/print'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
 import { setCachedBills, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
 import { exportBillsXlsx, getBillDetail } from '@/lib/api-client'
-import { printHtml, esc } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
 import { billStatusFamilySafe } from './bills-helpers'
-import { ListPagination, PageSizeSelect, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import {
   formatSum,
   formatDate,
@@ -61,38 +61,6 @@ function Barcode({ seed }: { seed: string }) {
   )
 }
 
-/** v204 (P-C): real print sheet for the receipt (user picks "Save as PDF"). */
-function printReceipt(b: EnrichedBill) {
-  const d = (b.detail || null) as CheckStatusResponse | null
-  const status = d?.invoiceStatus ?? b.invoiceStatus
-  const kv = (
-    pairs: [string, string][],
-  ) =>
-    pairs
-      .map(
-        ([k, v]) =>
-          `<div class="kv"><span>${esc(k)}</span><span>${esc(v)}</span></div>`,
-      )
-      .join('')
-  const html =
-    `<h1>Kvitansiya ${esc(b.number)}</h1>` +
-    `<div class="muted">billing.sud.uz · ${esc(statusLabel(status))} · ${esc(formatDate(b.issued))}</div>` +
-    kv([
-      ['Toʻlovchi', d?.payer || '-'],
-      ['Sud', d?.court || courtTypeLabel(d?.courtType) || '-'],
-      ['Instansiya', d?.instance || '-'],
-      ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : '-'],
-      ['Ish raqami', d?.claimCaseNumber || '-'],
-      ['Maqsad', d?.purpose || d?.description || '-'],
-      ['Toʻlangan', `${formatSum(d?.paidAmount)} soʻm`],
-      ['Balans', `${formatSum(d?.balance)} soʻm`],
-      ['Foydasiga', d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yoʻq" : '-'],
-    ]) +
-    `<div class="total"><span>Jami summa</span><span>${esc(formatSum(d?.amount))} soʻm</span></div>`
-  const ok = printHtml(`Kvitansiya ${b.number}`, html)
-  if (!ok) toast.error("Pop-up oynasi bloklandi — brauzerda ruxsat bering")
-}
-
 /** Receipt drawer — shared with the Overview "Soʻnggi toʻlovlar" strip. */
 export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
   const d = (b.detail || null) as CheckStatusResponse | null
@@ -113,6 +81,40 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
     rows.push(['Muddati oʻtgan', <span className="v" key="overdue" style={{ color: 'var(--neg-text)' }}>{formatSum(d.overdue)} soʻm</span>])
   }
   rows.push(['Foydasiga', <span className="v sans" key="favor">{d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yoʻq" : '-'}</span>])
+
+  // v204 (P-C): real print dialog for the receipt (was a fake toast).
+  const printReceipt = () => {
+    try {
+      printHtml(
+        `Kvitansiya ${b.number}`,
+        `<div class="pr-head">
+          <div>
+            <div class="pr-eyebrow">billing.sud.uz</div>
+            <div class="pr-title">${escapeHtml(b.number)}</div>
+          </div>
+          <div class="pr-meta"><span class="pr-badge">${escapeHtml(statusLabel(status))}</span></div>
+        </div>
+        ${[
+          ['Toʻlovchi', d?.payer],
+          ['Sud', d?.court || courtTypeLabel(d?.courtType)],
+          ['Instansiya', d?.instance],
+          ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : null],
+          ['Ish raqami', d?.claimCaseNumber],
+          ['Sana', formatDate(b.issued)],
+          ['Maqsad', d?.purpose || d?.description],
+          ['Toʻlangan', d ? `${formatSum(d.paidAmount)} soʻm` : null],
+          ['Balans', d ? `${formatSum(d.balance)} soʻm` : null],
+          ...(d?.overdue && d.overdue > 0 ? [['Muddati oʻtgan', `${formatSum(d.overdue)} soʻm`]] : []),
+          ['Foydasiga', d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? 'Yoʻq' : null],
+        ]
+          .map(([k, v]) => `<div class="pr-kv"><span class="k">${escapeHtml(String(k))}</span><span class="v">${escapeHtml(v == null || v === '' ? '-' : String(v))}</span></div>`)
+          .join('')}
+        <div class="pr-total"><span>Jami summa</span><span>${escapeHtml(formatSum(d?.amount))} soʻm</span></div>`,
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Chop etib boʻlmadi')
+    }
+  }
 
   openProtoDrawer(
     'Kvitansiya',
@@ -143,7 +145,7 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
         <button
           className="btn btn-outline btn-sm"
           style={{ flex: 1 }}
-          onClick={() => printReceipt(b)}
+          onClick={printReceipt}
         >
           <Download />
           <span>PDF</span>
@@ -228,7 +230,7 @@ export function BillsSection() {
   const [seg, setSeg] = useState<'all' | 'paid' | 'overdue'>('all')
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
-  // v204 (P-D): pagination + per-page (restores the old app's billPageSize)
+  // v204 (P-D): restored pagination (was dropped in the rebuild)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
@@ -299,10 +301,11 @@ export function BillsSection() {
     return list
   }, [items, seg, filter])
 
-  // v204 (P-D): reset to the first page whenever the filter result changes
+  // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
   }, [filter, seg, stir])
+
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
@@ -405,7 +408,6 @@ export function BillsSection() {
                 onChange={(k) => setSeg(k as typeof seg)}
               />
               <div style={{ flex: 1 }} />
-              <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} />
               <button className="btn btn-outline btn-sm" onClick={() => stir && stream.start(stir)}>
                 <Bolt />
                 <span>Oqimni koʻrsatish</span>
@@ -480,14 +482,16 @@ export function BillsSection() {
                 })}
               </div>
             )}
-            {!streaming && filtered.length > 0 ? (
-              <ListPagination
-                page={safePage}
-                pageSize={pageSize}
-                total={filtered.length}
-                onPageChange={setPage}
-              />
-            ) : null}
+            <ListPagination
+              page={safePage}
+              pageSize={pageSize}
+              total={filtered.length}
+              onPage={setPage}
+              onPageSize={(n) => {
+                setPageSize(n)
+                setPage(1)
+              }}
+            />
           </div>
         </>
       )}

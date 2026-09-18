@@ -17,7 +17,7 @@
  * attached for the failed one — the request never fails wholesale.
  */
 
-import { searchCourtCasesDetailed, type CourtCase } from './court-case'
+import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRating } from './chamber'
 
@@ -63,14 +63,21 @@ export interface CourtTypeError {
   error: string
 }
 
+/** v204 (P-E): chamber.uz contractor rating, threaded from getCompanyRating. */
+export interface StatsRating {
+  /** 0–100 score (chamber `criteriaAll`) */
+  score: number
+  /** Category letter: AAA … D (chamber `type`) */
+  category: string
+}
+
 export interface CompanyStats {
   company: CompanyStatsCompany
   cases: CaseWithClassification[]
   summary: CompanyStatsSummary
   errors: CourtTypeError[]
-  /** v204 (P-E): chamber.uz rating, threaded from the already-fetched
-   *  getCompanyRating(tin) result (null when chamber failed/no data). */
-  rating: { score: number; category: string } | null
+  /** Contractor rating from chamber.uz (null when the source failed). */
+  rating: StatsRating | null
 }
 
 // ---- Name normalization + matching -----------------------------------
@@ -221,17 +228,30 @@ const STATS_CACHE_TTL = 60 * 1000 // 60 seconds
  * If orginfo fails, we still proceed using the TIN itself as the company
  * identifier (matching will be looser but the workflow won't fail). If a court
  * type fetch fails, we return partial results with the error noted.
+ *
+ * v206: `opts.force` — explicit refreshes (watchlist card Yangilash, R key)
+ * skip the 60s statsCache read AND overwrite it with the fresh result.
+ * Before, force=1 only cleared the court-case cache while statsCache still
+ * served the stale payload, so a refresh inside 60s silently changed nothing.
  */
 export async function getCompanyStats(
   tin: string,
+  opts?: { force?: boolean },
 ): Promise<CompanyStats> {
-  console.log(`[stats] building stats for TIN ${tin}`)
+  console.log(`[stats] building stats for TIN ${tin}${opts?.force ? ' (forced)' : ''}`)
 
   // v139: Check server-side cache first — deduplicates concurrent calls
-  const cached = statsCache.get(tin)
-  if (cached && Date.now() - cached.ts < STATS_CACHE_TTL) {
-    console.log(`[stats] ${tin}: returning cached result (age ${Math.round((Date.now() - cached.ts) / 1000)}s)`)
-    return cached.result
+  if (!opts?.force) {
+    const cached = statsCache.get(tin)
+    if (cached && Date.now() - cached.ts < STATS_CACHE_TTL) {
+      console.log(`[stats] ${tin}: returning cached result (age ${Math.round((Date.now() - cached.ts) / 1000)}s)`)
+      return cached.result
+    }
+  } else {
+    statsCache.delete(tin)
+    // v207: court-case cache TTL is now 5 min (was 60s) — a forced refresh
+    // must also drop it, otherwise Yangilash serves stale case lists.
+    clearCourtCaseCache(tin)
   }
 
   // Fire the actual fetch and store the PROMISE (not the result) so that
@@ -275,8 +295,15 @@ async function fetchCompanyStatsInternal(
   let company: CompanyStatsCompany
   let companyNameNorm = ''
   let chamberName = ''
+  // v204 (P-E): keep the rating that getCompanyRating already fetched — it
+  // used to be fetched and thrown away outside the stats payload.
+  let rating: StatsRating | null = null
   if (chamberResult.status === 'fulfilled' && chamberResult.value) {
     chamberName = chamberResult.value.name || chamberResult.value.nameLat || chamberResult.value.nameRu || ''
+    rating = {
+      score: typeof chamberResult.value.criteriaAll === 'number' ? chamberResult.value.criteriaAll : 0,
+      category: chamberResult.value.type || '-',
+    }
   }
   if (orginfoResult.status === 'fulfilled' && orginfoResult.value) {
     const info = orginfoResult.value
@@ -383,16 +410,6 @@ async function fetchCompanyStatsInternal(
     `[stats] ${tin}: ${summary.total} cases (${summary.win}W / ${summary.lose}L / ${summary.neutral}N / ${summary.pending}P)` +
     (errors.length ? ` · ${errors.length} court-type errors` : ''),
   )
-
-  // v204 (P-E): surface the chamber rating (score 0-100 + category band) that
-  // is already fetched in parallel — previously it was fetched and dropped.
-  const rating =
-    chamberResult.status === 'fulfilled' && chamberResult.value
-      ? {
-          score: typeof chamberResult.value.criteriaAll === 'number' ? chamberResult.value.criteriaAll : 0,
-          category: chamberResult.value.type || '',
-        }
-      : null
 
   return {
     company,

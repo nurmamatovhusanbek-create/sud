@@ -399,12 +399,24 @@ function WorkersTab() {
 
 // ---- Health tab ------------------------------------------------------------------
 
+// v208: time-span pills are real now — each window filters the per-worker
+// request history client-side (success rate, volume, avg latency all follow).
+type Span = 'today' | '7d' | '30d' | 'all'
+const SPANS: { value: Span; short: string; label: string; ms: number | null }[] = [
+  { value: 'today', short: 'Bugun', label: 'soʻnggi 24 soat', ms: 24 * 3600 * 1000 },
+  { value: '7d', short: '7 kun', label: 'soʻnggi 7 kun', ms: 7 * 24 * 3600 * 1000 },
+  { value: '30d', short: '30 kun', label: 'soʻnggi 30 kun', ms: 30 * 24 * 3600 * 1000 },
+  { value: 'all', short: 'Barcha', label: 'barcha davr', ms: null },
+]
+
 function HealthTab() {
   const [data, setData] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState(true)
   const [auto, setAuto] = useState(false)
+  const [span, setSpan] = useState<Span>('today')
 
   const load = useCallback(async () => {
+    setLoading(true) // v208: "Qayta urinish" now shows the skeleton while retrying
     try {
       const res = await fetch('/api/settings/health')
       const json = (await res.json()) as HealthData & { ok?: boolean }
@@ -426,25 +438,42 @@ function HealthTab() {
     return () => clearInterval(t)
   }, [auto, load])
 
+  // v208: derive everything from the span-filtered history (was: server
+  // summary only — the pills could not change anything by design).
+  const workers = useMemo(() => {
+    const ms = SPANS.find((s) => s.value === span)?.ms ?? null
+    const now = Date.now()
+    return (data?.workers ?? []).map((w) => {
+      const h = ms == null ? w.history : w.history.filter((r) => now - r.ts <= ms)
+      const ok = h.filter((r) => r.ok).length
+      return { ...w, history: h, totalRequests: h.length, successRate: h.length ? ok / h.length : 0 }
+    })
+  }, [data, span])
+
   const summary = data?.summary
-  const rate = summary ? Math.round(summary.overallSuccessRate * 100) : 0
+  const rate = useMemo(() => {
+    const tot = workers.reduce((a, w) => a + w.totalRequests, 0)
+    if (!tot) return 0
+    return Math.round((workers.reduce((a, w) => a + w.history.filter((r) => r.ok).length, 0) / tot) * 100)
+  }, [workers])
+  const spanLabel = SPANS.find((s) => s.value === span)?.label ?? ''
   const alive = summary?.activeWorkers ?? 0
   const total = summary?.totalWorkers ?? 0
+  const totalReqs = workers.reduce((a, w) => a + w.totalRequests, 0)
   const avgMs = useMemo(() => {
-    const withMs = data?.workers.filter((w) => w.lastResponseTimeMs != null) ?? []
-    if (!withMs.length) return 0
-    return Math.round(withMs.reduce((a, w) => a + (w.lastResponseTimeMs ?? 0), 0) / withMs.length)
-  }, [data])
+    const all = workers.flatMap((w) => w.history)
+    if (!all.length) return 0
+    return Math.round(all.reduce((a, r) => a + r.ms, 0) / all.length)
+  }, [workers])
 
   // Request volume across workers (per-worker buckets → bar chart)
   const vol = useMemo(() => {
-    const ws = data?.workers ?? []
-    if (!ws.length) return { data: [0], labels: ['-'] }
+    if (!workers.length) return { data: [0], labels: ['-'] }
     return {
-      data: ws.map((w) => w.totalRequests),
-      labels: ws.map((w, i) => w.label?.slice(0, 10) || `W${i + 1}`),
+      data: workers.map((w) => w.totalRequests),
+      labels: workers.map((w, i) => w.label?.slice(0, 10) || `W${i + 1}`),
     }
-  }, [data])
+  }, [workers])
   const hotVol = vol.data.indexOf(Math.max(...vol.data))
 
   const openWorker = (w: WorkerHealth) => {
@@ -494,16 +523,17 @@ function HealthTab() {
 
   if (loading && !data) return <SkRows n={4} />
   if (!data)
-    return <EmptyBlock icon={<Activity />} title="Holat olinmadi" hint="Server /api/health javob bermadi." action={<button className="btn btn-outline btn-sm" onClick={() => void load()}>Qayta urinish</button>} />
+    return <EmptyBlock icon={<Activity />} title="Holat olinmadi" hint="Server /api/settings/health javob bermadi." action={<button className="btn btn-outline btn-sm" onClick={() => void load()}>Qayta urinish</button>} />
 
   return (
     <div>
       <div className="filterbar">
         <div className="seg">
-          <button className="on">Bugun</button>
-          <button onClick={() => toast("Vaqt oraligʻi oʻzgartirildi")}>7 kun</button>
-          <button onClick={() => toast("Vaqt oraligʻi oʻzgartirildi")}>30 kun</button>
-          <button onClick={() => toast("Vaqt oraligʻi oʻzgartirildi")}>Barcha</button>
+          {SPANS.map((s) => (
+            <button key={s.value} className={span === s.value ? 'on' : ''} onClick={() => setSpan(s.value)}>
+              {s.short}
+            </button>
+          ))}
         </div>
         <div style={{ flex: 1 }} />
         <div className="p-row" style={{ gap: 8 }}>
@@ -521,14 +551,14 @@ function HealthTab() {
             <span className={`badge ${rate >= 80 ? 'b-pos' : 'b-warn'}`}>{rate >= 80 ? "Sogʻlom" : 'Beqaror'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 2px' }}>
-            <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label="Muvaffaqiyat darajasi · soʻnggi 24 soat" />
+            <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label={`Muvaffaqiyat darajasi · ${spanLabel}`} />
           </div>
           <div className="health-grid" style={{ marginTop: 8 }}>
             <div>
               <div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', fontWeight: 600 }}>
                 Jami soʻrov
               </div>
-              <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>{summary?.totalRequests ?? 0}</div>
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>{totalReqs}</div>
             </div>
             <div>
               <div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', fontWeight: 600 }}>
@@ -569,14 +599,14 @@ function HealthTab() {
         <span className="faint" style={{ fontSize: 12 }}>kartani bosing · soʻrovlar tarixi</span>
       </div>
       <div className="wcards">
-        {(data.workers ?? []).length === 0 && (
+        {workers.length === 0 && (
           <div className="empty" style={{ gridColumn: '1/-1' }}>
             <div className="ico"><Server /></div>
             <h3>Worker yoʻq</h3>
             <p>Workerlar boʻlimidan qoʻshing. Holat shu yerda koʻrinadi.</p>
           </div>
         )}
-        {(data.workers ?? []).map((w) => {
+        {workers.map((w) => {
           const r = Math.round(w.successRate * 100)
           const failIdx = w.history.slice(-24).map((h, i) => (h.ok ? -1 : i)).filter((i) => i >= 0)
           const spark = w.history.slice(-24).map((h) => Math.max(2, Math.min(12, h.ms / 40)))

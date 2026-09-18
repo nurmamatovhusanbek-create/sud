@@ -14,11 +14,10 @@ import { getWorkerUrls, getWorkerSource } from './workers-config'
 import { registerHealthPool } from './health-registry'
 import { DEFAULT_WORKERS } from './worker-defaults'
 
-// v204 (P-A): unified worker resolution. FALLBACK_WORKERS now aliases the one
-// DEFAULT_WORKERS list (src/lib/worker-defaults.ts) so a fresh install has a
-// working pool out of the box, and workers.json / CF_WORKER_URLS still override.
-// This file is the ONLY resolver (getCfWorkerUrls) — no other module may keep
-// its own copy of the list or the parsing.
+// v204 (P-A): the 4 default workers now live in worker-defaults.ts — the
+// single home for hardcoded worker URLs — so cf-worker-pool, workers-config
+// seeding and billing.ts can never disagree again. getCfWorkerUrls() below is
+// THE one resolver: workers.json → CF_WORKER_URLS → CF_WORKER_URL → defaults.
 export const FALLBACK_WORKERS: string[] = DEFAULT_WORKERS
 
 /**

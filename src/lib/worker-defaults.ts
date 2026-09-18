@@ -1,10 +1,15 @@
 /**
- * v204 (P-A): The single source of truth for built-in default CF Worker URLs.
+ * Single source of truth for the DEFAULT CF Worker proxy pool.
  *
- * Precedence everywhere: workers.json  ->  CF_WORKER_URLS/CF_WORKER_URL  ->  these.
- * Operators add/remove more via Settings > Workers (persists to workers.json).
- * When you rotate/replace workers, edit ONLY this list.
+ * Every worker-URL consumer (cf-worker-pool.ts FALLBACK_WORKERS,
+ * workers-config.ts seeding, and transitively billing.ts via the shared
+ * getCfWorkerUrls()) resolves defaults through this module. No other file
+ * may hardcode worker URLs.
+ *
+ * These are the operator's own workers — deploy/replace via the Workers
+ * settings UI (persisted to workers.json) or CF_WORKER_URLS env.
  */
+
 export const DEFAULT_WORKERS: string[] = [
   'https://broad-field-f2b0.uzwebfox.workers.dev/',
   'https://wild-hall-04ae.uzwebfox.workers.dev/',

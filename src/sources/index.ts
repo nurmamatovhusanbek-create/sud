@@ -27,7 +27,8 @@ export const statsSource = defineSource<string, CompanyStats>({
       const { clearCourtCaseCache } = await import('@/lib/court-case')
       clearCourtCaseCache(tin)
     }
-    return getCompanyStats(tin)
+    // v206: force also bypasses the 60s statsCache inside getCompanyStats.
+    return getCompanyStats(tin, { force: ctx?.force })
   },
   schema: CompanyStatsSchema as unknown as z.ZodType<CompanyStats>,
 })

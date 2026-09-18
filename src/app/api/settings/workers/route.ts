@@ -27,16 +27,20 @@ async function GET_impl() {
   // v165: Always merge workers.json entries with fallback/env workers.
   // This way, even if workers.json has only 1 custom worker, the pre-set
   // fallback workers still show up in the UI.
+  // v204 (P-A): dedupe on NORMALIZED urls (both sides), so a manually-added
+  // copy of a default worker doesn't show up twice after P-A unified the
+  // defaults into getCfWorkerUrls().
+  const norm = (u: string) => normalizeWorkerUrl(u) || u
+  const entryUrls = new Set(entries.map((e) => norm(e.url)))
   const fallbackUrls = getCfWorkerUrls()
-  // v204 (P-A): dedupe on NORMALIZED urls so a default and a manually re-added
-  // copy of the same worker don't double up in the list.
-  const entryUrls = new Set(entries.map(e => normalizeWorkerUrl(e.url) || e.url))
+  const seenFallback = new Set<string>(entryUrls)
 
-  // Add fallback workers that aren't already in workers.json
+  // Add fallback workers that aren't already in workers.json (normalized compare)
   const mergedWorkers = [
     ...entries,
     ...fallbackUrls
-      .filter(url => !entryUrls.has(normalizeWorkerUrl(url) || url))
+      .map(u => norm(u))
+      .filter(url => !seenFallback.has(url) && (seenFallback.add(url), true))
       .map(url => ({
         url,
         addedAt: null as string | null,

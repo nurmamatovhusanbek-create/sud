@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server'
-import JSZip from 'jszip'
-
 /**
- * v204 (P-C): Shared minimal .xlsx builder — extracted from the byte-identical
- * JSZip/XML code that was duplicated in api/bills/export and api/stats/export.
+ * v204 (P-C): shared hand-rolled .xlsx builder — extracted from the identical
+ * JSZip XML blocks duplicated in api/bills/export and api/stats/export.
  *
- * An .xlsx file is just a ZIP archive of XML files (Office Open XML). Building
- * it manually avoids all Turbopack/bundler resolution issues with heavy Excel
- * libraries. All cells are written as shared strings — same behavior as the
- * routes this was extracted from.
+ * An .xlsx file is just a ZIP of XML parts (Office Open XML); building it
+ * manually avoids the heavy Excel libraries that kept tripping Turbopack.
+ * All string cells share one sharedStrings table; style 1 is the bold
+ * white-on-black header row.
  */
+
+import JSZip from 'jszip'
+import { NextResponse } from 'next/server'
 
 /** XML-escape a cell value. */
 function esc(s: string): string {
@@ -20,7 +20,7 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/** Convert a 0-based column index to its Excel letter (A, B, ..., Z, AA, ...). */
+/** Column index (0-based) → Excel letter (A, B, …, Z, AA, AB, …). */
 function colLetter(idx: number): string {
   let s = ''
   let n = idx
@@ -32,23 +32,23 @@ function colLetter(idx: number): string {
 }
 
 /**
- * Build a single-sheet .xlsx as a Node Buffer.
+ * Build a single-sheet .xlsx workbook.
  *
- * @param sheetName  Excel sheet tab name
- * @param headers    column headers (bold white-on-black style)
- * @param rows       data rows — each row maps header -> cell value
- * @param colWidths  per-column widths (same length as headers)
+ * @param sheetName  Excel sheet tab name (≤31 chars, no []:*?/\\)
+ * @param headers    Column header labels
+ * @param rows       Data rows, already ordered, one string[] per row
+ * @param colWidths  Per-column widths (same length as headers ideally)
  */
-export function buildXlsx(
+export async function buildXlsx(
   sheetName: string,
   headers: string[],
-  rows: Record<string, string>[],
+  rows: string[][],
   colWidths: number[],
 ): Promise<Buffer> {
   // ---- Shared strings table ----
   const strings: string[] = []
   const strIdx = new Map<string, number>()
-  function s(v: string): number {
+  const s = (v: string): number => {
     if (strIdx.has(v)) return strIdx.get(v)!
     const i = strings.length
     strings.push(v)
@@ -56,10 +56,9 @@ export function buildXlsx(
     return i
   }
 
+  const safeName = (sheetName || 'Sheet1').replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1'
   const headerIdx = headers.map((h) => s(h))
-  const rowData = rows.map((r) =>
-    headers.map((h) => s(String(r[h as keyof typeof r] ?? ''))),
-  )
+  const rowData = rows.map((r) => r.map((cell) => s(String(cell ?? ''))))
 
   // ---- XML parts ----
   const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -79,7 +78,7 @@ export function buildXlsx(
 
   const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="${esc(sheetName)}" sheetId="1" r:id="rId1"/></sheets>
+<sheets><sheet name="${esc(safeName)}" sheetId="1" r:id="rId1"/></sheets>
 </workbook>`
 
   const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -94,56 +93,25 @@ export function buildXlsx(
 ${strings.map((str) => `<si><t xml:space="preserve">${esc(str)}</t></si>`).join('')}
 </sst>`
 
-  // style 0 = default, style 1 = header (bold white on black)
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<fonts count="2">
-<font><sz val="11"/><name val="Calibri"/></font>
-<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-</fonts>
-<fills count="3">
-<fill><patternFill patternType="none"/></fill>
-<fill><patternFill patternType="gray125"/></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FF0A0A0A"/><bgColor indexed="64"/></patternFill></fill>
-</fills>
+<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0A0A0A"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="2">
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-</cellXfs>
+<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf></cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`
 
-  const colsXml = colWidths
-    .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
-    .join('')
-
-  const headerRow =
-    `<row r="1">` +
-    headerIdx
-      .map((idx, i) => `<c r="${colLetter(i)}1" t="s" s="1"><v>${idx}</v></c>`)
-      .join('') +
-    `</row>`
-
+  const colsXml = colWidths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')
+  const headerRow = `<row r="1">${headerIdx.map((idx, i) => `<c r="${colLetter(i)}1" t="s" s="1"><v>${idx}</v></c>`).join('')}</row>`
   const dataRows = rowData
-    .map(
-      (rowVals, ri) =>
-        `<row r="${ri + 2}">` +
-        rowVals
-          .map((idx, ci) => `<c r="${colLetter(ci)}${ri + 2}" t="s"><v>${idx}</v></c>`)
-          .join('') +
-        `</row>`,
-    )
+    .map((rv, ri) => `<row r="${ri + 2}">${rv.map((idx, ci) => `<c r="${colLetter(ci)}${ri + 2}" t="s"><v>${idx}</v></c>`).join('')}</row>`)
     .join('')
-
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<cols>${colsXml}</cols>
-<sheetData>${headerRow}${dataRows}</sheetData>
-</worksheet>`
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${colsXml}</cols><sheetData>${headerRow}${dataRows}</sheetData></worksheet>`
 
-  // ---- Assemble the ZIP ----
+  // ---- ZIP ----
   const zip = new JSZip()
   zip.file('[Content_Types].xml', contentTypes)
   zip.folder('_rels')!.file('.rels', rootRels)
@@ -161,13 +129,12 @@ ${strings.map((str) => `<si><t xml:space="preserve">${esc(str)}</t></si>`).join(
   })
 }
 
-/** Standard NextResponse that triggers a browser download of an .xlsx buffer. */
-export function xlsxResponse(buf: Buffer, filename: string): NextResponse {
+/** Standard download response for a built workbook (matches the old headers). */
+export function xlsxResponse(buf: Buffer, filename: string) {
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {
-      'Content-Type':
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': String(buf.byteLength),
       'Access-Control-Allow-Origin': '*',

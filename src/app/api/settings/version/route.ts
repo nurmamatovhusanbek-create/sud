@@ -20,7 +20,9 @@ import { APP_VERSION } from '@/lib/version'
 import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
 
-const GITHUB_REPO = 'nurmamatovhusanbek-create/sud-billing-lookup'
+// v208: the real repo (the old sud-billing-lookup mirror is stale — the
+// update check kept comparing against a v168 commit from a dead URL).
+const GITHUB_REPO = 'nurmamatovhusanbek-create/sud'
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 interface CachedRemote {

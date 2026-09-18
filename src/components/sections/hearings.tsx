@@ -7,18 +7,18 @@
  * detail drawer.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarDays, FileSpreadsheet } from 'lucide-react'
 import { EmptyBlock, SkRows } from '@/components/proto/primitives'
 import { PartialBanner } from '@/components/ui-custom/states'
+import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { getUpcomingHearings, exportHearingsXlsx } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { ListPagination, PageSizeSelect, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
-import { toast } from 'sonner'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
+import { toast } from 'sonner'
 
 const MONTHS_UZ = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba']
@@ -50,14 +50,14 @@ function docketParts(isoDate: string): Omit<DocketPart, 'isoDate' | 'caseNumber'
 export function HearingsSection() {
   const company = useAppStore((s) => s.activeCompany)
   const setCounts = useTabCounts((s) => s.set)
-  // v204 (P-D): pagination + per-page; v204 (P-C): Excel export button
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [exporting, setExporting] = useState(false)
   const { state, refetch } = useResource<UpcomingHearingsData>((signal) => getUpcomingHearings(company?.stir || '', signal), {
     cacheKey: company ? `upcoming:${company.stir}` : undefined,
     enabled: !!company,
   })
+  // v204 (P-D): pagination for long dockets + (P-C) Excel export
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const handler = () => void refetch()
@@ -69,14 +69,6 @@ export function HearingsSection() {
   const loaded = view.status === 'success' || view.status === 'partial'
   const hearings = loaded ? (view.data.hearings as unknown as Record<string, unknown>[]) : []
   const hearingsCount = loaded ? view.data.count ?? hearings.length : undefined
-
-  // v204 (P-D): slice for the current page — nearest hearing across ALL pages
-  // is what gets the .now highlight, so compute the overall nearest first.
-  const paged = useMemo(
-    () => hearings.slice((clampPage(page, hearings.length, pageSize) - 1) * pageSize, clampPage(page, hearings.length, pageSize) * pageSize),
-    [hearings, page, pageSize],
-  )
-  const safePage = clampPage(page, hearings.length, pageSize)
 
   useEffect(() => {
     if (loaded) setCounts({ hearings: hearingsCount })
@@ -100,7 +92,15 @@ export function HearingsSection() {
     }
   }, [loaded, company, hearings])
 
+  // Reset to page 1 when the company changes (must run before early returns)
+  useEffect(() => {
+    setPage(1)
+  }, [company?.stir])
+
   if (!company) return null
+
+  const safePage = clampPage(page, hearings.length, pageSize)
+  const paged = hearings.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const openCase = (caseNumber: string, courtType: string) => {
     useAppStore.getState().setSection('cases')
@@ -144,15 +144,14 @@ export function HearingsSection() {
           <h3>Kelgusi majlislar</h3>
           <div className="sp" />
           <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
-          <PageSizeSelect value={pageSize} onChange={(n) => setPageSize(n)} />
           <button
             className="btn btn-outline btn-sm"
-            disabled={exporting}
+            disabled={exporting || hearings.length === 0}
             onClick={() => {
               setExporting(true)
               void (async () => {
                 try {
-                  await exportHearingsXlsx(company.stir)
+                  await exportHearingsXlsx({ tin: company.stir })
                   toast.success('Excel yuklab olindi')
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : 'Eksport xatosi')
@@ -170,9 +169,8 @@ export function HearingsSection() {
           {paged.map((h, i) => {
             const iso = h.isoDate as string
             const p = docketParts(iso)
-            // v204 (P-D): highlight the OVERALL nearest hearing (index 0 of the
-            // full list), not just the first row of the current page
-            const near = i === 0 && safePage === 1
+            // .now marks the OVERALL nearest hearing (index 0), wherever it pages to
+            const near = (safePage - 1) * pageSize + i === 0
             return (
               <div
                 key={`${(h.caseNumber as string) || 'h'}-${i}`}
@@ -200,7 +198,11 @@ export function HearingsSection() {
           page={safePage}
           pageSize={pageSize}
           total={hearings.length}
-          onPageChange={setPage}
+          onPage={setPage}
+          onPageSize={(n) => {
+            setPageSize(n)
+            setPage(1)
+          }}
         />
       </div>
     </div>
