@@ -49,7 +49,11 @@ async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<
     return { ok: false, error: 'Noma’lum javob shakli', status: res.status }
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: e instanceof Error ? e.message : "Tarmoq xatosi", status: 0 }
+    // Whatever lands here is a raw transport failure (fetch() itself threw —
+    // DNS, offline, CORS) — e.message is always the browser's own English
+    // text ("Failed to fetch" etc.), never something already localized, so
+    // it must never reach a toast verbatim.
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
   }
 }
 
@@ -104,7 +108,7 @@ export async function submitMibCheck(tin: string, sessionId: string, captchaAnsw
     return { ok: true, data: rest as unknown }
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: e instanceof Error ? e.message : "Tarmoq xatosi", status: 0 }
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
   }
 }
 
@@ -171,7 +175,7 @@ export async function streamBills(stir: string, handlers: StreamHandlers, signal
     handlers.onDone?.()
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return
-    handlers.onError?.(e instanceof Error ? e.message : "Tarmoq xatosi")
+    handlers.onError?.('Tarmoq xatosi — serverga ulanib boʻlmadi')
   }
 }
 
@@ -211,7 +215,12 @@ async function saveBlob(res: Response, fallbackName: string): Promise<void> {
 }
 
 async function downloadGet(url: string): Promise<void> {
-  const res = await fetch(url, { headers: authHeaders() })
+  let res: Response
+  try {
+    res = await fetch(url, { headers: authHeaders() })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
   if (!res.ok) {
     let msg = 'Eksport xatosi'
     try {
@@ -224,11 +233,16 @@ async function downloadGet(url: string): Promise<void> {
 }
 
 async function downloadPost(url: string, body: unknown): Promise<void> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
   if (!res.ok) {
     let msg = 'Eksport xatosi'
     try {

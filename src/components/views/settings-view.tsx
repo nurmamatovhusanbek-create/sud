@@ -19,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Server,
+  Shield,
   Trash2,
   X,
   Zap,
@@ -26,6 +27,7 @@ import {
 import { ArcGauge, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
 import { openProtoDrawer } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
+import { getTorStatus } from '@/lib/api-client'
 import { toast } from 'sonner'
 
 // ---- shared shapes --------------------------------------------------------------
@@ -198,6 +200,64 @@ function UpdatesTab() {
 
 // ---- Workers tab ------------------------------------------------------------------
 
+// ---- Tor card (moved out of the topbar — optional infra, lives in Settings) ----
+//
+// Every scrape already routes through the CF worker pool regardless of Tor,
+// so this is informational/optional: a user who never sets Tor up just never
+// looks at this card and nothing else in the app nags them about it.
+
+function TorCard() {
+  const [state, setState] = useState<'checking' | 'active' | 'inactive'>('checking')
+
+  // manual=true is a click handler (setState there is fine); the mount call
+  // below only ever awaits — its state updates land after the await, never
+  // synchronously inside the effect body.
+  const check = useCallback(async (manual: boolean) => {
+    if (manual) {
+      setState('checking')
+      toast.loading('Tor holati tekshirilmoqda…', { id: 'tor-check', duration: 20_000 })
+    }
+    try {
+      const res = await getTorStatus()
+      const running = res.ok && res.data.running
+      setState(running ? 'active' : 'inactive')
+      if (manual) {
+        if (running) toast.success('Tor faol', { id: 'tor-check' })
+        else toast.warning("Tor oʻchiq — ixtiyoriy, boshqa hech narsaga taʼsir qilmaydi", { id: 'tor-check' })
+      }
+    } catch {
+      setState('inactive')
+      if (manual) toast.error('Tor holatini olib boʻlmadi', { id: 'tor-check' })
+    }
+  }, [])
+
+  useEffect(() => {
+    void check(false)
+  }, [check])
+
+  const color = state === 'active' ? 'var(--pos-base)' : state === 'inactive' ? 'var(--neg-base)' : 'var(--warn-base)'
+  const label = state === 'active' ? 'Tor faol' : state === 'inactive' ? "Tor oʻchiq" : 'Tekshirilmoqda…'
+
+  return (
+    <div className="p-card rise-c" style={{ marginBottom: 16 }}>
+      <div className="card-h">
+        <div className="ico"><Shield /></div>
+        <h3>Tor</h3>
+        <div className="sp" />
+        <span className="p-dot" style={{ background: color }} />
+        <span className="faint" style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
+      </div>
+      <p className="faint" style={{ fontSize: 12.5, margin: '0 0 12px' }}>
+        Ixtiyoriy — barcha soʻrovlar Cloudflare workerlar orqali oʻtadi. Tor yoqilmagan boʻlsa ham ilova toʻliq ishlayveradi.
+      </p>
+      <button className="btn btn-outline btn-sm" onClick={() => void check(true)} disabled={state === 'checking'}>
+        {state === 'checking' ? <span className="spinner" /> : <RefreshCw />}
+        Tekshirish
+      </button>
+    </div>
+  )
+}
+
 function WorkersTab() {
   const [data, setData] = useState<WorkersResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -305,12 +365,18 @@ function WorkersTab() {
     }
   }
 
-  if (loading && !data) return <SkRows n={4} />
+  if (loading && !data) return (
+    <div>
+      <TorCard />
+      <SkRows n={4} />
+    </div>
+  )
 
   const src = data?.source === 'file' ? 'workers.json' : data?.source === 'env' ? '.env' : 'Birlamchi'
 
   return (
     <div>
+      <TorCard />
       <div className="p-card rise-c" style={{ padding: 8 }}>
         <div className="filterbar" style={{ margin: '8px 8px 4px' }}>
           <span className="badge b-neu"><Server />Manba: {src}</span>

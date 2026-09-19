@@ -83,7 +83,10 @@ export function useResource<T>(
       } catch (e) {
         clearInterval(timer)
         if (e instanceof DOMException && e.name === 'AbortError') return
-        setState({ status: 'error', error: e instanceof Error ? e.message : 'Xatolik' })
+        // A throw here means the fetcher itself blew up (not a handled API
+        // error — those resolve via res.ok===false above), so e.message is
+        // raw/unlocalized. Never surface it verbatim.
+        setState({ status: 'error', error: 'Kutilmagan xatolik yuz berdi' })
       }
     },
      
