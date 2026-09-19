@@ -66,7 +66,7 @@ async function POST_impl(req: NextRequest) {
     return xlsxResponse(buf, filename)
   } catch (e) {
     return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : 'Export failed' },
+      { ok: false, error: e instanceof Error ? e.message : 'Eksport xatosi' },
       { status: 500 },
     )
   }

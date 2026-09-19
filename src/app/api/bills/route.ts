@@ -36,7 +36,7 @@ export const GET = guard(async (req) => {
       const detail = await getBillStatus(invoice)
       return Response.json({ ok: true, data: { bill: detail } })
     } catch (e) {
-      return jsonFail(e instanceof Error ? e.message : 'Failed to fetch bill', 'upstream_error', 502)
+      return jsonFail(e instanceof Error ? e.message : 'Kvitansiyani olib boʻlmadi', 'upstream_error', 502)
     }
   }
 
@@ -73,7 +73,7 @@ export const GET = guard(async (req) => {
       } catch (e) {
         send({
           type: 'error',
-          error: e instanceof Error ? e.message : 'Failed to fetch bills',
+          error: e instanceof Error ? e.message : 'Toʻlovlarni olib boʻlmadi',
         })
         log.error('bills stream failed', { inn, error: e instanceof Error ? e.message : String(e) })
       } finally {
