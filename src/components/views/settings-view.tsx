@@ -103,6 +103,34 @@ const REASON_LABELS: Record<string, string> = {
 
 // ---- Updates tab ------------------------------------------------------------------
 
+const UPDATE_ERROR_LABELS: Record<string, string> = {
+  dirty_tree: "Ish daraxtida oʻzgarishlar bor va ularni vaqtincha yashirib boʻlmadi",
+  wrong_branch: "Server 'main' branchida emas — avtomatik yangilash faqat 'main'da ishlaydi",
+  git_unavailable: 'Git topilmadi — bu muhitda mavjud emas',
+  pull_failed: "git pull amalga oshmadi",
+  not_supervised: "Server nazoratchisiz ishga tushirilgan — avtomatik qayta ishga tushirib boʻlmaydi",
+}
+
+/** Poll until the server answers again (it genuinely goes offline mid-restart —
+ *  connection-refused during that window is expected, not a failure) or the
+ *  budget runs out (production mode rebuilds can take a while). */
+async function pollForRestart(onTick: (elapsedMs: number) => void): Promise<boolean> {
+  const start = Date.now()
+  const budgetMs = 120_000
+  const intervalMs = 1500
+  while (Date.now() - start < budgetMs) {
+    await new Promise((r) => setTimeout(r, intervalMs))
+    onTick(Date.now() - start)
+    try {
+      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { cache: 'no-store' })
+      if (res.ok) return true
+    } catch {
+      // still restarting — keep polling
+    }
+  }
+  return false
+}
+
 function UpdatesTab() {
   const [info, setInfo] = useState<{
     local: { version: string; sha: string | null; branch: string | null; dirty: boolean; gitAvailable: boolean }
@@ -110,6 +138,8 @@ function UpdatesTab() {
     updateAvailable: boolean
   } | null>(null)
   const [checking, setChecking] = useState(false)
+  const [updateState, setUpdateState] = useState<'idle' | 'pulling' | 'restarting' | 'timeout'>('idle')
+  const [elapsed, setElapsed] = useState(0)
 
   const load = useCallback(async () => {
     setChecking(true)
@@ -127,12 +157,50 @@ function UpdatesTab() {
     void load()
   }, [load])
 
+  const runUpdate = useCallback(async () => {
+    setUpdateState('pulling')
+    let res: Response
+    try {
+      res = await fetch('/api/settings/update', { method: 'POST' })
+    } catch {
+      setUpdateState('idle')
+      toast.error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+      return
+    }
+    const body = await res.json().catch(() => null)
+    if (!body?.ok) {
+      setUpdateState('idle')
+      const code = body?.error as string | undefined
+      toast.error((code && UPDATE_ERROR_LABELS[code]) || body?.detail || 'Yangilash amalga oshmadi')
+      return
+    }
+    if (!body.restarting) {
+      // Pulled but HEAD didn't move (nothing new despite the check saying
+      // so — e.g. someone else already updated it) — no restart needed.
+      setUpdateState('idle')
+      toast.success('Allaqachon eng soʻnggi versiyada')
+      void load()
+      return
+    }
+    setUpdateState('restarting')
+    setElapsed(0)
+    const ok = await pollForRestart(setElapsed)
+    if (ok) {
+      toast.success('Yangilandi — sahifa qayta yuklanmoqda…')
+      window.location.reload()
+    } else {
+      setUpdateState('timeout')
+    }
+  }, [load])
+
   const kv = (k: string, v: React.ReactNode) => (
     <div className="kv" key={k}>
       <span className="k">{k}</span>
       {v}
     </div>
   )
+
+  const busy = updateState === 'pulling' || updateState === 'restarting'
 
   return (
     <div className="dash" style={{ gridTemplateColumns: '1fr 1fr' }}>
@@ -141,7 +209,8 @@ function UpdatesTab() {
           <div className="ico"><GitBranch /></div>
           <h3>Joriy versiya</h3>
           <div className="sp" />
-          <span className="badge b-pos"><Check />Eng soʻnggi</span>
+          {info && !info.updateAvailable && <span className="badge b-pos"><Check />Eng soʻnggi</span>}
+          {info?.updateAvailable && <span className="badge b-warn">Yangilanish bor</span>}
         </div>
         {kv('Versiya', <span className="badge b-neu">{info?.local.version || APP_VERSION}</span>)}
         {kv('Git SHA', <span className="mono">{info?.local.sha || '-'}</span>)}
@@ -157,42 +226,61 @@ function UpdatesTab() {
         {kv('Commit', <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: '60%' }}>{info?.remote?.message || '-'}</span>)}
         {kv('Muallif', <span>{info?.remote?.author || '-'}</span>)}
         {kv('Sana', <span className="mono faint">{info?.remote?.date || '-'}</span>)}
-        <button className="btn btn-outline" style={{ width: '100%', marginTop: 14 }} onClick={() => void load()} disabled={checking}>
+        <button className="btn btn-outline" style={{ width: '100%', marginTop: 14 }} onClick={() => void load()} disabled={checking || busy}>
           {checking ? <span className="spinner" /> : <RefreshCw />}
           <span>Qayta tekshirish</span>
         </button>
       </div>
       <div className="p-card rise-c" style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30 }}>
-        <div className="empty" style={{ padding: 0 }}>
-          <div className="ico" style={{ background: 'var(--pos-soft)', color: 'var(--pos-text)' }}>
-            <Check />
+        {updateState === 'pulling' || updateState === 'restarting' ? (
+          <div className="empty" style={{ padding: 0 }}>
+            <div className="ico" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+              <span className="spinner" style={{ width: 22, height: 22 }} />
+            </div>
+            <h3>{updateState === 'pulling' ? 'Yangilanish olinmoqda…' : 'Server qayta ishga tushirilmoqda…'}</h3>
+            <p style={{ margin: 0 }}>
+              {updateState === 'pulling'
+                ? 'git pull ishlamoqda.'
+                : `Bu bir necha soniyadan bir necha daqiqagacha davom etishi mumkin (production rejimida qayta build qilinadi). ${Math.round(elapsed / 1000)}s`}
+            </p>
           </div>
-          <h3>{info?.updateAvailable ? 'Yangilanish mavjud' : "Eng soʻnggi versiyada"}</h3>
-          <p style={{ margin: '0 0 14px' }}>
-            {info?.updateAvailable ? (
-              'GitHubʼda yangi commit bor. Yangilash tugmasi orqali oling.'
-            ) : info ? (
-              <>
-                Lokal kod GitHubʼdagi <span className="mono">{info.local.branch || 'main'}</span> bilan bir xil.{' '}
-                <span className="mono">git pull</span> talab etilmaydi.
-              </>
-            ) : (
-              'Versiya ma’lumotlari yuklanmoqda…'
-            )}
-          </p>
-          {info?.updateAvailable && (
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => {
-                toast('Yangilanish oʻrnatilmoqda…')
-                void fetch('/api/settings/update', { method: 'POST' }).then(() => toast.success('Yangilanish buyruqi yuborildi'))
-              }}
-            >
-              <Download />
-              <span>Yangilash (git pull)</span>
+        ) : updateState === 'timeout' ? (
+          <div className="alert warn" style={{ textAlign: 'left' }}>
+            <AlertTriangle />
+            <div className="at">
+              <b>Server hali javob bermayapti</b>
+              <p>Qayta ishga tushirish odatdagidan uzoqroq davom etmoqda. Terminaldagi loglarni tekshiring yoki sahifani qoʻlda yangilang.</p>
+            </div>
+            <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={() => window.location.reload()}>
+              Sahifani yangilash
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="empty" style={{ padding: 0 }}>
+            <div className="ico" style={{ background: 'var(--pos-soft)', color: 'var(--pos-text)' }}>
+              <Check />
+            </div>
+            <h3>{info?.updateAvailable ? 'Yangilanish mavjud' : "Eng soʻnggi versiyada"}</h3>
+            <p style={{ margin: '0 0 14px' }}>
+              {info?.updateAvailable ? (
+                'GitHubʼda yangi commit bor. Yangilash tugmasi orqali oling — server avtomatik qayta ishga tushadi.'
+              ) : info ? (
+                <>
+                  Lokal kod GitHubʼdagi <span className="mono">{info.local.branch || 'main'}</span> bilan bir xil.{' '}
+                  <span className="mono">git pull</span> talab etilmaydi.
+                </>
+              ) : (
+                'Versiya ma’lumotlari yuklanmoqda…'
+              )}
+            </p>
+            {info?.updateAvailable && (
+              <button className="btn btn-outline btn-sm" onClick={() => void runUpdate()} disabled={busy}>
+                <Download />
+                <span>Yangilash</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
