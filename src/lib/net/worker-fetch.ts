@@ -37,17 +37,38 @@ import { getCfWorkerUrls, OriginHealthPool } from '@/lib/cf-worker-pool'
  */
 
 // ---------------- tunables (env-overridable) ----------------
-const GLOBAL_MAX = int('NET_GLOBAL_MAX', 8) // total in-flight worker reqs (interactive)
+// v208 (API limits report): the worker pool (workers.json) now has 6 workers,
+// not the 4 this was originally tuned against — GLOBAL_MAX matches PER_WORKER_MAX
+// × pool size (6 × 2 = 12) so the global cap and real capacity stay pinned
+// equal, per the report's §2 finding (raising one without the other did nothing).
+const GLOBAL_MAX = int('NET_GLOBAL_MAX', 12) // total in-flight worker reqs (interactive)
 const BACKGROUND_MAX = int('NET_BACKGROUND_MAX', 3) // total in-flight for background scans
 const PER_WORKER_MAX = int('NET_PER_WORKER_MAX', 2) // in-flight per worker URL
-const PER_ORIGIN_MAX = int('NET_PER_ORIGIN_MAX', 4) // in-flight per origin host
-const ORIGIN_SPACING = int('NET_ORIGIN_SPACING_MS', 120) // min ms between reqs to one origin
+const PER_ORIGIN_MAX = int('NET_PER_ORIGIN_MAX', 4) // in-flight per origin host — conservative default (jadval.sud.uz's per-TIN bucket + billing.sud.uz's PoW gate punish concurrency)
+const ORIGIN_SPACING = int('NET_ORIGIN_SPACING_MS', 120) // min ms between reqs to one origin — conservative default
+
+// v208: jadvalapi.sud.uz is confirmed open/unauthenticated/per-TIN-independent
+// (live probe in the API limits report — different TINs and repeated calls all
+// succeeded with no throttling). It is NOT a bottleneck, so it doesn't need the
+// jadval.sud.uz/billing.sud.uz conservative pacing above — loosen only it.
+// jadval.sud.uz keeps ORIGIN_SPACING/PER_ORIGIN_MAX: it runs a per-TIN token
+// bucket, so more concurrency there burns quota instead of buying speed.
+const OPEN_ORIGINS = new Set(list('NET_OPEN_ORIGINS', ['jadvalapi.sud.uz']))
+const OPEN_ORIGIN_MAX = int('NET_PER_ORIGIN_MAX_OPEN', 6)
+const OPEN_ORIGIN_SPACING = int('NET_ORIGIN_SPACING_MS_OPEN', 60)
+
 const DEAD_COOLDOWN = int('NET_DEAD_COOLDOWN_MS', 30_000)
 const DEAD_THRESHOLD = int('NET_DEAD_THRESHOLD', 3)
 
 function int(k: string, d: number) {
   const v = Number(process.env[k])
   return Number.isFinite(v) && v > 0 ? v : d
+}
+
+function list(k: string, d: string[]): string[] {
+  const v = process.env[k]
+  if (!v) return d
+  return v.split(',').map((s) => s.trim()).filter(Boolean)
 }
 
 const UA =
@@ -86,7 +107,7 @@ function wSem(u: string) {
 function oSem(o: string) {
   let s = perOriginSem.get(o)
   if (!s) {
-    s = new Sem(PER_ORIGIN_MAX)
+    s = new Sem(OPEN_ORIGINS.has(o) ? OPEN_ORIGIN_MAX : PER_ORIGIN_MAX)
     perOriginSem.set(o, s)
   }
   return s
@@ -95,9 +116,10 @@ function oSem(o: string) {
 // ---------------- per-origin spacing ----------------
 const originNextAt = new Map<string, number>()
 async function space(origin: string) {
+  const spacing = OPEN_ORIGINS.has(origin) ? OPEN_ORIGIN_SPACING : ORIGIN_SPACING
   const now = Date.now()
   const next = Math.max(now, originNextAt.get(origin) ?? 0)
-  originNextAt.set(origin, next + ORIGIN_SPACING)
+  originNextAt.set(origin, next + spacing)
   const wait = next - now
   if (wait > 0) await new Promise((r) => setTimeout(r, wait))
 }

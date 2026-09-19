@@ -15,7 +15,6 @@ import type {
   CourtCase,
   EnrichedBill,
   FullCaseData,
-  MibPrepareData,
   UpcomingHearingsData,
 } from './api-types'
 
@@ -49,7 +48,11 @@ async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<
     return { ok: false, error: 'Noma’lum javob shakli', status: res.status }
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: e instanceof Error ? e.message : "Tarmoq xatosi", status: 0 }
+    // Whatever lands here is a raw transport failure (fetch() itself threw —
+    // DNS, offline, CORS) — e.message is always the browser's own English
+    // text ("Failed to fetch" etc.), never something already localized, so
+    // it must never reach a toast verbatim.
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
   }
 }
 
@@ -83,29 +86,6 @@ export function searchCompanies(query: string, signal?: AbortSignal) {
 
 export function getBillDetail(invoice: string, signal?: AbortSignal) {
   return request<BillDetailData>(`/api/bills?invoice=${encodeURIComponent(invoice)}`, signal)
-}
-
-export function prepareMibCheck(tin: string, signal?: AbortSignal) {
-  return request<MibPrepareData>(`/api/mib-debt?tin=${tin}`, signal)
-}
-
-export async function submitMibCheck(tin: string, sessionId: string, captchaAnswer: string, signal?: AbortSignal): Promise<ApiResult<unknown>> {
-  try {
-    const res = await fetch('/api/mib-debt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ tin, sessionId, captchaAnswer }),
-      signal,
-    })
-    const json = await res.json().catch(() => null)
-    if (!json) return { ok: false, error: `Server javob bermadi (${res.status})`, status: res.status }
-    if (json.ok === false) return { ok: false, error: json.error || 'Xatolik', status: res.status }
-    const { ok: _ok, ...rest } = json
-    return { ok: true, data: rest as unknown }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: e instanceof Error ? e.message : "Tarmoq xatosi", status: 0 }
-  }
 }
 
 export function getTorStatus(signal?: AbortSignal) {
@@ -171,7 +151,7 @@ export async function streamBills(stir: string, handlers: StreamHandlers, signal
     handlers.onDone?.()
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return
-    handlers.onError?.(e instanceof Error ? e.message : "Tarmoq xatosi")
+    handlers.onError?.('Tarmoq xatosi — serverga ulanib boʻlmadi')
   }
 }
 
@@ -211,7 +191,12 @@ async function saveBlob(res: Response, fallbackName: string): Promise<void> {
 }
 
 async function downloadGet(url: string): Promise<void> {
-  const res = await fetch(url, { headers: authHeaders() })
+  let res: Response
+  try {
+    res = await fetch(url, { headers: authHeaders() })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
   if (!res.ok) {
     let msg = 'Eksport xatosi'
     try {
@@ -224,11 +209,16 @@ async function downloadGet(url: string): Promise<void> {
 }
 
 async function downloadPost(url: string, body: unknown): Promise<void> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
   if (!res.ok) {
     let msg = 'Eksport xatosi'
     try {

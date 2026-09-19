@@ -40,10 +40,3 @@ export type BillStreamMessage =
 export interface BillDetailData {
   bill: unknown
 }
-
-// ---- MIB -----------------------------------------------------------------------
-
-export interface MibPrepareData {
-  sessionId: string
-  captchaUrl: string
-}

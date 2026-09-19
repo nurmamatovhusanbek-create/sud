@@ -102,7 +102,7 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
     if (chamberResult.status === 'rejected') {
       partial.push({ source: 'chamber', error: chamberResult.reason instanceof Error ? chamberResult.reason.message : String(chamberResult.reason) })
     }
-    if (!company && !rating) throw new Error('Company not found on orginfo.uz or chamber.uz')
+    if (!company && !rating) throw new Error('Kompaniya orginfo.uz yoki chamber.uz saytlarida topilmadi')
     return {
       company: company
         ? ({
@@ -223,13 +223,4 @@ export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPaylo
     })
     return { tin, count: allHearings.length, hearings: allHearings }
   },
-})
-
-// ---- MIB debt -------------------------------------------------------------------
-
-import { parseMibHtml, type MibDebtResult } from '@/lib/mib'
-
-export const mibParseSource = defineSource<{ html: string; tin: string }, MibDebtResult>({
-  name: 'mib-parse',
-  run: async (p) => parseMibHtml(p.html, p.tin),
 })

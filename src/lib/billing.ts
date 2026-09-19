@@ -496,8 +496,44 @@ export async function searchBillsByInn(
 // hedge 900ms) and the shared per-origin cap (NET_PER_ORIGIN_MAX) + spacing
 // (NET_ORIGIN_SPACING_MS) pace the whole enrichment across all callers.
 
+/**
+ * v208 (API limits report, item F): per-invoice status cache.
+ *
+ * getFullBillData re-checks EVERY bill on every open/refresh of the same TIN
+ * (60 checkStatus calls is the dominant billing.sud.uz load — see the API
+ * limits report). Most invoices are already in a terminal state (paid/used/
+ * cancelled/errored) and will never change again, so re-checking them is
+ * pure waste. Cache terminal statuses indefinitely; cache non-terminal ones
+ * (unpaid/partially paid/awaiting confirmation/sent to MIB) briefly so a
+ * refresh still re-checks THOSE, just not the whole set.
+ */
+const FINAL_INVOICE_STATUSES = new Set(['PAID', 'USED', 'CANCELLED', 'BREAKED'])
+const PENDING_STATUS_CACHE_TTL = 3 * 60 * 1000 // 3 minutes
+interface BillStatusCacheEntry {
+  detail: CheckStatusResponse
+  ts: number
+}
+const billStatusCache = new Map<string, BillStatusCacheEntry>()
+
+function cachedBillStatus(invoiceNumber: string): CheckStatusResponse | null {
+  const cached = billStatusCache.get(invoiceNumber)
+  if (!cached) return null
+  const status = cached.detail.invoiceStatus
+  if (status && FINAL_INVOICE_STATUSES.has(status)) return cached.detail
+  if (Date.now() - cached.ts < PENDING_STATUS_CACHE_TTL) return cached.detail
+  return null
+}
+
 /** Get the detailed status of one bill using the shared hedged scheduler. */
-export async function getBillStatus(invoiceNumber: string, lang = 'ru'): Promise<CheckStatusResponse> {
+export async function getBillStatus(
+  invoiceNumber: string,
+  lang = 'ru',
+  opts: { force?: boolean } = {},
+): Promise<CheckStatusResponse> {
+  if (!opts.force) {
+    const cached = cachedBillStatus(invoiceNumber)
+    if (cached) return cached
+  }
   const params = new URLSearchParams({ invoice: invoiceNumber, lang })
   const url = `${BILLING_API}/api/invoice/checkStatus?${params.toString()}`
   const headers = {
@@ -537,6 +573,20 @@ export async function getBillStatus(invoiceNumber: string, lang = 'ru'): Promise
         console.log(`[billing] checkStatus ${invoiceNumber}: invalid body — retrying`)
         lastErr = new Error('Invalid response')
         continue
+      }
+      billStatusCache.set(invoiceNumber, { detail: body, ts: Date.now() })
+      if (billStatusCache.size > 500) {
+        const now = Date.now()
+        for (const [k, v] of billStatusCache) {
+          const isFinal = v.detail.invoiceStatus && FINAL_INVOICE_STATUSES.has(v.detail.invoiceStatus)
+          if (!isFinal && now - v.ts > PENDING_STATUS_CACHE_TTL * 5) billStatusCache.delete(k)
+        }
+        // Hard cap even for terminal entries (they never expire above) — evict
+        // the oldest once the map gets unreasonably large.
+        if (billStatusCache.size > 5000) {
+          const oldest = [...billStatusCache.entries()].sort((a, b) => a[1].ts - b[1].ts)
+          for (const [k] of oldest.slice(0, billStatusCache.size - 5000)) billStatusCache.delete(k)
+        }
       }
       return body
     } catch (e) {

@@ -4,11 +4,16 @@
  * App shell — v18 layout (sud-tizimi-ui-v18.html): the 248px navy sidebar
  * (brand «Sud tizimi · by Nurmamatov», Ish maydoni nav group with Kuzatuv and
  * Statistika last, Tizim group, live worker sysstat footer) + the topbar
- * (menu button on mobile, ⌘K search, Tor badge, bell).
+ * (menu button on mobile, ⌘K search, bell).
  *
  * v18 bell: each notification leads with the COUNTERPARTY company (matched
  * from the cached CompanyStats by case number) and a numeric DD.MM date.
  * Click still lands on the companyʼs Majlislar section.
+ *
+ * Tor status/check lives in Settings › Workerlar now, not here — it's
+ * optional infrastructure (every scrape already routes through the CF
+ * worker pool regardless of Tor), so it no longer occupies the topbar for
+ * users who never set it up.
  */
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -30,10 +35,9 @@ import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-sto
 import { useTabCounts } from '@/lib/tab-counts'
 import { watched } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
-import { getHealth, getTorStatus } from '@/lib/api-client'
+import { getHealth } from '@/lib/api-client'
 import { getCached } from '@/lib/cache'
 import type { CompanyStats } from '@/lib/api-types'
-import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -196,7 +200,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
   const [sideOpen, setSideOpen] = useState(false)
-  const [torState, setTorState] = useState<'checking' | 'active' | 'inactive'>('checking')
   const [workerStat, setWorkerStat] = useState<{ alive: number; total: number } | null>(null)
   // Post-hydration registry read via useSyncExternalStore: server snapshot is 0,
   // the client snapshot re-checks after hydration.
@@ -214,25 +217,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   )
   const hydrated = useHydrated()
   const counts = useTabCountsSafe()
-
-  // Tor status — poll lightly, refresh on demand
-  useEffect(() => {
-    let alive = true
-    const poll = async () => {
-      try {
-        const res = await getTorStatus()
-        if (alive && res.ok) setTorState(res.data.running ? 'active' : 'inactive')
-      } catch {
-        if (alive) setTorState('inactive')
-      }
-    }
-    void poll()
-    const t = setInterval(poll, 30_000)
-    return () => {
-      alive = false
-      clearInterval(t)
-    }
-  }, [])
 
   // sysstat footer — light poll of the worker health summary
   useEffect(() => {
@@ -256,32 +240,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       clearInterval(t)
     }
   }, [])
-
-  const checkTor = () => {
-    if (torState === 'active') {
-      toast.success('Tor allaqachon faol')
-      return
-    }
-    setTorState('checking')
-    // v208: one toast for the whole check — the loading toast is REPLACED by
-    // the result toast via the shared id.
-    toast.loading('Tor holati tekshirilmoqda…', { id: 'tor-check', duration: 20_000 })
-    void (async () => {
-      try {
-        const res = await getTorStatus()
-        setTorState(res.ok && res.data.running ? 'active' : 'inactive')
-        if (res.ok && res.data.running) toast.success('Tor faol', { id: 'tor-check' })
-        else toast.warning("Tor oʻchiq. Toʻlovlar soʻrovlari cheklangan boʻlishi mumkin", { id: 'tor-check' })
-      } catch {
-        setTorState('inactive')
-        toast.error('Tor holatini olib boʻlmadi', { id: 'tor-check' })
-      }
-    })()
-  }
-
-  const torColor =
-    torState === 'active' ? 'var(--pos-base)' : torState === 'inactive' ? 'var(--neg-base)' : 'var(--warn-base)'
-  const torText = torState === 'active' ? 'Tor faol' : torState === 'inactive' ? "Tor oʻchiq" : 'Tor…'
 
   const inWorkspace = surface === 'main' && view === 'company' && !!company
 
@@ -399,10 +357,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </button>
           <div className="top-right">
-            <button className="tor-badge" onClick={checkTor} title="Tor holati">
-              <span className="dot" style={{ background: torColor }} />
-              <span>{torText}</span>
-            </button>
             <BellPopover />
           </div>
         </header>
