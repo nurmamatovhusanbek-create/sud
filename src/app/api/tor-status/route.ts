@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import * as path from 'path'
 import { isSocksPortOpen, ensureTor, findTorBinaryPath } from '@/lib/tor'
 import { guard } from '@/server/middleware'
+import { jsonOk } from '@/server/envelope'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -23,10 +24,15 @@ export const maxDuration = 10
 async function GET_impl() {
   const binaryFound = !!findTorBinaryPath()
   const available = await isSocksPortOpen()
-  return NextResponse.json({
-    available,
-    binaryFound,
-    socksPort: 9050,
+  // v208: getTorStatus() (api-client.ts) reads the {ok,data} envelope via the
+  // shared request() helper — this used to return a bare object with no `ok`
+  // field, so request() always fell through to its "unknown response shape"
+  // failure branch and the topbar Tor badge never left its initial
+  // 'checking' state, no matter Tor's real status.
+  return jsonOk({
+    running: available,
+    installed: binaryFound,
+    port: 9050,
   })
 }
 
@@ -39,11 +45,11 @@ async function POST_impl() {
       ok,
       available,
       binaryFound,
-      message: ok ? 'Tor started successfully' : 'Tor could not start',
+      message: ok ? 'Tor muvaffaqiyatli ishga tushdi' : 'Tor ishga tushmadi',
     })
   } catch (e) {
     return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : 'Failed to start Tor' },
+      { ok: false, error: e instanceof Error ? e.message : 'Tor ishga tushmadi' },
       { status: 500 },
     )
   }

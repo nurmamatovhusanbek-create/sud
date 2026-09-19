@@ -110,7 +110,7 @@ export const SCRAPE_CFG: Record<string, ScrapeCfg> = {
     phases: [
       'orginfo.uz ga ulanilmoqda',
       'Roʻyxatdan oʻtish maʼlumoti',
-      'MIB qarzdorlik tekshirilmoqda',
+      'chamber.uz reytingi olinmoqda',
       'Reyting hisoblanmoqda',
     ],
   },

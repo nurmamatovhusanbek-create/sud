@@ -23,7 +23,9 @@ async function GET_impl(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const tin = searchParams.get('tin')?.trim()
   const name = searchParams.get('name')?.trim()
-  const search = searchParams.get('search')?.trim()
+  // `q` is the param the client (searchCompanies in api-client.ts) actually
+  // sends; `search` is kept as an alias for the documented contract above.
+  const search = (searchParams.get('search') || searchParams.get('q'))?.trim()
   const tinOnly = searchParams.get('tinOnly') === 'true'
 
   // Search mode — return list of results
@@ -33,7 +35,7 @@ async function GET_impl(req: NextRequest) {
       return NextResponse.json({ ok: true, results })
     } catch (e) {
       return NextResponse.json(
-        { ok: false, error: e instanceof Error ? e.message : 'Search failed' },
+        { ok: false, error: e instanceof Error ? e.message : 'Qidiruv amalga oshmadi' },
         { status: 502 },
       )
     }
@@ -47,7 +49,7 @@ async function GET_impl(req: NextRequest) {
         const foundTin = await lookupTinByName(name)
         if (!foundTin) {
           return NextResponse.json(
-            { ok: false, error: `No TIN found for name "${name}"` },
+            { ok: false, error: `«${name}» nomi boʻyicha STIR topilmadi` },
             { status: 404 },
           )
         }
@@ -58,14 +60,14 @@ async function GET_impl(req: NextRequest) {
       const company = await getCompanyByName(name)
       if (!company) {
         return NextResponse.json(
-          { ok: false, error: `No company found for name "${name}"` },
+          { ok: false, error: `«${name}» nomi boʻyicha kompaniya topilmadi` },
           { status: 404 },
         )
       }
       return NextResponse.json({ ok: true, company })
     } catch (e) {
       return NextResponse.json(
-        { ok: false, error: e instanceof Error ? e.message : 'Failed to fetch company info' },
+        { ok: false, error: e instanceof Error ? e.message : 'Kompaniya maʼlumotini olib boʻlmadi' },
         { status: 502 },
       )
     }
@@ -74,7 +76,7 @@ async function GET_impl(req: NextRequest) {
   // TIN lookup
   if (!tin || !/^\d{9}$/.test(tin)) {
     return NextResponse.json(
-      { ok: false, error: 'Provide ?tin=XXXXXXXXX (9 digits), ?name=Company Name, or ?search=query' },
+      { ok: false, error: '?tin=XXXXXXXXX (9 ta raqam), ?name=Kompaniya nomi yoki ?search=soʻrov kiriting' },
       { status: 400 },
     )
   }
@@ -83,14 +85,14 @@ async function GET_impl(req: NextRequest) {
     const company = await getCompanyByTin(tin)
     if (!company) {
       return NextResponse.json(
-        { ok: false, error: 'Company not found on orginfo.uz' },
+        { ok: false, error: 'Kompaniya orginfo.uz saytida topilmadi' },
         { status: 404 },
       )
     }
     return NextResponse.json({ ok: true, company })
   } catch (e) {
     return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : 'Failed to fetch company info' },
+      { ok: false, error: e instanceof Error ? e.message : 'Kompaniya maʼlumotini olib boʻlmadi' },
       { status: 502 },
     )
   }
