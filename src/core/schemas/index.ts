@@ -176,22 +176,6 @@ export const Jadval2HearingSchema = z.object({
   caseType: z.string().catch(''),
 }).passthrough()
 
-// ---- MIB ----------------------------------------------------------------------
-
-export const MibDebtSchema = z.object({
-  tin: z.string(),
-  hasDebt: z.boolean().catch(false),
-  totalDebt: z.string().catch('0'),
-  debts: z.array(z.object({
-    number: z.string().catch(''),
-    debtAmount: z.string().catch(''),
-    penaltyAmount: z.string().catch(''),
-    totalAmount: z.string().catch(''),
-    detail: z.unknown().optional(),
-  }).passthrough()).catch([]),
-  checkedAt: z.string().optional().catch(undefined),
-}).passthrough()
-
 // ---- Health / workers -----------------------------------------------------------
 
 export const SourceErrorSchema = z.object({

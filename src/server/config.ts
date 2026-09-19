@@ -116,7 +116,6 @@ export const config = {
       courtCaseMs: int('CACHE_TTL_COURT_MS', 60_000, { min: 0 }),
       companyMs: int('CACHE_TTL_COMPANY_MS', 24 * 60 * 60_000, { min: 0 }), // orginfo TIN: 24h
       upcomingMs: int('CACHE_TTL_UPCOMING_MS', 5 * 60_000, { min: 0 }),
-      mibSessionMs: int('CACHE_TTL_MIB_SESSION_MS', 10 * 60_000, { min: 0 }),
     },
   },
 
