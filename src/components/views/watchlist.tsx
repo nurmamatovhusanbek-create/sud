@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, Eye, Plus, RefreshCw, X } from 'lucide-react'
-import { EmptyBlock, Ring, bandOf, familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
+import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
@@ -17,17 +17,6 @@ import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
-
-const isKnownActive = (s?: string) => !!s && /фаол|faol|active|мавжуд|mavjud/i.test(s)
-
-const statusLabel = (s?: string) => {
-  if (!s) return ''
-  const v = s.toLowerCase()
-  if (v.includes('фаол') || v.includes('faol') || v.includes('active') || v.includes('мавжуд') || v.includes('mavjud')) return 'Faoliyatda'
-  if (v.includes('тўхтатилган') || v.includes("to'xtatilgan") || v.includes('suspended')) return "Toʻxtatilgan"
-  if (v.includes('тугатилган') || v.includes('tugatilgan') || v.includes('liquidat')) return 'Tugatilgan'
-  return s
-}
 
 interface HearingRow {
   stir: string
@@ -39,21 +28,9 @@ interface HearingRow {
   judge?: string
 }
 
-function RatingBadge({ rating }: { rating?: string | null }) {
-  if (!rating) return null
-  const letter = rating.trim().toUpperCase()[0]
-  const band = letter === 'A' ? 'pos' : letter === 'B' ? 'warn' : letter === 'C' || letter === 'D' ? 'neg' : 'neu'
-  return <span className={`badge ${familyBadgeClass(band)}`}>Reyting {rating}</span>
-}
-
 function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUnwatch: (stir: string) => void; onRefresh: (stir: string) => Promise<void> }) {
   const openCompany = useAppStore((s) => s.openCompany)
   const meta = rec.meta
-  const wr = meta?.winRate
-  const iso = meta?.nextHearingIso
-  const score = meta?.score
-  const ratingCat = meta?.rating
-  const inactive = !!meta?.status && !isKnownActive(meta.status) && /тўхтатилган|тугатилган|tugatilgan|suspended|liquidat/i.test(meta.status)
   const [refreshing, setRefreshing] = useState(false)
   const refresh = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -65,18 +42,15 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
   }
   return (
     <div className="ccard" onClick={() => openCompany(rec.stir, { name: rec.name })}>
-      {/* v206: actions live IN the header row (no more absolute overlays that
-          covered the rating badge) — hover still reveals them. */}
-      <div className="ccard-top">
+      <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
+        <div className="cc-id">
+          <div className="nm">{rec.name || `STIR ${grp(rec.stir)}`}</div>
+          <div className="tin">{grp(rec.stir)}</div>
+        </div>
+        {/* Hover tools (top-right): refresh + remove — unchanged behavior. */}
         <div className="ccard-tools">
-          <RatingBadge rating={ratingCat} />
-          <button
-            className="ccard-act"
-            title="Yangilash"
-            aria-label="Yangilash"
-            onClick={refresh}
-          >
+          <button className="ccard-act" title="Yangilash" aria-label="Yangilash" onClick={refresh}>
             {refreshing ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
           </button>
           <button
@@ -92,48 +66,7 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
           </button>
         </div>
       </div>
-      <h3>{rec.name || `STIR ${grp(rec.stir)}`}</h3>
-      <div className="p-row" style={{ gap: 8 }}>
-        {meta?.status && (
-          <span className={`p-dot ${familyDotClass(isKnownActive(meta.status) ? 'positive' : inactive ? 'negative' : 'neutral')}`} />
-        )}
-        <span className="stir">{grp(rec.stir)}</span>
-        {meta?.status && <span className="faint" style={{ fontSize: 11 }}>· {statusLabel(meta.status)}</span>}
-      </div>
-      {/* v204 (P-E): four metrics restored — win% ring, ishlar, numeric reyting, keyingi majlis */}
-      <div className="ccard-foot">
-        <span title="Gʻalaba darajasi">
-          <Ring pct={wr ?? 0} size={52} band={wr === undefined ? 'neu' : bandOf(wr)} />
-        </span>
-        <div className="mini">
-          <b>{wr !== undefined ? `${wr}%` : '-'}</b>
-          <span>Gʻalaba</span>
-        </div>
-        <div className="mini">
-          <b>{meta?.cases ?? '-'}</b>
-          <span>Ishlar</span>
-        </div>
-        <div className="mini" title={ratingCat ? `Reyting toifasi: ${ratingCat}` : undefined}>
-          <b>{score != null ? score : '-'}</b>
-          <span>Reyting{ratingCat && ratingCat !== '-' ? ` · ${ratingCat}` : ''}</span>
-        </div>
-        {iso && !inactive ? (
-          (() => {
-            const [, m, d] = iso.split('-').map(Number)
-            return (
-              <span className="hearing-pill b-warn">
-                <CalendarDays />
-                {`${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}`}
-              </span>
-            )
-          })()
-        ) : (
-          <span className="hearing-pill b-neu">
-            <CalendarDays />
-            Majlis yoʻq
-          </span>
-        )}
-      </div>
+      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
     </div>
   )
 }

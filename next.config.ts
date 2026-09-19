@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   // adds request de-duplication / in-flight coalescing (blueprint P4), so strict
   // mode's double-invoke doesn't double real upstream scrapes. Tracked, not forgotten.
   reactStrictMode: false,
+  // Dev-only: the Next.js dev indicator defaults to bottom-left, directly on top
+  // of the sidebar theme-toggle button (.side-foot), which makes that button
+  // unclickable while running `bun run dev`. Move it out of the way. No effect on
+  // the production standalone build.
+  devIndicators: {
+    position: "bottom-right",
+  },
 };
 
 export default nextConfig;
