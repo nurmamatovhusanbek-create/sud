@@ -205,20 +205,32 @@ html, body { height: 100%; }
 .ccards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
 .ccard { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); padding: 18px; cursor: pointer; box-shadow: var(--elev-1); transition: transform .25s var(--ease-emph), box-shadow .25s; position: relative; }
 .ccard:hover { transform: translateY(-4px); box-shadow: var(--elev-3); }
-.ccard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+/* mono-tile: default ink; on a company card it's the indigo brand tile. */
 .mono-tile { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-contrast); display: grid; place-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.02em; flex: 0 0 auto; }
-.ccard h3 { font-size: 14.5px; line-height: 1.3; margin: 12px 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ccard .stir { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); letter-spacing: .03em; }
-.ccard-foot { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
-.mini { display: flex; flex-direction: column; gap: 1px; }
-.mini b { font-family: var(--font-mono); font-size: 15px; font-weight: 600; }
-.mini span { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
-.hearing-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 6px 11px; border-radius: var(--radius-pill); }
-.hearing-pill svg { width: 13px; height: 13px; }
-.ccard-x { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: .15s; }
-.ccard:hover .ccard-x { opacity: 1; }
-.ccard-x:hover { background: var(--surface-active); color: var(--neg-text); }
-.ccard-x svg { width: 14px; height: 14px; }
+.ccard .mono-tile { background: var(--brand-tile); color: #fff; }
+/* Option C body: identity (monogram + name + TIN), divider, two columns
+   (Reyting | Keyingi majlis). Shared markup via primitives' CardStats. */
+.cc-head { display: flex; align-items: flex-start; gap: 12px; }
+.cc-id { min-width: 0; flex: 1; }
+.cc-id .nm { font-size: 15px; font-weight: 700; color: var(--text-1); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-id .tin { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); letter-spacing: .03em; margin-top: 3px; }
+.cc-div { height: 1px; background: var(--border-subtle); margin: 14px 0; }
+.cc-cols { display: grid; grid-template-columns: 1fr 1fr; }
+.cc-col { min-width: 0; }
+.cc-col + .cc-col { border-left: 1px solid var(--border-subtle); padding-left: 18px; }
+.cc-col .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+.cc-col .v { display: flex; align-items: baseline; gap: 8px; margin-top: 7px; }
+.cc-col .num { font-family: var(--font-mono); font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text-1); }
+.cc-col .mo { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.cc-col .none { font-size: 15px; color: var(--text-3); }
+.cc-col .days { font-size: 11.5px; color: var(--text-3); margin-top: 6px; }
+.cc-col .days.warn { color: var(--warn-text); }
+/* rating letter pill — the only signal color on the card body */
+.lt { display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: var(--radius-pill); border: 1px solid transparent; }
+.lt.b-pos { border-color: var(--pos-line); }
+.lt.b-warn { border-color: var(--warn-line); }
+.lt.b-neg { border-color: var(--neg-line); }
+.lt.b-neu { border-color: var(--neu-line); }
 /* v206: watchlist card actions — in-flow header tools instead of absolute
    overlays (they used to cover the rating badge). Hover-reveal kept. */
 .ccard-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
@@ -227,7 +239,6 @@ html, body { height: 100%; }
 .ccard-act:hover { background: var(--surface-active); color: var(--text-1); }
 .ccard-act-danger:hover { color: var(--neg-text); }
 .ccard-act svg { width: 14px; height: 14px; }
-.ccard-tools .badge { margin-right: 2px; }
 @media (hover: none) { .ccard-act { opacity: .75; } } /* touch: keep actions visible */
 
 /* ---------- context bar + tabs ---------- */

@@ -15,76 +15,29 @@ import { recents, removeRecent, allRecords } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { searchCompanies } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { CountUp, Ring, Kpi, Seg, bandOf, familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
+import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
 import type { CompanyRecord } from '@/lib/registry'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
-const statusLabel = (s?: string) => {
-  if (!s) return ''
-  const v = s.toLowerCase()
-  if (v.includes('фаол') || v.includes('faol') || v.includes('active') || v.includes('мавжуд') || v.includes('mavjud')) return 'Faoliyatda'
-  if (v.includes('тўхтатилган') || v.includes('to‘xtatilgan') || v.includes("to'xtatilgan") || v.includes('suspended'))
-    return "Toʻxtatilgan"
-  if (v.includes('тугатилган') || v.includes('tugatilgan') || v.includes('liquidat')) return 'Tugatilgan'
-  return s
-}
 const isKnownActive = (s?: string) =>
   !!s && /фаол|faol|active|мавжуд|mavjud/i.test(s)
 const isKnownInactive = (s?: string) =>
   !!s && /тўхтатилган|тугатилган|to'xtatilgan|to‘xtatilgan|tugatilgan|suspended|liquidat/i.test(s)
 
-function RatingBadge({ rating }: { rating?: string | null }) {
-  if (!rating) return null
-  // Chamber-style categories: A* → positive, B* → warning, C/D → negative
-  const letter = rating.trim().toUpperCase()[0]
-  const band = letter === 'A' ? 'pos' : letter === 'B' ? 'warn' : letter === 'C' || letter === 'D' ? 'neg' : 'neu'
-  return <span className={`badge ${familyBadgeClass(band)}`}>Reyting {rating}</span>
-}
-
-function HearingPill({ rec }: { rec: CompanyRecord }) {
-  const iso = rec.meta?.nextHearingIso
-  if (iso && !isKnownInactive(rec.meta?.status)) {
-    const [, m, d] = iso.split('-').map(Number)
-    return (
-      <span className="hearing-pill b-warn">
-        <CalendarDays />
-        {`${String(d).padStart(2, '0')} ${['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'][m - 1] ?? ''}`}
-      </span>
-    )
-  }
-  return (
-    <span className="hearing-pill b-neu">
-      <CalendarDays />
-      Majlis yoʻq
-    </span>
-  )
-}
-
 function CompanyCard({ rec }: { rec: CompanyRecord }) {
   const openCompany = useAppStore((s) => s.openCompany)
   const meta = rec.meta
-  const wr = meta?.winRate
   return (
     <div className="ccard" data-open={rec.stir} onClick={() => openCompany(rec.stir, { name: rec.name })}>
-      <div className="ccard-top">
+      <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
-        <RatingBadge rating={meta?.rating} />
-      </div>
-      <h3>{rec.name || `STIR ${grp(rec.stir)}`}</h3>
-      <div className="p-row" style={{ gap: 8 }}>
-        {meta?.status && <span className={`p-dot ${familyDotClass(isKnownActive(meta.status) ? 'positive' : isKnownInactive(meta.status) ? 'negative' : 'neutral')}`} />}
-        <span className="stir">{grp(rec.stir)}</span>
-        {meta?.status && <span className="faint" style={{ fontSize: 11 }}>· {statusLabel(meta.status)}</span>}
-      </div>
-      <div className="ccard-foot">
-        <Ring pct={wr ?? 0} size={52} band={wr === undefined ? 'neu' : bandOf(wr)} />
-        <div className="mini">
-          <b>{meta?.cases ?? '-'}</b>
-          <span>Ishlar</span>
+        <div className="cc-id">
+          <div className="nm">{rec.name || `STIR ${grp(rec.stir)}`}</div>
+          <div className="tin">{grp(rec.stir)}</div>
         </div>
-        <HearingPill rec={rec} />
       </div>
+      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
     </div>
   )
 }
