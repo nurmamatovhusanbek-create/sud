@@ -57,6 +57,9 @@ const OPEN_ORIGINS = new Set(list('NET_OPEN_ORIGINS', ['jadvalapi.sud.uz']))
 const OPEN_ORIGIN_MAX = int('NET_PER_ORIGIN_MAX_OPEN', 6)
 const OPEN_ORIGIN_SPACING = int('NET_ORIGIN_SPACING_MS_OPEN', 60)
 
+const DEAD_COOLDOWN = int('NET_DEAD_COOLDOWN_MS', 30_000)
+const DEAD_THRESHOLD = int('NET_DEAD_THRESHOLD', 3)
+
 function int(k: string, d: number) {
   const v = Number(process.env[k])
   return Number.isFinite(v) && v > 0 ? v : d

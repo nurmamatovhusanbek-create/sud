@@ -102,7 +102,7 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
     if (chamberResult.status === 'rejected') {
       partial.push({ source: 'chamber', error: chamberResult.reason instanceof Error ? chamberResult.reason.message : String(chamberResult.reason) })
     }
-    if (!company && !rating) throw new Error('Company not found on orginfo.uz or chamber.uz')
+    if (!company && !rating) throw new Error('Kompaniya orginfo.uz yoki chamber.uz saytlarida topilmadi')
     return {
       company: company
         ? ({

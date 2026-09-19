@@ -646,7 +646,7 @@ function HealthTab() {
 type SetTab = 'updates' | 'workers' | 'health'
 
 export function SettingsView() {
-  const [tab, setTab] = useState<SetTab>('health')
+  const [tab, setTab] = useState<SetTab>('workers')
 
   useEffect(() => {
     document.title = 'Sozlamalar · Sud tizimi'
