@@ -4,7 +4,6 @@
  * Profile section — the prototypeʼs Profil: data strips (Manzil/Direktor,
  * Roʻyxat/Kapital/Telefon/Email/OKED), quick-action buttons, and the Chamber
  * rating card with the arc gauge, category badge and founders list.
- * MIB debt check stays parked (redesign §13.1) — as in the prototype.
  */
 
 import { useEffect } from 'react'

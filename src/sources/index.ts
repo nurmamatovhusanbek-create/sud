@@ -224,12 +224,3 @@ export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPaylo
     return { tin, count: allHearings.length, hearings: allHearings }
   },
 })
-
-// ---- MIB debt -------------------------------------------------------------------
-
-import { parseMibHtml, type MibDebtResult } from '@/lib/mib'
-
-export const mibParseSource = defineSource<{ html: string; tin: string }, MibDebtResult>({
-  name: 'mib-parse',
-  run: async (p) => parseMibHtml(p.html, p.tin),
-})

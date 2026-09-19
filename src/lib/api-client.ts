@@ -15,7 +15,6 @@ import type {
   CourtCase,
   EnrichedBill,
   FullCaseData,
-  MibPrepareData,
   UpcomingHearingsData,
 } from './api-types'
 
@@ -87,29 +86,6 @@ export function searchCompanies(query: string, signal?: AbortSignal) {
 
 export function getBillDetail(invoice: string, signal?: AbortSignal) {
   return request<BillDetailData>(`/api/bills?invoice=${encodeURIComponent(invoice)}`, signal)
-}
-
-export function prepareMibCheck(tin: string, signal?: AbortSignal) {
-  return request<MibPrepareData>(`/api/mib-debt?tin=${tin}`, signal)
-}
-
-export async function submitMibCheck(tin: string, sessionId: string, captchaAnswer: string, signal?: AbortSignal): Promise<ApiResult<unknown>> {
-  try {
-    const res = await fetch('/api/mib-debt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ tin, sessionId, captchaAnswer }),
-      signal,
-    })
-    const json = await res.json().catch(() => null)
-    if (!json) return { ok: false, error: `Server javob bermadi (${res.status})`, status: res.status }
-    if (json.ok === false) return { ok: false, error: json.error || 'Xatolik', status: res.status }
-    const { ok: _ok, ...rest } = json
-    return { ok: true, data: rest as unknown }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
-  }
 }
 
 export function getTorStatus(signal?: AbortSignal) {
