@@ -256,3 +256,20 @@ Work Log:
 - Gates: tsc CLEAN; 30/30 tests; packed "download/zip files/sud-billing-lookup-v207.zip" (243 files, unzip -t clean); git commit + tag sud-signal-v207; APP_VERSION v206->v207, package.json 0.3.5->0.3.6
 
 Stage Summary: case counts restored to full archive (7 -> 106 for the test TIN); root cause documented as per-TIN upstream token bucket; defense = quota-frugal sampling (2 worker + 2 curl across 2 machines) + 10-min memoization + honest incomplete flag; v207 zipped and tagged
+
+---
+Task ID: 17 (v208 — six UI/UX defect fixes + correct update-check repo)
+Agent: main (Super Z)
+Task: "qayta button not working; refresh not working properly; timespan pill in workers tab not changing/not clickable; notification button not clickable?; wrong github link (correct: https://github.com/nurmamatovhusanbek-create/sud.git); tor pop-ups broken (transparent one + black one)"
+
+Work Log:
+- Tor popups ROOT CAUSE (reproduced in browser): prototype.css sonner retint used var(--warn-solid) which is defined NOWHERE -> warning toast computed background:initial = TRANSPARENT, while plain toasts fell to --accent ink pill = BLACK. Fixed retint to canonical --status-{positive,negative,warning}-solid + -on vars (success/error/warning all colored, readable). ALSO checkTor now uses ONE toast with shared id 'tor-check' (toast.loading replaced by result) — no more double popup stack. Verified: single amber toast rgb(183,121,31).
+- Timespan pills (Settings > Holat): were decorative (hardcoded className="on" + toast-only onClick). Now real: Span state ('today'|'7d'|'30d'|'all'), SPANS table, span-filtered per-worker history drives success rate gauge + label ("Muvaffaqiyat darajasi · so'nggi 7 kun"), Jami so'rov total, avg latency, volume chart, worker cards + sparklines. HealthTab load() now setLoading(true) first so "Qayta urinish" shows skeleton; hint corrected to /api/settings/health.
+- Refresh (Yangilash) was dead/broken per section: overview remounted via key but useResource replayed localStorage cache (no network); cases + profile had NO sud:force-section listener at all. Fixed: overview wrapper clears stats:/upcoming: client caches then remounts with force prop -> fetcher calls getStats(stir,{force}) -> /api/stats?force=1 re-scrapes server-side (verified in network log: plain GET then &force=1 GET); cases.tsx refetchAll() listener (all enabled courts, cache dropped first); profile.tsx refetch listener; hearings/bills already wired.
+- Qayta (overview partial banner) now dispatches sud:force-section (full force pipeline incl. server) instead of a cache-replaying refetch.
+- GitHub update check: GITHUB_REPO 'nurmamatovhusanbek-create/sud-billing-lookup' -> 'nurmamatovhusanbek-create/sud' in api/settings/version/route.ts (was comparing against stale v168 mirror); verified live: commitUrl now github.com/nurmamatovhusanbek-create/sud/commit/b4167ce (their real v205).
+- Bell ("Bildirishnomalar") retested at 1280x720: opens/closes fine — the "not clickable" symptom on user machine matches the invisible transparent toast stacking over the corner (fixed above).
+- Gates: tsc --noEmit CLEAN; eslint 0 problems; 30/30 core tests; browser E2E: pills switch active + labels follow, single colored tor toast, /api/settings/version hits correct repo, refresh fires force=1.
+- Release: APP_VERSION v207->v208, package.json 0.3.6->0.3.7; pack-release.sh now auto-derives VER from src/lib/version.ts (was hardcoded); packed "download/zip files/sud-billing-lookup-v208.zip" (246 files, unzip -t clean, APP_VERSION v208 inside); git commit + tag sud-signal-v208. NOTE: an intermediate pack run briefly overwrote v207.zip with v208 content — restored from git, both zips re-verified.
+
+Stage Summary: all six reported defects fixed and browser-verified; v208 zipped and tagged; update-check now points at the real repo (nurmamatovhusanbek-create/sud)

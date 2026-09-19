@@ -7,7 +7,7 @@
  * All colors flow through the semantic tokens (color = signal only).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { StatusFamily } from '@/core/status'
 
 export type Band = 'pos' | 'neg' | 'warn' | 'info' | 'neu'
@@ -389,4 +389,199 @@ export function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase()
   return out || '··'
+}
+
+// ==== v18 additions — interactive pizza chart + win-rate ring ==================
+
+import { pizzaModel, winRing as winRingGeom, PIZZA_GEOM, type PizzaItem } from '@/components/proto/pizza-geometry'
+
+/**
+ * Pizza — the v18 radial won/lost chart. Each wedge = one slice (court type
+ * or category): filled radius = won share, empty band = lost, total in a pill
+ * just outside, navy dotted seams part the slices. Click/keyboard selects a
+ * wedge — the others blur (pure CSS via .has-sel) and onSelect fires.
+ */
+export function Pizza({
+  items,
+  onSelect,
+  initial = 0,
+  size = 340,
+}: {
+  items: PizzaItem[]
+  onSelect?: (item: PizzaItem, index: number) => void
+  initial?: number
+  size?: number
+}) {
+  const [sel, setSel] = useState(initial)
+  // dataset swaps (Sud turi ↔ Turkum) must not leave a dangling selection —
+  // adjust-state-during-render (React docs), no effect needed.
+  const clamped = Math.min(sel, Math.max(0, items.length - 1))
+  if (clamped !== sel) setSel(clamped)
+  const model = useMemo(() => pizzaModel(items), [items])
+  const { cx, cy, r0 } = PIZZA_GEOM
+
+  const pick = (i: number) => {
+    setSel(i)
+    const it = items[i]
+    if (it) onSelect?.(it, i)
+  }
+
+  return (
+    <svg
+      className={`pie-wrap${items.length ? ' has-sel' : ''}`}
+      width={size}
+      height={size}
+      viewBox="0 0 340 340"
+      role="img"
+      aria-label="Ishlar taqsimoti, yutuq ulushi bilan"
+    >
+      {model.rings.map((r, i) => (
+        <circle key={i} className={`cring${r.edge ? ' edge' : ''}`} cx={cx} cy={cy} r={r.r} />
+      ))}
+      {model.wedges.map((w) => {
+        const it = items[w.index]
+        return (
+          <g
+            key={w.index}
+            className={`cwedge${clamped === w.index ? ' sel' : ''}`}
+            data-i={w.index}
+            tabIndex={0}
+            role="button"
+            aria-label={w.aria}
+            onClick={() => pick(w.index)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                pick(w.index)
+              }
+            }}
+          >
+            <path className="lost" d={w.lostPath} fill={it.col} fillOpacity={0.14} />
+            {w.wonPath && <path className="won" d={w.wonPath} fill={it.col} />}
+            {w.wonText && (
+              <text className="cwon" x={w.wonText.x} y={w.wonText.y}>
+                {w.wonText.v}
+              </text>
+            )}
+            {w.lostText && (
+              <text className="clost" x={w.lostText.x} y={w.lostText.y}>
+                {w.lostText.v}
+              </text>
+            )}
+            <rect
+              x={w.pill.x - 14.5}
+              y={w.pill.y - 10.5}
+              width={29}
+              height={21}
+              rx={7}
+              fill={w.pill.fill}
+              stroke="var(--surface)"
+              strokeWidth={1.5}
+            />
+            <text className="ctot" x={w.pill.x} y={w.pill.y + 4}>
+              {w.pill.v}
+            </text>
+          </g>
+        )
+      })}
+      <circle className="pie-hub" cx={cx} cy={cy} r={r0} />
+      {model.seams.map((s, i) => (
+        <line key={i} className="csep" x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
+      ))}
+    </svg>
+  )
+}
+
+/** Win-rate ring — the prototypeʼs ringSvg2 (88px detail-panel gauge). */
+export function WinRing({ pct, col, size = 88 }: { pct: number; col: string; size?: number }) {
+  const g = winRingGeom(pct, col)
+  return (
+    <svg width={size} height={size} viewBox="0 0 88 88" aria-label={`Yutuq ${pct}%`}>
+      <circle cx={44} cy={44} r={g.track} fill="none" stroke="var(--surface-inset)" strokeWidth={8} />
+      <circle
+        cx={44}
+        cy={44}
+        r={g.arc}
+        fill="none"
+        stroke={col}
+        strokeWidth={8}
+        strokeLinecap="round"
+        strokeDasharray={g.dash}
+        transform={`rotate(${g.rotate} 44 44)`}
+      />
+      <text
+        x={44}
+        y={49}
+        textAnchor="middle"
+        fontSize={18}
+        fontWeight={800}
+        fill="var(--text-1)"
+        fontFamily="var(--font-mono)"
+      >
+        {pct}
+      </text>
+    </svg>
+  )
+}
+
+/** Detail panel body for one selected pizza wedge (prototype pieDetailHtml). */
+export function PizzaDetail({
+  item,
+  kind,
+  action,
+}: {
+  item: PizzaItem
+  kind: string
+  action?: React.ReactNode
+}) {
+  const tot = item.won + item.lost
+  const wr = tot ? Math.round((item.won / tot) * 100) : 0
+  const sp = (v: number) => (tot ? (v / tot) * 100 : 0)
+  const extra: { nm: string; v: number }[] = []
+  if (item.pending) extra.push({ nm: 'Jarayonda', v: item.pending })
+  if (item.neutral) extra.push({ nm: 'Neytral', v: item.neutral })
+  return (
+    <div>
+      <div className="det-head">
+        <span className="sw" style={{ background: item.col }} />
+        <span className="k">{kind}</span>
+      </div>
+      <div className="det-name">{item.full}</div>
+      <div className="det-sub">
+        Jami {tot} ish · {item.won} yutgan, {item.lost} yutqazgan
+      </div>
+      <div className="det-ring">
+        <WinRing pct={wr} col={item.col} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="stackbar">
+            <i style={{ width: `${sp(item.won)}%`, background: item.col }} />
+            <i style={{ width: `${sp(item.lost)}%`, background: `${item.col}22` }} />
+          </div>
+          <div className="det-sub" style={{ marginTop: 8 }}>
+            Toʻldirilgan = yutgan · boʻsh = yutqazgan
+          </div>
+        </div>
+      </div>
+      <div className="det-rows">
+        <div className="r">
+          <span className="sw" style={{ background: item.col }} />
+          <span className="nm">Yutgan</span>
+          <span className="vl tnum">{item.won}</span>
+        </div>
+        <div className="r">
+          <span className="sw" style={{ background: `${item.col}33` }} />
+          <span className="nm">Yutqazgan</span>
+          <span className="vl tnum">{item.lost}</span>
+        </div>
+        {extra.map((e) => (
+          <div className="r" key={e.nm}>
+            <span className="sw" style={{ background: 'var(--neu-soft)', border: '1px solid var(--border-subtle)' }} />
+            <span className="nm">{e.nm}</span>
+            <span className="vl tnum">{e.v}</span>
+          </div>
+        ))}
+      </div>
+      {action}
+    </div>
+  )
 }

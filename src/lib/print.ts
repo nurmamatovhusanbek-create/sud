@@ -56,7 +56,7 @@ export function printHtml(title: string, bodyHtml: string): void {
     throw new Error('Brauzer chop etish oynasini blokladi — pop-up ruxsatini bering')
   }
   const doc = `<!doctype html><html lang="uz"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${PRINT_CSS}</style></head><body>${bodyHtml}
-<div class="pr-foot"><span>Sud Billing Lookup · sud.uz maʼlumotlari asosida</span><span>${stamp()}</span></div>
+<div class="pr-foot"><span>Sud tizimi · by Nurmamatov · sud.uz maʼlumotlari asosida</span><span>${stamp()}</span></div>
 </body></html>`
   w.document.open()
   w.document.write(doc)

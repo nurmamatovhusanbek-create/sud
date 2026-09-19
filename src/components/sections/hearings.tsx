@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, FileSpreadsheet } from 'lucide-react'
 import { EmptyBlock, SkRows } from '@/components/proto/primitives'
+import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
@@ -50,7 +51,7 @@ function docketParts(isoDate: string): Omit<DocketPart, 'isoDate' | 'caseNumber'
 export function HearingsSection() {
   const company = useAppStore((s) => s.activeCompany)
   const setCounts = useTabCounts((s) => s.set)
-  const { state, refetch } = useResource<UpcomingHearingsData>((signal) => getUpcomingHearings(company?.stir || '', signal), {
+  const { state, elapsed, refetch } = useResource<UpcomingHearingsData>((signal) => getUpcomingHearings(company?.stir || '', signal), {
     cacheKey: company ? `upcoming:${company.stir}` : undefined,
     enabled: !!company,
   })
@@ -110,7 +111,9 @@ export function HearingsSection() {
     )
   }
 
-  if (view.status === 'idle' || view.status === 'loading') return <SkRows n={4} />
+  // v18: scrape progress card on first load (skeleton only for in-place refreshes)
+  if (view.status === 'idle' || view.status === 'loading')
+    return <ScrapeProgress {...SCRAPE_CFG.hearings} elapsed={elapsed} />
   if (view.status === 'error')
     return (
       <EmptyBlock

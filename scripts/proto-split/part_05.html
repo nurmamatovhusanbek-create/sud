@@ -1,0 +1,231 @@
+    var body='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="badge neu mono">proxy.js</span><span class="faint" style="font-size:11.5px">Cloudflare Worker · CORS proksi</span><span style="flex:1"></span><button class="btn ghost sm" id="wcCopy"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Nusxa</button></div>'
+      +'<pre class="codeblock">'+esc(WORKER_CODE)+'</pre>'
+      +'<div class="faint" style="font-size:11.5px;margin-top:10px">Har bir worker bir xil kodni ishlatadi. Faqat ruxsat etilgan hostlarga soʻrov yuboriladi — ochiq proksi emas.</div>';
+    openDrawer(codeIcon,'Worker kodi',h,body);
+    var cp=$('#wcCopy'); if(cp)cp.addEventListener('click',function(){ try{ if(navigator.clipboard)navigator.clipboard.writeText(WORKER_CODE); }catch(e){} toast('Kod nusxalandi','pos'); });
+  }
+
+  /* ---- Statistika depth: win-rate-by-court · next hearing · recent activity · compare ---- */
+  function renderUmumiyExtra(){
+    var wr=$('#wrRows'); if(wr) wr.innerHTML=COURT_TYPES.map(function(c){var tot=c.won+c.lost,rate=tot?Math.round(c.won/tot*100):0,bg=rate>=60?'var(--pos)':rate>=40?'var(--warn)':'var(--neg)';return '<div class="wr-row"><span class="wr-lbl">'+c.label+'</span><div class="wr-track"><div class="wr-fill" style="width:'+rate+'%;background:'+bg+'"></div></div><span class="wr-val">'+rate+'%</span></div>';}).join('');
+    var nh=$('#nextHearing'); if(nh){ var h=hearings[0]; if(h){ var cn=(h[4].match(/Ish\s+([\w\-\/]+)/)||[])[1]||''; nh.innerHTML='<div class="datecard now" style="cursor:pointer"><div class="d"><div class="dd tnum">'+h[0]+'</div><div class="mm">'+h[1]+'</div></div><div class="body"><b>'+h[3]+'</b><span>Ish '+cn+'</span></div><div class="time">'+h[5]+'</div></div><div class="faint" style="font-size:12px;margin-top:12px;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>3 kun qoldi · sudya X. Rahimov</div>'; nh.querySelector('.datecard').addEventListener('click',function(){show('majlislar');if(cn)setTimeout(function(){openCaseDrawer(cn);},150);}); } }
+    var rb=$('#recentBills'); if(rb){ rb.innerHTML=bills.slice(0,3).map(function(b){return '<div class="lrow" data-bill="'+b[0]+'"><div class="lead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8M8 12h8"/></svg></div><div class="main-c"><b class="mono">'+b[0]+'</b><div class="sub">Davlat boji · '+b[1]+'</div></div><span class="badge '+b[3]+'">'+b[4]+'</span></div>';}).join(''); rb.querySelectorAll('.lrow').forEach(function(el){el.addEventListener('click',function(){openReceiptDrawer(el.dataset.bill);});}); }
+    var rc=$('#recentCases'); if(rc){ var META={pos:{ic:'<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0zM7 4H4v2a3 3 0 003 3M17 4h3v2a3 3 0 01-3 3"/>',lab:'Yutgan',cls:'pos',txt:'Daʼvo toʻliq qanoatlantirildi'},neg:{ic:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>',lab:'Yutqazgan',cls:'neg',txt:'Daʼvo qanoatlantirilmadi'},neu:{ic:'<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',lab:'Neytral',cls:'warn',txt:'Neytral yakunlandi'}}; var decided=cases.filter(function(c){return c[3]==='pos'||c[3]==='neg'||c[3]==='neu';}).slice(0,3); rc.innerHTML=decided.map(function(c){var m=META[c[3]]||META.neu;return '<div class="lrow" data-case="'+c[0]+'"><div class="lead '+m.cls+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">'+m.ic+'</svg></div><div class="main-c"><b class="mono">'+c[0]+'</b><div class="sub">'+m.txt+'</div></div><span class="badge '+m.cls+'">'+m.lab+'</span></div>';}).join(''); rc.querySelectorAll('.lrow').forEach(function(el){el.addEventListener('click',function(){openCaseDrawer(el.dataset.case);});}); }
+    $$('#view-umumiy [data-goto]').forEach(function(b){ if(!b._w){b._w=1;b.addEventListener('click',function(e){e.preventDefault();show(b.dataset.goto);});} });
+    var cb=$('#cmpBtn'); if(cb&&!cb._w){cb._w=1;cb.addEventListener('click',toggleCompare);}
+  }
+  /* ---- in-page side-by-side comparison (lives inside Statistika) ---- */
+  var cmpOpen=false;
+  function ensureCmpPanel(){
+    var p=$('#cmpPanel'); if(p)return p;
+    var v=$('#view-umumiy'); if(!v)return null;
+    p=document.createElement('div'); p.id='cmpPanel'; p.className='card p cmp-panel'; p.hidden=true;
+    var others=watch.slice(1);
+    p.innerHTML='<div class="card-h"><span class="ic">'+cmpIcon+'</span><h3>Yonma-yon solishtirish</h3>'
+      +'<span class="grow"></span>'
+      +'<select class="pie-filter" id="cmpPick" aria-label="Ikkinchi kompaniya"><option value="">Kompaniyani tanlang…</option>'
+      +others.map(function(w){return '<option value="'+w[2]+'">'+w[0]+'</option>';}).join('')+'</select>'
+      +'<button class="btn ghost sm" id="cmpClose" style="margin-left:8px">Yopish</button></div>'
+      +'<div id="cmpBody"><div class="empty-block" style="padding:26px 20px"><div class="eic">'+cmpIcon+'</div><h3>Ikkinchi kompaniyani tanlang</h3><p>Ikkala kompaniya bir vaqtda parallel yuklanadi va statistikasi yonma-yon chiqadi.</p></div></div>';
+    v.insertBefore(p, v.firstChild);
+    $('#cmpClose').addEventListener('click',function(){ p.hidden=true; cmpOpen=false; $('#view-umumiy').classList.remove('comparing'); });
+    $('#cmpPick').addEventListener('change',function(){ if(this.value) cmpLoad(this.value); });
+    return p;
+  }
+  function toggleCompare(){
+    var p=ensureCmpPanel(); if(!p)return;
+    cmpOpen=!p.hidden ? false : true; p.hidden=!cmpOpen;
+    if(!cmpOpen){ $('#view-umumiy').classList.remove('comparing'); }
+    else { p.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'}); }
+  }
+  function cmpLoad(stir){
+    var w=null; for(var i=0;i<watch.length;i++){if(watch[i][2]===stir){w=watch[i];break;}} if(!w)return;
+    var body=$('#cmpBody'); if(!body)return;
+    var base={name:'ARTIKUL AZIYA KABEL',init:'AK',stir:'302 678 824',cases:38,wr:61,rating:'BBB',courts:COURT_TYPES,turkum:TURKUM_CATS,pending:2,debt:'142.6 mln'};
+    var other={name:w[0],init:w[1],stir:w[2],cases:w[3],wr:w[4],rating:w[5],courts:synthCourts(w[3],w[4],w[2]),turkum:synthTurkum(w[3],w[4],w[2]),pending:seedFrom(w[2])%4,debt:(20+seedFrom(w[2])%120)+'.0 mln'};
+    function modesOf(c){ return {court:{kind:'Tanlangan sud turi',note:'sud turini tanlang',items:c.courts}, turkum:{kind:'Tanlangan turkum',note:'turkumni tanlang',items:c.turkum}}; }
+    function render(){
+      body.innerHTML='<div class="cmp-grid">'+companyStatsCol(base,0)+companyStatsCol(other,1)+'</div>'
+        +'<div class="faint" style="font-size:11.5px;margin-top:14px;display:flex;align-items:flex-start;gap:7px;line-height:1.5">'
+        +'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>'
+        +'<span>Har bir kompaniya alohida STIR — token-bucket alohida, shuning uchun ikkalasi parallel yuklandi. Statistika birinchi, tafsilotlar keyin (deferred), 10 daqiqa keshlanadi.</span></div>';
+      mountCmpPie(0, modesOf(base)); mountCmpPie(1, modesOf(other));
+      $('#view-umumiy').classList.add('comparing');
+    }
+    if(reduce){ render(); return; }
+    // parallel two-company fetch representation: two lanes advancing together
+    body.innerHTML='<div class="cmp-lanes">'
+      +cmpLane('L',base.name,'var(--c-navy)')
+      +cmpLane('R',w[0],'var(--c-slate)')+'</div>';
+    var la=$('#laneL-fill'), lb=$('#laneR-fill'), pa=0,pb=0;
+    var iv=setInterval(function(){
+      pa=Math.min(100,pa+ (8+Math.random()*10)); pb=Math.min(100,pb+ (8+Math.random()*10));
+      if(la)la.style.width=Math.round(pa)+'%'; if(lb)lb.style.width=Math.round(pb)+'%';
+      var sa=$('#laneL-st'), sb=$('#laneR-st');
+      if(sa)sa.textContent=pa>=100?'tayyor':pa>66?'boyitilmoqda':pa>33?'olinmoqda':'ulanmoqda';
+      if(sb)sb.textContent=pb>=100?'tayyor':pb>66?'boyitilmoqda':pb>33?'olinmoqda':'ulanmoqda';
+      if(pa>=100&&pb>=100){ clearInterval(iv); setTimeout(render,340); }
+    },230);
+  }
+  function cmpLane(id,name,col){
+    return '<div class="cmp-lane"><div class="lane-h"><span class="dot" style="background:'+col+'"></span>'
+      +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span>'
+      +'<span class="grow" style="flex:1"></span><span class="spinner" style="width:12px;height:12px;color:'+col+'"></span></div>'
+      +'<div class="stream-bar" style="margin:0 0 7px"><div class="stream-fill" id="lane'+id+'-fill" style="width:4%"></div></div>'
+      +'<div class="faint mono" style="font-size:11px">holat: <span id="lane'+id+'-st">ulanmoqda</span></div></div>';
+  }
+  /* deterministic per-company court split so each company's charts differ but are stable */
+  function seedFrom(s){ var n=7; String(s).replace(/\D/g,'').split('').forEach(function(d){ n=(n*31 + (+d))%99991; }); return n; }
+  function synthCourts(total,winRate,stir){
+    var share=[0.55,0.30,0.15], seed=seedFrom(stir), out=[], assigned=0;
+    COURT_TYPES.forEach(function(c,i){
+      var ct = i===COURT_TYPES.length-1 ? (total-assigned) : Math.round(total*share[i]); if(ct<0)ct=0; assigned+=ct;
+      var v=(((seed>>(i*3))&3)-1)*0.07, rate=Math.max(0.05,Math.min(0.95, winRate/100 + v));
+      var won=Math.round(ct*rate); out.push({label:c.label,full:c.full,won:won,lost:ct-won,col:c.col,pill:c.pill});
+    });
+    return out;
+  }
+  function synthTurkum(total,winRate,stir){
+    var w=[0.22,0.16,0.13,0.09,0.10,0.08,0.12,0.10], seed=seedFrom(stir+'7'), out=[], assigned=0, n=TURKUM_CATS.length;
+    TURKUM_CATS.forEach(function(c,i){
+      var ct = i===n-1 ? Math.max(0,total-assigned) : Math.round(total*w[i]); assigned+=ct;
+      var v=(((seed>>(i*2))&3)-1)*0.08, rate=Math.max(0.05,Math.min(0.95, winRate/100 + v));
+      var won=Math.round(ct*rate); out.push({label:c.label,full:c.full,won:won,lost:ct-won,col:c.col,pill:c.pill});
+    });
+    return out;
+  }
+  // Full compact dashboard column for one company: identity + KPIs + interactive pizza + win-rate bars.
+  function companyStatsCol(d, i){
+    var band=d.wr>=60?'#0f9070':d.wr>=40?'#3b5bdb':'#c04a68', rb=/^A/i.test(d.rating)?'pos':/^B/i.test(d.rating)?'warn':'neg';
+    var bars=d.courts.map(function(c){ var t=c.won+c.lost,r=t?Math.round(c.won/t*100):0;
+      return '<div class="wr-row"><span class="wr-lbl">'+c.label+'</span><div class="wr-track"><div class="wr-fill" style="width:'+r+'%;background:'+c.col+'"></div></div><span class="wr-val">'+r+'%</span></div>'; }).join('');
+    return '<div class="cmp-co">'
+      +'<div class="co-h"><span class="av">'+d.init+'</span><div class="nm"><b>'+d.name+'</b><div class="faint mono" style="font-size:10.5px">STIR '+d.stir+'</div></div>'
+        +'<span class="grow" style="flex:1"></span><svg width="60" height="60" viewBox="0 0 88 88" style="flex:none">'+ringSvg2(d.wr,band)+'</svg></div>'
+      +'<div class="co-kpis">'
+        +'<div class="co-kpi"><div class="k">Jami ishlar</div><div class="v">'+d.cases+'</div></div>'
+        +'<div class="co-kpi"><div class="k">Yutuq</div><div class="v" style="color:'+band+'">'+d.wr+'%</div></div>'
+        +'<div class="co-kpi"><div class="k">Kutilayotgan majlis</div><div class="v">'+d.pending+'</div></div>'
+        +'<div class="co-kpi"><div class="k">Reyting</div><div class="v"><span class="badge '+rb+'" style="font-family:var(--sans)">'+d.rating+'</span></div></div>'
+      +'</div>'
+      +'<div class="cmp-pie-h"><span class="co-sub" style="margin:0">Ishlar taqsimoti</span><span class="grow" style="flex:1"></span>'
+        +'<select class="pie-filter" id="cmpPieMode'+i+'" aria-label="Filtr"><option value="court">Sud turi</option><option value="turkum">Turkum</option></select></div>'
+      +'<svg class="pie-wrap" id="cmpPie'+i+'" width="100%" viewBox="0 0 340 340" style="display:block;max-width:290px;margin:0 auto"></svg>'
+      +'<div class="petal-legend" id="cmpLeg'+i+'" style="justify-content:center;margin-top:2px"></div>'
+      +'<div class="cmp-det" id="cmpDet'+i+'"></div>'
+      +'<div class="co-sub" style="margin-top:14px">Sud turi boʻyicha yutuq</div>'+bars
+      +'</div>';
+  }
+  // Wire one comparison column's pizza: own selection/blur, category dropdown, expandable detail.
+  function mountCmpPie(i, modes){
+    if(!$('#cmpPie'+i)) return;
+    var mode='court';
+    var inst=makePizza('#cmpPie'+i, '#cmpLeg'+i, function(it,kind){
+      var det=$('#cmpDet'+i); if(!det)return; det.innerHTML=pieDetailHtml(it,kind);
+      var b=det.querySelector('[data-goto]'); if(b)b.addEventListener('click',function(e){e.preventDefault();$('#view-umumiy').classList.remove('comparing');var pn=$('#cmpPanel');if(pn)pn.hidden=true;cmpOpen=false;show('sudishlari');});
+    });
+    function rndr(){ inst.render(modes[mode]); }
+    var dd=$('#cmpPieMode'+i); if(dd)dd.addEventListener('change',function(){ mode=this.value; inst.reset(); rndr(); });
+    rndr();
+  }
+  var _ps3=show; show=function(v){ _ps3(v); if(v==='umumiy') renderUmumiyExtra(); };
+  renderUmumiyExtra();
+
+  /* ---- honest states: skeleton first-load · live filter+empty · partial banner ---- */
+  function wireFilter(inputSel, bodySel){
+    var inp=$(inputSel), body=$(bodySel); if(!inp||!body)return;
+    inp.addEventListener('input',function(){
+      var q=inp.value.trim().toLowerCase(), shown=0;
+      $$('tr',body).forEach(function(tr){ if(tr.classList.contains('empty-row'))return; var m=!q||tr.textContent.toLowerCase().indexOf(q)>=0; tr.style.display=m?'':'none'; if(m)shown++; });
+      var er=body.querySelector('.empty-row');
+      if(shown===0){ if(!er){ er=document.createElement('tr'); er.className='empty-row'; body.appendChild(er);} er.innerHTML='<td colspan="5"><div class="empty-block" style="padding:28px 20px"><div class="eic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg></div><h3>Natija topilmadi</h3><p>«'+esc(inp.value.trim())+'» boʻyicha mos yozuv yoʻq.</p></div></td>'; er.style.display=''; }
+      else if(er){ er.style.display='none'; }
+    });
+  }
+  wireFilter('#view-sudishlari .f-search input','#casesBody');
+  wireFilter('#view-tolovlar .f-search input','#billsBody');
+
+  /* --- court filter: mini cards + segmented control drive the Sud ishlari table --- */
+  var COURT_SUB={iqtisodiy:'iqtisodiy',fuqarolik:'fuqarolik',maʼmuriy:'maʼmuriy'};
+  var COURT_LBL={iqtisodiy:'Iqtisodiy',fuqarolik:'Fuqarolik',maʼmuriy:'Maʼmuriy'};
+  function filterCasesByCourt(court){
+    var body=$('#casesBody'); if(!body)return; var sub=COURT_SUB[court]||'', shown=0;
+    var inp=$('#view-sudishlari .f-search input'); if(inp)inp.value='';
+    $$('tr',body).forEach(function(tr){ if(tr.classList.contains('empty-row'))return;
+      var cc=(tr.children[1]?tr.children[1].textContent:'').toLowerCase();
+      var m=!sub||cc.indexOf(sub)>=0; tr.style.display=m?'':'none'; if(m)shown++; });
+    var er=body.querySelector('.empty-row');
+    if(shown===0){ if(!er){er=document.createElement('tr');er.className='empty-row';body.appendChild(er);}
+      er.innerHTML='<td colspan="5"><div class="empty-block" style="padding:28px 20px"><div class="eic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg></div><h3>Ish topilmadi</h3><p>'+(COURT_LBL[court]||'Tanlangan')+' sud boʻyicha ish yoʻq.</p></div></td>'; er.style.display=''; }
+    else if(er){ er.style.display='none'; }
+  }
+  function setCourtSeg(court){
+    var seg=$('#view-sudishlari .seg'); if(!seg)return; var order=['','iqtisodiy','fuqarolik','maʼmuriy'];
+    $$('button',seg).forEach(function(b,i){ b.classList.toggle('on', order[i]===(court||'')); });
+    positionThumb(seg);
+  }
+  (function(){
+    var seg=$('#view-sudishlari .seg'); if(seg){ var order=['','iqtisodiy','fuqarolik','maʼmuriy'];
+      $$('button',seg).forEach(function(b,i){ b.addEventListener('click',function(){ filterCasesByCourt(order[i]); }); }); }
+    $$('#view-umumiy .fcard[data-court]').forEach(function(c){ c.style.cursor='pointer';
+      c.addEventListener('click',function(){ var court=c.dataset.court; show('sudishlari');
+        var sec=$('#view-sudishlari'), busy=sec&&sec.classList.contains('scraping');
+        setTimeout(function(){ setCourtSeg(court); filterCasesByCourt(court); }, busy?3000:80); });
+    });
+  })();
+
+  /* --- reusable scrape progress card: shown on first visit of every scraping tab --- */
+  var scraped={};
+  function scrapeCardHtml(cfg){
+    return '<div class="stream"><div style="display:flex;align-items:center;gap:12px">'
+      +'<span style="width:36px;height:36px;border-radius:11px;background:var(--accent);color:#fff;display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></span>'
+      +'<div><b style="font-size:14px">'+cfg.title+'…</b><div class="faint mono" style="font-size:12px"><span class="scLoaded">0</span> / ~'+cfg.total+' '+(cfg.unit||'yozuv')+'</div></div>'
+      +'<span style="flex:1"></span><span class="spinner"></span></div>'
+      +'<div class="stream-bar"><div class="stream-fill scFill" style="width:4%"></div></div>'
+      +'<div class="phases scPhases">'+cfg.phases.map(function(p){return '<div class="phase"><span class="pd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'+p+'</div>';}).join('')+'</div></div>';
+  }
+  function runScrape(mountSel, cfg, done){
+    var mount=$(mountSel); if(!mount){ if(done)done(); return; }
+    if(reduce){ if(cfg.after)cfg.after(); if(done)done(); return; }
+    var card=document.createElement('div'); card.className='scrape'; card.innerHTML=scrapeCardHtml(cfg);
+    mount.insertBefore(card, mount.firstChild); mount.classList.add('scraping');
+    var np=cfg.phases.length, step=0, loaded=0;
+    function paint(){ $$('.phase',card).forEach(function(ph,i){ ph.classList.toggle('done',i<step); ph.classList.toggle('active',i===step); if(i<step)ph.querySelector('.pd').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg>'; }); }
+    function finish(){ mount.classList.remove('scraping'); card.remove(); if(cfg.after)cfg.after(); if(done)done(); }
+    function adv(){ paint();
+      if(step<np-1){ var f=card.querySelector('.scFill'); if(f)f.style.width=(8+step*(60/np))+'%'; step++; setTimeout(adv,500); }
+      else { var iv=setInterval(function(){ loaded=Math.min(cfg.total,loaded+Math.max(1,Math.ceil(cfg.total/8)));
+        var l=card.querySelector('.scLoaded'); if(l)l.textContent=loaded;
+        var f=card.querySelector('.scFill'); if(f)f.style.width=Math.max(72,Math.min(100,Math.round(loaded/cfg.total*100)))+'%';
+        if(loaded>=cfg.total){ clearInterval(iv); step=np; paint(); setTimeout(finish,300); } },90); }
+    }
+    setTimeout(adv,200);
+  }
+  var SCR={
+    umumiy:{sel:'#view-umumiy', title:'Statistika yigʻilmoqda', total:38, unit:'ish', phases:['sud.uz manbalariga ulanilmoqda','PoW captcha yechilmoqda (SHA-256)','Ishlar roʻyxati olinmoqda','Har bir ish tafsiloti boyitilmoqda'], after:function(){renderUmumiyExtra();}},
+    sudishlari:{sel:'#view-sudishlari', title:'Sud ishlari olinmoqda', total:38, unit:'ish', phases:['my.sud.uz ga ulanilmoqda','PoW captcha yechilmoqda','Ishlar boʻyicha qidiruv','Qarshi tomon va holat boyitilmoqda'], after:function(){sudPartial();}},
+    majlislar:{sel:'#view-majlislar', title:'Majlislar jadvali olinmoqda', total:3, unit:'majlis', phases:['e-sud.uz ga ulanilmoqda','Majlislar kalendari olinmoqda','Sudya va zal maʼlumoti']},
+    kompaniya:{sel:'#view-kompaniya', title:'Kompaniya profili olinmoqda', total:12, unit:'maydon', phases:['orginfo.uz ga ulanilmoqda','Roʻyxatdan oʻtish maʼlumoti','MIB qarzdorlik tekshirilmoqda','Reyting hisoblanmoqda']}
+  };
+  function scrapeOnce(v){ var cfg=SCR[v]; if(!cfg||scraped[v])return; scraped[v]=true; runScrape(cfg.sel,cfg); }
+
+  var sudPartialShown=false;
+  function sudPartial(){
+    if(sudPartialShown)return; sudPartialShown=true;
+    var card=$('#view-sudishlari .card.p'); if(!card)return;
+    var b=document.createElement('div'); b.className='partial-banner';
+    b.innerHTML='<span class="pbic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span><div><b>Qisman natija</b><p>Maʼmuriy sud manbasi javob bermadi — roʻyxat toʻliq boʻlmasligi mumkin.</p></div><div class="pbx"><button class="btn ghost sm" data-x>Yopish</button><button class="btn sm" data-retry>Qayta urinish</button></div>';
+    card.parentNode.insertBefore(b, card);
+    b.querySelector('[data-x]').addEventListener('click',function(){b.remove();});
+    b.querySelector('[data-retry]').addEventListener('click',function(){b.remove();toast('Barcha manbalar yangilandi','pos');});
+  }
+  var _ps4=show; show=function(v){ _ps4(v); if(SCR[v]) scrapeOnce(v); };
+
+  /* ---------- boot ---------- */
+  runCounts(); positionThumbs();
+  scrapeOnce('umumiy');
+  window.addEventListener('resize', positionThumbs);
+})();
+</script>
+
+</body></html>

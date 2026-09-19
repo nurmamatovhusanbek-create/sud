@@ -17,9 +17,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sud Billing Lookup",
+  title: "Sud tizimi",
   description:
-    "Yuridik shaxslar uchun sud maʼlumotlarini yigʻish: toʻlovlar, sud ishlari, majlislar, kompaniya profili va statistika.",
+    "Sud tizimi · by Nurmamatov — sud ishlari, toʻlovlar, majlislar va kompaniya statistikasi.",
   icons: { icon: "/logo.svg" },
 };
 

@@ -649,7 +649,7 @@ export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('health')
 
   useEffect(() => {
-    document.title = 'Sozlamalar · Sud Signal'
+    document.title = 'Sozlamalar · Sud tizimi'
   }, [])
 
   return (

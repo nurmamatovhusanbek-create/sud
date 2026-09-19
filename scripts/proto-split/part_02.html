@@ -1,0 +1,320 @@
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Menyu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <label class="search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input id="topSearch" value="302 678 824" aria-label="STIR, kvitansiya yoki ish raqami" placeholder="STIR (9), kvitansiya (12) yoki ish raqami (4-…)…" spellcheck="false" autocomplete="off"><span class="modehint" id="modeHint">STIR</span></label>
+      <div class="top-actions">
+        <button class="tor-badge" id="torBadge" title="Tor holatini tekshirish"><span class="tdot" style="background:var(--pos)"></span><span class="tlabel">Tor faol</span></button>
+        <div class="bellwrap">
+          <button class="bell" id="bellBtn" aria-label="Bildirishnomalar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span class="cbadge" id="bellBadge">2</span></button>
+          <div class="pop" id="bellPop" hidden><div class="pop-h"><b>Bildirishnomalar</b><span class="badge warn" id="bellCount">2</span></div><div class="pop-list" id="bellList"></div></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="scroll" id="scroll">
+      <div class="company" id="companyBar">
+        <div class="mono-tile">AK</div>
+        <div>
+          <h1>ARTIKUL AZIYA KABEL <span style="font-weight:600;color:var(--ink-3);font-size:15px">MChJ</span></h1>
+          <div class="sub"><span><span class="dot pos"></span> Faoliyatda</span><span class="mono" style="color:var(--ink-3)">STIR 302 678 824</span><span>·</span><span>Toshkent shahri</span></div>
+        </div>
+        <div class="grow"></div>
+        <span class="badge blue">Reyting BBB · 74</span>
+        <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Kuzatish</button>
+        <button class="btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>Eksport</button>
+      </div>
+
+      <!-- ===== UMUMIY ===== -->
+      <section class="view" id="view-umumiy">
+        <div class="grid g-kpi stagger" style="margin-bottom:18px">
+          <div class="card kpi">
+            <div class="lab"><span class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v18M7 7l-4 6a3 3 0 006 0z"/></svg></span>Jami sud ishlari</div>
+            <div class="val tnum" data-count="38">0</div>
+            <div class="foot"><span class="up">▲ 4</span><span style="color:var(--ink-3)">soʻnggi 90 kun</span></div>
+            <svg class="spark" data-spark="6,9,7,8,11,9,13,12,15" viewBox="0 0 76 34"></svg>
+          </div>
+          <div class="card kpi">
+            <div class="lab"><span class="g" style="background:var(--pos-soft);color:var(--pos)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20 6 9 17l-5-5"/></svg></span>Yutuq darajasi</div>
+            <div class="val tnum" data-count="61" data-suffix="%">0</div>
+            <div class="foot"><span class="up">▲ 3%</span><span style="color:var(--ink-3)">14 yutgan / 23</span></div>
+            <svg class="spark" data-spark="40,44,42,50,48,55,58,60,61" data-color="pos" viewBox="0 0 76 34"></svg>
+          </div>
+          <div class="card kpi">
+            <div class="lab"><span class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Kutilayotgan majlis</div>
+            <div class="val tnum" data-count="3">0</div>
+            <div class="foot"><span style="color:var(--ink-2)">7 kun ichida 2 ta</span></div>
+            <svg class="spark" data-spark="1,0,2,1,3,2,1,2,3" viewBox="0 0 76 34"></svg>
+          </div>
+          <div class="card kpi">
+            <div class="lab"><span class="g" style="background:var(--neu-soft);color:var(--ink-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/></svg></span>Umumiy qarzdorlik</div>
+            <div class="val tnum" data-count="142.6" data-dec="1" data-suffix=" mln">0</div>
+            <div class="foot"><span class="down">8 muddati oʻtgan</span><span style="color:var(--ink-3)">soʻm</span></div>
+            <svg class="spark" data-spark="90,95,110,105,120,118,130,138,143" data-color="neu" viewBox="0 0 76 34"></svg>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:1.5fr 1fr;gap:18px;margin-bottom:18px;align-items:stretch">
+          <div class="card p">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3a9 9 0 109 9h-9z"/></svg></span><h3>Sud ishlari taqsimoti</h3><span class="grow"></span><select class="pie-filter" id="pieMode" aria-label="Filtr"><option value="court">Sud turi boʻyicha</option><option value="turkum">Turkum boʻyicha</option></select></div>
+            <div style="display:flex;justify-content:center;padding:2px 0"><svg id="courtPie" class="pie-wrap" width="340" height="340" viewBox="0 0 340 340" role="img" aria-label="Sud ishlari sud turi boʻyicha, yutuq ulushi bilan"></svg></div>
+            <div class="petal-legend" id="courtLegend"></div>
+          </div>
+          <div class="card p" id="caseDetail"></div>
+        </div>
+        <div class="grid stagger" style="grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px">
+          <div class="card mini fcard" data-court="iqtisodiy" title="Iqtisodiy ishlarni koʻrsatish"><div class="lab">Iqtisodiy</div><div class="val tnum">1.8<small>k</small></div><svg class="spark" data-spark="8,10,9,12,11,14,13,16,15,18" viewBox="0 0 130 34"></svg><div class="foot up" style="color:var(--pos)">▲ 17%</div></div>
+          <div class="card mini fcard" data-court="fuqarolik" title="Fuqarolik ishlarini koʻrsatish"><div class="lab">Fuqarolik</div><div class="val tnum">920</div><svg class="spark" data-spark="12,9,13,10,14,11,15,12,16,14" data-color="slate" viewBox="0 0 130 34"></svg><div class="foot up" style="color:var(--pos)">▲ 8%</div></div>
+          <div class="card mini fcard" data-court="maʼmuriy" title="Maʼmuriy ishlarni koʻrsatish"><div class="lab">Maʼmuriy</div><div class="val tnum">340</div><svg class="spark" data-spark="4,6,5,7,6,8,7,9,8,10" viewBox="0 0 130 34"></svg><div class="foot up" style="color:var(--pos)">▲ 5%</div></div>
+          <a href="#" class="card mini link" data-goto="sudishlari"><span class="arrow"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><b style="font-size:13px">Barcha ishlar</b></a>
+        </div>
+
+        <div class="card p">
+          <div class="card-h">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v18h18"/><path d="M6 15l4-5 3 3 5-7"/></svg></span><h3>Toʻlovlar oqimi</h3>
+            <div class="line-legend" style="margin-left:16px"><span class="li"><i style="background:var(--c-navy)"></i>Toʻlangan</span><span class="li"><i style="background:var(--c-slate)"></i>Undirilishi kerak</span></div>
+            <span class="grow"></span>
+            <div class="seg" id="lineSeg"><span class="thumb"></span><button>Yil</button><button class="on">Oy</button><button>Hafta</button></div>
+          </div>
+          <div id="lineChart"></div>
+          <div class="chart-x" id="lineX"></div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:18px;margin-top:18px">
+          <div class="card p">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v18"/><path d="M7 7l-4 6a3 3 0 006 0z"/><path d="M17 7l4 6a3 3 0 01-6 0z"/><path d="M5 21h14"/></svg></span><h3>Sud turi boʻyicha yutuq</h3></div>
+            <div id="wrRows"></div>
+            <button class="btn sm" style="width:100%;justify-content:center;margin-top:14px" id="cmpBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Boshqa kompaniya bilan solishtirish</button>
+          </div>
+          <div class="card p">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></span><h3>Keyingi majlis</h3></div>
+            <div id="nextHearing"></div>
+          </div>
+        </div>
+
+        <div class="section-head" style="margin:24px 2px 14px"><h2 style="font-size:17px">Soʻnggi faoliyat</h2><span class="faint" style="font-size:12px">· toʻlovlar va qarorlar</span></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:18px">
+          <div class="card p">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8M8 12h8"/></svg></span><h3>Soʻnggi toʻlovlar</h3><span class="grow"></span><button class="btn ghost sm" data-goto="tolovlar">Barchasi ›</button></div>
+            <div class="list" id="recentBills"></div>
+          </div>
+          <div class="card p">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v18"/><path d="M7 7l-4 6a3 3 0 006 0z"/><path d="M17 7l4 6a3 3 0 01-6 0z"/></svg></span><h3>Soʻnggi qarorlar</h3><span class="grow"></span><button class="btn ghost sm" data-goto="sudishlari">Barchasi ›</button></div>
+            <div class="list" id="recentCases"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TOʻLOVLAR ===== -->
+      <section class="view" id="view-tolovlar" hidden>
+        <div style="margin-bottom:16px"><div class="togglepair" id="billsMode"><button class="on" data-m="stir">STIR · barcha toʻlovlar</button><button data-m="invoice">Kvitansiya boʻyicha</button></div></div>
+        <div id="billsInvoice" hidden style="margin-bottom:18px">
+          <label class="field" style="max-width:440px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input id="invNum" inputmode="numeric" placeholder="12 xonali kvitansiya raqami…"><button class="btn accent sm" id="invCheck" style="margin:-3px -6px -3px 0">Tekshirish</button></label>
+          <div class="faint" style="font-size:12px;margin-top:8px">Bitta kvitansiya raqamini kiriting — billing.sud.uz dan toʻlov holati olinadi.</div>
+        </div>
+        <div id="billsStir">
+          <div class="stat-strip" style="margin-bottom:18px">
+            <div class="s"><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/></svg></span><div><div class="sv tnum">62</div><div class="sk">Jami kvitansiya</div></div></div>
+            <div class="s"><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6 9 17l-5-5"/></svg></span><div><div class="sv tnum">318.4 mln</div><div class="sk">Toʻlangan summa</div></div></div>
+            <div class="s"><span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><div class="sv tnum">142.6 mln</div><div class="sk">Muddati oʻtgan</div></div></div>
+          </div>
+          <div class="card p">
+            <div class="filterbar">
+              <div class="f-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input placeholder="Kvitansiya yoki ish raqami…"></div>
+              <div class="seg"><span class="thumb"></span><button class="on">Barchasi</button><button>Toʻlangan</button><button>Muddati oʻtgan</button></div>
+              <span class="grow"></span>
+              <button class="btn sm" id="billsReplay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>Oqimni koʻrsatish</button>
+              <button class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>Excel</button>
+            </div>
+            <div id="billsStream" hidden></div>
+            <div id="billsTableWrap">
+              <div class="table-wrap"><table><thead><tr><th>Kvitansiya</th><th>Sud</th><th>Summa</th><th>Holati</th><th>Sana</th></tr></thead><tbody id="billsBody"></tbody></table></div>
+              <div class="pager"><span>62 tadan 1–8</span><span class="grow"></span><select><option>8 / sahifa</option><option>25 / sahifa</option></select><div class="pg"><button>‹</button><button class="on">1</button><button>2</button><button>3</button><button>›</button></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SUD ISHLARI ===== -->
+      <section class="view" id="view-sudishlari" hidden>
+        <div class="card p">
+          <div class="filterbar">
+            <div class="f-search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input placeholder="Ish raqami, sudya yoki tomon…"></div>
+            <div class="seg"><span class="thumb"></span><button class="on">Barchasi</button><button>Iqtisodiy</button><button>Fuqarolik</button><button>Maʼmuriy</button></div>
+            <span class="grow"></span><button class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M9 13h6M9 17h6"/></svg>PDF</button><button class="btn sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>Excel</button>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Ish raqami</th><th>Sud</th><th>Qarshi tomon</th><th>Holat</th><th>Sana</th></tr></thead><tbody id="casesBody"></tbody></table></div>
+          <div class="pager"><span>38 tadan 1–8</span><span class="grow"></span><select><option>8 / sahifa</option><option>25 / sahifa</option></select><div class="pg"><button>‹</button><button class="on">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>›</button></div></div>
+        </div>
+      </section>
+
+      <!-- ===== MAJLISLAR ===== -->
+      <section class="view" id="view-majlislar" hidden>
+        <div class="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>2 ta majlis 7 kun ichida</b><p>ARTIKUL AZIYA KABEL · 22 Sen · Toshkent tumanlararo iqtisodiy sudi</p></div></div>
+        <div class="section-head"><h2>Yaqinlashayotgan majlislar</h2><span class="count">3</span></div>
+        <div class="datecards stagger" id="hearingsWrap"></div>
+      </section>
+
+      <!-- ===== KOMPANIYA (PROFIL) ===== -->
+      <section class="view" id="view-kompaniya" hidden>
+        <div class="grid" style="grid-template-columns:1.5fr 1fr;gap:18px;align-items:start">
+          <div class="stagger">
+            <div id="profStrips"></div>
+            <div style="margin-top:16px">
+              <div class="section-head" style="margin:4px 2px 10px"><h2 style="font-size:15px">Ijro va qarzdorlik (MIB)</h2><span class="grow"></span></div>
+              <div id="mibCard"></div>
+            </div>
+          </div>
+          <div class="card p rise" id="ratingCard"></div>
+        </div>
+      </section>
+
+      <!-- ===== KUZATUV ===== -->
+      <section class="view" id="view-kuzatuv" hidden>
+        <div class="company" style="margin-bottom:8px">
+          <div><div class="eyebrow" style="margin-bottom:6px">Koʻp kompaniyali monitoring</div><h1>Kuzatuv roʻyxati</h1><div class="sub">Belgilangan kompaniyalar boʻyicha ishlar, yutuq va reyting · bir qarashda</div></div>
+          <div class="grow"></div><button class="btn accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Kompaniya qoʻshish</button>
+        </div>
+        <div class="section-head"><h2>Kuzatuvdagi kompaniyalar</h2><span class="count">6</span></div>
+        <div class="ccards stagger" id="watchWrap"></div>
+      </section>
+
+      <!-- ===== SOZLAMALAR ===== -->
+      <section class="view" id="view-sozlamalar" hidden>
+        <div class="hero"><h1>Sozlamalar</h1><p>Yangilanishlar, Cloudflare workerlar va tarmoq holatini boshqaring.</p></div>
+        <div class="set-tabs" id="setTabs">
+          <button data-set="updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>Yangilanishlar</button>
+          <button data-set="workers" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7.5h.01M7 17h.01"/></svg>Workerlar</button>
+          <button data-set="health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Holat</button>
+        </div>
+
+        <!-- updates -->
+        <div id="set-updates" hidden>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:18px">
+            <div class="card p"><div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 3v12M6 15a3 3 0 100 6 3 3 0 000-6zM18 9a3 3 0 100-6 3 3 0 000 6zM18 9v3a3 3 0 01-3 3H9"/></svg></span><h3>Joriy versiya</h3><span class="grow"></span><span class="badge pos">Eng soʻnggi</span></div>
+              <div class="kv"><span class="k">Versiya</span><span class="v badge neu">v205</span></div>
+              <div class="kv"><span class="k">Git SHA</span><span class="v mono">b4167ce</span></div>
+              <div class="kv"><span class="k">Branch</span><span class="v mono">main</span></div>
+              <div class="kv"><span class="k">Ish daraxti</span><span class="v" style="color:var(--ink-3);font-weight:600">Toza</span></div>
+            </div>
+            <div class="card p"><div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg></span><h3>GitHubʼdagi soʻnggi</h3></div>
+              <div class="kv"><span class="k">SHA</span><span class="v mono">b4167ce</span></div>
+              <div class="kv"><span class="k">Commit</span><span class="v" style="font-size:12px;max-width:60%;text-align:right">unified workers, exports, docket index</span></div>
+              <div class="kv"><span class="k">Muallif</span><span class="v">nurmamatovhusanbek</span></div>
+              <div class="kv"><span class="k">Sana</span><span class="v mono" style="color:var(--ink-3)">17.09.2026</span></div>
+              <button class="btn" style="width:100%;margin-top:14px;justify-content:center" id="recheckBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>Qayta tekshirish</button>
+            </div>
+            <div class="card p" style="grid-column:1/-1;text-align:center;padding:30px">
+              <div class="empty-cta" style="padding:0"><div class="ic" style="background:var(--pos-soft);color:var(--pos)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20 6 9 17l-5-5"/></svg></div>
+                <h3 style="margin:0 0 6px;color:var(--ink)">Eng soʻnggi versiyada</h3>
+                <p style="margin:0">Lokal kod GitHubʼdagi <span class="mono">main</span> bilan bir xil. <span class="mono">git pull</span> talab etilmaydi.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- workers -->
+        <div id="set-workers">
+          <div class="card p" style="padding:10px 8px 4px">
+            <div class="filterbar" style="margin:8px 10px 6px">
+              <span class="badge neu"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg> Manba: workers.json</span>
+              <span style="font-size:12px;color:var(--ink-3)" id="workerCount">6 worker</span>
+              <span class="grow"></span>
+              <button class="btn sm" id="testAllBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v5l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3"/></svg>Barchasini sinash</button>
+            </div>
+            <div id="workerList"></div>
+          </div>
+          <div class="card p" style="margin-top:16px">
+            <div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg></span><h3>Yangi worker qoʻshish</h3></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <label class="f-search" style="max-width:none;flex:1;min-width:220px"><input id="newWorker" placeholder="https://sud-proxy-7.workers.dev" style="font-family:var(--mono);font-size:12.5px"></label>
+              <button class="btn sm" id="testNewBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v5l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3"/></svg>Sinash</button>
+              <button class="btn accent sm" id="addWorker">Qoʻshish</button>
+            </div>
+            <div style="font-size:12px;color:var(--ink-3);margin-top:10px"><span class="mono">workers.json</span> ga saqlanadi. Qayta ishga tushirish shart emas.</div>
+          </div>
+        </div>
+
+        <!-- health -->
+        <div id="set-health" hidden>
+          <div class="filterbar" style="margin-bottom:14px"><div class="seg"><span class="thumb"></span><button class="on">Bugun</button><button>7 kun</button><button>30 kun</button></div><span class="grow"></span><span style="font-size:12px;color:var(--ink-2)">Avto-yangilash (5s)</span><button class="toggle" id="autoRefresh" aria-label="Avto-yangilash"></button></div>
+          <div class="health-grid">
+            <div class="card p"><div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></span><h3>Umumiy holat</h3><span class="grow"></span><span class="badge pos" id="healthBadge">Sogʻlom</span></div>
+              <div style="display:flex;justify-content:center;padding:6px 0"><svg id="gauge" width="230" height="140" viewBox="0 0 230 140" role="img" aria-label="Muvaffaqiyat darajasi"></svg></div>
+              <div class="hstat"><div><div class="k">Jami soʻrov</div><div class="v tnum" id="hReq">1 284</div></div><div><div class="k">Oʻrtacha javob</div><div class="v tnum" id="hMs">312<span style="font-size:13px;color:var(--ink-3)">ms</span></div></div><div><div class="k">Faol worker</div><div class="v tnum" id="hAlive">6<span style="font-size:13px;color:var(--ink-3)">/6</span></div></div></div>
+            </div>
+            <div class="card p"><div class="card-h"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3a9 9 0 109 9h-9z"/></svg></span><h3>Workerlar muvaffaqiyati</h3><span class="grow"></span><span style="font-size:12px;color:var(--ink-3)">ustiga bosing</span></div>
+              <div style="display:flex;justify-content:center;padding:2px 0"><svg id="workerPie" class="pie-wrap" width="320" height="320" viewBox="0 0 340 340" role="img" aria-label="Workerlar muvaffaqiyat ulushi"></svg></div>
+              <div class="petal-legend" id="workerLegend"></div>
+            </div>
+          </div>
+          <div class="section-head"><h2>Worker tafsiloti</h2><span class="count" id="hCount">6</span><span class="grow"></span><span style="font-size:12px;color:var(--ink-3)">petalni tanlang</span></div>
+          <div class="card p" id="workerDetail"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="pTrack" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8cee1"/><stop offset="1" stop-color="#adb5d3"/></linearGradient>
+  <linearGradient id="pFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3e8d5"/><stop offset="1" stop-color="#ebf7f1"/></linearGradient>
+  <linearGradient id="pFillSel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a2dabf"/><stop offset="1" stop-color="#d4efe3"/></linearGradient>
+</defs></svg>
+<div class="cmdk-ov" id="cmdkOv"><div class="cmdk" role="dialog" aria-label="Qidiruv">
+  <div class="cmdk-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input id="cmdkInput" placeholder="STIR (9), kvitansiya (12), ish raqami (4-…) yoki nom…" autocomplete="off" spellcheck="false"><span class="cmdk-mode" id="cmdkMode">STIR</span></div>
+  <div class="cmdk-list" id="cmdkList"></div>
+  <div class="cmdk-foot"><span><span class="kbd">↑↓</span> tanlash</span><span><span class="kbd">↵</span> ochish</span><span><span class="kbd">1–6</span> boʻlim</span><span><span class="kbd">esc</span> yopish</span></div>
+</div></div>
+<div class="ov" id="ov"></div>
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="drawer-h">
+    <span class="dh-ic" id="drawerIc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3v18"/><path d="M7 7l-4 6a3 3 0 006 0z"/><path d="M17 7l4 6a3 3 0 01-6 0z"/></svg></span>
+    <div class="dh-t"><b id="drawerTitle">—</b><small id="drawerSub"></small></div>
+    <button class="drawer-x" id="drawerX" aria-label="Yopish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-b" id="drawerBody"></div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
+  var reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  /* ---------- toasts ---------- */
+  function toast(msg, kind){
+    var t=document.createElement('div'); t.className='toast'+(kind?' '+kind:'');
+    var ic = kind==='neg'?'<path d="M18 6 6 18M6 6l12 12"/>':kind==='pos'?'<path d="M20 6 9 17l-5-5"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/>';
+    t.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">'+ic+'</svg>'+msg;
+    $('#toasts').appendChild(t);
+    setTimeout(function(){ t.classList.add('out'); setTimeout(function(){t.remove();},300); }, 2600);
+  }
+
+  /* ---------- nav / views ---------- */
+  var WORKSPACE={umumiy:1,tolovlar:1,sudishlari:1,majlislar:1,kompaniya:1};
+  function show(view){
+    $$('.view').forEach(function(v){ var on=v.id==='view-'+view; v.hidden=!on; if(on){ v.classList.remove('enter'); void v.offsetWidth; if(!reduce) v.classList.add('enter'); } });
+    $$('#nav a').forEach(function(a){ a.classList.toggle('on', a.dataset.view===view); });
+    $('#companyBar').hidden=!WORKSPACE[view];
+    $('#side').classList.remove('open'); $('#scroll').scrollTop=0;
+    if(view==='umumiy') runCounts();
+    if(view==='sozlamalar') { positionThumbs(); }
+  }
+  $('#nav').addEventListener('click', function(e){ var a=e.target.closest('a'); if(!a)return; e.preventDefault(); show(a.dataset.view); });
+  $$('[data-goto]').forEach(function(el){ el.addEventListener('click', function(e){ e.preventDefault(); show(el.dataset.goto); }); });
+  $$('.sysstat').forEach(function(el){ el.addEventListener('click', function(e){ e.preventDefault(); show('sozlamalar'); }); });
+  $('#menuBtn').addEventListener('click', function(){ $('#side').classList.toggle('open'); });
+
+  /* ---------- count-up ---------- */
+  function runCounts(){
+    $$('#view-umumiy [data-count]').forEach(function(el){
+      var to=parseFloat(el.dataset.count), dec=+(el.dataset.dec||0), suf=el.dataset.suffix||'';
+      if(reduce){ el.textContent=to.toFixed(dec)+ (suf?'':''); el.innerHTML=to.toFixed(dec)+(suf?'<small>'+suf+'</small>':''); return; }
+      var t0=performance.now(), dur=850;
+      (function tick(now){ var p=Math.min(1,(now-t0)/dur); var e=1-Math.pow(1-p,3); var val=(to*e).toFixed(dec);
+        el.innerHTML=val+(suf?'<small>'+suf+'</small>':''); if(p<1) requestAnimationFrame(tick); })(t0);
+    });
+  }
+
+  /* ---------- sparklines ---------- */
+  var SC={blue:'#3b5bdb',pos:'#0f9070',neg:'#c04a68',warn:'#3b5bdb',slate:'#aab3d8',navy:'#1a2350',neu:'#8b93b8'};

@@ -1,19 +1,18 @@
 'use client'
 
 /**
- * Sud Signal — app root.
+ * Sud tizimi — app root.
  *
- * Views mirror the prototypeʼs four surfaces: home (launcher), company
- * workspace (context bar + section tabs), watchlist, settings — hosted on the
- * single `/` route with in-app state (the guides' sanctioned interim).
- * The prototype drawer (receipt / case / compare) mounts globally.
+ * Views mirror the v18 prototypeʼs surfaces: home (launcher), company
+ * workspace (context bar + sidebar-driven sections), watchlist, settings —
+ * hosted on the single `/` route with in-app state. The prototype drawer
+ * (receipt / case / compare) mounts globally.
  *
- * Keyboard model (§7.4): ⌘K/⌘F palette · / palette · 1–5 sections ·
+ * Keyboard model (§7.4): ⌘K/⌘F palette · / palette · 1–6 workspace nav ·
  * R refresh · E export · Esc close.
  */
 
 import { useEffect, useState } from 'react'
-import { BarChart3, CalendarDays, Gavel, Receipt, Building2 } from 'lucide-react'
 import { AppShell } from '@/components/shell/app-shell'
 import { CommandPalette } from '@/components/shell/command-palette'
 import { ProtoDrawer } from '@/components/proto/drawer'
@@ -26,26 +25,16 @@ import { BillsSection } from '@/components/sections/bills'
 import { CasesSection } from '@/components/sections/cases'
 import { HearingsSection } from '@/components/sections/hearings'
 import { ProfileSection } from '@/components/sections/profile'
-import { useAppStore, SECTIONS, type SectionKey } from '@/lib/store/app-store'
+import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { exportStatsXlsx, getStats } from '@/lib/api-client'
-import { useTabCounts } from '@/lib/tab-counts'
 import { toast } from 'sonner'
 import { keepIdentityWarm } from '@/lib/identity'
 
-const SECTION_ICONS: Record<SectionKey, React.ReactNode> = {
-  overview: <BarChart3 />,
-  bills: <Receipt />,
-  cases: <Gavel />,
-  hearings: <CalendarDays />,
-  profile: <Building2 />,
-}
-
-/** Workspace: context bar + section tabs + the active section. */
+/** Workspace: the v18 sidebar IS the nav — this mounts the active section. */
 function CompanyWorkspace() {
   const company = useAppStore((s) => s.activeCompany)
   const section = useAppStore((s) => s.section)
   const setSection = useAppStore((s) => s.setSection)
-  const counts = useTabCounts()
   // Adjust-state-during-render pattern (React docs): no effect needed.
   const [prevSection, setPrevSection] = useState<SectionKey>(section)
   const [visited, setVisited] = useState<Set<SectionKey>>(() => new Set(['overview' as SectionKey]))
@@ -54,15 +43,21 @@ function CompanyWorkspace() {
     setVisited((v) => new Set(v).add(section))
   }
 
-  // Keyboard model: 1–5 sections, R refresh, E export
+  // Keyboard model: 1–6 follow the sidebar workspace group (Kuzatuv = 5,
+  // Statistika = 6), R refresh, E export
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const target = e.target as HTMLElement
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
       const idx = Number(e.key)
-      if (idx >= 1 && idx <= SECTIONS.length) {
-        setSection(SECTIONS[idx - 1].key)
+      if (idx >= 1 && idx <= WORKSPACE_NAV.length) {
+        const key = WORKSPACE_NAV[idx - 1].key
+        if (key === 'kuzatuv') useAppStore.getState().setSurface('watchlist')
+        else {
+          useAppStore.getState().setSurface('main')
+          setSection(key)
+        }
       }
       if (e.key.toLowerCase() === 'r') {
         window.dispatchEvent(new CustomEvent('sud:force-section'))
@@ -99,34 +94,12 @@ function CompanyWorkspace() {
 
   if (!company) return null
 
-  const tabCount = (key: SectionKey): number | undefined => {
-    if (key === 'bills') return counts.bills
-    if (key === 'cases') return counts.cases
-    if (key === 'hearings') return counts.hearings
-    return undefined
-  }
-
   return (
     <div>
       <ContextBar />
 
-      {/* Section tabs — the prototypeʼs underline rail with number, icon, count */}
-      <div className="tabs">
-        {SECTIONS.map((s, i) => {
-          const c = tabCount(s.key)
-          return (
-            <button key={s.key} className={`tab ${section === s.key ? 'active' : ''}`} data-sec={s.key} onClick={() => setSection(s.key)}>
-              <span className="tnum">{i + 1}</span>
-              {SECTION_ICONS[s.key]}
-              <span>{s.label}</span>
-              {c !== undefined && c > 0 && <span className="tc">{c}</span>}
-              <span className="ind" />
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Section content — lazy mount on first visit, then keep alive */}
+      {/* Section content — lazy mount on first visit, then keep alive.
+          v18: the sidebar nav replaces the old tab rail. */}
       <div>
         {visited.has('overview') && (
           <div style={{ display: section === 'overview' ? 'block' : 'none' }}>

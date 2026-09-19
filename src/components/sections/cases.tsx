@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass } from '@/components/proto/primitives'
+import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
@@ -361,6 +362,8 @@ interface MergedRow {
 
 export function CasesSection() {
   const company = useAppStore((s) => s.activeCompany)
+  const storeCourtFilter = useAppStore((s) => s.caseCourtFilter)
+  const setStoreCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const [courtFilter, setCourtFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -379,6 +382,30 @@ export function CasesSection() {
     }
     window.addEventListener('sud:open-case', openCase)
     return () => window.removeEventListener('sud:open-case', openCase)
+  }, [])
+
+  // v18: pizza detail «Ishlarni koʻrish» + mini filter cards land here — apply
+  // the one-shot court filter from the store, then clear it so manual seg
+  // clicks stay authoritative afterwards.
+  useEffect(() => {
+    if (storeCourtFilter !== 'all') {
+      setCourtFilter(storeCourtFilter)
+      setPage(1)
+      setStoreCourtFilter('all')
+    }
+  }, [storeCourtFilter, setStoreCourtFilter])
+
+  // v18: turkum mode «Ishlarni koʻrish» pre-fills the text query
+  useEffect(() => {
+    const onQuery = (e: Event) => {
+      const d = (e as CustomEvent).detail as { query?: string }
+      if (d?.query) {
+        setQuery(d.query)
+        setPage(1)
+      }
+    }
+    window.addEventListener('sud:cases-query', onQuery)
+    return () => window.removeEventListener('sud:cases-query', onQuery)
   }, [])
 
   // v204 (P-D): one useResource per court type, lifted into the parent.
@@ -400,11 +427,11 @@ export function CasesSection() {
   const views = useMemo(
     () =>
       [
-        { courtType: 'economic' as CourtType, view: econ.state as ResourceState<{ cases: CourtCase[] }>, refetch: econ.refetch },
-        { courtType: 'civil' as CourtType, view: civ.state as ResourceState<{ cases: CourtCase[] }>, refetch: civ.refetch },
-        { courtType: 'administrative' as CourtType, view: adm.state as ResourceState<{ cases: CourtCase[] }>, refetch: adm.refetch },
+        { courtType: 'economic' as CourtType, view: econ.state as ResourceState<{ cases: CourtCase[] }>, refetch: econ.refetch, elapsed: econ.elapsed },
+        { courtType: 'civil' as CourtType, view: civ.state as ResourceState<{ cases: CourtCase[] }>, refetch: civ.refetch, elapsed: civ.elapsed },
+        { courtType: 'administrative' as CourtType, view: adm.state as ResourceState<{ cases: CourtCase[] }>, refetch: adm.refetch, elapsed: adm.elapsed },
       ].filter((v) => courts.includes(v.courtType)),
-    [econ.state, civ.state, adm.state, courtFilter],
+    [econ.state, civ.state, adm.state, econ.elapsed, civ.elapsed, adm.elapsed, courtFilter],
   )
   const refetchEnabled = () => {
     if (courts.includes('economic') && econ.state.status === 'error') econ.refetch()
@@ -428,6 +455,7 @@ export function CasesSection() {
 
   const anyLoading = views.some((v) => v.view.status === 'idle' || v.view.status === 'loading')
   const allError = views.length > 0 && views.every((v) => v.view.status === 'error')
+  const maxElapsed = views.reduce((acc, v) => Math.max(acc, v.elapsed ?? 0), 0)
   const partialErrors = views.flatMap((v) =>
     v.view.status === 'partial'
       ? v.view.partialErrors
@@ -530,7 +558,12 @@ export function CasesSection() {
       </div>
 
       {anyLoading ? (
-        <SkRows n={6} />
+        merged.length === 0 ? (
+          // v18: first load shows the scrape progress card, not a blank skeleton
+          <ScrapeProgress {...SCRAPE_CFG.cases} elapsed={maxElapsed} />
+        ) : (
+          <SkRows n={6} />
+        )
       ) : allError ? (
         <ErrorState
           error={(views.find((v) => v.view.status === 'error')?.view as { error: string } | undefined)?.error || 'Xatolik'}

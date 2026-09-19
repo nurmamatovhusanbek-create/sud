@@ -18,13 +18,24 @@ import { upsertRegistry } from '@/lib/registry'
 
 export type AppView = 'launcher' | 'company'
 export type SectionKey = 'overview' | 'bills' | 'cases' | 'hearings' | 'profile'
+/** v18: Statistika last (prototype nav order); keys are load-bearing — never rename. */
 export const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: 'overview', label: 'Umumiy' },
-  { key: 'bills', label: "To'lovlar" },
+  { key: 'bills', label: 'Toʻlovlar' },
   { key: 'cases', label: 'Sud ishlari' },
   { key: 'hearings', label: 'Majlislar' },
-  { key: 'profile', label: 'Profil' },
+  { key: 'profile', label: 'Kompaniya' },
+  { key: 'overview', label: 'Statistika' },
 ]
+/** v18: the sidebar workspace group — SECTIONS with Kuzatuv slotted before Statistika. */
+export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv'; label: string }[] = [
+  { key: 'bills', label: 'Toʻlovlar' },
+  { key: 'cases', label: 'Sud ishlari' },
+  { key: 'hearings', label: 'Majlislar' },
+  { key: 'profile', label: 'Kompaniya' },
+  { key: 'kuzatuv', label: 'Kuzatuv' },
+  { key: 'overview', label: 'Statistika' },
+]
+export type CaseCourtFilter = 'all' | 'economic' | 'civil' | 'administrative'
 
 export type GlobalSurface = 'main' | 'watchlist' | 'settings'
 export type CommandPurpose = 'search' | 'add'
@@ -35,6 +46,8 @@ interface AppState {
   surface: GlobalSurface
   activeCompany: Company | null
   commandOpen: boolean
+  /** v18: one-shot court filter for Sud ishlari (mini cards + pizza «Ishlarni koʻrish»). */
+  caseCourtFilter: CaseCourtFilter
   /** 'add' mode: choosing a company in the palette adds it to the watchlist. */
   commandPurpose: CommandPurpose
 
@@ -43,6 +56,7 @@ interface AppState {
   /** Patch the active company (e.g. name/status/rating once identity loads). */
   patchCompany: (patch: Partial<Company>) => void
   setSection: (s: SectionKey) => void
+  setCaseCourtFilter: (f: CaseCourtFilter) => void
   goLauncher: () => void
   setSurface: (s: GlobalSurface) => void
   setCommandOpen: (open: boolean) => void
@@ -56,6 +70,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeCompany: null,
   commandOpen: false,
   commandPurpose: 'search',
+  caseCourtFilter: 'all',
 
   openCompany: (stir, seed) => {
     const normalized = normalizeStir(stir)
@@ -87,6 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     ),
 
   setSection: (section) => set({ section }),
+  setCaseCourtFilter: (caseCourtFilter) => set({ caseCourtFilter }),
   goLauncher: () => set({ view: 'launcher', surface: 'main' }),
   setSurface: (surface) => set({ surface }),
   setCommandOpen: (commandOpen) => set({ commandOpen }),

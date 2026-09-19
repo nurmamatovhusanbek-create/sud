@@ -150,7 +150,7 @@ export function ReceiptView({
 
         {/* Footer */}
         <div className="receipt-footer">
-          Sud Billing Lookup tomonidan yaratilgan
+          Sud tizimi · by Nurmamatov
         </div>
       </div>
 

@@ -1,34 +1,49 @@
 'use client'
 
 /**
- * App shell — the prototypeʼs floating shell: rounded frame on the canvas,
- * left icon rail (logo, Home / Watchlist / Settings with tooltips + badges,
- * Tor + theme at the bottom) and the topbar (dynamic view title, ⌘K search
- * box, Tor badge with text, bell with imminent-hearing notifications, "+" as
- * the solid quick-search action).
+ * App shell — v18 layout (sud-tizimi-ui-v18.html): the 248px navy sidebar
+ * (brand «Sud tizimi · by Nurmamatov», Ish maydoni nav group with Kuzatuv and
+ * Statistika last, Tizim group, live worker sysstat footer) + the topbar
+ * (menu button on mobile, ⌘K search, Tor badge, bell).
+ *
+ * v18 bell: each notification leads with the COUNTERPARTY company (matched
+ * from the cached CompanyStats by case number) and a numeric DD.MM date.
+ * Click still lands on the companyʼs Majlislar section.
  */
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 import {
+  BarChart3,
   Bell,
+  Building2,
+  CalendarDays,
   Eye,
-  Home,
+  Gavel,
+  Menu,
   Moon,
-  Plus,
-  Search,
+  Receipt,
   Settings,
-  CalendarClock,
   Sun,
 } from 'lucide-react'
-import { useAppStore } from '@/lib/store/app-store'
+import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
+import { useTabCounts } from '@/lib/tab-counts'
 import { watched } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
-import { getTorStatus } from '@/lib/api-client'
+import { getHealth, getTorStatus } from '@/lib/api-client'
+import { getCached } from '@/lib/cache'
+import type { CompanyStats } from '@/lib/api-types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
+const NAV_ICONS: Record<string, React.ReactNode> = {
+  bills: <Receipt />,
+  cases: <Gavel />,
+  hearings: <CalendarDays />,
+  profile: <Building2 />,
+  kuzatuv: <Eye />,
+  overview: <BarChart3 />,
+}
 
 interface Notif {
   stir: string
@@ -72,26 +87,18 @@ function useHydrated(): boolean {
   return useSyncExternalStore(noopSubscribe, () => true, () => false)
 }
 
-function RailNav({
-  active,
-  label,
-  badge,
-  onClick,
-  children,
-}: {
-  active: boolean
-  label: string
-  badge?: number
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button className={cn('rnav', active && 'active')} data-nav onClick={onClick} aria-label={label}>
-      {children}
-      {badge !== undefined && badge > 0 && <span className="rn-badge">{badge}</span>}
-      <span className="tip">{label}</span>
-    </button>
-  )
+/**
+ * v18: the alert title is the OTHER party of the case. We match the case
+ * number inside the company's cached stats (10-min server memoization means
+ * this is free); without a match we fall back to the watched company name.
+ */
+function counterpartyFor(stir: string, caseNumber?: string, fallback?: string): string {
+  if (caseNumber) {
+    const stats = getCached<CompanyStats>(`stats:${stir}`)
+    const hit = stats?.cases?.find((c) => c.caseNumber === caseNumber)
+    if (hit?.counterparty) return hit.counterparty
+  }
+  return fallback || `STIR ${stir}`
 }
 
 function BellPopover() {
@@ -99,14 +106,11 @@ function BellPopover() {
   const [open, setOpen] = useState(false)
   const rv = useRegistryVersion()
   // v206: hydration gate — computeAlerts() reads the localStorage registry.
-  // During hydration it produced different HTML than the server pass (badge
-  // present client-side, absent server-side) → React hydration error.
-  // Server snapshot: no badge; the badge appears right after hydration.
   const hydrated = useHydrated()
   const alerts = useMemo(() => (hydrated ? computeAlerts() : []), [rv, hydrated])
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // Outside click closes the popover (prototype behavior)
+  // Outside click closes the popover
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
@@ -117,10 +121,11 @@ function BellPopover() {
   }, [open])
 
   return (
-    <div style={{ position: 'relative' }} ref={rootRef}>
+    <div className="bellwrap" ref={rootRef}>
       <button
-        className="circ"
+        className="bell"
         title="Bildirishnomalar"
+        aria-label="Bildirishnomalar"
         onClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)
@@ -139,13 +144,15 @@ function BellPopover() {
             {alerts.length === 0 ? (
               <div className="empty" style={{ padding: 26 }}>
                 <div className="ico">
-                  <CalendarClock />
+                  <CalendarDays />
                 </div>
                 <h3>Bildirishnoma yoʻq</h3>
               </div>
             ) : (
               alerts.map((a, i) => {
                 const [, m, d] = a.isoDate.split('-').map(Number)
+                const ddmm = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
+                const party = counterpartyFor(a.stir, a.caseNumber, a.name)
                 return (
                   <div
                     key={`${a.stir}-${i}`}
@@ -157,14 +164,13 @@ function BellPopover() {
                     }}
                   >
                     <div className="ni b-warn">
-                      <CalendarClock />
+                      <CalendarDays />
                     </div>
                     <div className="nt">
-                      <b>
-                        {(a.name || a.stir).slice(0, 18)} · majlis {d} {MONTHS[m - 1]}
-                      </b>
+                      <b>{party}</b>
                       <span>
-                        {a.court || ''} · {a.time || ''} {a.judge ? `· ${a.judge}` : ''}
+                        {ddmm} · {a.court || ''}
+                        {a.time ? ` · ${a.time}` : ''}
                       </span>
                     </div>
                   </div>
@@ -180,15 +186,20 @@ function BellPopover() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const view = useAppStore((s) => s.view)
+  const section = useAppStore((s) => s.section)
   const surface = useAppStore((s) => s.surface)
+  const company = useAppStore((s) => s.activeCompany)
   const goLauncher = useAppStore((s) => s.goLauncher)
   const setSurface = useAppStore((s) => s.setSurface)
+  const setSection = useAppStore((s) => s.setSection)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
+  const [sideOpen, setSideOpen] = useState(false)
   const [torState, setTorState] = useState<'checking' | 'active' | 'inactive'>('checking')
+  const [workerStat, setWorkerStat] = useState<{ alive: number; total: number } | null>(null)
   // Post-hydration registry read via useSyncExternalStore: server snapshot is 0,
-  // the client snapshot re-checks after hydration (no setState-in-effect).
+  // the client snapshot re-checks after hydration.
   const watchCount = useSyncExternalStore(
     (cb) => {
       window.addEventListener('sud:registry-changed', cb)
@@ -201,6 +212,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => watched().length,
     () => 0,
   )
+  const hydrated = useHydrated()
+  const counts = useTabCountsSafe()
 
   // Tor status — poll lightly, refresh on demand
   useEffect(() => {
@@ -221,6 +234,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // sysstat footer — light poll of the worker health summary
+  useEffect(() => {
+    let alive = true
+    const poll = async () => {
+      try {
+        const res = await getHealth()
+        if (!res.ok) return
+        const s = (res.data ?? {}) as { summary?: { activeWorkers?: number; totalWorkers?: number } }
+        if (alive && s.summary && typeof s.summary.totalWorkers === 'number') {
+          setWorkerStat({ alive: s.summary.activeWorkers ?? 0, total: s.summary.totalWorkers })
+        }
+      } catch {
+        /* footer is cosmetic — stay silent */
+      }
+    }
+    void poll()
+    const t = setInterval(poll, 60_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
+
   const checkTor = () => {
     if (torState === 'active') {
       toast.success('Tor allaqachon faol')
@@ -228,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     setTorState('checking')
     // v208: one toast for the whole check — the loading toast is REPLACED by
-    // the result toast via the shared id (two stacked popups looked broken).
+    // the result toast via the shared id.
     toast.loading('Tor holati tekshirilmoqda…', { id: 'tor-check', duration: 20_000 })
     void (async () => {
       try {
@@ -247,50 +283,104 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     torState === 'active' ? 'var(--pos-base)' : torState === 'inactive' ? 'var(--neg-base)' : 'var(--warn-base)'
   const torText = torState === 'active' ? 'Tor faol' : torState === 'inactive' ? "Tor oʻchiq" : 'Tor…'
 
-  const title =
-    surface === 'watchlist' ? 'Kuzatuv' : surface === 'settings' ? 'Sozlamalar' : view === 'company' ? 'Ish maydoni' : 'Bosh sahifa'
+  const inWorkspace = surface === 'main' && view === 'company' && !!company
+
+  const goWorkspaceSection = (key: SectionKey) => {
+    setSideOpen(false)
+    if (!company) {
+      // no active company → the palette resolves one first
+      setCommandPurpose('search')
+      setCommandOpen(true)
+      return
+    }
+    setSurface('main')
+    setSection(key)
+  }
+
+  const navClick = (key: SectionKey | 'kuzatuv') => {
+    if (key === 'kuzatuv') {
+      setSideOpen(false)
+      setSurface('watchlist')
+      return
+    }
+    goWorkspaceSection(key)
+  }
+
+  const navActive = (key: SectionKey | 'kuzatuv') => {
+    if (key === 'kuzatuv') return surface === 'watchlist'
+    return inWorkspace && section === key
+  }
+
+  const pipFor = (key: SectionKey | 'kuzatuv'): number | undefined => {
+    if (!hydrated) return undefined
+    if (key === 'kuzatuv') return watchCount || undefined
+    if (key === 'bills') return counts.bills
+    if (key === 'cases') return counts.cases
+    if (key === 'hearings') return counts.hearings
+    return undefined
+  }
 
   return (
-    <div className="shell">
-      <aside className="rail" aria-label="Global navigatsiya">
-        <div className="rail-logo" aria-hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M12 3 3 8l9 5 9-5-9-5Z" />
-            <path d="M3 8v8l9 5 9-5V8" opacity=".55" />
-          </svg>
-        </div>
-        <RailNav active={surface === 'main' && view === 'launcher'} label="Bosh sahifa" onClick={goLauncher}>
-          <Home />
-        </RailNav>
-        <RailNav
-          active={surface === 'watchlist'}
-          label="Kuzatuv"
-          badge={watchCount}
-          onClick={() => setSurface(surface === 'watchlist' ? 'main' : 'watchlist')}
-        >
-          <Eye />
-        </RailNav>
-        <RailNav active={surface === 'settings'} label="Sozlamalar" onClick={() => setSurface('settings')}>
-          <Settings />
-        </RailNav>
-        <div className="rail-sep" />
-        {/* v206: the duplicate rail Tor button is gone — the topbar badge
-            (dot + «Tor faol/oʻchiq» text) is the single Tor control. */}
-        <button
-          className="rail-mini"
-          title="Mavzu"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          aria-label="Mavzu almashtirish"
-        >
-          {/* CSS-driven swap — no hydration mismatch */}
-          <Sun className="theme-icon-light" style={{ width: 18, height: 18 }} />
-          <Moon className="theme-icon-dark" style={{ width: 18, height: 18 }} />
+    <div className="app-frame">
+      <aside className={cn('side', sideOpen && 'open')} aria-label="Global navigatsiya">
+        <button className="brand" onClick={goLauncher} aria-label="Bosh sahifa">
+          <span className="logo" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3 4 7v5c0 4.5 3.2 7.9 8 9 4.8-1.1 8-4.5 8-9V7z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </span>
+          <span>
+            <b>Sud tizimi</b>
+            <span>by Nurmamatov</span>
+          </span>
         </button>
+
+        <div className="nav-label">Ish maydoni</div>
+        <nav className="nav">
+          {WORKSPACE_NAV.map((n) => (
+            <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)}>
+              {NAV_ICONS[n.key]}
+              {n.label}
+              {pipFor(n.key) !== undefined && <span className="pip">{pipFor(n.key)}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="nav-label">Tizim</div>
+        <nav className="nav">
+          <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }}>
+            <Settings />
+            Sozlamalar
+          </button>
+        </nav>
+
+        <div className="side-spacer" />
+        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }}>
+          <span className="pulse" />
+          <span>
+            <b>{workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : 'Workerlar tekshirilmoqda'}</b>
+            <small>Tarmoq holati · sogʻlom</small>
+          </span>
+        </button>
+        <div className="side-foot">
+          <button
+            className="rail-mini"
+            title="Mavzu"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label="Mavzu almashtirish"
+          >
+            <Sun className="theme-icon-light" style={{ width: 18, height: 18 }} />
+            <Moon className="theme-icon-dark" style={{ width: 18, height: 18 }} />
+          </button>
+        </div>
       </aside>
 
       <div className="main">
         <header className="topbar">
-          <div className="top-title">{title}</div>
+          <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
+            <Menu style={{ width: 18, height: 18 }} />
+          </button>
           <button
             className="searchbox"
             onClick={() => {
@@ -314,16 +404,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span>{torText}</span>
             </button>
             <BellPopover />
-            <button
-              className="circ solid"
-              title="Yangi qidiruv"
-              onClick={() => {
-                setCommandPurpose('search')
-                setCommandOpen(true)
-              }}
-            >
-              <Plus />
-            </button>
           </div>
         </header>
         <div className="scroll">
@@ -332,4 +412,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   )
+}
+
+/** useTabCounts with a STABLE cached snapshot (getSnapshot must not return a
+ *  fresh object per call — that spins useSyncExternalStore into an infinite
+ *  re-render loop and crashes the app). */
+const EMPTY_COUNTS: { bills?: number; cases?: number; hearings?: number } = {}
+let tabCountsSnap: { bills?: number; cases?: number; hearings?: number } = EMPTY_COUNTS
+function useTabCountsSafe(): { bills?: number; cases?: number; hearings?: number } {
+  return useSyncExternalStore(subscribeTabCounts, getTabCountsSnap, () => EMPTY_COUNTS)
+}
+function subscribeTabCounts(cb: () => void): () => void {
+  return useTabCounts.subscribe(cb)
+}
+function getTabCountsSnap(): { bills?: number; cases?: number; hearings?: number } {
+  const s = useTabCounts.getState()
+  if (s.bills !== tabCountsSnap.bills || s.cases !== tabCountsSnap.cases || s.hearings !== tabCountsSnap.hearings) {
+    tabCountsSnap = { bills: s.bills, cases: s.cases, hearings: s.hearings }
+  }
+  return tabCountsSnap
 }

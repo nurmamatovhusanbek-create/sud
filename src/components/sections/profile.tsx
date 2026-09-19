@@ -10,6 +10,7 @@
 import { useEffect } from 'react'
 import { Building2, CalendarDays, Factory, Mail, Phone, Receipt, Gavel, User, Wallet, Star } from 'lucide-react'
 import { EmptyBlock, ArcGauge, SkRows, initials } from '@/components/proto/primitives'
+import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
 import { getCompanyInfo } from '@/lib/api-client'
@@ -23,7 +24,7 @@ export function ProfileSection() {
   const company = useAppStore((s) => s.activeCompany)
   const patchCompany = useAppStore((s) => s.patchCompany)
   const setSection = useAppStore((s) => s.setSection)
-  const { state, refetch } = useResource<CompanyInfoData>(
+  const { state, elapsed, refetch } = useResource<CompanyInfoData>(
     (signal) => getCompanyInfo(company?.stir || '', { signal }),
     {
       cacheKey: company ? `company-info:${company.stir}` : undefined,
@@ -58,7 +59,9 @@ export function ProfileSection() {
   if (!company) return null
   const view = state as ResourceState<CompanyInfoData>
 
-  if (view.status === 'idle' || view.status === 'loading') return <SkRows n={6} />
+  // v18: scrape progress card on first load (skeleton only for in-place refreshes)
+  if (view.status === 'idle' || view.status === 'loading')
+    return <ScrapeProgress {...SCRAPE_CFG.profile} elapsed={elapsed} />
   if (view.status === 'error')
     return (
       <EmptyBlock
