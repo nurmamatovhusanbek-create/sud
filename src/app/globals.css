@@ -83,6 +83,11 @@
   --accent-soft:     rgba(0,0,0,0.05);
   --accent-ring:     rgba(0,0,0,0.16);
 
+  /* Brand tile — indigo gradient that ties company-card monograms to the navy
+     sidebar. A fixed brand surface (like .side): stays navy in both themes, so
+     it is intentionally NOT redefined under dark mode. */
+  --brand-tile: linear-gradient(135deg, #1a2350, #2c3873);
+
   --status-positive-solid: var(--signal-positive-500);
   --status-positive-on:    #ffffff;
   --status-positive-soft:  var(--signal-positive-tint);

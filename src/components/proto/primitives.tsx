@@ -9,6 +9,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { StatusFamily } from '@/core/status'
+import { ratingBandFamily } from '@/core/status'
+
+const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
 export type Band = 'pos' | 'neg' | 'warn' | 'info' | 'neu'
 
@@ -389,6 +392,64 @@ export function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase()
   return out || '··'
+}
+
+/**
+ * Company-card stats body (Option C): a full-width divider, then two columns —
+ * Reyting (score + a band-colored rating letter pill) and Keyingi majlis (day +
+ * month, with an amber "N kun qoldi" sub line when ≤7 days; "Majlis yoʻq" when
+ * there is no upcoming hearing). Shared by the launcher and watchlist cards so
+ * they never drift. Score/rating come from meta.score / meta.rating; the date
+ * from meta.nextHearingIso.
+ */
+export function CardStats({
+  score,
+  rating,
+  hearingIso,
+}: {
+  score?: number | null
+  rating?: string | null
+  hearingIso?: string | null
+}) {
+  const hearing = (() => {
+    if (!hearingIso) return null
+    const [y, m, d] = hearingIso.split('-').map(Number)
+    if (!y || !m || !d) return null
+    const days = Math.ceil((new Date(y, m - 1, d).getTime() - Date.now()) / 86_400_000)
+    return { d: String(d).padStart(2, '0'), mo: MONTHS[m - 1] ?? '', days }
+  })()
+  return (
+    <>
+      <div className="cc-div" />
+      <div className="cc-cols">
+        <div className="cc-col">
+          <div className="k">Reyting</div>
+          <div className="v">
+            <span className="num">{score != null ? score : '—'}</span>
+            {rating ? <span className={`lt ${familyBadgeClass(ratingBandFamily(rating) ?? 'neutral')}`}>{rating}</span> : null}
+          </div>
+        </div>
+        <div className="cc-col">
+          <div className="k">Keyingi majlis</div>
+          {hearing ? (
+            <>
+              <div className="v">
+                <span className="num">{hearing.d}</span>
+                <span className="mo">{hearing.mo}</span>
+              </div>
+              {hearing.days >= 0 ? (
+                <div className={`days${hearing.days <= 7 ? ' warn' : ''}`}>{hearing.days} kun qoldi</div>
+              ) : null}
+            </>
+          ) : (
+            <div className="v">
+              <span className="none">Majlis yoʻq</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
 }
 
 // ==== v18 additions — interactive pizza chart + win-rate ring ==================
