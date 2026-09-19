@@ -15,4 +15,6 @@ export const DEFAULT_WORKERS: string[] = [
   'https://wild-hall-04ae.uzwebfox.workers.dev/',
   'https://orange-darkness-8843.najimsheikh071.workers.dev/',
   'https://wandering-wind-1d3d.najimsheikh071.workers.dev/',
+  'https://shiny-darkness-4a1f.nurmamatovhusanbek.workers.dev/',
+  'https://blue-haze-3834.nurmamatovhusanbek.workers.dev/',
 ]
