@@ -475,7 +475,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
       </div>
 
       {/* mini filter cards → Sud ishlari */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 16 }}>
         {[
           { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
           { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },

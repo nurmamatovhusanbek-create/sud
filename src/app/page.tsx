@@ -37,7 +37,11 @@ function CompanyWorkspace() {
   const setSection = useAppStore((s) => s.setSection)
   // Adjust-state-during-render pattern (React docs): no effect needed.
   const [prevSection, setPrevSection] = useState<SectionKey>(section)
-  const [visited, setVisited] = useState<Set<SectionKey>>(() => new Set(['overview' as SectionKey]))
+  // Seed with the CURRENT section, not a hard-coded 'overview' — otherwise a
+  // company that opens directly on another section (e.g. profile) never gets
+  // it added to `visited` (prevSection already equals section on mount) and
+  // that section renders blank until you navigate away and back.
+  const [visited, setVisited] = useState<Set<SectionKey>>(() => new Set([section]))
   if (prevSection !== section) {
     setPrevSection(section)
     setVisited((v) => new Set(v).add(section))

@@ -58,7 +58,7 @@ export function ProtoDrawer() {
       <aside className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-modal="true">
         <div className="drawer-h">
           <div className="dt">
-            {title}
+            <b>{title}</b>
             {sub ? <span>{sub}</span> : null}
           </div>
           <button className="circ sm" onClick={hide} aria-label="Yopish">
