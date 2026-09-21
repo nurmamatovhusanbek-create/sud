@@ -273,3 +273,26 @@ Work Log:
 - Release: APP_VERSION v207->v208, package.json 0.3.6->0.3.7; pack-release.sh now auto-derives VER from src/lib/version.ts (was hardcoded); packed "download/zip files/sud-billing-lookup-v208.zip" (246 files, unzip -t clean, APP_VERSION v208 inside); git commit + tag sud-signal-v208. NOTE: an intermediate pack run briefly overwrote v207.zip with v208 content — restored from git, both zips re-verified.
 
 Stage Summary: all six reported defects fixed and browser-verified; v208 zipped and tagged; update-check now points at the real repo (nurmamatovhusanbek-create/sud)
+
+---
+Task ID: 18 (v209 — v18 "Sud Signal" UI polish: pie interaction, navigation, worker cards, PDF/exports)
+Agent: Claude (Opus 4.8), branch claude/gifted-volta-d1wpww → main
+Task: iterative UI-fixing pass against the v18 mockup — banner/worker spacing, pie chart behaviour, case-detail PDF, hearings export, worker card labels, and the workspace-tab navigation flows
+
+Work Log:
+- Statistika pie chart (src/components/proto/pizza-geometry.ts, primitives.tsx, sections/overview.tsx):
+  - single court type (N=1) failed to fill — a 360° annular sector degenerates (arc start==end); cap the wedge span at 359.9° so one slice renders a full donut (regression test added)
+  - "show all by default": Pizza is now a controlled component (parent owns the selected index, -1 = none). Every slice renders crisp until one is picked — clean for screenshots. The detail panel stays empty until then, prompting "Maʼlumotlarni koʻrish uchun sud turini / kategoriyani tanlang" per filter mode. Clicking the selected slice again clears it.
+  - selected slice now LIFTS concentrically: grow it radially from the pie centre (scale about 170,170 via transform-box: view-box) + a soft drop-shadow, so it stays on the guide-ring grid instead of sliding off (a translate detached the slice from its circle)
+  - PizzaDetail breaks the full «Jami» total into its four statuses, each its own colour (green won · rose lost · brand-blue in-progress · grey neutral — no orange) in both the stackbar and the rows, so pending/neutral cases stop being invisible next to the total
+- Case-detail PDF (sections/cases.tsx, lib/print.ts): trimmed to essentials (Umumiy, Tomonlar, Oxirgi qaror) and surfaces "Keyingi majlis" in a highlighted block when an upcoming hearing exists, instead of dumping the full majlislar history + instansiyalar filler
+- Majlislar export (app/api/upcoming-hearings/export/route.ts, lib/api-client.ts, sections/hearings.tsx): the "Excel" button did nothing — the GET re-scraped sud.uz server-side and timed out. Now a POST that builds the workbook from the rows the section already loaded
+- Worker cards (views/settings-view.tsx, app/prototype.css): clipped overflow (.wcard/.spark overflow:hidden + minWidth:0 on the stat column); cards show a two-word short name via shortWorker() (e.g. "wild-hall-04ae.uzwebfox.workers.dev" → "wild-hall") with the full URL in the hover title + the detail drawer
+- Spacing: keep the «Qisman natija» banner off the KPI cards (.alert margin-bottom)
+- Navigation (store/app-store.ts, shell/app-shell.tsx, shell/command-palette.tsx, views/watchlist.tsx):
+  - workspace tabs (Toʻlovlar/Majlislar/…) were dead from the main menu — the handler set the section but left view on the launcher so nothing rendered. Now clicking a tab from the launcher opens the company picker and lands straight on that function; the target survives the palette round-trip via a new store pendingSection (cleared on palette close). Inside a workspace the tab still switches section directly
+  - Kuzatuv "Yaqinlashayotgan majlislar" datecards and the bell now open the company on Majlislar (hearings), not the default/stale section (openCompany gained an optional section arg)
+
+Gates: tsc --noEmit CLEAN; bun test src/core 40/40; browser-verified with headless Chromium (mock-mounted pie for default/selected/4-status since live scraping is blocked in-sandbox; navigation flows launcher→Majlislar/Toʻlovlar→pick→land, in-workspace switch, Kuzatuv datecard→Majlislar all green; shortWorker output correct for the reported URLs). Developed on claude/gifted-volta-d1wpww and fast-forwarded to main each round; no new release zip/tag this pass (APP_VERSION already v209).
+
+Stage Summary: the v18 pie now shows all slices by default and lifts the picked one concentrically with a four-status breakdown; case PDF slimmed to "Keyingi majlis" + essentials; hearings export works; worker cards stop overflowing; and the workspace tabs finally work from the main menu, landing on the chosen function.

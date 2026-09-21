@@ -1,20 +1,20 @@
 <div align="center">Sud Billing Lookup
 A legal-intelligence platform for Uzbekistan — aggregates court cases, payment receipts, hearings, company profiles, and contractor ratings from government portals into one company-centric workspace.
-Next.js 16 · React 19 · TypeScript · Tailwind v4 · shadcn/ui
+Next.js 16 · React 19 · TypeScript · Tailwind v4 · Plus Jakarta Sans / IBM Plex Mono
 </div>
 
 Overview
 Sud Billing Lookup takes a company's STIR (9-digit tax ID) and pulls everything the Uzbek legal system knows about it — payment receipts, court cases with full history, upcoming hearings, the company profile, and its contractor rating — from billing.sud.uz, jadval.sud.uz, orginfo.uz, chamber.uz and related portals. Requests are proxied through health-tracked Cloudflare Workers so the operator's IP is never exposed, with PoW/captcha solving, a TLS-fingerprint bypass, and Tor fallback for hostile endpoints.
 It is a desktop power tool for a small expert team: dense, keyboard-driven, and optimized for scanning.
 
-Design note. The interface is being rebuilt under the "Monochrome Signal" design system — a monochrome chrome where color appears only to signal status (paid/overdue, win/lose, healthy/dead). The full redesign spec, tokens, and an interactive prototype live in docs/.
+Design note. The interface runs the v18 "Sud Signal" design system — one brand hue (indigo→blue) over a navy ink and an indigo canvas, with color used semantically: green for won/paid, rose for lost/overdue, and the brand blue for pending/info (no orange). Type is Plus Jakarta Sans for UI and IBM Plex Mono for figures. Everything is token-driven in src/app/globals.css (an indigo-biased neutral ramp + status roles, bridged to Tailwind v4 via @theme inline) and dark-mode aware. The earlier "Monochrome Signal" spec and prototype it grew out of live in docs/.
 
 Features
 Toʻlovlar (Bills) — search billing.sud.uz by STIR or single kvitansiya; results stream in progressively (PoW captcha → fetch → enrich) and render as styled receipts with full payment status, court, and case links. Excel export.
 Sud ishlari (Cases) — search by STIR / PINFL / case number across economic, civil, and administrative courts. Full case detail: judge, hearings timeline, decisions, and appellate/cassation instances, with plaintiff/defendant cross-links. PDF export.
 Sud majlislari (Hearings) — monitor scheduled hearings across three court types; each renders as a docket ticket linked to its case.
 Kompaniya (Profile) — company profile from orginfo.uz (address, director, status, capital, founders, OKED) plus the chamber.uz contractor rating (0–100 score, AAA–D category).
-Statistika (Overview) — win/lose/pending classification, trend chart, outcome donut, win-rate by court, and side-by-side company comparison.
+Statistika (Overview) — win/lose/pending classification, trend chart, and the interactive "pizza" chart (by court type or case category): all slices show at once, and picking one lifts it and opens a detail panel that breaks the total into its four statuses — won, lost, in-progress, neutral — each in its own color. Plus win-rate by court and side-by-side company comparison.
 Kuzatuv (Watchlist) — multi-company monitoring with hearings-due-soon alerts.
 Settings — self-update from GitHub, Cloudflare Worker management, and a live health dashboard (per-worker success gauges, sparklines, request timelines).
 
