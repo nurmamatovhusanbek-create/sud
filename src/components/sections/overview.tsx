@@ -147,8 +147,8 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
     () => (mode === 'court' ? courtItems(d.cases) : turkumItems(d.cases)),
     [d.cases, mode],
   )
-  const [selIdx, setSelIdx] = useState(0)
-  const sel = items.length ? items[Math.min(selIdx, items.length - 1)] : null
+  const [selIdx, setSelIdx] = useState(-1)
+  const sel = selIdx >= 0 && selIdx < items.length ? items[selIdx] : null
   const rb = rating ? (/^A/i.test(rating) ? 'b-pos' : /^B/i.test(rating) ? 'b-warn' : 'b-neg') : null
 
   return (
@@ -182,7 +182,7 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           aria-label="Filtr"
           onChange={(e) => {
             setMode(e.target.value as 'court' | 'turkum')
-            setSelIdx(0)
+            setSelIdx(-1)
           }}
         >
           <option value="court">Sud turi</option>
@@ -190,7 +190,7 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
         </select>
       </div>
       {items.length ? (
-        <Pizza items={items} initial={Math.min(selIdx, items.length - 1)} onSelect={(_, i) => setSelIdx(i)} />
+        <Pizza items={items} selected={selIdx} onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))} />
       ) : (
         <div className="empty" style={{ padding: 26 }}><h3>Maʼlumot yoʻq</h3></div>
       )}
@@ -201,7 +201,15 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           ))}
         </div>
       )}
-      <div className="cmp-det">{sel && <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />}</div>
+      <div className="cmp-det">
+        {sel ? (
+          <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />
+        ) : (
+          <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: '10px 4px' }}>
+            {mode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
+          </div>
+        )}
+      </div>
       <div className="co-sub" style={{ marginTop: 14 }}>Sud turi boʻyicha yutuq</div>
       <WrRows cases={d.cases} />
     </div>
@@ -325,8 +333,9 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
     () => (pieMode === 'court' ? courtItems(data.cases) : turkumItems(data.cases)),
     [data.cases, pieMode],
   )
-  const [pieSel, setPieSel] = useState(0)
-  const pieSelClamped = pieItems.length ? pieItems[Math.min(pieSel, pieItems.length - 1)] : null
+  // -1 = nothing selected: the pie shows every slice crisp until one is picked
+  const [pieSel, setPieSel] = useState(-1)
+  const pieSelClamped = pieSel >= 0 && pieSel < pieItems.length ? pieItems[pieSel] : null
 
   // court mini-card counts
   const courtCounts = useMemo(() => {
@@ -431,7 +440,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
               aria-label="Filtr"
               onChange={(e) => {
                 setPieMode(e.target.value as 'court' | 'turkum')
-                setPieSel(0)
+                setPieSel(-1)
               }}
             >
               <option value="court">Sud turi boʻyicha</option>
@@ -441,7 +450,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           {pieItems.length ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
-                <Pizza items={pieItems} initial={Math.min(pieSel, pieItems.length - 1)} onSelect={(_, i) => setPieSel(i)} />
+                <Pizza items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
               </div>
               <div className="petal-legend">
                 {pieItems.map((it) => (
@@ -469,7 +478,11 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
               }
             />
           ) : (
-            <EmptyBlock icon={<BarChart3 />} title="Kesim tanlanmagan" hint="Diagrammadan boʻlimni tanlang." />
+            <EmptyBlock
+              icon={<BarChart3 />}
+              title="Boʻlim tanlanmagan"
+              hint={pieMode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
+            />
           )}
         </div>
       </div>

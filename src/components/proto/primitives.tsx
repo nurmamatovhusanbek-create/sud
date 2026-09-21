@@ -475,37 +475,37 @@ import { pizzaModel, winRing as winRingGeom, PIZZA_GEOM, type PizzaItem } from '
 /**
  * Pizza — the v18 radial won/lost chart. Each wedge = one slice (court type
  * or category): filled radius = won share, empty band = lost, total in a pill
- * just outside, navy dotted seams part the slices. Click/keyboard selects a
- * wedge — the others blur (pure CSS via .has-sel) and onSelect fires.
+ * just outside, navy dotted seams part the slices.
+ *
+ * Controlled: `selected` (index, or -1 for "nothing selected") is owned by the
+ * parent. With nothing selected every slice shows crisp (good for a share/
+ * screenshot); once a slice is picked it pops forward while the rest recede and
+ * blur (pure CSS via .has-sel). Clicking a slice reports its index; the parent
+ * decides selection (and toggles it off when the same slice is clicked again).
  */
 export function Pizza({
   items,
   onSelect,
-  initial = 0,
+  selected = -1,
   size = 340,
 }: {
   items: PizzaItem[]
   onSelect?: (item: PizzaItem, index: number) => void
-  initial?: number
+  selected?: number
   size?: number
 }) {
-  const [sel, setSel] = useState(initial)
-  // dataset swaps (Sud turi ↔ Turkum) must not leave a dangling selection —
-  // adjust-state-during-render (React docs), no effect needed.
-  const clamped = Math.min(sel, Math.max(0, items.length - 1))
-  if (clamped !== sel) setSel(clamped)
   const model = useMemo(() => pizzaModel(items), [items])
   const { cx, cy, r0 } = PIZZA_GEOM
+  const hasSel = selected >= 0 && selected < items.length
 
   const pick = (i: number) => {
-    setSel(i)
     const it = items[i]
     if (it) onSelect?.(it, i)
   }
 
   return (
     <svg
-      className={`pie-wrap${items.length ? ' has-sel' : ''}`}
+      className={`pie-wrap${hasSel ? ' has-sel' : ''}`}
       width={size}
       height={size}
       viewBox="0 0 340 340"
@@ -517,14 +517,17 @@ export function Pizza({
       ))}
       {model.wedges.map((w) => {
         const it = items[w.index]
+        const isSel = hasSel && selected === w.index
         return (
           <g
             key={w.index}
-            className={`cwedge${clamped === w.index ? ' sel' : ''}`}
+            className={`cwedge${isSel ? ' sel' : ''}`}
             data-i={w.index}
             tabIndex={0}
             role="button"
+            aria-pressed={isSel}
             aria-label={w.aria}
+            style={isSel ? { transform: `translate(${w.pop.dx}px, ${w.pop.dy}px)` } : undefined}
             onClick={() => pick(w.index)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -611,15 +614,25 @@ export function PizzaDetail({
   kind: string
   action?: React.ReactNode
 }) {
-  // «Jami» is ALL cases (won+lost+pending+neutral); the win-rate ring and the
-  // won/lost stackbar are computed over DECIDED cases only.
+  // «Jami» is ALL cases; the win-rate ring is over DECIDED cases, but the
+  // stackbar + rows now break the full total into its FOUR statuses, each with
+  // its own colour — so pending/neutral cases stop being invisible next to the
+  // total (design bible: green won · rose lost · brand-blue in-progress · grey
+  // neutral — no orange).
   const decided = item.won + item.lost
-  const total = decided + (item.pending ?? 0) + (item.neutral ?? 0)
+  const pending = item.pending ?? 0
+  const neutral = item.neutral ?? 0
+  const total = decided + pending + neutral
   const wr = decided ? Math.round((item.won / decided) * 100) : 0
-  const sp = (v: number) => (decided ? (v / decided) * 100 : 0)
-  const extra: { nm: string; v: number }[] = []
-  if (item.pending) extra.push({ nm: 'Jarayonda', v: item.pending })
-  if (item.neutral) extra.push({ nm: 'Neytral', v: item.neutral })
+  const seg = (v: number) => (total ? (v / total) * 100 : 0)
+
+  const rows: { nm: string; v: number; c: string }[] = [
+    { nm: 'Yutgan', v: item.won, c: 'var(--status-positive-solid)' },
+    { nm: 'Yutqazgan', v: item.lost, c: 'var(--status-negative-solid)' },
+  ]
+  if (pending) rows.push({ nm: 'Jarayonda', v: pending, c: 'var(--status-warning-solid)' })
+  if (neutral) rows.push({ nm: 'Neytral', v: neutral, c: 'var(--status-neutral-base)' })
+
   return (
     <div>
       <div className="det-head">
@@ -628,36 +641,25 @@ export function PizzaDetail({
       </div>
       <div className="det-name">{item.full}</div>
       <div className="det-sub">
-        Jami {total} ish · {item.won} yutgan, {item.lost} yutqazgan
+        Jami {total} ish · yutuq {wr}% (hal qilingan ishlar boʻyicha)
       </div>
       <div className="det-ring">
         <WinRing pct={wr} col={item.col} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="stackbar">
-            <i style={{ width: `${sp(item.won)}%`, background: item.col }} />
-            <i style={{ width: `${sp(item.lost)}%`, background: `${item.col}22` }} />
+            {rows.map((r) => (r.v > 0 ? <i key={r.nm} style={{ width: `${seg(r.v)}%`, background: r.c }} /> : null))}
           </div>
           <div className="det-sub" style={{ marginTop: 8 }}>
-            Toʻldirilgan = yutgan · boʻsh = yutqazgan
+            Barcha holatlar boʻyicha taqsimot
           </div>
         </div>
       </div>
       <div className="det-rows">
-        <div className="r">
-          <span className="sw" style={{ background: item.col }} />
-          <span className="nm">Yutgan</span>
-          <span className="vl tnum">{item.won}</span>
-        </div>
-        <div className="r">
-          <span className="sw" style={{ background: `${item.col}33` }} />
-          <span className="nm">Yutqazgan</span>
-          <span className="vl tnum">{item.lost}</span>
-        </div>
-        {extra.map((e) => (
-          <div className="r" key={e.nm}>
-            <span className="sw" style={{ background: 'var(--neu-soft)', border: '1px solid var(--border-subtle)' }} />
-            <span className="nm">{e.nm}</span>
-            <span className="vl tnum">{e.v}</span>
+        {rows.map((r) => (
+          <div className="r" key={r.nm}>
+            <span className="sw" style={{ background: r.c }} />
+            <span className="nm">{r.nm}</span>
+            <span className="vl tnum">{r.v}</span>
           </div>
         ))}
       </div>
