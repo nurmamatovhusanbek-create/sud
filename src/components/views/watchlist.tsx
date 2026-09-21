@@ -262,7 +262,7 @@ export function WatchlistView() {
               // Prototype: .now marks hearings inside the 7-day alert window
               const near = alerts.some((a) => a.stir === h.stir && a.isoDate === h.isoDate)
               return (
-                <div key={`${h.stir}-${i}`} className={`datecard ${near ? 'now' : ''}`} onClick={() => openCompany(h.stir, { name: h.name })}>
+                <div key={`${h.stir}-${i}`} className={`datecard ${near ? 'now' : ''}`} onClick={() => openCompany(h.stir, { name: h.name }, 'hearings')}>
                   <div className="dc-date">
                     <div className="d">{p.d}</div>
                     <div className="m">{p.m}</div>

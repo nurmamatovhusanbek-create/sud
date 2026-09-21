@@ -125,13 +125,15 @@ function PaletteInner() {
   }
 
   const pickCompany = (stir: string, name?: string) => {
+    // Capture the target section BEFORE closing (close clears pendingSection).
+    const target = useAppStore.getState().pendingSection ?? undefined
     setOpen(false)
     if (purpose === 'add') {
       setWatched(stir, name, true)
       toast.success('Kuzatuvga qoʻshildi', { description: name || `STIR ${grp(stir)}` })
       return
     }
-    openCompany(stir, { name })
+    openCompany(stir, { name }, target)
   }
 
   const q = query.trim().toLowerCase()

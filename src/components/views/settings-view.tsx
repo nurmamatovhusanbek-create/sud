@@ -80,6 +80,16 @@ interface WorkersResponse {
   workers: WorkerEntry[]
 }
 
+/** Short worker name for a card: the first two words of the sub-domain label
+ *  (e.g. "wild-hall-04ae.uzwebfox.workers.dev" → "wild-hall"). The full URL
+ *  still shows in the drawer. */
+function shortWorker(url: string): string {
+  const host = url.replace(/^https?:\/\//, '').split('/')[0]
+  const first = host.split('.')[0]
+  const words = first.split('-').filter(Boolean)
+  return words.slice(0, 2).join('-') || first || url
+}
+
 interface TestResult {
   ok: boolean
   reason?: string
@@ -768,7 +778,7 @@ function HealthTab() {
             <div className="wcard" key={w.workerUrl} onClick={() => openWorker(w)}>
               <div className="p-row">
                 <span className={`p-dot ${r >= 90 ? 'd-pos' : r >= 60 ? 'd-warn' : 'd-neg'}`} />
-                <b className="mono" style={{ fontSize: 13, flex: 1 }}>{w.label || w.workerUrl}</b>
+                <b className="mono" title={w.workerUrl} style={{ fontSize: 13, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.label || shortWorker(w.workerUrl)}</b>
                 <span className={`badge ${r >= 90 ? 'b-pos' : r >= 60 ? 'b-warn' : 'b-neg'}`}>{r >= 90 ? "Sogʻlom" : r >= 60 ? 'Sekin' : "Oʻlik"}</span>
               </div>
               <div className="p-row" style={{ gap: 14, marginTop: 12 }}>

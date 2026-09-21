@@ -50,9 +50,12 @@ interface AppState {
   caseCourtFilter: CaseCourtFilter
   /** 'add' mode: choosing a company in the palette adds it to the watchlist. */
   commandPurpose: CommandPurpose
+  /** Section to land on once a company is chosen in the palette — set when a
+   *  workspace tab is clicked with no company in context, cleared on pick/close. */
+  pendingSection: SectionKey | null
 
-  /** Resolve a company by STIR and enter its workspace. */
-  openCompany: (stir: string, seed?: Partial<Company>) => boolean
+  /** Resolve a company by STIR and enter its workspace (optionally on a section). */
+  openCompany: (stir: string, seed?: Partial<Company>, section?: SectionKey) => boolean
   /** Patch the active company (e.g. name/status/rating once identity loads). */
   patchCompany: (patch: Partial<Company>) => void
   setSection: (s: SectionKey) => void
@@ -61,6 +64,7 @@ interface AppState {
   setSurface: (s: GlobalSurface) => void
   setCommandOpen: (open: boolean) => void
   setCommandPurpose: (p: CommandPurpose) => void
+  setPendingSection: (s: SectionKey | null) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -71,8 +75,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   commandOpen: false,
   commandPurpose: 'search',
   caseCourtFilter: 'all',
+  pendingSection: null,
 
-  openCompany: (stir, seed) => {
+  openCompany: (stir, seed, section) => {
     const normalized = normalizeStir(stir)
     if (!normalized) return false
     const existing = get().activeCompany
@@ -87,8 +92,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         rating: seed?.rating ?? (sameCompany ? existing?.rating : undefined),
         updatedAt: Date.now(),
       },
-      // Reset section only when the company actually changes.
-      ...(sameCompany ? {} : { section: 'overview' }),
+      // Explicit target wins (e.g. "Majlislar" chosen from the launcher); else
+      // reset to overview only when the company actually changes.
+      ...(section ? { section } : sameCompany ? {} : { section: 'overview' }),
     })
     upsertRegistry(normalized, seed?.name)
     return true
@@ -105,8 +111,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCaseCourtFilter: (caseCourtFilter) => set({ caseCourtFilter }),
   goLauncher: () => set({ view: 'launcher', surface: 'main' }),
   setSurface: (surface) => set({ surface }),
-  setCommandOpen: (commandOpen) => set({ commandOpen }),
+  // Closing the palette drops any pending section so it can't leak into an
+  // unrelated later open (e.g. ⌘K search).
+  setCommandOpen: (commandOpen) => set(commandOpen ? { commandOpen } : { commandOpen, pendingSection: null }),
   setCommandPurpose: (commandPurpose) => set({ commandPurpose }),
+  setPendingSection: (pendingSection) => set({ pendingSection }),
 }))
 
 /** Selector: is a company active (workspace visible). */
