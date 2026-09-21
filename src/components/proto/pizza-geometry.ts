@@ -39,9 +39,6 @@ export interface PizzaGeom {
 
 export const PIZZA_GEOM: PizzaGeom = { cx: 170, cy: 170, R: 120, r0: 18 }
 
-/** How far (px) a selected wedge pops outward along its mid-angle. */
-export const PIZZA_POP = 9
-
 export function polarPt(cx: number, cy: number, r: number, deg: number): [number, number] {
   const a = (deg * Math.PI) / 180
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)]
@@ -71,10 +68,6 @@ export interface PizzaWedge {
   wonText: { x: number; y: number; v: number } | null
   lostText: { x: number; y: number; v: number } | null
   pill: { x: number; y: number; v: number; fill: string }
-  /** outward nudge (along the wedge mid-angle) applied when the wedge is
-   *  selected — the slice "pops" forward while the rest recede/blur. Zero for
-   *  a single wedge (a full donut has no meaningful direction to pop). */
-  pop: { dx: number; dy: number }
   aria: string
 }
 
@@ -116,7 +109,6 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
     const a1 = a0 + Math.min(step, 359.9)
     const mid = (a0 + a1) / 2
     const fillR = r0 + (R - r0) * wr
-    const popV = N > 1 ? polarPt(0, 0, PIZZA_POP, mid) : [0, 0]
     const pill = polarPt(cx, cy, R + 15, mid)
     const wp = polarPt(cx, cy, Math.max(r0 + 11, (r0 + fillR) / 2), mid)
     const lp = polarPt(cx, cy, Math.min(R - 9, (fillR + R) / 2), mid)
@@ -127,7 +119,6 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
       wonText: it.won > 0 ? { x: +wp[0].toFixed(1), y: +(wp[1] + 4).toFixed(1), v: it.won } : null,
       lostText: it.lost > 0 ? { x: +lp[0].toFixed(1), y: +(lp[1] + 3.5).toFixed(1), v: it.lost } : null,
       pill: { x: +pill[0].toFixed(1), y: +pill[1].toFixed(1), v: tot, fill: it.pill },
-      pop: { dx: +popV[0].toFixed(2), dy: +popV[1].toFixed(2) },
       aria: `${it.full}, ${tot}, ${Math.round(wr * 100)}%`,
     })
     const sb = polarPt(cx, cy, r0, a0)
