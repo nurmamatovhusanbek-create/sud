@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import "./globals.css";
 import "./prototype.css";
 
-// Inter with Cyrillic subset — the UI face. JetBrains Mono — the figures face.
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin", "cyrillic"],
+// v18 faces: Plus Jakarta Sans (UI) + IBM Plex Mono (figures).
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-sans-face",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
+const plex = IBM_Plex_Mono({
+  variable: "--font-mono-face",
   subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -29,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrains.variable} antialiased bg-background text-foreground`}>
+    <html lang="uz" className={`${jakarta.variable} ${plex.variable}`} suppressHydrationWarning>
+      <body className="antialiased bg-background text-foreground">
         <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           {children}
         </ThemeProvider>

@@ -10,7 +10,7 @@
  * empty state, the section banners) instead of a parallel Tailwind idiom.
  */
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AlertTriangle, Inbox, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { SourceError } from '@/core/envelope'
@@ -54,24 +54,31 @@ export function ErrorState({ error, onRetry }: { error: string; onRetry?: () => 
 }
 
 /**
- * Non-blocking, on-system strip naming which sources failed (partial ≠
- * complete). Slim neutral chrome; the warning reads only through the icon
- * color. Full per-source detail stays available on hover (title).
+ * Non-blocking partial-result banner (v18 «Qisman natija»): a tinted alert
+ * card naming which sources failed, with dismiss (Yopish) + retry (Qayta
+ * urinish). Full per-source detail stays on hover (title).
  */
 export function PartialBanner({ errors, onRetry }: { errors: SourceError[]; onRetry?: () => void }) {
-  if (!errors.length) return null
+  const [dismissed, setDismissed] = useState(false)
+  if (!errors.length || dismissed) return null
   const sources = errors.map((e) => e.source).join(', ')
   return (
-    <div className="partial-strip" title={errors.map((e) => `${e.source}: ${e.error}`).join('\n')}>
+    <div className="alert warn" title={errors.map((e) => `${e.source}: ${e.error}`).join('\n')}>
       <AlertTriangle />
-      <span className="ptxt">
-        <b>Qisman maʼlumot</b> — {sources} ulanib boʻlmadi
-      </span>
-      {onRetry && (
-        <button className="pretry" onClick={onRetry}>
-          <RefreshCw /> Qayta
+      <div className="at">
+        <b>Qisman natija</b>
+        <p>{sources} javob bermadi — roʻyxat toʻliq boʻlmasligi mumkin.</p>
+      </div>
+      <div className="alert-actions">
+        <button className="btn btn-ghost btn-sm" onClick={() => setDismissed(true)}>
+          Yopish
         </button>
-      )}
+        {onRetry && (
+          <button className="btn btn-outline btn-sm" onClick={onRetry}>
+            <RefreshCw /> Qayta urinish
+          </button>
+        )}
+      </div>
     </div>
   )
 }
