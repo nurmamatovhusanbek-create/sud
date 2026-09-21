@@ -53,27 +53,25 @@ export function ErrorState({ error, onRetry }: { error: string; onRetry?: () => 
   )
 }
 
-/** Non-blocking banner naming which sources failed (partial ≠ complete). */
+/**
+ * Non-blocking, on-system strip naming which sources failed (partial ≠
+ * complete). Slim neutral chrome; the warning reads only through the icon
+ * color. Full per-source detail stays available on hover (title).
+ */
 export function PartialBanner({ errors, onRetry }: { errors: SourceError[]; onRetry?: () => void }) {
   if (!errors.length) return null
+  const sources = errors.map((e) => e.source).join(', ')
   return (
-    <div className="alert warn">
+    <div className="partial-strip" title={errors.map((e) => `${e.source}: ${e.error}`).join('\n')}>
       <AlertTriangle />
-      <div className="at">
-        <b>Qisman maʼlumot</b>
-        <ul style={{ margin: '4px 0 0', padding: 0, listStyle: 'none' }}>
-          {errors.map((e, i) => (
-            <li key={i} style={{ fontSize: 12, marginTop: 2, overflowWrap: 'anywhere' }}>
-              <strong style={{ fontWeight: 600 }}>{e.source}</strong> · {e.error}
-            </li>
-          ))}
-        </ul>
-        {onRetry && (
-          <button className="btn btn-xs btn-ghost" style={{ marginTop: 8 }} onClick={onRetry}>
-            <RefreshCw /> Qayta
-          </button>
-        )}
-      </div>
+      <span className="ptxt">
+        <b>Qisman maʼlumot</b> — {sources} ulanib boʻlmadi
+      </span>
+      {onRetry && (
+        <button className="pretry" onClick={onRetry}>
+          <RefreshCw /> Qayta
+        </button>
+      )}
     </div>
   )
 }
