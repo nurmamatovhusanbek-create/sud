@@ -64,7 +64,7 @@ export function ContextBar() {
 
   return (
     <div className="ctxbar">
-      <div className="mono-tile" style={{ width: 52, height: 52, borderRadius: 15, fontSize: 18 }}>
+      <div className="mono-tile">
         {company.name ? initials(company.name) : grp(company.stir).slice(0, 2)}
       </div>
       <div className="ctx-name">

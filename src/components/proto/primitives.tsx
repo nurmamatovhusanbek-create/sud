@@ -611,9 +611,12 @@ export function PizzaDetail({
   kind: string
   action?: React.ReactNode
 }) {
-  const tot = item.won + item.lost
-  const wr = tot ? Math.round((item.won / tot) * 100) : 0
-  const sp = (v: number) => (tot ? (v / tot) * 100 : 0)
+  // «Jami» is ALL cases (won+lost+pending+neutral); the win-rate ring and the
+  // won/lost stackbar are computed over DECIDED cases only.
+  const decided = item.won + item.lost
+  const total = decided + (item.pending ?? 0) + (item.neutral ?? 0)
+  const wr = decided ? Math.round((item.won / decided) * 100) : 0
+  const sp = (v: number) => (decided ? (v / decided) * 100 : 0)
   const extra: { nm: string; v: number }[] = []
   if (item.pending) extra.push({ nm: 'Jarayonda', v: item.pending })
   if (item.neutral) extra.push({ nm: 'Neytral', v: item.neutral })
@@ -625,7 +628,7 @@ export function PizzaDetail({
       </div>
       <div className="det-name">{item.full}</div>
       <div className="det-sub">
-        Jami {tot} ish · {item.won} yutgan, {item.lost} yutqazgan
+        Jami {total} ish · {item.won} yutgan, {item.lost} yutqazgan
       </div>
       <div className="det-ring">
         <WinRing pct={wr} col={item.col} />

@@ -97,8 +97,11 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
   const seams: PizzaSeam[] = []
   for (let i = 0; i < N; i++) {
     const it = items[i]
-    const tot = it.won + it.lost
-    const wr = tot ? it.won / tot : 0
+    // decided drives the win-rate fill; total (all statuses) is the case count
+    // shown in the pill — pending/neutral cases still count toward the total.
+    const decided = it.won + it.lost
+    const tot = decided + (it.pending ?? 0) + (it.neutral ?? 0)
+    const wr = decided ? it.won / decided : 0
     const a0 = -90 + i * step
     const a1 = -90 + (i + 1) * step
     const mid = (a0 + a1) / 2

@@ -251,9 +251,10 @@ html, body { height: 100%; }
 @media (hover: none) { .ccard-act { opacity: .75; } } /* touch: keep actions visible */
 
 /* ---------- context bar + tabs ---------- */
-.ctxbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ctxbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 6px 0 20px; }
+.ctxbar .mono-tile { width: 56px; height: 56px; border-radius: 15px; background: var(--brand-tile); color: #fff; font-size: 18px; box-shadow: var(--elev-3); }
 .ctx-name { min-width: 0; }
-.ctx-name .nm { font-size: clamp(17px, 2vw, 20px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.ctx-name .nm { font-size: clamp(18px, 2vw, 22px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .ctx-name .sub { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-top: 3px; flex-wrap: wrap; }
 .ctx-name .sub .mono { color: var(--text-2); }
 .copy { color: var(--text-3); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; }
@@ -545,6 +546,8 @@ html, body { height: 100%; }
 .det-rows .r .vl { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
 
 /* ---------- mini filter cards ---------- */
+/* compact card variant — used by the Statistika mini filter cards. */
+.p-card.mini { padding: 15px 16px; }
 .fcard { cursor: pointer; }
 .fcard:hover { transform: translateY(-3px); box-shadow: var(--elev-3); background: var(--surface-hover); }
 .fcard .lab { color: var(--text-2); font-size: 12.5px; font-weight: 600; }
