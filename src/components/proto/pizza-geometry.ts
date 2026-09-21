@@ -103,7 +103,10 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
     const tot = decided + (it.pending ?? 0) + (it.neutral ?? 0)
     const wr = decided ? it.won / decided : 0
     const a0 = -90 + i * step
-    const a1 = -90 + (i + 1) * step
+    // Cap a wedge's span just under a full turn: a single item (N=1) spans 360°,
+    // whose arc start/end coincide and the sector degenerates to nothing (the
+    // pie wouldn't fill). 359.9° renders a full donut with a hairline seam.
+    const a1 = a0 + Math.min(step, 359.9)
     const mid = (a0 + a1) / 2
     const fillR = r0 + (R - r0) * wr
     const pill = polarPt(cx, cy, R + 15, mid)

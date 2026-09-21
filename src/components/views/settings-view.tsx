@@ -762,8 +762,8 @@ function HealthTab() {
         )}
         {workers.map((w) => {
           const r = Math.round(w.successRate * 100)
-          const failIdx = w.history.slice(-24).map((h, i) => (h.ok ? -1 : i)).filter((i) => i >= 0)
-          const spark = w.history.slice(-24).map((h) => Math.max(2, Math.min(12, h.ms / 40)))
+          const failIdx = w.history.slice(-16).map((h, i) => (h.ok ? -1 : i)).filter((i) => i >= 0)
+          const spark = w.history.slice(-16).map((h) => Math.max(2, Math.min(12, h.ms / 40)))
           return (
             <div className="wcard" key={w.workerUrl} onClick={() => openWorker(w)}>
               <div className="p-row">
@@ -775,7 +775,7 @@ function HealthTab() {
                 <div style={{ flex: '0 0 auto' }}>
                   <ArcGauge pct={r} size={110} band={r >= 90 ? 'pos' : r >= 60 ? 'warn' : 'neg'} />
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div className="p-row" style={{ justifyContent: 'space-between' }}>
                     <span className="faint" style={{ fontSize: 11 }}>Soʻrovlar</span>
                     <b className="mono" style={{ fontSize: 13 }}>{w.totalRequests}</b>

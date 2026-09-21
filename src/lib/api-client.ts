@@ -172,9 +172,10 @@ export async function exportCasesXlsx(params: { tin: string; courtTypes?: string
   await downloadGet(`/api/court-cases/export?${q}`)
 }
 
-/** v204 (P-C): upcoming-hearings export — server re-fetches, client downloads. */
-export async function exportHearingsXlsx(params: { tin: string }): Promise<void> {
-  await downloadGet(`/api/upcoming-hearings/export?tin=${encodeURIComponent(params.tin)}`)
+/** Upcoming-hearings export — the client posts the rows it already loaded so
+ *  the server just builds the workbook (no unreliable server-side re-scrape). */
+export async function exportHearingsXlsx(params: { tin: string; hearings: unknown[] }): Promise<void> {
+  await downloadPost('/api/upcoming-hearings/export', { tin: params.tin, hearings: params.hearings })
 }
 
 async function saveBlob(res: Response, fallbackName: string): Promise<void> {
