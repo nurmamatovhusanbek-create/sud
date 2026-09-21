@@ -163,8 +163,7 @@ function BellPopover() {
                     className="notif"
                     onClick={() => {
                       setOpen(false)
-                      openCompany(a.stir, { name: a.name })
-                      useAppStore.getState().setSection('hearings')
+                      openCompany(a.stir, { name: a.name }, 'hearings')
                     }}
                   >
                     <div className="ni b-warn">
@@ -245,14 +244,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const goWorkspaceSection = (key: SectionKey) => {
     setSideOpen(false)
-    if (!company) {
-      // no active company → the palette resolves one first
-      setCommandPurpose('search')
-      setCommandOpen(true)
+    // Inside a company workspace the tab just switches section (even when a
+    // global surface like Kuzatuv/Sozlamalar is layered on top). From the
+    // launcher (main menu) there is no company context to switch, so choose a
+    // company first and land straight on the picked function.
+    if (useAppStore.getState().view === 'company' && company) {
+      setSurface('main')
+      setSection(key)
       return
     }
-    setSurface('main')
-    setSection(key)
+    useAppStore.getState().setPendingSection(key)
+    setCommandPurpose('search')
+    setCommandOpen(true)
   }
 
   const navClick = (key: SectionKey | 'kuzatuv') => {
