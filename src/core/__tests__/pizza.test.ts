@@ -57,10 +57,14 @@ describe('pizza geometry (v18 port)', () => {
     expect(rFull).toBeGreaterThan(rNone)
   })
 
-  it('pill total equals won+lost and aria carries the win %', () => {
+  it('pill total is ALL cases (won+lost+pending+neutral); win % is over decided', () => {
     const w = pizzaModel([item('A', 7, 3)]).wedges[0]
     expect(w.pill.v).toBe(10)
     expect(w.aria).toContain('70%')
+    // pending + neutral count toward the total but not the win rate
+    const w2 = pizzaModel([{ ...item('B', 2, 0), pending: 3, neutral: 2 }]).wedges[0]
+    expect(w2.pill.v).toBe(7) // 2 + 0 + 3 + 2
+    expect(w2.aria).toContain('100%') // 2/(2+0) decided
   })
 
   it('selection contract: wedge index maps 1:1 to items order', () => {

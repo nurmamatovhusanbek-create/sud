@@ -23,7 +23,7 @@ import { EmptyBlock, SkRows, Seg, familyBadgeClass } from '@/components/proto/pr
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
-import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
+import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
@@ -369,7 +369,9 @@ export function CasesSection() {
   const [exporting, setExporting] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // v18 paginates cases densely (≈8/page); keep the pager visible even on a
+  // single page so the count + page-size control are always available.
+  const [pageSize, setPageSize] = useState(10)
 
   const stir = company?.stir || ''
   const courts: CourtType[] = courtFilter === 'all' ? COURT_TYPES : [courtFilter as CourtType]
@@ -602,6 +604,7 @@ export function CasesSection() {
             page={safePage}
             pageSize={pageSize}
             total={filtered.length}
+            hideWhenSinglePage={false}
             onPage={setPage}
             onPageSize={(n) => {
               setPageSize(n)
