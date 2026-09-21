@@ -154,7 +154,7 @@ export function HearingsSection() {
               setExporting(true)
               void (async () => {
                 try {
-                  await exportHearingsXlsx({ tin: company.stir })
+                  await exportHearingsXlsx({ tin: company.stir, hearings })
                   toast.success('Excel yuklab olindi')
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : 'Eksport xatosi')

@@ -21,6 +21,10 @@ const PRINT_CSS = `
   .pr-kv .k { color: #555; white-space: nowrap; }
   .pr-kv .v { text-align: right; font-weight: 500; }
   .pr-total { display: flex; justify-content: space-between; padding: 9px 0 0; margin-top: 8px; border-top: 2px solid #111; font-weight: 700; font-size: 14px; }
+  .pr-next { border: 1.5px solid #111; border-radius: 6px; padding: 10px 14px; margin-top: 4px; }
+  .pr-next-date { font-size: 15px; font-weight: 700; }
+  .pr-next-meta { font-size: 11.5px; color: #444; margin-top: 3px; }
+  .pr-text { padding: 6px 0; font-size: 12.5px; line-height: 1.5; }
   table.pr-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   table.pr-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1.5px solid #111; padding: 5px 7px; background: #f2f2f2; }
   table.pr-table td { border-bottom: 1px solid #ddd; padding: 5px 7px; vertical-align: top; }

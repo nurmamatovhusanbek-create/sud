@@ -73,45 +73,32 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
     ...(ca?.hearings ?? []),
   ].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
 
+  // The next hearing = the earliest one not yet held. When one exists we show
+  // it prominently instead of dumping the whole majlislar history (which is the
+  // "too much unnecessary info" the sheet used to carry).
+  const nextHearing = allHearings.find((h) => !hearingDone(h.status))
+
+  // Only the most recent decision is meaningful on a one-page sheet.
   const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
+  const lastDecision = decisions[decisions.length - 1]
+
+  const nextSec = nextHearing
+    ? `<div class="pr-sec">Keyingi majlis</div>
+       <div class="pr-next">
+         <div class="pr-next-date">${escapeHtml(nextHearing.date || '-')}${nextHearing.time ? ` · ${escapeHtml(nextHearing.time)}` : ''}</div>
+         <div class="pr-next-meta">${escapeHtml(hearingEn(nextHearing.status) || nextHearing.status || 'Rejalashtirilgan')}${nextHearing.courtroom ? ` · ${escapeHtml(nextHearing.courtroom)} zal` : ''}</div>
+       </div>`
+    : ''
 
   const parties = `
     <div class="pr-sec">Tomonlar</div>
-    ${kv('Daʼvogar', g?.plaintiff)}${g?.plaintiffTin ? kv('Daʼvogar STIR', g.plaintiffTin) : ''}
-    ${kv('Javobgar', g?.defendant)}${g?.defendantTin ? kv('Javobgar STIR', g.defendantTin) : ''}`
+    ${kv('Daʼvogar', g?.plaintiff)}
+    ${kv('Javobgar', g?.defendant)}`
 
-  const hearingsSec = allHearings.length
-    ? `<div class="pr-sec">Majlislar tarixi</div>
-       <table class="pr-table"><thead><tr><th>Sana</th><th>Vaqt</th><th>Holat</th><th>Zal</th></tr></thead><tbody>
-       ${allHearings
-         .map(
-           (h) =>
-             `<tr><td>${escapeHtml(h.date || '-')}</td><td>${escapeHtml(h.time || '-')}</td><td>${escapeHtml(
-               hearingEn(h.status) || h.status || '-',
-             )}</td><td>${escapeHtml(h.courtroom || '-')}</td></tr>`,
-         )
-         .join('')}
-       </tbody></table>`
+  const decisionSec = lastDecision
+    ? `<div class="pr-sec">Oxirgi qaror${lastDecision.date ? ` · ${escapeHtml(lastDecision.date)}` : ''}</div>
+       <div class="pr-text">${escapeHtml(lastDecision.text || '-')}</div>`
     : ''
-
-  const decisionsSec = decisions.length
-    ? `<div class="pr-sec">Qarorlar</div>
-       <table class="pr-table"><thead><tr><th>Sana</th><th>Mazmun</th></tr></thead><tbody>
-       ${decisions.map((dec) => `<tr><td style="white-space:nowrap">${escapeHtml(dec!.date || '-')}</td><td>${escapeHtml(dec!.text || '-')}</td></tr>`).join('')}
-       </tbody></table>`
-    : ''
-
-  const instances = [
-    { name: 'Birinchi instansiya', d: fi },
-    { name: 'Apellyatsiya', d: ap },
-    { name: 'Kassatsiya', d: ca },
-  ]
-    .map((inst) => {
-      const has = (inst.d?.hearings.length ?? 0) > 0 || !!inst.d?.decision
-      const outcome = inst.d?.decision?.text ? 'Koʻrib chiqilgan' : inst.d?.appellateOutcome || (has ? 'Yozuvlar bor' : "Maʼlumot yoʻq")
-      return kv(inst.name, outcome)
-    })
-    .join('')
 
   return `
     <div class="pr-head">
@@ -124,16 +111,14 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
         ${g?.court ? `<div style="margin-top:4px">${escapeHtml(g.court)}</div>` : ''}
       </div>
     </div>
+    ${nextSec}
     <div class="pr-sec">Umumiy maʼlumot</div>
     ${kv('Sudya', g?.judge)}
-    ${kv('Daʼvo summasi', g?.claimAmount)}
     ${kv('Sud', g?.court)}
+    ${kv('Daʼvo summasi', g?.claimAmount)}
     ${kv('Ish turi', g?.caseType)}
     ${parties}
-    ${hearingsSec}
-    ${decisionsSec}
-    <div class="pr-sec">Instansiyalar</div>
-    ${instances}`
+    ${decisionSec}`
 }
 
 function caseListHtml(

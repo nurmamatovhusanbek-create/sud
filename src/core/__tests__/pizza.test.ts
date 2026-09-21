@@ -67,6 +67,20 @@ describe('pizza geometry (v18 port)', () => {
     expect(w2.aria).toContain('100%') // 2/(2+0) decided
   })
 
+  it('single item (N=1) fills: wedge spans a near-full turn, not a degenerate 360°', () => {
+    // A 360° sector collapses (arc start == end → nothing renders). One court
+    // type must still fill the pie, so the span is capped just under a full turn.
+    const m = pizzaModel([item('A', 10, 0)])
+    expect(m.wedges.length).toBe(1)
+    const w = m.wedges[0]
+    // full win → wonPath present and drawn with the large-arc flag (span > 180°)
+    expect(w.wonPath).toBeTruthy()
+    expect(w.wonPath).toMatch(/A120 120 0 1 1/)
+    // and its two arc endpoints must differ (a degenerate sector coincides)
+    const pts = w.wonPath!.match(/-?\d+\.\d+ -?\d+\.\d+/g) ?? []
+    expect(pts[0]).not.toBe(pts[1])
+  })
+
   it('selection contract: wedge index maps 1:1 to items order', () => {
     const items = [item('A', 1, 1, 0), item('B', 2, 1, 1), item('C', 3, 1, 2), item('D', 4, 1, 3)]
     const m = pizzaModel(items)
