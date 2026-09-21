@@ -403,6 +403,15 @@
   * {
     border-color: var(--border-default);
   }
+  /* Interactive elements get the hand cursor. Native <button> defaults to the
+     arrow (cursor:default) and Tailwind v4's preflight no longer overrides it,
+     so without this every .btn / nav button / tab / bell shows the arrow. */
+  button:not(:disabled), [role="button"], summary, select {
+    cursor: pointer;
+  }
+  button:disabled, [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   html {
     background: var(--bg-canvas);
   }
