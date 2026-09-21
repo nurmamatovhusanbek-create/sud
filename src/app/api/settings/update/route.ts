@@ -1,17 +1,22 @@
 /**
- * v209: POST /api/settings/update
+ * v210: POST /api/settings/update
  *
  * Runs `git pull origin main`, then actually applies the update to the
- * RUNNING app: this process exits (after the response flushes), and the
- * supervisor wrapping it (scripts/supervisor.mjs — see package.json's
- * dev/start scripts) notices the exit, reinstalls deps, rebuilds when
- * running in production mode, and starts a fresh process. Before this, the
- * route only ran `git pull` — new files sat on disk with nothing ever
- * reloading or rebuilding to actually serve them (fatal in production mode,
- * where the running server is a frozen prebuilt bundle unrelated to the
- * source tree; unreliable in dev mode too after a large diff, since Fast
- * Refresh's module cache can end up with stale entries for moved/deleted
- * files).
+ * RUNNING app: it drops a `.sud-restart` sentinel file that the supervisor
+ * (scripts/supervisor.mjs — see package.json's dev/start scripts) is polling
+ * for. The supervisor then kills the whole server process TREE and respawns
+ * it, reinstalling deps and rebuilding in production mode.
+ *
+ * Why a sentinel and not a self-kill: under `bun x next dev` the process that
+ * serves this request is often a grandchild of the process the supervisor
+ * tracks, so killing our own pid never reached the tracked process — the
+ * supervisor never noticed and never respawned (the in-app update silently
+ * did nothing, especially on Windows). Letting the supervisor kill its own
+ * child tree is reliable across platforms. Before all this, the route only ran
+ * `git pull` — new files sat on disk with nothing reloading or rebuilding to
+ * serve them (fatal in production mode, where the running server is a frozen
+ * prebuilt bundle; unreliable in dev too after a large diff, since Fast
+ * Refresh's module cache can end up stale for moved/deleted files).
  *
  * The client is expected to poll GET /api/settings/version until it gets a
  * response again (the connection will genuinely refuse for a few seconds to
@@ -33,24 +38,27 @@
 import { NextResponse } from 'next/server'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
 import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
 
 const execFileAsync = promisify(execFile)
 
 /**
- * Kill this process after `delayMs` so the HTTP response has time to flush
- * to the client first. SIGTERM gives Next's own shutdown handling (if any) a
- * chance to run; a hard process.exit() fallback covers the case where
- * something swallows the signal, so the supervisor's respawn is never stuck
- * waiting on a process that won't die.
+ * Ask the supervisor to restart the server by dropping the sentinel file it
+ * polls for. The supervisor kills the whole server process tree and respawns
+ * it — reliable across platforms, unlike this process trying to kill itself
+ * (see the route header). The current process keeps serving until the
+ * supervisor cycles it (~1s), giving the HTTP response time to flush first.
  */
-function scheduleRestart(delayMs = 300) {
-  setTimeout(() => {
-    console.log('[update] restarting — exiting for the supervisor to respawn')
-    process.kill(process.pid, 'SIGTERM')
-    setTimeout(() => process.exit(0), 5000)
-  }, delayMs)
+function requestRestart(newSha: string) {
+  try {
+    writeFileSync(join(process.cwd(), '.sud-restart'), `${newSha}\n${Date.now()}\n`)
+    console.log('[update] restart sentinel written — supervisor will cycle the server')
+  } catch (e) {
+    console.error('[update] failed to write restart sentinel:', e)
+  }
 }
 
 async function POST_impl() {
@@ -119,10 +127,10 @@ async function POST_impl() {
 
     const newSha = getLocalGitSha()
     const output = (stdout + (stderr ? '\n' + stderr : '')).trim()
-    const changed = newSha !== currentSha
+    const changed = !!newSha && newSha !== currentSha
     // Only restart when the pull actually moved HEAD — an already-up-to-date
     // click shouldn't bounce the server for nothing.
-    if (changed) scheduleRestart()
+    if (changed) requestRestart(newSha)
 
     return NextResponse.json({
       ok: true,
