@@ -527,7 +527,10 @@ export function Pizza({
             role="button"
             aria-pressed={isSel}
             aria-label={w.aria}
-            style={isSel ? { transform: `translate(${w.pop.dx}px, ${w.pop.dy}px)` } : undefined}
+            // "Lift" the slice by growing it radially from the pie centre — this
+            // keeps it concentric with the guide rings (they come forward with
+            // it) instead of sliding off-grid the way a translate would.
+            style={isSel ? { transform: 'scale(1.06)' } : undefined}
             onClick={() => pick(w.index)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {

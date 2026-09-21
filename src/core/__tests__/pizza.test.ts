@@ -81,15 +81,6 @@ describe('pizza geometry (v18 port)', () => {
     expect(pts[0]).not.toBe(pts[1])
   })
 
-  it('pop offset: multi-wedge slices nudge outward, a lone wedge does not', () => {
-    const multi = pizzaModel([item('A', 3, 1, 0), item('B', 2, 2, 1)])
-    // each wedge carries a non-zero outward vector (used when selected)
-    expect(multi.wedges.every((w) => Math.hypot(w.pop.dx, w.pop.dy) > 0)).toBe(true)
-    // a single full-circle wedge has no meaningful direction → no pop
-    const lone = pizzaModel([item('A', 5, 0)]).wedges[0]
-    expect(lone.pop).toEqual({ dx: 0, dy: 0 })
-  })
-
   it('selection contract: wedge index maps 1:1 to items order', () => {
     const items = [item('A', 1, 1, 0), item('B', 2, 1, 1), item('C', 3, 1, 2), item('D', 4, 1, 3)]
     const m = pizzaModel(items)
