@@ -297,8 +297,24 @@ export function Seg({
   value: string
   onChange: (key: string) => void
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [thumb, setThumb] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  useEffect(() => {
+    const root = ref.current
+    if (!root) return
+    const measure = () => {
+      const active = root.querySelector<HTMLButtonElement>('button.on')
+      if (!active) return setThumb(null)
+      setThumb({ left: active.offsetLeft, top: active.offsetTop, width: active.offsetWidth, height: active.offsetHeight })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(root)
+    return () => ro.disconnect()
+  }, [value, options])
   return (
-    <div className="seg">
+    <div className={`seg${thumb ? ' has-thumb' : ''}`} ref={ref}>
+      {thumb && <span className="thumb" style={{ left: thumb.left, top: thumb.top, width: thumb.width, height: thumb.height }} />}
       {options.map((o) => (
         <button key={o.key} className={value === o.key ? 'on' : ''} onClick={() => onChange(o.key)}>
           {o.label}

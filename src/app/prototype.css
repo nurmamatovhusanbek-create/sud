@@ -197,9 +197,14 @@ html, body { height: 100%; }
 .f-search svg { width: 15px; height: 15px; color: var(--text-3); flex: 0 0 auto; }
 .f-search input { border: none; background: none; outline: none; flex: 1; min-width: 0; font-size: 13px; color: var(--text-1); }
 .f-search input::placeholder { color: var(--text-3); }
-.seg { display: inline-flex; background: var(--surface-inset); border-radius: var(--radius-pill); padding: 3px; flex-wrap: wrap; }
-.seg button { padding: 6px 13px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 600; color: var(--text-2); transition: background .16s, color .16s; }
-.seg button.on { background: var(--surface); color: var(--text-1); box-shadow: var(--elev-1); }
+/* v18 segmented control: rounded-rect track + bordered, with a white .thumb
+   that slides under the active option (positioned by the Seg component). The
+   :not(.has-thumb) fallback covers raw .seg markup with no thumb element. */
+.seg { display: inline-flex; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: 10px; padding: 3px; position: relative; }
+.seg button { padding: 6px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--text-2); position: relative; z-index: 1; transition: color .2s; }
+.seg button.on { color: var(--text-1); }
+.seg:not(.has-thumb) button.on { background: var(--surface); box-shadow: var(--elev-1); }
+.seg .thumb { position: absolute; border-radius: 8px; background: var(--surface); box-shadow: var(--elev-1); transition: left .28s var(--ease-emph), top .28s var(--ease-emph), width .28s var(--ease-emph), height .28s var(--ease-emph); z-index: 0; }
 
 /* ---------- company cards ---------- */
 .ccards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; align-items: stretch; }
@@ -292,29 +297,25 @@ html, body { height: 100%; }
 .founder .av { width: 34px; height: 34px; border-radius: 11px; background: var(--surface-inset); display: grid; place-items: center; font-weight: 600; font-size: 12px; color: var(--text-2); flex: 0 0 34px; }
 
 /* ---------- alert / empty / skeleton ---------- */
-.alert { display: flex; gap: 12px; padding: 14px 16px; border-radius: var(--r-md); align-items: flex-start; }
-.alert svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; }
-.alert.warn { background: var(--warn-soft); color: var(--warn-text); }
-.alert.err { background: var(--neg-soft); color: var(--neg-text); }
-.alert.info { background: var(--info-soft); color: var(--info-text); }
+/* v18 alert: tinted card + colored icon + INK text (not tinted) + optional
+   right-aligned actions. Variants only tint the bg/border and the icon. */
+.alert { display: flex; gap: 12px; padding: 13px 16px; border-radius: var(--r-md); align-items: center; background: var(--surface-inset); border: 1px solid var(--border-default); }
+.alert svg { width: 20px; height: 20px; flex: 0 0 20px; }
 .alert .at { flex: 1; min-width: 0; }
-.alert .at b { font-size: 13px; display: block; }
-.alert .at p { margin: 2px 0 0; font-size: 12px; opacity: .9; }
+.alert .at b { font-size: 13.5px; display: block; color: var(--text-1); }
+.alert .at p { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); }
+.alert .alert-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+.alert.warn { background: var(--warn-soft); border-color: var(--warn-line); }
+.alert.warn > svg { color: var(--warn-base); }
+.alert.err { background: var(--neg-soft); border-color: var(--neg-line); }
+.alert.err > svg { color: var(--neg-base); }
+.alert.info { background: var(--info-soft); border-color: var(--info-line); }
+.alert.info > svg { color: var(--info-base); }
 .empty { text-align: center; padding: 44px 20px; color: var(--text-3); }
 .empty .ico { width: 54px; height: 54px; border-radius: var(--r-lg); background: var(--surface-inset); display: grid; place-items: center; margin: 0 auto 14px; }
 .empty .ico svg { width: 26px; height: 26px; }
 .empty h3 { font-size: 15px; color: var(--text-1); margin: 0 0 4px; }
 .empty p { margin: 0 0 14px; font-size: 13px; max-width: 40ch; margin-inline: auto; }
-/* Partial-data notice — slim on-system strip: neutral chrome (surface-inset +
-   subtle border + secondary text), with the warning conveyed only by the icon
-   color, matching the app's "color is signal, chrome is monochrome" system. */
-.partial-strip { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: var(--r-md); background: var(--surface-inset); border: 1px solid var(--border-subtle); font-size: 12.5px; color: var(--text-2); }
-.partial-strip > svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--warn-base); }
-.partial-strip .ptxt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.partial-strip .ptxt b { color: var(--text-1); font-weight: 600; }
-.partial-strip .pretry { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-weight: 600; font-size: 12px; }
-.partial-strip .pretry:hover { color: var(--text-1); }
-.partial-strip .pretry svg { width: 14px; height: 14px; }
 .sk { position: relative; overflow: hidden; background: var(--surface-inset); border-radius: 8px; }
 .sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .35), transparent); animation: sk-shimmer 1.3s infinite; }
 [data-theme='dark'] .sk::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .06), transparent); }
