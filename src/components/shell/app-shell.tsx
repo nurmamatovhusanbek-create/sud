@@ -347,23 +347,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>
-          <button
-            className="searchbox"
-            onClick={() => {
-              setCommandPurpose('search')
-              setCommandOpen(true)
-            }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="7" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            <span>STIR, ish raqami yoki kvitansiya boʻyicha qidiring…</span>
-            <span className="kbd">
-              <kbd>⌘</kbd>
-              <kbd>K</kbd>
-            </span>
-          </button>
+          {surface !== 'documents' && surface !== 'settings' ? (
+            <button
+              className="searchbox"
+              onClick={() => {
+                setCommandPurpose('search')
+                setCommandOpen(true)
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <span>STIR, ish raqami yoki kvitansiya boʻyicha qidiring…</span>
+              <span className="kbd">
+                <kbd>⌘</kbd>
+                <kbd>K</kbd>
+              </span>
+            </button>
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
           <div className="top-right">
             <BellPopover />
           </div>

@@ -65,19 +65,19 @@ export const FIELDS: Record<string, FieldDef> = {
   reg_justice: { key: 'reg_justice', label: 'Adliya roʻyxati raqami', default: '№2013433, 17.10.2014', mono: true },
   reg_consular: { key: 'reg_consular', label: 'TIV Konsullik roʻyxati', default: '20610', mono: true },
 
-  // applicant
-  full_name: { key: 'full_name', label: 'F.I.Sh (toʻliq)', placeholder: 'Ahmed Saleh' },
-  sex: { key: 'sex', label: 'Jinsi', placeholder: 'Erkak / M' },
+  // applicant — placeholders are generic field hints, not sample data
+  full_name: { key: 'full_name', label: 'F.I.Sh (toʻliq)', placeholder: 'Ism va familiya' },
+  sex: { key: 'sex', label: 'Jinsi', placeholder: 'Erkak / Ayol' },
   dob: { key: 'dob', label: 'Tugʻilgan sana', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
-  birthplace: { key: 'birthplace', label: 'Tugʻilgan joyi', placeholder: 'Kalyobiya' },
-  citizenship: { key: 'citizenship', label: 'Fuqaroligi', placeholder: 'Misr' },
-  citizenship_en: { key: 'citizenship_en', label: 'Citizenship (EN)', placeholder: 'Arab Republic of Egypt' },
+  birthplace: { key: 'birthplace', label: 'Tugʻilgan joyi', placeholder: 'Shahar, davlat' },
+  citizenship: { key: 'citizenship', label: 'Fuqaroligi', placeholder: 'Davlat' },
+  citizenship_en: { key: 'citizenship_en', label: 'Citizenship (EN)', placeholder: 'Country' },
   citizenship_sentence: {
     key: 'citizenship_sentence', label: 'Fuqaroligi (matnda)',
-    placeholder: 'Misr Arab Respublikasi', hint: 'Kafolat xati matnida «… fuqarolarini» dan oldin turadi',
+    placeholder: 'Davlatning toʻliq nomi', hint: 'Kafolat xati matnida «… fuqarolarini» dan oldin turadi',
   },
-  passport: { key: 'passport', label: 'Pasport raqami', placeholder: 'A37041987', mono: true },
-  position: { key: 'position', label: 'Lavozim', placeholder: 'GM operations' },
+  passport: { key: 'passport', label: 'Pasport raqami', placeholder: 'Seriya va raqam', mono: true },
+  position: { key: 'position', label: 'Lavozim', placeholder: 'Lavozim' },
   role_en: { key: 'role_en', label: 'Role in sentence (EN)', default: 'Planning engineer', hint: '«…officially invites the ___» — matndagi lavozim' },
   stay_from: { key: 'stay_from', label: 'Boʻlish muddati — dan', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   stay_to: { key: 'stay_to', label: 'Boʻlish muddati — gacha', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
@@ -89,14 +89,14 @@ export const FIELDS: Record<string, FieldDef> = {
   visa_place: { key: 'visa_place', label: 'Viza olish joyi', default: 'Qohira shahridagi O’zbekiston elchixonasi' },
   cities: { key: 'cities', label: 'Boriladigan shaharlar', default: 'Toshkent' },
   residence: { key: 'residence', label: 'Oʻzbekistondagi yashash joyi', default: '“Simma” mehmonxonasi' },
-  responsible: { key: 'responsible', label: 'Masʼul shaxs (rasmiylashtiruvchi)', default: 'Jurayev N. +998(93) 433 30 33' },
-  greeter: { key: 'greeter', label: 'Kutib oluvchi / hamroh shaxs', default: 'Ganiev H. +998(90) 951 61 00' },
+  responsible: { key: 'responsible', label: 'Masʼul shaxs (rasmiylashtiruvchi)', placeholder: 'F.I.Sh · telefon' },
+  greeter: { key: 'greeter', label: 'Kutib oluvchi / hamroh shaxs', placeholder: 'F.I.Sh · telefon' },
 
   // ro'yxatga olish extras
   children: { key: 'children', label: 'Farzandlari', default: 'yo‘q' },
-  visa_type: { key: 'visa_type', label: 'Viza turi', default: 'B2' },
-  visa_no: { key: 'visa_no', label: 'Viza raqami', placeholder: '4933652', mono: true },
-  visa_issuer: { key: 'visa_issuer', label: 'Viza kim tomonidan berilgan', default: '“Alukabel Payrav” MCHJ XK' },
+  visa_type: { key: 'visa_type', label: 'Viza turi', placeholder: 'Masalan: B2' },
+  visa_no: { key: 'visa_no', label: 'Viza raqami', placeholder: 'Raqam', mono: true },
+  visa_issuer: { key: 'visa_issuer', label: 'Viza kim tomonidan berilgan', placeholder: 'Korxona / tashkilot' },
   visa_from: { key: 'visa_from', label: 'Viza amal qiladi — dan', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   visa_to: { key: 'visa_to', label: 'Viza amal qiladi — gacha', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   visa_days: { key: 'visa_days', label: 'Muddat (kun)', default: '180', mono: true },
@@ -152,7 +152,6 @@ export const TABS: TabDef[] = [
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'] },
     ],
     docs: DOCS.filter((d) => d.tab === 'iio'),
-    defaults: { responsible: 'Ganiev Hasan' },
   },
 ]
 
