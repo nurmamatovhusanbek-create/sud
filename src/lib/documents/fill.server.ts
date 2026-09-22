@@ -10,8 +10,16 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
-import sharp from 'sharp'
 import { docById } from './registry'
+
+// A 1×1 fully transparent PNG. When no letterhead is supplied we swap the
+// template's embedded banner for this — the drawing box (and thus the vertical
+// space) is preserved, but no company branding is forced onto the document.
+const BLANK_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
 
@@ -60,14 +68,12 @@ export async function generateDocx(
   const xml = await docXmlFile.async('string')
   zip.file('word/document.xml', fillXml(xml, values))
 
-  // Optional per-company letterhead: swap the banner image the templates embed
-  // at word/media/image1.png. Everything is normalised to PNG (sharp) so the
-  // part name / content-type stay valid and Word renders it into the same box.
-  if (letterheadPngBase64) {
-    const png = await letterheadToPng(letterheadPngBase64)
-    if (png && zip.file('word/media/image1.png')) {
-      zip.file('word/media/image1.png', png)
-    }
+  // Letterhead: the templates embed a banner at word/media/image1.png. We
+  // always replace it — with the uploaded PNG when given (the client sends a
+  // canvas-encoded PNG so it is already valid), otherwise with a blank
+  // transparent PNG so the space is kept but no branding is imposed.
+  if (zip.file('word/media/image1.png')) {
+    zip.file('word/media/image1.png', decodePng(letterheadPngBase64) ?? BLANK_PNG)
   }
 
   const buffer = await zip.generateAsync({
@@ -81,16 +87,15 @@ export async function generateDocx(
   return { buffer, filename }
 }
 
-/** Decode a base64 image (data-URL or raw) and re-encode as a bounded PNG. */
-async function letterheadToPng(b64: string): Promise<Buffer | null> {
+/** Decode a base64 PNG (data-URL or raw). Returns null if absent or not a PNG. */
+function decodePng(b64?: string): Buffer | null {
+  if (!b64) return null
   try {
     const raw = b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64
-    const input = Buffer.from(raw, 'base64')
-    if (input.length === 0 || input.length > 12 * 1024 * 1024) return null
-    return await sharp(input)
-      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-      .png()
-      .toBuffer()
+    const buf = Buffer.from(raw, 'base64')
+    if (buf.length < 8 || buf.length > 12 * 1024 * 1024) return null
+    if (!buf.subarray(0, 8).equals(PNG_MAGIC)) return null
+    return buf
   } catch {
     return null
   }
