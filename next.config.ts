@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: "bottom-right",
   },
+  // The document engine reads the .docx templates from the filesystem at
+  // request time. Trace them into the standalone build so the route can find
+  // them in production (dev reads straight from the project tree).
+  outputFileTracingIncludes: {
+    "/api/documents/generate": ["./src/lib/documents/templates/*.docx"],
+  },
 };
 
 export default nextConfig;

@@ -178,6 +178,29 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
   await downloadPost('/api/upcoming-hearings/export', { tin: params.tin, hearings: params.hearings })
 }
 
+/** Document engine — fill a .docx template and download it (Hujjatlar). */
+export async function generateDocument(docId: string, values: Record<string, string>): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch('/api/documents/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ docId, values }),
+    })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+  if (!res.ok) {
+    let msg = 'Hujjatni yaratib boʻlmadi'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+    } catch { /* binary */ }
+    throw new Error(msg)
+  }
+  await saveBlob(res, 'hujjat.docx')
+}
+
 async function saveBlob(res: Response, fallbackName: string): Promise<void> {
   const blob = await res.blob()
   const cd = res.headers.get('content-disposition') || ''

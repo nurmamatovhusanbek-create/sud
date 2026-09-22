@@ -37,7 +37,7 @@ export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv'; label: string }[] = [
 ]
 export type CaseCourtFilter = 'all' | 'economic' | 'civil' | 'administrative'
 
-export type GlobalSurface = 'main' | 'watchlist' | 'settings'
+export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents'
 export type CommandPurpose = 'search' | 'add'
 
 interface AppState {
