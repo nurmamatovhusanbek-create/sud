@@ -19,6 +19,7 @@ import { ProtoDrawer } from '@/components/proto/drawer'
 import { Launcher } from '@/components/views/launcher'
 import { WatchlistView } from '@/components/views/watchlist'
 import { SettingsView } from '@/components/views/settings-view'
+import { DocumentsView } from '@/components/views/documents-view'
 import { ContextBar } from '@/components/company/context-bar'
 import { OverviewSection } from '@/components/sections/overview'
 import { BillsSection } from '@/components/sections/bills'
@@ -150,6 +151,8 @@ export default function Home() {
         <WatchlistView />
       ) : surface === 'settings' ? (
         <SettingsView />
+      ) : surface === 'documents' ? (
+        <DocumentsView />
       ) : view === 'company' ? (
         <CompanyWorkspace />
       ) : (

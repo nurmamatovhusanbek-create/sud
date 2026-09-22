@@ -24,6 +24,7 @@ import {
   Building2,
   CalendarDays,
   Eye,
+  FileText,
   Gavel,
   Menu,
   Moon,
@@ -310,6 +311,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="nav-label">Tizim</div>
         <nav className="nav">
+          <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }}>
+            <FileText />
+            Hujjatlar
+          </button>
           <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }}>
             <Settings />
             Sozlamalar

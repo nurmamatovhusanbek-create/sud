@@ -609,3 +609,16 @@ img, svg { max-width: 100%; }
 .bell:hover { transform: translateY(-1px); color: var(--text-1); background: var(--surface-hover); }
 .bell svg { width: 17px; height: 17px; }
 .cbadge { position: absolute; top: 5px; right: 5px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 20px; background: var(--neg-base); color: #fff; font-size: 9.5px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--surface); }
+
+/* ---- Hujjatlar (document engine) ------------------------------------------- */
+.doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 14px; }
+.doc-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.doc-field-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.doc-field .field { min-width: 0; }
+.doc-field textarea { width: 100%; resize: vertical; border: none; border-radius: var(--radius-md); background: var(--surface-inset); padding: 10px 14px; color: var(--text-1); outline: none; }
+.doc-field textarea:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
+.doc-field textarea::placeholder { color: var(--text-3); }
+.doc-field-hint { font-size: 11px; color: var(--text-3); line-height: 1.35; }
+.doc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.doc-card { display: flex; flex-direction: column; }
+.spin { animation: p-spin .7s linear infinite; }
