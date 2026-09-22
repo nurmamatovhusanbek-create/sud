@@ -146,7 +146,9 @@ await build('visa1_invitation','94f688b9-Invitation_Letter_Ahmed_Saleh.docx', (x
   xml = paraReplace(xml, 'Ahmad Saleh Eid Muhammad', '{{full_name}}')
   xml = paraReplace(xml, 'Arab Republic of Egypt', '{{citizenship_en}}')
   xml = paraReplace(xml, 'A37041987', '{{passport}}')
-  xml = paraReplace(xml, 'Planning engineer', '{{position}}')
+  // Two distinct role spots kept as separate fields: the sentence role
+  // ("invites the …") vs the Subject/Position line.
+  xml = paraReplace(xml, 'Planning engineer', '{{role_en}}')
   xml = paraReplace(xml, 'GM operations', '{{position}}')
   xml = paraReplace(xml, '30.07.2026', '{{stay_from}}')
   xml = paraReplace(xml, '25.12.2026', '{{stay_to}}')

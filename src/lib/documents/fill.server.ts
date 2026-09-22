@@ -10,6 +10,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
+import sharp from 'sharp'
 import { docById } from './registry'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
@@ -39,7 +40,11 @@ export interface GeneratedDoc {
   filename: string
 }
 
-export async function generateDocx(docId: string, values: Record<string, string>): Promise<GeneratedDoc> {
+export async function generateDocx(
+  docId: string,
+  values: Record<string, string>,
+  letterheadPngBase64?: string,
+): Promise<GeneratedDoc> {
   const def = docById(docId)
   if (!def) throw new Error('Nomaʼlum hujjat turi')
 
@@ -55,6 +60,16 @@ export async function generateDocx(docId: string, values: Record<string, string>
   const xml = await docXmlFile.async('string')
   zip.file('word/document.xml', fillXml(xml, values))
 
+  // Optional per-company letterhead: swap the banner image the templates embed
+  // at word/media/image1.png. Everything is normalised to PNG (sharp) so the
+  // part name / content-type stay valid and Word renders it into the same box.
+  if (letterheadPngBase64) {
+    const png = await letterheadToPng(letterheadPngBase64)
+    if (png && zip.file('word/media/image1.png')) {
+      zip.file('word/media/image1.png', png)
+    }
+  }
+
   const buffer = await zip.generateAsync({
     type: 'nodebuffer',
     compression: 'DEFLATE',
@@ -64,6 +79,21 @@ export async function generateDocx(docId: string, values: Record<string, string>
   const person = slug(values.full_name || 'hujjat')
   const filename = `${def.slug}-${person}-${stamp()}.docx`
   return { buffer, filename }
+}
+
+/** Decode a base64 image (data-URL or raw) and re-encode as a bounded PNG. */
+async function letterheadToPng(b64: string): Promise<Buffer | null> {
+  try {
+    const raw = b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64
+    const input = Buffer.from(raw, 'base64')
+    if (input.length === 0 || input.length > 12 * 1024 * 1024) return null
+    return await sharp(input)
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer()
+  } catch {
+    return null
+  }
 }
 
 function stamp(): string {

@@ -78,6 +78,7 @@ export const FIELDS: Record<string, FieldDef> = {
   },
   passport: { key: 'passport', label: 'Pasport raqami', placeholder: 'A37041987', mono: true },
   position: { key: 'position', label: 'Lavozim', placeholder: 'GM operations' },
+  role_en: { key: 'role_en', label: 'Role in sentence (EN)', default: 'Planning engineer', hint: '«…officially invites the ___» — matndagi lavozim' },
   stay_from: { key: 'stay_from', label: 'Boʻlish muddati — dan', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   stay_to: { key: 'stay_to', label: 'Boʻlish muddati — gacha', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
 
@@ -107,7 +108,7 @@ export const DOCS: DocDef[] = [
   {
     id: 'visa1_invitation', tab: 'visa', lang: 'en', slug: 'invitation-letter',
     title: 'Invitation Letter', subtitle: 'Elchixona konsulligiga taklifnoma (EN)',
-    file: 'visa1_invitation.docx', extra: [],
+    file: 'visa1_invitation.docx', extra: ['role_en'],
   },
   {
     id: 'visa2_kafolat', tab: 'visa', lang: 'uz', slug: 'kafolat-xati',

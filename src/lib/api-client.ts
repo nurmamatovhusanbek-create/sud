@@ -178,14 +178,19 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
   await downloadPost('/api/upcoming-hearings/export', { tin: params.tin, hearings: params.hearings })
 }
 
-/** Document engine — fill a .docx template and download it (Hujjatlar). */
-export async function generateDocument(docId: string, values: Record<string, string>): Promise<void> {
+/** Document engine — fill a .docx template and download it (Hujjatlar).
+ *  `letterhead` (optional base64 image) replaces the embedded banner. */
+export async function generateDocument(
+  docId: string,
+  values: Record<string, string>,
+  letterhead?: string,
+): Promise<void> {
   let res: Response
   try {
     res = await fetch('/api/documents/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ docId, values }),
+      body: JSON.stringify({ docId, values, letterhead: letterhead || undefined }),
     })
   } catch {
     throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
