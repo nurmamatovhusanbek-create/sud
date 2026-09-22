@@ -14,7 +14,7 @@ export const maxDuration = 30
  * See src/lib/documents/registry.ts for the doc/field definitions.
  */
 async function POST_impl(req: NextRequest) {
-  let body: { docId?: string; values?: Record<string, unknown> }
+  let body: { docId?: string; values?: Record<string, unknown>; letterhead?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -33,9 +33,11 @@ async function POST_impl(req: NextRequest) {
     }
   }
 
+  const letterhead = typeof body.letterhead === 'string' ? body.letterhead : undefined
+
   let out
   try {
-    out = await generateDocx(docId, values)
+    out = await generateDocx(docId, values, letterhead)
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi' },

@@ -10,8 +10,8 @@
  * side at /api/documents/generate.
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { FileDown, FileText, Building2, UserRound, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FileDown, FileText, Building2, UserRound, Loader2, ImagePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   TABS,
@@ -33,8 +33,8 @@ function Field({
   onChange: (v: string) => void
 }) {
   const font: React.CSSProperties = def.mono
-    ? { fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '.02em' }
-    : { fontFamily: 'var(--font-sans)', fontSize: 14, letterSpacing: 'normal' }
+    ? { fontFamily: 'var(--font-mono)', fontSize: 14.5, letterSpacing: '.02em' }
+    : { fontFamily: 'var(--font-sans)', fontSize: 15, letterSpacing: 'normal' }
   return (
     <label className="doc-field">
       <span className="doc-field-label">{def.label}</span>
@@ -47,12 +47,57 @@ function Field({
           style={font}
         />
       ) : (
-        <span className="field" style={{ height: 38 }}>
+        <span className="field" style={{ height: 48 }}>
           <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={def.placeholder} style={font} />
         </span>
       )}
       {def.hint && <span className="doc-field-hint">{def.hint}</span>}
     </label>
+  )
+}
+
+const LH_KEY = 'sud-doc-letterhead-v1'
+
+/** Per-company letterhead: upload an image that replaces the embedded banner
+ *  in generated documents. Persisted (localStorage) and shared across tabs. */
+function LetterheadRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const onFile = (f: File | null) => {
+    if (!f) return
+    if (!f.type.startsWith('image/')) { toast.error('Rasm fayl tanlang (PNG/JPG)'); return }
+    if (f.size > 8 * 1024 * 1024) { toast.error('Rasm juda katta (maks 8MB)'); return }
+    const reader = new FileReader()
+    reader.onload = () => { onChange(String(reader.result || '')); toast.success('Blanka yuklandi') }
+    reader.onerror = () => toast.error('Rasmni oʻqib boʻlmadi')
+    reader.readAsDataURL(f)
+  }
+
+  return (
+    <div className="lh-row">
+      <div className="lh-prev">
+        {value
+          ? <img src={value} alt="Korxona blankasi" />
+          : <div className="lh-empty"><ImagePlus /><span>Standart blanka</span></div>}
+      </div>
+      <div className="lh-ctl">
+        <span className="doc-field-label">Korxona blankasi (letterhead)</span>
+        <div className="faint" style={{ fontSize: 12, margin: '4px 0 10px', lineHeight: 1.4 }}>
+          Yuklanmasa, hujjatning standart blankasi ishlatiladi. Keng banner tavsiya etiladi (masalan 1600×420 px).
+        </div>
+        <div className="p-row" style={{ gap: 8 }}>
+          <button className="btn btn-outline btn-sm" onClick={() => inputRef.current?.click()}>
+            <ImagePlus />{value ? 'Almashtirish' : 'Rasm yuklash'}
+          </button>
+          {value && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { onChange(''); toast('Blanka olib tashlandi') }}>
+              <X />Olib tashlash
+            </button>
+          )}
+        </div>
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files?.[0] || null)} />
+      </div>
+    </div>
   )
 }
 
@@ -104,7 +149,7 @@ function DocCard({
   )
 }
 
-function TabPanel({ tab }: { tab: TabDef }) {
+function TabPanel({ tab, letterhead, onLetterhead }: { tab: TabDef; letterhead: string; onLetterhead: (v: string) => void }) {
   // TabPanel is remounted per tab (key={tab.id} in the parent), so the form
   // seeds once from this tab's defaults and each tab stays an independent flow.
   const [values, setValues] = useState<Record<string, string>>(() => tabDefaults(tab))
@@ -119,7 +164,7 @@ function TabPanel({ tab }: { tab: TabDef }) {
     }
     setBusy(doc.id)
     try {
-      await generateDocument(doc.id, values)
+      await generateDocument(doc.id, values, letterhead || undefined)
       toast.success(`${doc.title} tayyor — yuklab olindi`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi')
@@ -146,6 +191,7 @@ function TabPanel({ tab }: { tab: TabDef }) {
               <Field key={k} def={FIELDS[k]} value={values[k] ?? ''} onChange={(v) => set(k, v)} />
             ))}
           </div>
+          {g.title === 'Korxona' && <LetterheadRow value={letterhead} onChange={onLetterhead} />}
         </div>
       ))}
 
@@ -176,6 +222,21 @@ export function DocumentsView() {
   const [tabId, setTabId] = useState<TabDef['id']>('visa')
   const tab = useMemo(() => TABS.find((t) => t.id === tabId) ?? TABS[0], [tabId])
 
+  // Company letterhead is app-level (one company) and persisted across sessions.
+  // Lazy init from localStorage — this view only mounts on a client click, so
+  // there is no SSR pass to mismatch against.
+  const [letterhead, setLetterhead] = useState<string>(() => {
+    if (typeof window === 'undefined') return ''
+    try { return localStorage.getItem(LH_KEY) || '' } catch { return '' }
+  })
+  const updateLetterhead = (v: string) => {
+    setLetterhead(v)
+    try {
+      if (v) localStorage.setItem(LH_KEY, v)
+      else localStorage.removeItem(LH_KEY)
+    } catch { /* private mode / quota */ }
+  }
+
   useEffect(() => {
     document.title = 'Hujjatlar · Sud tizimi'
   }, [])
@@ -197,7 +258,7 @@ export function DocumentsView() {
         ))}
       </div>
 
-      <TabPanel key={tab.id} tab={tab} />
+      <TabPanel key={tab.id} tab={tab} letterhead={letterhead} onLetterhead={updateLetterhead} />
     </div>
   )
 }

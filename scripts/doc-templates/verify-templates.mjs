@@ -16,9 +16,7 @@ const cases={
  visa1_invitation:{ src:'94f688b9-Invitation_Letter_Person_Person.docx', vals:{
    company_en:'JV LLC “ARTIKUL AZIYA KABEL”', company_address_en:'115, Fayzli street, Yangihayot district, Tashkent',
    full_name:'Test Person', citizenship_en:'Arab Republic of Egypt', passport:'ZZ 0000000',
-   position:'GM operations', stay_from:'30.07.2026', stay_to:'25.12.2026', director:'Turgunov Sh.A.' },
-   // NOTE: original has "Planning engineer" AND "GM operations"; template unifies both to {{position}}.
-   allowDiff:true },
+   role_en:'Planning engineer', position:'GM operations', stay_from:'30.07.2026', stay_to:'25.12.2026', director:'Turgunov Sh.A.' } },
  visa2_kafolat:{ src:'9dc3fda2-Kafolat_xati_Person_Person.docx', vals:{
    out_no:'_______', doc_date:'2026 yil « ___ » ______', citizenship_sentence:'Misr Arab Respublikasi',
    company:'“Artikul Aziya Kabel” MCHJ QK', full_name:'Test Person', dob:'01.01.2000', birthplace:'Person',

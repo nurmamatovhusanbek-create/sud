@@ -622,3 +622,9 @@ img, svg { max-width: 100%; }
 .doc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 .doc-card { display: flex; flex-direction: column; }
 .spin { animation: p-spin .7s linear infinite; }
+.lh-row { display: flex; gap: 16px; align-items: stretch; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle, var(--border-default)); flex-wrap: wrap; }
+.lh-prev { flex: 0 0 auto; width: 260px; max-width: 100%; min-height: 76px; border-radius: var(--radius-md); background: var(--surface-inset); border: 1px dashed var(--border-default); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.lh-prev img { width: 100%; height: auto; display: block; }
+.lh-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-3); font-size: 12px; }
+.lh-empty svg { width: 22px; height: 22px; }
+.lh-ctl { flex: 1; min-width: 220px; display: flex; flex-direction: column; justify-content: center; }
