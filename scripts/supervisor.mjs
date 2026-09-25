@@ -43,6 +43,19 @@ let current = null
 let sinceLastStart = 0
 let attempt = 0
 let restarting = false
+let deliberate = false // true = a sentinel-driven update restart (force reinstall)
+let portStreak = 0     // consecutive quick exits caused by port 3000 being busy
+
+const PORT = process.env.PORT || '3000'
+
+function portHelp() {
+  console.error(
+    `\n[supervisor] Port ${PORT} band — avvalgi «bun run dev» toʻliq yopilmagan boʻlishi mumkin.\n` +
+    `  Windows:      netstat -ano | findstr :${PORT}   →  taskkill /PID <PID> /F\n` +
+    `  macOS/Linux:  lsof -ti tcp:${PORT} | xargs kill -9\n` +
+    `Soʻng qaytadan «bun run dev». (Yoki boshqa portda: PORT=3001 bun run dev)\n`,
+  )
+}
 
 function pipe(child) {
   child.stdout?.on('data', (d) => { process.stdout.write(d); logStream.write(d) })
@@ -88,13 +101,18 @@ function runStep(label, cmd, args) {
   })
 }
 
-async function cycle() {
+async function cycle(doInstall = true) {
   attempt++
   restarting = false
-  await runStep('bun install', bunCmd, ['install'])
-  if (mode === 'start') await runStep('bun run build', bunCmd, ['run', 'build'])
+  // Only (re)install on the first boot, after a healthy run, or a deliberate
+  // update — NOT on every rapid crash-restart (that just spammed `bun install`
+  // while the real problem, e.g. a busy port, never got surfaced).
+  if (doInstall) {
+    await runStep('bun install', bunCmd, ['install'])
+    if (mode === 'start') await runStep('bun run build', bunCmd, ['run', 'build'])
+  }
 
-  const args = mode === 'dev' ? ['x', 'next', 'dev', '-p', '3000'] : ['.next/standalone/server.js']
+  const args = mode === 'dev' ? ['x', 'next', 'dev', '-p', PORT] : ['.next/standalone/server.js']
   const env = { ...process.env, SUD_SUPERVISED: '1', ...(mode === 'start' ? { NODE_ENV: 'production' } : {}) }
   console.log(`[supervisor] starting: ${bunCmd} ${args.join(' ')}`)
   sinceLastStart = Date.now()
@@ -102,16 +120,41 @@ async function cycle() {
   // signal the whole tree; harmless on Windows (taskkill /T handles the tree).
   const child = spawn(bunCmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env, detached: !isWin })
   pipe(child)
+  // Watch the child's output for a port-in-use failure so we can react to it
+  // instead of blindly respawning into the same wall.
+  let portConflict = false
+  const portRe = new RegExp(`EADDRINUSE|port ${PORT} is in use|Is port ${PORT} in use`, 'i')
+  const scan = (d) => { if (portRe.test(String(d))) portConflict = true }
+  child.stdout?.on('data', scan)
+  child.stderr?.on('data', scan)
   current = child
 
   child.on('exit', (code, signal) => {
     current = null
     console.log(`[supervisor] server exited (code=${code} signal=${signal})`)
-    // Reset the backoff once a run stayed up a while — this only guards genuine
-    // crash loops, not the deliberate one-shot restart the updater triggers.
-    if (Date.now() - sinceLastStart > 15_000) attempt = 1
+    const shortLived = Date.now() - sinceLastStart < 15_000
+    // Reset the backoff/streak once a run stayed up a while — this only guards
+    // genuine crash loops, not the deliberate one-shot updater restart.
+    if (!shortLived) { attempt = 1; portStreak = 0 }
+
+    // Port 3000 held by another process (often an orphaned prior dev server).
+    // Retry a couple of times to ride out a restart race, then stop looping and
+    // print exactly how to free the port instead of reinstalling forever.
+    if (portConflict && shortLived && !deliberate) {
+      portStreak++
+      if (portStreak >= 3) {
+        portHelp()
+        process.exit(1)
+      }
+      console.error(`[supervisor] port ${PORT} band — bir lahzada qayta urinamiz (${portStreak}/3)…`)
+      setTimeout(() => cycle(false), 3_000)
+      return
+    }
+
+    const nextInstall = deliberate || !shortLived
+    deliberate = false
     const delay = Math.min(500 * attempt, 8_000)
-    setTimeout(cycle, delay)
+    setTimeout(() => cycle(nextInstall), delay)
   })
 }
 
@@ -120,6 +163,7 @@ async function cycle() {
 setInterval(() => {
   if (!restarting && current && existsSync(RESTART_SENTINEL)) {
     restarting = true
+    deliberate = true // force a reinstall/rebuild on this respawn (code changed)
     try { unlinkSync(RESTART_SENTINEL) } catch { /* best effort */ }
     console.log('[supervisor] update requested — restarting the server')
     killTree(current) // → child 'exit' handler → cycle() respawns with new code
