@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CalendarDays, Eye, Plus, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
@@ -212,6 +212,50 @@ export function WatchlistView() {
     [items],
   )
 
+  // Click «Yaqinlashayotgan majlislar» to load EVERY upcoming hearing for EVERY
+  // watched company (not just each company's cached next one). Toggles closed.
+  const [allRows, setAllRows] = useState<HearingRow[] | null>(null)
+  const [loadingAll, setLoadingAll] = useState(false)
+
+  const toggleAll = async () => {
+    if (loadingAll) return
+    if (allRows) { setAllRows(null); return }
+    if (items.length === 0) return
+    setLoadingAll(true)
+    try {
+      const lists = await Promise.all(
+        items.map(async (w) => {
+          try {
+            const res = await getUpcomingHearings(w.stir)
+            if (!res.ok) return [] as HearingRow[]
+            const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
+            return hs.map((h) => ({
+              stir: w.stir,
+              name: w.name,
+              isoDate: String(h.isoDate ?? ''),
+              court: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
+              caseNumber: (h.caseNumber as string) || undefined,
+              time: (h.hearingTime as string) || undefined,
+              judge: (h.judge as string) || undefined,
+            })) as HearingRow[]
+          } catch {
+            return [] as HearingRow[]
+          }
+        }),
+      )
+      const rows = lists
+        .flat()
+        .filter((r) => r.isoDate)
+        .sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
+      setAllRows(rows)
+      if (rows.length === 0) toast('Kuzatuvdagi kompaniyalar boʻyicha majlis topilmadi')
+    } finally {
+      setLoadingAll(false)
+    }
+  }
+
+  const shownRows = allRows ?? upcoming
+
   const unwatch = (stir: string) => {
     setWatched(stir, undefined, false)
     toast.success('Kuzatuvdan olib tashlandi')
@@ -249,16 +293,33 @@ export function WatchlistView() {
         </div>
       )}
 
-      <div className="section-head">
+      <div
+        className="section-head sh-click"
+        role="button"
+        tabIndex={0}
+        title="Barcha kuzatuvdagi kompaniyalar majlislarini koʻrsatish"
+        onClick={() => void toggleAll()}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && void toggleAll()}
+      >
         <h2>Yaqinlashayotgan majlislar</h2>
-        <span className="count">{upcoming.length}</span>
+        <span className="count">{shownRows.length}</span>
+        <div className="sp" />
+        <span className="faint sh-hint">
+          {loadingAll ? (
+            <><span className="spinner" style={{ width: 13, height: 13 }} />Yuklanmoqda…</>
+          ) : allRows ? (
+            <>Yaqinlarini koʻrsatish<ChevronDown style={{ transform: 'rotate(180deg)' }} /></>
+          ) : (
+            <>Barcha majlislar<ChevronDown /></>
+          )}
+        </span>
       </div>
       <div className="p-card rise-c">
-        {upcoming.length === 0 ? (
+        {shownRows.length === 0 ? (
           <EmptyBlock icon={<CalendarDays />} title="Majlis yoʻq" hint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
         ) : (
           <div className="datecards" style={{ flexDirection: 'column' }}>
-            {upcoming.map((h, i) => {
+            {shownRows.map((h, i) => {
               const p = isoParts(h.isoDate)
               // Prototype: .now marks hearings inside the 7-day alert window
               const near = alerts.some((a) => a.stir === h.stir && a.isoDate === h.isoDate)
