@@ -37,18 +37,26 @@ export interface DocDef {
   lang: 'uz' | 'en'
   /** ascii slug for the download filename */
   slug: string
-  /** doc-specific field keys rendered inside this doc's card (beyond the shared groups) */
-  extra: string[]
+  /** the complete, ordered list of field keys this document fills (its
+   *  template placeholders). Each document is its own self-contained form. */
+  fields: string[]
+  /** extra keywords to widen search matches. */
+  keywords?: string
 }
 
+/** A category groups documents on the picker; also carries per-category chrome. */
 export interface TabDef {
   id: DocTab
   label: string
   intro: string
-  groups: { title: string; keys: string[] }[]
-  docs: DocDef[]
-  /** per-tab default overrides (a key can mean different things in each tab) */
-  defaults?: Record<string, string>
+  /** Combined categories (visa, iio) share ONE form built from these panels —
+   *  fill once, generate every document in the category. A document's card
+   *  then only adds the fields not already covered here. Separate categories
+   *  (court) omit groups. */
+  groups?: { title: string; keys: string[] }[]
+  /** Separate category: the category opens a grid of document cards, and each
+   *  document opens its own full-window form. */
+  separate?: boolean
   /** show the letterhead uploader (blank the banner when none). Court
    *  petitions keep their own embedded letterhead, so they omit this. */
   letterhead?: boolean
@@ -133,54 +141,57 @@ export const DOCS: DocDef[] = [
   {
     id: 'visa1_invitation', tab: 'visa', lang: 'en', slug: 'invitation-letter',
     title: 'Invitation Letter', subtitle: 'Elchixona konsulligiga taklifnoma (EN)',
-    file: 'visa1_invitation.docx', extra: ['role_en'],
+    file: 'visa1_invitation.docx',
+    fields: ['company_en', 'company_address_en', 'full_name', 'citizenship_en', 'passport', 'role_en', 'position', 'stay_from', 'stay_to', 'director'],
   },
   {
     id: 'visa2_kafolat', tab: 'visa', lang: 'uz', slug: 'kafolat-xati',
     title: 'Kafolat xati', subtitle: 'TIV Konsulligi boshqarmasiga kafolat',
-    file: 'visa2_kafolat.docx', extra: [],
+    file: 'visa2_kafolat.docx',
+    fields: ['company', 'director', 'out_no', 'doc_date', 'citizenship_sentence', 'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'],
   },
   {
     id: 'visa3_talabnoma', tab: 'visa', lang: 'uz', slug: 'viza-talabnomasi',
     title: 'Viza talabnomasi', subtitle: 'TIV Konsullik-huquqiy boshqarmasiga',
     file: 'visa3_talabnoma.docx',
-    extra: ['entries', 'travel_from', 'travel_to', 'visa_place', 'cities', 'residence', 'responsible', 'greeter', 'reg_justice', 'reg_consular'],
+    fields: ['company', 'director', 'out_no', 'doc_date', 'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position', 'entries', 'travel_from', 'travel_to', 'visa_place', 'cities', 'residence', 'responsible', 'greeter', 'reg_justice', 'reg_consular'],
   },
   {
     id: 'iio1_kafolat', tab: 'iio', lang: 'uz', slug: 'iio-kafolat-xati',
     title: 'Kafolat xati (IIO)', subtitle: 'Tuman IIO FMB MvaPB boshligʻiga',
-    file: 'iio1_kafolat.docx', extra: [],
+    file: 'iio1_kafolat.docx',
+    fields: ['company', 'director', 'doc_date', 'district_office', 'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'],
   },
   {
     id: 'iio2_royxat', tab: 'iio', lang: 'uz', slug: 'royxatga-olish-talabnomasi',
     title: 'Roʻyxatga olish talabnomasi', subtitle: 'Vaqtincha roʻyxatga olish (MvaPB)',
     file: 'iio2_royxat.docx',
-    extra: ['children', 'visa_type', 'visa_no', 'visa_issuer', 'visa_from', 'visa_to', 'visa_days', 'responsible'],
+    fields: ['company', 'director', 'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'children', 'visa_type', 'visa_no', 'visa_issuer', 'visa_from', 'visa_to', 'visa_days', 'responsible'],
   },
-  // ---- court petitions (Sud arizalari) ----
+  // ---- court petitions (Sud arizalari) — separate: one card + form per doc ----
   {
     id: 'court_copy', tab: 'court', lang: 'uz', slug: 'ish-hujjatlaridan-nusxa-olish',
     title: 'Ish hujjatlaridan nusxa olish', subtitle: 'Iqtisodiy sudga ariza',
-    file: 'court_copy.docx',
-    extra: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time'],
+    file: 'court_copy.docx', keywords: 'nusxa kochirma copy',
+    fields: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time'],
   },
   {
     id: 'court_postpone', tab: 'court', lang: 'uz', slug: 'sud-majlisini-qoldirish',
     title: 'Sud majlisini qoldirish', subtitle: 'Majlisni keyinga qoldirish arizasi',
-    file: 'court_postpone.docx',
-    extra: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time', 'reason', 'legal_basis', 'phone'],
+    file: 'court_postpone.docx', keywords: 'qoldirish keyinga majlis postpone',
+    fields: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time', 'reason', 'legal_basis', 'phone'],
   },
   {
     id: 'court_deadline', tab: 'court', lang: 'uz', slug: 'muddatni-tiklash',
     title: 'Muddatni tiklash', subtitle: 'Protsessual muddatni tiklash iltimosnomasi',
-    file: 'court_deadline.docx',
-    extra: ['court', 'applicant_person', 'phone', 'passport'],
+    file: 'court_deadline.docx', keywords: 'muddat tiklash deadline',
+    fields: ['court', 'applicant_person', 'phone', 'passport'],
   },
   {
     id: 'court_cancel', tab: 'court', lang: 'uz', slug: 'sud-buyrugini-bekor-qilish',
     title: 'Sud buyrugʻini bekor qilish', subtitle: 'Buyruqqa eʼtiroz / bekor qilish arizasi',
-    file: 'court_cancel.docx',
-    extra: ['court', 'company', 'rep_name', 'order_date', 'order_number', 'beneficiary', 'amount', 'director', 'executor'],
+    file: 'court_cancel.docx', keywords: 'buyruq bekor cancel etiroz',
+    fields: ['court', 'company', 'rep_name', 'order_date', 'order_number', 'beneficiary', 'amount', 'director', 'executor'],
   },
 ]
 
@@ -192,7 +203,6 @@ export const TABS: TabDef[] = [
       { title: 'Korxona', keys: ['company', 'company_en', 'company_address_en', 'director', 'out_no', 'doc_date'] },
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'citizenship_sentence', 'citizenship_en', 'passport', 'position', 'stay_from', 'stay_to'] },
     ],
-    docs: DOCS.filter((d) => d.tab === 'visa'),
     letterhead: true,
     requireKey: 'full_name',
   },
@@ -203,35 +213,57 @@ export const TABS: TabDef[] = [
       { title: 'Korxona', keys: ['company', 'director', 'doc_date', 'district_office'] },
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'] },
     ],
-    docs: DOCS.filter((d) => d.tab === 'iio'),
     letterhead: true,
     requireKey: 'full_name',
   },
   {
     id: 'court', label: 'Sud arizalari',
-    intro: 'Sudlarga ariza va iltimosnomalar: nusxa olish, muddatni tiklash, buyruqni bekor qilish, majlisni qoldirish. Har bir hujjatning oʻz maydonlari.',
-    groups: [],
-    docs: DOCS.filter((d) => d.tab === 'court'),
+    intro: 'Sudlarga ariza va iltimosnomalar. Hujjat turini tanlang.',
+    separate: true,
     requireKey: 'court',
   },
 ]
 
-/** All field keys a tab touches (shared groups + every doc's extras). */
-export function tabFieldKeys(tab: TabDef): string[] {
-  const keys = new Set<string>()
-  tab.groups.forEach((g) => g.keys.forEach((k) => keys.add(k)))
-  tab.docs.forEach((d) => d.extra.forEach((k) => keys.add(k)))
-  return [...keys]
+// ---- helpers ----------------------------------------------------------------
+
+export function tabById(id: DocTab): TabDef | undefined {
+  return TABS.find((t) => t.id === id)
 }
 
-/** Initial values for a tab: catalog defaults + per-tab overrides. */
-export function tabDefaults(tab: TabDef): Record<string, string> {
-  const out: Record<string, string> = {}
-  tabFieldKeys(tab).forEach((k) => { out[k] = FIELDS[k]?.default ?? '' })
-  if (tab.defaults) Object.assign(out, tab.defaults)
-  return out
+export function docsByTab(id: DocTab): DocDef[] {
+  return DOCS.filter((d) => d.tab === id)
 }
 
 export function docById(id: string): DocDef | undefined {
   return DOCS.find((d) => d.id === id)
+}
+
+/** All field keys shared by a combined category's panels. */
+export function groupKeys(tab: TabDef): string[] {
+  return tab.groups?.flatMap((g) => g.keys) ?? []
+}
+
+/** A document's fields NOT already covered by the category's shared panels
+ *  (i.e. what its own card adds in a combined category). */
+export function docExtraFields(doc: DocDef, tab: TabDef): string[] {
+  const shared = new Set(groupKeys(tab))
+  return doc.fields.filter((k) => !shared.has(k))
+}
+
+function defaultsFor(keys: string[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  keys.forEach((k) => { out[k] = FIELDS[k]?.default ?? '' })
+  return out
+}
+
+/** Initial values for a combined category (union of every doc's fields + panels). */
+export function categoryDefaults(tab: TabDef): Record<string, string> {
+  const keys = new Set<string>(groupKeys(tab))
+  docsByTab(tab.id).forEach((d) => d.fields.forEach((k) => keys.add(k)))
+  return defaultsFor([...keys])
+}
+
+/** Initial values for a single document's own form. */
+export function docDefaults(doc: DocDef): Record<string, string> {
+  return defaultsFor(doc.fields)
 }
