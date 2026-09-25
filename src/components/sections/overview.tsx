@@ -62,7 +62,7 @@ import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
 import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
-import { MibMini } from '@/components/sections/mib-card'
+import { MibCard } from '@/components/sections/mib-card'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 
@@ -488,8 +488,8 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
-      {/* mini filter cards → Sud ishlari, + MIB debt status */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 16, marginTop: 16 }}>
+      {/* mini filter cards → Sud ishlari */}
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 16 }}>
         {[
           { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
           { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
@@ -509,7 +509,6 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
             <div className="foot faint">{c.label} sudlari boʻyicha</div>
           </div>
         ))}
-        <MibMini stir={stir} />
         <div
           className="p-card mini fcard"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, textAlign: 'center' }}
@@ -525,7 +524,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
-      <div className="dash">
+      <div className="dash" style={{ gridTemplateColumns: 'minmax(0, 1.55fr) minmax(0, 1fr)' }}>
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Activity /></div>
@@ -544,6 +543,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
             Ustunni bosing · oʻsha oydagi ishlar
           </div>
         </div>
+        <MibCard stir={stir} />
       </div>
 
       <div className="dash" style={{ gridTemplateColumns: '1fr 1fr' }}>
