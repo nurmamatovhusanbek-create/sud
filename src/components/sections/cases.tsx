@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
-import { EmptyBlock, SkRows, Seg, familyBadgeClass } from '@/components/proto/primitives'
+import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
@@ -351,6 +351,7 @@ export function CasesSection() {
   const setStoreCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const [courtFilter, setCourtFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<SortKey>('new')
   const [exporting, setExporting] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [page, setPage] = useState(1)
@@ -463,16 +464,21 @@ export function CasesSection() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return merged
-    return merged.filter(({ c }) =>
-      Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)),
+    const list = q
+      ? merged.filter(({ c }) => Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)))
+      : merged
+    return applySort(
+      list,
+      sort,
+      ({ c }) => parseSortDate(c.hearingDate || c.dateFiled),
+      ({ c }) => c.caseNumber || '',
     )
-  }, [merged, query])
+  }, [merged, query, sort])
 
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
-  }, [query, courtFilter, stir])
+  }, [query, courtFilter, sort, stir])
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -525,6 +531,7 @@ export function CasesSection() {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
         </div>
         <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+        <SortMenu value={sort} onChange={setSort} />
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-outline btn-sm"

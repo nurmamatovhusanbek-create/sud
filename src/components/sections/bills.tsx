@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
-import { EmptyBlock, Kpi, TogglePair, Seg, CountUp } from '@/components/proto/primitives'
+import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
@@ -228,6 +228,7 @@ export function BillsSection() {
   const [invoice, setInvoice] = useState('')
   const [filter, setFilter] = useState('')
   const [seg, setSeg] = useState<'all' | 'paid' | 'overdue'>('all')
+  const [sort, setSort] = useState<SortKey>('new')
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
   // v204 (P-D): restored pagination (was dropped in the rebuild)
@@ -298,13 +299,13 @@ export function BillsSection() {
           (b.detail?.court || '').toLowerCase().includes(q),
       )
     }
-    return list
-  }, [items, seg, filter])
+    return applySort(list, sort, (b) => b.issued ?? 0, (b) => b.number)
+  }, [items, seg, filter, sort])
 
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
-  }, [filter, seg, stir])
+  }, [filter, seg, sort, stir])
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -407,6 +408,7 @@ export function BillsSection() {
                 value={seg}
                 onChange={(k) => setSeg(k as typeof seg)}
               />
+              <SortMenu value={sort} onChange={setSort} />
               <div style={{ flex: 1 }} />
               <button className="btn btn-outline btn-sm" onClick={() => stir && stream.start(stir)}>
                 <Bolt />

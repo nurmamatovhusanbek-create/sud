@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDownUp } from 'lucide-react'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 
@@ -668,5 +669,73 @@ export function PizzaDetail({
       </div>
       {action}
     </div>
+  )
+}
+
+// ---- list sorting (Toʻlovlar · Sud ishlari · Majlislar …) --------------------
+//
+// One shared sort control + a non-mutating sorter, reused by every list section
+// so the modes read identically everywhere: avval yangi / eski, A–Z / Z–A.
+
+export type SortKey = 'new' | 'old' | 'az' | 'za'
+
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'new', label: 'Avval yangi' },
+  { key: 'old', label: 'Avval eski' },
+  { key: 'az', label: 'A–Z' },
+  { key: 'za', label: 'Z–A' },
+]
+
+/** Parse dd.mm.yyyy · yyyy-mm-dd · epoch-ms into a comparable number (0 = unknown). */
+export function parseSortDate(v: string | number | null | undefined): number {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  if (!v) return 0
+  const s = String(v).trim()
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s) // yyyy-mm-dd
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3])
+  m = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/.exec(s) // dd.mm.yyyy
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1])
+  const t = Date.parse(s)
+  return Number.isNaN(t) ? 0 : t
+}
+
+const sortCollator = new Intl.Collator('uz', { numeric: true, sensitivity: 'base' })
+
+/** Return a NEW array sorted by the chosen mode. `getDate` → epoch ms, `getText` → label. */
+export function applySort<T>(
+  list: T[],
+  sort: SortKey,
+  getDate: (t: T) => number,
+  getText: (t: T) => string,
+): T[] {
+  const arr = [...list]
+  switch (sort) {
+    case 'new':
+      arr.sort((a, b) => getDate(b) - getDate(a))
+      break
+    case 'old':
+      arr.sort((a, b) => getDate(a) - getDate(b))
+      break
+    case 'az':
+      arr.sort((a, b) => sortCollator.compare(getText(a), getText(b)))
+      break
+    case 'za':
+      arr.sort((a, b) => sortCollator.compare(getText(b), getText(a)))
+      break
+  }
+  return arr
+}
+
+/** Compact sort picker for the filter bar. */
+export function SortMenu({ value, onChange }: { value: SortKey; onChange: (k: SortKey) => void }) {
+  return (
+    <label className="sortsel" title="Tartiblash">
+      <ArrowDownUp />
+      <select value={value} onChange={(e) => onChange(e.target.value as SortKey)} aria-label="Tartiblash">
+        {SORT_OPTIONS.map((o) => (
+          <option key={o.key} value={o.key}>{o.label}</option>
+        ))}
+      </select>
+    </label>
   )
 }
