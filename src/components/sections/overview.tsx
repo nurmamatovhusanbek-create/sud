@@ -62,6 +62,7 @@ import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
 import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
+import { MibCard } from '@/components/sections/mib-card'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 
@@ -742,6 +743,7 @@ export function OverviewSection() {
   return (
     <div className={`stat-view${comparing ? ' comparing' : ''}`}>
       {comparing && baseStats && <ComparePanel base={baseStats} onClose={() => setComparing(false)} />}
+      <MibCard stir={company.stir} />
       <OverviewView
         key={`${company.stir}-${forceKey}`}
         stir={company.stir}
