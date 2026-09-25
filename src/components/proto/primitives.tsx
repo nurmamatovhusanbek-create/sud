@@ -72,13 +72,22 @@ export function useMounted(): boolean {
 const REDUCED = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 /** Count-up number (eased, 750ms) — matches prototype countUp(). */
-export function CountUp({ value, suffix = '', className }: { value: number; suffix?: string; className?: string }) {
+// Remember the last value each keyed counter reached, so a REMOUNT (e.g. the
+// stats view re-keys on refresh, or you re-enter the tab) doesn't replay the
+// count-up from zero. Same id + same value → no animation; a changed value
+// animates from the previous one, not 0. Unkeyed counters behave as before.
+const countCache = new Map<string, number>()
+
+export function CountUp({ value, suffix = '', className, id }: { value: number; suffix?: string; className?: string; id?: string }) {
   const skip = REDUCED || !Number.isFinite(value)
-  const [display, setDisplay] = useState(skip ? value : Math.min(value, 0))
-  const fromRef = useRef(0)
+  const seed = id != null && countCache.has(id) ? (countCache.get(id) as number) : Math.min(value, 0)
+  const [display, setDisplay] = useState(skip ? value : seed)
+  const fromRef = useRef(seed)
   useEffect(() => {
+    if (id != null) countCache.set(id, value) // remember the target across remounts
     if (skip) return
     const from = fromRef.current
+    if (from === value) { fromRef.current = value; return } // already there — no replay
     const dur = 750
     const t0 = performance.now()
     let raf = 0
@@ -91,7 +100,7 @@ export function CountUp({ value, suffix = '', className }: { value: number; suff
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [value, skip])
+  }, [value, skip, id])
   if (skip) {
     return (
       <span className={className}>
@@ -151,7 +160,7 @@ export function Ring({ pct, size, band = 'neu' }: { pct: number; size: number; b
 }
 
 /** Semi-circular dash gauge — prototype arcGauge(). */
-export function ArcGauge({ pct, size, band = 'neu', label }: { pct: number; size: number; band?: Band; label?: string }) {
+export function ArcGauge({ pct, size, band = 'neu', label, id }: { pct: number; size: number; band?: Band; label?: string; id?: string }) {
   const mounted = useMounted()
   const N = 22
   const cx = size / 2
@@ -189,7 +198,7 @@ export function ArcGauge({ pct, size, band = 'neu', label }: { pct: number; size
       </svg>
       <div style={{ textAlign: 'center', marginTop: -size * 0.2 }}>
         <div className="mono" style={{ fontSize: size * 0.17, fontWeight: 700, letterSpacing: '-.02em' }}>
-          <CountUp value={pct} suffix="%" />
+          <CountUp value={pct} suffix="%" id={id} />
         </div>
         {label ? <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>{label}</div> : null}
       </div>

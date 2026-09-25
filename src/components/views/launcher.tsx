@@ -193,7 +193,7 @@ export function Launcher() {
 
       <div className="kpis" style={{ marginTop: 24 }}>
         <Kpi label="Kompaniyalar" icon={<Users />} ink foot="Kuzatuv + soʻnggi">
-          <CountUp value={companies.length} />
+          <CountUp value={companies.length} id="lnch-companies" />
         </Kpi>
         <Kpi
           label="Jami sud ishlari"
@@ -205,7 +205,7 @@ export function Launcher() {
             </>
           }
         >
-          <CountUp value={totCases} />
+          <CountUp value={totCases} id="lnch-cases" />
         </Kpi>
         <Kpi
           label="Yaqin majlislar"
@@ -222,11 +222,11 @@ export function Launcher() {
             </>
           }
         >
-          <CountUp value={nearHearings} />
+          <CountUp value={nearHearings} id="lnch-hearings" />
         </Kpi>
         <Kpi label="Umumiy qarzdorlik" icon={<Wallet />} foot={`${overdueCompanies} kompaniyada`}>
           <span style={{ fontSize: 19 }}>
-            <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" />
+            <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
             <span style={{ fontSize: 13, color: 'var(--text-3)' }}> mln soʻm</span>
           </span>
         </Kpi>

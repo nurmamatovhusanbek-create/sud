@@ -152,7 +152,7 @@ export function ProfileSection() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
             {score !== null ? (
-              <ArcGauge pct={score} size={160} band={ratingBand} label="Ishonch balli (0–100)" />
+              <ArcGauge pct={score} size={160} band={ratingBand} label="Ishonch balli (0–100)" id="profile-score" />
             ) : (
               <ArcGauge pct={0} size={160} band="neu" label="Ball mavjud emas" />
             )}

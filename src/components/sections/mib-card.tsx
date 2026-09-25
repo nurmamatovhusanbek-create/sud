@@ -1,13 +1,14 @@
 'use client'
 
 /**
- * MIB (Ijro qarzdorligi) card for the Statistika tab.
+ * MIB (Ijro qarzdorligi) — a compact status tile for the Statistika KPI row
+ * (MibMini) that opens the full detail in a drawer (MibDetail).
  *
  * The operator opens the fast «Qarzdorlikni tekshirish» service on mib.uz in
  * their own browser (a UZ IP — no geo-block), solves the captcha, selects-all
- * and copies the result, and pastes it here. The server parses it (never
- * renders it) and we cache the structured debts into the company registry so
- * the watchlist can flag debtors. Manual + on-demand, with a refresh.
+ * and copies the result, and pastes it into the drawer. The server parses it
+ * (never renders it) and we cache the structured debts into the company
+ * registry so the watchlist can flag debtors. Manual + on-demand, with refresh.
  */
 
 import { useState } from 'react'
@@ -16,6 +17,7 @@ import { toast } from 'sonner'
 import { parseMibDebt } from '@/lib/api-client'
 import { patchMeta, getRecord } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
+import { openProtoDrawer } from '@/components/proto/drawer'
 import type { MibDebt } from '@/lib/mib-types'
 
 const MIB_URL = 'https://mib.uz/bl'
@@ -25,14 +27,16 @@ function money(n: number | undefined): string {
   if (n == null) return '—'
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' soʻm'
 }
-
+function moneyShort(n: number | undefined): string {
+  if (!n) return '0'
+  if (n >= 1e6) return `${(n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} mln`
+  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 })
+}
 function whenChecked(ts: number | undefined): string {
   if (!ts) return ''
   try {
     return new Date(ts).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return ''
-  }
+  } catch { return '' }
 }
 
 function DebtRow({ d }: { d: MibDebt }) {
@@ -49,22 +53,22 @@ function DebtRow({ d }: { d: MibDebt }) {
       </div>
       <div style={{ textAlign: 'right', flex: '0 0 auto' }}>
         <b className="mono" style={{ fontSize: 13, color: 'var(--neg-text)' }}>{money(d.amount)}</b>
-        {d.status && d.status !== '—' && (
-          <div className="faint" style={{ fontSize: 11 }}>{d.status}</div>
-        )}
+        {d.status && d.status !== '—' && <div className="faint" style={{ fontSize: 11 }}>{d.status}</div>}
       </div>
     </div>
   )
 }
 
-export function MibCard({ stir }: { stir: string }) {
-  useRegistryVersion() // re-render when meta (cached MIB result) changes
+/** Full detail — used inside the drawer. Reads the cached result and lets the
+ *  operator paste a fresh mib.uz result to (re)check. */
+export function MibDetail({ stir }: { stir: string }) {
+  useRegistryVersion()
   const meta = getRecord(stir)?.meta
   const checked = meta?.mibCheckedAt != null
   const hasDebt = !!meta?.mibHasDebt
   const debts = meta?.mibDebts ?? []
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!checked) // unchecked → show the check flow straight away
   const [paste, setPaste] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -78,26 +82,14 @@ export function MibCard({ stir }: { stir: string }) {
 
   const submit = async () => {
     const html = paste.trim()
-    if (!html) {
-      toast.error('Avval MIB natijasini joylang')
-      return
-    }
-    if (html.length > MAX_PASTE) {
-      toast.error('Matn juda katta')
-      return
-    }
+    if (!html) { toast.error('Avval MIB natijasini joylang'); return }
+    if (html.length > MAX_PASTE) { toast.error('Matn juda katta'); return }
     setBusy(true)
     try {
       const res = await parseMibDebt(stir, html)
-      if (!res.ok) {
-        toast.error(res.error)
-        return
-      }
+      if (!res.ok) { toast.error(res.error); return }
       const r = res.data
-      if (r.status === 'error') {
-        toast.error(r.message || 'MIB natijasi oʻqilmadi')
-        return
-      }
+      if (r.status === 'error') { toast.error(r.message || 'MIB natijasi oʻqilmadi'); return }
       patchMeta(stir, {
         mibHasDebt: r.hasDebt,
         mibTotalDebt: r.totalDebt ?? (r.debts?.reduce((a, d) => a + d.amount, 0) || 0),
@@ -116,45 +108,28 @@ export function MibCard({ stir }: { stir: string }) {
   }
 
   return (
-    <div className="p-card rise-c" style={{ marginBottom: 18 }}>
-      <div className="card-h">
-        <div className="ico"><ShieldAlert /></div>
-        <div style={{ minWidth: 0 }}>
-          <h3 style={{ marginBottom: 2 }}>Ijro qarzdorligi · MIB</h3>
-          <div className="faint" style={{ fontSize: 12 }}>
-            {checked ? `Soʻnggi tekshiruv: ${whenChecked(meta?.mibCheckedAt)}` : 'mib.uz orqali qoʻlda tekshiriladi'}
-          </div>
-        </div>
-        <div className="sp" />
+    <div>
+      <div className="p-row" style={{ gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {checked && (
           hasDebt
-            ? <span className="badge b-neg"><AlertTriangle />Qarzdor</span>
-            : <span className="badge b-pos"><CheckCircle2 />Qarzdorlik yoʻq</span>
+            ? <span className="badge b-neg" style={{ height: 28 }}><AlertTriangle />Qarzdor</span>
+            : <span className="badge b-pos" style={{ height: 28 }}><CheckCircle2 />Qarzdorlik yoʻq</span>
         )}
+        {checked && <span className="faint" style={{ fontSize: 12 }}>Soʻnggi tekshiruv: {whenChecked(meta?.mibCheckedAt)}</span>}
+        <div style={{ flex: 1 }} />
         <button className="btn btn-outline btn-sm" onClick={() => setOpen((o) => !o)}>
-          <RefreshCw />
-          <span>{checked ? 'Qayta tekshirish' : 'Tekshirish'}</span>
+          <RefreshCw />{checked ? 'Qayta tekshirish' : 'Tekshirish'}
         </button>
       </div>
 
-      {/* Cached result */}
       {checked && hasDebt && (
         <>
           <div className="mib-tot">
-            <div>
-              <span className="lbl">Umumiy qarzdorlik</span>
-              <b className="mono">{money(meta?.mibTotalDebt)}</b>
-            </div>
+            <div><span className="lbl">Umumiy qarzdorlik</span><b className="mono">{money(meta?.mibTotalDebt)}</b></div>
             {meta?.mibCurrentDebt != null && (
-              <div>
-                <span className="lbl">Joriy</span>
-                <b className="mono">{money(meta?.mibCurrentDebt)}</b>
-              </div>
+              <div><span className="lbl">Joriy</span><b className="mono">{money(meta?.mibCurrentDebt)}</b></div>
             )}
-            <div>
-              <span className="lbl">Ijro ishlari</span>
-              <b className="mono">{debts.length}</b>
-            </div>
+            <div><span className="lbl">Ijro ishlari</span><b className="mono">{debts.length}</b></div>
           </div>
           <div className="list" style={{ marginTop: 4 }}>
             {debts.map((d) => <DebtRow key={d.enforcementCaseNumber} d={d} />)}
@@ -163,11 +138,10 @@ export function MibCard({ stir }: { stir: string }) {
       )}
       {checked && !hasDebt && !open && (
         <div className="faint" style={{ fontSize: 12.5, padding: '4px 2px' }}>
-          {meta?.mibCheckedAt ? 'Oxirgi tekshiruvda ijro qarzdorligi topilmadi.' : ''}
+          Oxirgi tekshiruvda ijro qarzdorligi topilmadi.
         </div>
       )}
 
-      {/* Paste flow */}
       {open && (
         <div className="mib-flow">
           <ol className="mib-steps">
@@ -178,8 +152,7 @@ export function MibCard({ stir }: { stir: string }) {
                   <ExternalLink />mib.uz ochish
                 </a>
                 <button className="btn btn-outline btn-sm" onClick={copyStir}>
-                  {copied ? <ClipboardCheck /> : <Copy />}
-                  <span>STIR: {stir}</span>
+                  {copied ? <ClipboardCheck /> : <Copy />}<span>STIR: {stir}</span>
                 </button>
               </div>
             </li>
@@ -195,10 +168,9 @@ export function MibCard({ stir }: { stir: string }) {
             </li>
           </ol>
           <div className="p-row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setOpen(false); setPaste('') }}>Bekor qilish</button>
+            {checked && <button className="btn btn-ghost btn-sm" onClick={() => { setOpen(false); setPaste('') }}>Bekor qilish</button>}
             <button className="btn btn-primary btn-sm" onClick={() => void submit()} disabled={busy || !paste.trim()}>
-              {busy ? <span className="spinner" /> : <ClipboardCheck />}
-              <span>Natijani oʻqish</span>
+              {busy ? <span className="spinner" /> : <ClipboardCheck />}<span>Natijani oʻqish</span>
             </button>
           </div>
           <div className="faint" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>
@@ -206,6 +178,42 @@ export function MibCard({ stir }: { stir: string }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+export function openMibDrawer(stir: string) {
+  openProtoDrawer('Ijro qarzdorligi · MIB', <MibDetail stir={stir} />, `STIR ${stir}`)
+}
+
+/** Compact KPI-row tile — always visible (even with no debt), opens the drawer. */
+export function MibMini({ stir }: { stir: string }) {
+  useRegistryVersion()
+  const meta = getRecord(stir)?.meta
+  const checked = meta?.mibCheckedAt != null
+  const hasDebt = !!meta?.mibHasDebt
+  const count = meta?.mibDebts?.length ?? 0
+
+  const val = !checked ? 'Tekshirish' : hasDebt ? moneyShort(meta?.mibTotalDebt) : 'Yoʻq'
+  const foot = !checked ? 'MIB · qoʻlda tekshiriladi' : hasDebt ? `${count} ta ijro ishi · qarzdor` : 'Ijro qarzdorligi topilmadi'
+  const open = () => openMibDrawer(stir)
+
+  return (
+    <div
+      className={`p-card mini fcard mib-mini${hasDebt ? ' has-debt' : ''}`}
+      title="Ijro qarzdorligi (MIB)"
+      onClick={open}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && open()}
+    >
+      <div className="lab" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <ShieldAlert style={{ width: 13, height: 13 }} />Ijro qarzdorligi
+      </div>
+      <div className="val" style={{ color: hasDebt ? 'var(--neg-text)' : checked ? 'var(--pos-text)' : undefined, fontSize: checked && hasDebt ? 17 : 20 }}>
+        {val}{checked && hasDebt ? <span style={{ fontSize: 12, color: 'var(--text-3)' }}> soʻm</span> : null}
+      </div>
+      <div className="foot faint">{foot}</div>
     </div>
   )
 }
