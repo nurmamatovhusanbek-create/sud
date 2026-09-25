@@ -731,8 +731,7 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .mib-total { font-size: 24px; font-weight: 700; color: var(--neg-text); letter-spacing: -.02em; }
 
 /* clickable «Yaqinlashayotgan majlislar» header (watchlist → all hearings) */
-.section-head.sh-click { cursor: pointer; border-radius: 8px; transition: background .15s; }
-.section-head.sh-click:hover { background: var(--surface-inset); }
+.section-head.sh-click { cursor: pointer; }
 .section-head.sh-click:hover .sh-hint { color: var(--accent); }
-.sh-hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.sh-hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; transition: color .15s; }
 .sh-hint svg { width: 14px; height: 14px; }
