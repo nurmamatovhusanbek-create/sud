@@ -62,7 +62,7 @@ import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
 import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
-import { MibCard } from '@/components/sections/mib-card'
+import { MibMini } from '@/components/sections/mib-card'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 
@@ -488,8 +488,8 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
-      {/* mini filter cards → Sud ishlari */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 16 }}>
+      {/* mini filter cards → Sud ishlari, + MIB debt status */}
+      <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 16, marginTop: 16 }}>
         {[
           { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
           { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
@@ -509,6 +509,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
             <div className="foot faint">{c.label} sudlari boʻyicha</div>
           </div>
         ))}
+        <MibMini stir={stir} />
         <div
           className="p-card mini fcard"
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, textAlign: 'center' }}
@@ -743,7 +744,6 @@ export function OverviewSection() {
   return (
     <div className={`stat-view${comparing ? ' comparing' : ''}`}>
       {comparing && baseStats && <ComparePanel base={baseStats} onClose={() => setComparing(false)} />}
-      <MibCard stir={company.stir} />
       <OverviewView
         key={`${company.stir}-${forceKey}`}
         stir={company.stir}

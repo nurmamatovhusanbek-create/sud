@@ -715,7 +715,7 @@ function HealthTab() {
             <span className={`badge ${rate >= 80 ? 'b-pos' : 'b-warn'}`}>{rate >= 80 ? "Sogʻlom" : 'Beqaror'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 2px' }}>
-            <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label={`Muvaffaqiyat darajasi · ${spanLabel}`} />
+            <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label={`Muvaffaqiyat darajasi · ${spanLabel}`} id="health-overall" />
           </div>
           <div className="health-grid" style={{ marginTop: 8 }}>
             <div>
@@ -783,7 +783,7 @@ function HealthTab() {
               </div>
               <div className="p-row" style={{ gap: 14, marginTop: 12 }}>
                 <div style={{ flex: '0 0 auto' }}>
-                  <ArcGauge pct={r} size={110} band={r >= 90 ? 'pos' : r >= 60 ? 'warn' : 'neg'} />
+                  <ArcGauge pct={r} size={110} band={r >= 90 ? 'pos' : r >= 60 ? 'warn' : 'neg'} id={`health-${w.workerUrl}`} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div className="p-row" style={{ justifyContent: 'space-between' }}>
