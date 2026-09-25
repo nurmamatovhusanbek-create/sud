@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { CalendarDays, FileSpreadsheet } from 'lucide-react'
-import { EmptyBlock, SkRows } from '@/components/proto/primitives'
+import { EmptyBlock, SkRows, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
@@ -59,6 +59,8 @@ export function HearingsSection() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [exporting, setExporting] = useState(false)
+  // Upcoming hearings read best nearest-first, so default to ascending (eski).
+  const [sort, setSort] = useState<SortKey>('old')
 
   useEffect(() => {
     const handler = () => void refetch()
@@ -93,15 +95,21 @@ export function HearingsSection() {
     }
   }, [loaded, company, hearings])
 
-  // Reset to page 1 when the company changes (must run before early returns)
+  // Reset to page 1 when the company or sort changes (must run before early returns)
   useEffect(() => {
     setPage(1)
-  }, [company?.stir])
+  }, [company?.stir, sort])
 
   if (!company) return null
 
-  const safePage = clampPage(page, hearings.length, pageSize)
-  const paged = hearings.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const sorted = applySort(
+    hearings,
+    sort,
+    (h) => parseSortDate(h.isoDate as string),
+    (h) => String((h.caseNumber as string) || (h.courtName as string) || ''),
+  )
+  const safePage = clampPage(page, sorted.length, pageSize)
+  const paged = sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const openCase = (caseNumber: string, courtType: string) => {
     useAppStore.getState().setSection('cases')
@@ -147,6 +155,7 @@ export function HearingsSection() {
           <h3>Kelgusi majlislar</h3>
           <div className="sp" />
           <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
+          <SortMenu value={sort} onChange={setSort} />
           <button
             className="btn btn-outline btn-sm"
             disabled={exporting || hearings.length === 0}
@@ -200,7 +209,7 @@ export function HearingsSection() {
         <ListPagination
           page={safePage}
           pageSize={pageSize}
-          total={hearings.length}
+          total={sorted.length}
           onPage={setPage}
           onPageSize={(n) => {
             setPageSize(n)

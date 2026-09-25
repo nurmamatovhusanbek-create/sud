@@ -664,3 +664,9 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .doc-crumb-title b { font-size: 15px; color: var(--text-1); }
 .doc-crumb-ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
 .doc-crumb-ico svg { width: 17px; height: 17px; }
+
+/* ---- list sort picker (SortMenu) ------------------------------------------- */
+.sortsel { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-2); transition: border-color .15s, box-shadow .15s; }
+.sortsel svg { width: 15px; height: 15px; color: var(--text-3); flex: 0 0 auto; }
+.sortsel select { border: none; background: none; outline: none; color: var(--text-1); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; padding-right: 2px; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+.sortsel:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
