@@ -27,11 +27,6 @@ function money(n: number | undefined): string {
   if (n == null) return '—'
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' soʻm'
 }
-function moneyShort(n: number | undefined): string {
-  if (!n) return '0'
-  if (n >= 1e6) return `${(n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} mln`
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 })
-}
 function whenChecked(ts: number | undefined): string {
   if (!ts) return ''
   try {
@@ -186,34 +181,51 @@ export function openMibDrawer(stir: string) {
   openProtoDrawer('Ijro qarzdorligi · MIB', <MibDetail stir={stir} />, `STIR ${stir}`)
 }
 
-/** Compact KPI-row tile — always visible (even with no debt), opens the drawer. */
-export function MibMini({ stir }: { stir: string }) {
+/** Statistika card (beside the «Oylik faollik» chart) — a status summary that
+ *  opens the full check/detail drawer. Always shown, even with no debt. */
+export function MibCard({ stir }: { stir: string }) {
   useRegistryVersion()
   const meta = getRecord(stir)?.meta
   const checked = meta?.mibCheckedAt != null
   const hasDebt = !!meta?.mibHasDebt
   const count = meta?.mibDebts?.length ?? 0
-
-  const val = !checked ? 'Tekshirish' : hasDebt ? moneyShort(meta?.mibTotalDebt) : 'Yoʻq'
-  const foot = !checked ? 'MIB · qoʻlda tekshiriladi' : hasDebt ? `${count} ta ijro ishi · qarzdor` : 'Ijro qarzdorligi topilmadi'
   const open = () => openMibDrawer(stir)
 
   return (
-    <div
-      className={`p-card mini fcard mib-mini${hasDebt ? ' has-debt' : ''}`}
-      title="Ijro qarzdorligi (MIB)"
-      onClick={open}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && open()}
-    >
-      <div className="lab" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <ShieldAlert style={{ width: 13, height: 13 }} />Ijro qarzdorligi
+    <div className={`p-card rise-c mib-card${hasDebt ? ' has-debt' : ''}`}>
+      <div className="card-h">
+        <div className="ico"><ShieldAlert /></div>
+        <h3>Ijro qarzdorligi</h3>
+        <div className="sp" />
+        {checked && (
+          hasDebt
+            ? <span className="badge b-neg"><AlertTriangle />Qarzdor</span>
+            : <span className="badge b-pos"><CheckCircle2 />Yoʻq</span>
+        )}
       </div>
-      <div className="val" style={{ color: hasDebt ? 'var(--neg-text)' : checked ? 'var(--pos-text)' : undefined, fontSize: checked && hasDebt ? 17 : 20 }}>
-        {val}{checked && hasDebt ? <span style={{ fontSize: 12, color: 'var(--text-3)' }}> soʻm</span> : null}
-      </div>
-      <div className="foot faint">{foot}</div>
+
+      {!checked ? (
+        <div className="mib-body">
+          <div className="mib-icowrap"><ShieldAlert /></div>
+          <div className="mib-lead">Hali tekshirilmagan</div>
+          <p className="faint">MIB (Majburiy ijro byurosi) orqali ijro qarzdorligini qoʻlda tekshiring.</p>
+          <button className="btn btn-primary btn-sm" onClick={open}><RefreshCw />Tekshirish</button>
+        </div>
+      ) : hasDebt ? (
+        <div className="mib-body mib-body-debt">
+          <div className="mib-total mono">{money(meta?.mibTotalDebt)}</div>
+          <div className="faint">{count} ta ijro ishi boʻyicha qarzdorlik</div>
+          <div className="faint" style={{ fontSize: 11.5, marginTop: 2 }}>Soʻnggi tekshiruv: {whenChecked(meta?.mibCheckedAt)}</div>
+          <button className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={open}><ShieldAlert />Batafsil koʻrish</button>
+        </div>
+      ) : (
+        <div className="mib-body">
+          <div className="mib-icowrap mib-ok"><CheckCircle2 /></div>
+          <div className="mib-lead">Qarzdorlik yoʻq</div>
+          <p className="faint">Oxirgi tekshiruvda ijro qarzdorligi topilmadi.<br />Soʻnggi tekshiruv: {whenChecked(meta?.mibCheckedAt)}</p>
+          <button className="btn btn-outline btn-sm" onClick={open}><RefreshCw />Qayta tekshirish</button>
+        </div>
+      )}
     </div>
   )
 }
