@@ -29,7 +29,8 @@ function CompanyCard({ rec }: { rec: CompanyRecord }) {
   const openCompany = useAppStore((s) => s.openCompany)
   const meta = rec.meta
   return (
-    <div className="ccard" data-open={rec.stir} onClick={() => openCompany(rec.stir, { name: rec.name })}>
+    <div className={`ccard${meta?.mibHasDebt ? ' has-debt' : ''}`} data-open={rec.stir} onClick={() => openCompany(rec.stir, { name: rec.name })}>
+      {meta?.mibHasDebt && <span className="debt-flag" title="Ijro qarzdorligi (MIB) mavjud" aria-label="Ijro qarzdorligi mavjud" />}
       <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
         <div className="cc-id">
@@ -48,7 +49,7 @@ export function Launcher() {
   const openCompany = useAppStore((s) => s.openCompany)
   const setSection = useAppStore((s) => s.setSection)
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'active' | 'risk'>('all')
+  const [filter, setFilter] = useState<'all' | 'active' | 'risk' | 'qarzdor'>('all')
   const [searching, setSearching] = useState(false)
   const rv = useRegistryVersion()
 
@@ -133,6 +134,7 @@ export function Launcher() {
   const filtered = companies.filter((c) => {
     if (filter === 'active') return isKnownActive(c.meta?.status)
     if (filter === 'risk') return isKnownInactive(c.meta?.status) || (c.meta?.overdueTotal ?? 0) > 0
+    if (filter === 'qarzdor') return !!c.meta?.mibHasDebt
     return true
   })
 
@@ -239,6 +241,7 @@ export function Launcher() {
             { key: 'all', label: 'Barchasi' },
             { key: 'active', label: 'Faol' },
             { key: 'risk', label: 'Xavfli' },
+            { key: 'qarzdor', label: 'Qarzdor' },
           ]}
           value={filter}
           onChange={(k) => setFilter(k as typeof filter)}

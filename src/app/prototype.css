@@ -672,3 +672,25 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 /* the outer box already shows the focus ring — kill the control's own glow */
 .sortsel select:focus, .sortsel select:focus-visible { outline: none; box-shadow: none; }
 .sortsel:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+/* ---- MIB debt: watchlist red flag + Statistika card ------------------------ */
+@keyframes debt-glow {
+  0%, 100% { box-shadow: var(--elev-1); border-color: var(--neg-base); }
+  50% { box-shadow: 0 0 0 1px var(--neg-base), 0 0 16px 1px rgba(192, 74, 104, .38); border-color: var(--neg-base); }
+}
+@keyframes debt-ping {
+  0% { box-shadow: 0 0 0 0 rgba(192, 74, 104, .55); }
+  70% { box-shadow: 0 0 0 8px rgba(192, 74, 104, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(192, 74, 104, 0); }
+}
+.ccard.has-debt { border-color: var(--neg-base); animation: debt-glow 1.9s ease-in-out infinite; }
+.debt-flag { position: absolute; top: 11px; left: 11px; width: 9px; height: 9px; border-radius: 50%; background: var(--neg-base, #c04a68); animation: debt-ping 1.5s ease-out infinite; z-index: 2; }
+
+.mib-tot { display: flex; gap: 24px; flex-wrap: wrap; padding: 12px 2px 8px; margin-top: 4px; border-top: 1px solid var(--border-subtle); }
+.mib-tot > div { display: flex; flex-direction: column; gap: 3px; }
+.mib-tot .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+.mib-tot b { font-size: 15px; }
+.mib-flow { margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+.mib-steps { margin: 0 0 12px; padding-left: 20px; list-style: decimal; font-size: 13px; color: var(--text-2); }
+.mib-steps li { line-height: 1.45; margin-bottom: 14px; }
+.mib-steps li::marker { color: var(--text-3); font-weight: 700; }
