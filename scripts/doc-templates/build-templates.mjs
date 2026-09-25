@@ -233,4 +233,61 @@ await build('iio2_royxat','ded48e95-Royxatga_olish_talabnomasi.docx', (xml)=>{
   return xml
 })
 
+// ---- court petitions (Sud arizalari) ----------------------------------------
+
+await build('court_copy', '211051e2-ish_hujjatlaridan_nusxa_olish_to_g_risida.docx', (xml) => {
+  xml = paraReplace(xml, 'Toshkent tumanlararo iqtisodiy sud', '{{court}}', 'all')
+  xml = paraReplace(xml, 'Fozilova Yulduz Olimovna', '{{judge}}')
+  xml = paraReplace(xml, '4-1001-2609/51959', '{{case_number}}', 'all')
+  xml = paraReplace(xml, '“ARTIKUL AZIYA KABEL” MCHJ QK', '{{company}}', 'all')
+  xml = paraReplace(xml, 'Sobirov Baxriddin', '{{rep_name}}')
+  xml = paraReplace(xml, 'Toshkent shahar, Yangihayot tumani, Janubiy sanoat hududi, Fayzli MFY', '{{address}}')
+  xml = paraReplace(xml, '“Toshkent shahar suv ta`minoti” AJ', '{{plaintiff}}')
+  xml = paraReplace(xml, 'kommunal xizmat ko‘rsatish shartnomasi', '{{contract_subject}}')
+  xml = paraReplace(xml, '2026-yil 8-sentyabr', '{{hearing_date}}')
+  xml = paraReplace(xml, '10:05', '{{hearing_time}}')
+  return xml
+})
+
+await build('court_postpone', 'e0eb5ba2-sud_majlisini_keyinga_qoldirish_to_g_risida.docx', (xml) => {
+  xml = paraReplace(xml, 'Toshkent tumanlararo iqtisodiy sud', '{{court}}', 'all')
+  xml = paraReplace(xml, 'Fozilova Yulduz Olimovna', '{{judge}}')
+  xml = paraReplace(xml, '4-1001-2609/51959', '{{case_number}}', 'all')
+  // reason paragraph BEFORE company (it contains the company name)
+  xml = paraReplace(xml, 'Hozirgi kunda “ARTIKUL AZIYA KABEL” MCHJ QK oldida qarzdor “CHIMQURG‘ON SERVIS INVEST” MCHJga nisbatan toʻlovga qobiliyatsizlik toʻgʻrisidagi ish yuritulayotgan boʻlib, aynan sud majlisi kuni mazkur toʻlovga qobiliyatsizlik ishi boʻyicha kreditorlar yigʻilishida ishtirok etishimiz zarur boʻlib qolmoqda.', '{{reason}}')
+  xml = paraReplace(xml, '“ARTIKUL AZIYA KABEL” MCHJ QK', '{{company}}', 'all')
+  xml = paraReplace(xml, 'Sobirov Baxriddin', '{{rep_name}}')
+  xml = paraReplace(xml, 'Toshkent shahar, Yangihayot tumani, Janubiy sanoat hududi, Fayzli MFY', '{{address}}')
+  xml = paraReplace(xml, '“Toshkent shahar suv ta`minoti” AJ', '{{plaintiff}}')
+  xml = paraReplace(xml, 'kommunal xizmat ko‘rsatish shartnomasi', '{{contract_subject}}')
+  xml = paraReplace(xml, 'Iqtisodiy protsessual kodeksining 42, 43 va 171-moddalari', '{{legal_basis}}')
+  xml = paraReplace(xml, '2026-yil 8-sentyabr', '{{hearing_date}}', 'all')
+  xml = paraReplace(xml, '10:05', '{{hearing_time}}', 'all')
+  xml = paraReplace(xml, '+998 77 978 10 01', '{{phone}}')
+  return xml
+})
+
+await build('court_deadline', '1b4c14b2-Muddatni_tiklash_togrisida.docx', (xml) => {
+  xml = paraReplace(xml, 'Shayxontohur tumanlararo fuqarolik sud', '{{court}}', 'all')
+  xml = paraReplace(xml, 'Sobirov Baxriddin Sabirovich', '{{applicant_person}}')
+  xml = paraReplace(xml, '+998 77 978 10 01', '{{phone}}')
+  xml = paraReplace(xml, 'AD 5137576', '{{passport}}')
+  return xml
+})
+
+await build('court_cancel', 'f296cd33-Sud_buyrugi_bekor_45144.docx', (xml) => {
+  // wording fix: the source doubles "sudi sudi"
+  xml = paraReplace(xml, 'tumanlararo sudi sudi tomonidan', 'tumanlararo sudi tomonidan')
+  xml = paraReplace(xml, 'Fuqarolik ishlari bo‘yicha Yakkasaroy tumanlararo sud', '{{court}}', 'all')
+  xml = paraReplace(xml, '“Artikul Aziya Kabel” MCHJ QK', '{{company}}', 'all')
+  xml = paraReplace(xml, 'Musayev Dilshod', '{{rep_name}}')
+  xml = paraReplace(xml, '12.08.2026', '{{order_date}}', 'all')
+  xml = paraReplace(xml, '2-1005-2605/45144', '{{order_number}}', 'all')
+  xml = paraReplace(xml, 'Yangihayot tumani Kambag‘allikni qisqartirish va bandlikka ko‘maklashish bo‘limi (Vafayev Erkin Ibragimovich nomidan)', '{{beneficiary}}')
+  xml = paraReplace(xml, '8 032 742', '{{amount}}')
+  xml = paraReplace(xml, 'Turg‘unov Sh.A', '{{director}}')
+  xml = paraReplace(xml, 'Musayev D.+998 91 254 09 95', '{{executor}}')
+  return xml
+})
+
 console.log('done ->', OUT)
