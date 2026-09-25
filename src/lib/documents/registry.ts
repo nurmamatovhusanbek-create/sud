@@ -12,7 +12,7 @@
  * so this file must stay free of client/server-only imports.
  */
 
-export type DocTab = 'visa' | 'iio'
+export type DocTab = 'visa' | 'iio' | 'court'
 export type FieldKind = 'text' | 'date' | 'textarea'
 
 export interface FieldDef {
@@ -49,6 +49,11 @@ export interface TabDef {
   docs: DocDef[]
   /** per-tab default overrides (a key can mean different things in each tab) */
   defaults?: Record<string, string>
+  /** show the letterhead uploader (blank the banner when none). Court
+   *  petitions keep their own embedded letterhead, so they omit this. */
+  letterhead?: boolean
+  /** field key that must be filled before a document can be generated. */
+  requireKey?: string
 }
 
 // ---- field catalog ----------------------------------------------------------
@@ -100,6 +105,26 @@ export const FIELDS: Record<string, FieldDef> = {
   visa_from: { key: 'visa_from', label: 'Viza amal qiladi — dan', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   visa_to: { key: 'visa_to', label: 'Viza amal qiladi — gacha', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
   visa_days: { key: 'visa_days', label: 'Muddat (kun)', default: '180', mono: true },
+
+  // ---- court petitions (Sud arizalari) --------------------------------------
+  court: { key: 'court', label: 'Sud nomi', placeholder: 'Toshkent tumanlararo iqtisodiy sud', hint: '«sud» bilan tugasin — «…ga», «…ning» avtomatik qoʻshiladi' },
+  judge: { key: 'judge', label: 'Sudya', placeholder: 'F.I.Sh' },
+  case_number: { key: 'case_number', label: 'Ish raqami', placeholder: '4-1001-2609/00000', mono: true },
+  rep_name: { key: 'rep_name', label: 'Ishonchli vakil', placeholder: 'F.I.Sh' },
+  address: { key: 'address', label: 'Manzil', default: 'Toshkent shahar, Yangihayot tumani, Janubiy sanoat hududi, Fayzli MFY' },
+  plaintiff: { key: 'plaintiff', label: 'Daʼvogar', placeholder: 'Tashkilot nomi' },
+  contract_subject: { key: 'contract_subject', label: 'Shartnoma predmeti', placeholder: 'masalan: kommunal xizmat koʻrsatish shartnomasi' },
+  hearing_date: { key: 'hearing_date', label: 'Sud majlisi sanasi', placeholder: '2026-yil 00-oy' },
+  hearing_time: { key: 'hearing_time', label: 'Sud majlisi vaqti', placeholder: '00:00', mono: true },
+  reason: { key: 'reason', label: 'Keyinga qoldirish sababi', kind: 'textarea', placeholder: 'Majlisga qatnasha olmaslik sababini yozing…' },
+  legal_basis: { key: 'legal_basis', label: 'Huquqiy asos (kodeks moddalari)', default: 'Iqtisodiy protsessual kodeksining 42, 43 va 171-moddalari' },
+  phone: { key: 'phone', label: 'Telefon', placeholder: '+998 00 000 00 00', mono: true },
+  applicant_person: { key: 'applicant_person', label: 'Ariza beruvchi (F.I.Sh)', placeholder: 'F.I.Sh' },
+  order_date: { key: 'order_date', label: 'Sud buyrugʻi sanasi', placeholder: 'kk.oo.yyyy', mono: true },
+  order_number: { key: 'order_number', label: 'Sud buyrugʻi raqami', placeholder: '2-0000-0000/00000', mono: true },
+  beneficiary: { key: 'beneficiary', label: 'Undiruvchi (foydasiga)', kind: 'textarea', placeholder: 'Tashkilot / shaxs nomi' },
+  amount: { key: 'amount', label: 'Undiriladigan summa', placeholder: '0 000 000', mono: true },
+  executor: { key: 'executor', label: 'Ijrochi (F.I.Sh · telefon)', placeholder: 'F.I.Sh · +998 …' },
 }
 
 // ---- documents & tabs -------------------------------------------------------
@@ -132,6 +157,31 @@ export const DOCS: DocDef[] = [
     file: 'iio2_royxat.docx',
     extra: ['children', 'visa_type', 'visa_no', 'visa_issuer', 'visa_from', 'visa_to', 'visa_days', 'responsible'],
   },
+  // ---- court petitions (Sud arizalari) ----
+  {
+    id: 'court_copy', tab: 'court', lang: 'uz', slug: 'ish-hujjatlaridan-nusxa-olish',
+    title: 'Ish hujjatlaridan nusxa olish', subtitle: 'Iqtisodiy sudga ariza',
+    file: 'court_copy.docx',
+    extra: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time'],
+  },
+  {
+    id: 'court_postpone', tab: 'court', lang: 'uz', slug: 'sud-majlisini-qoldirish',
+    title: 'Sud majlisini qoldirish', subtitle: 'Majlisni keyinga qoldirish arizasi',
+    file: 'court_postpone.docx',
+    extra: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time', 'reason', 'legal_basis', 'phone'],
+  },
+  {
+    id: 'court_deadline', tab: 'court', lang: 'uz', slug: 'muddatni-tiklash',
+    title: 'Muddatni tiklash', subtitle: 'Protsessual muddatni tiklash iltimosnomasi',
+    file: 'court_deadline.docx',
+    extra: ['court', 'applicant_person', 'phone', 'passport'],
+  },
+  {
+    id: 'court_cancel', tab: 'court', lang: 'uz', slug: 'sud-buyrugini-bekor-qilish',
+    title: 'Sud buyrugʻini bekor qilish', subtitle: 'Buyruqqa eʼtiroz / bekor qilish arizasi',
+    file: 'court_cancel.docx',
+    extra: ['court', 'company', 'rep_name', 'order_date', 'order_number', 'beneficiary', 'amount', 'director', 'executor'],
+  },
 ]
 
 export const TABS: TabDef[] = [
@@ -143,6 +193,8 @@ export const TABS: TabDef[] = [
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'citizenship_sentence', 'citizenship_en', 'passport', 'position', 'stay_from', 'stay_to'] },
     ],
     docs: DOCS.filter((d) => d.tab === 'visa'),
+    letterhead: true,
+    requireKey: 'full_name',
   },
   {
     id: 'iio', label: 'Ichki ishlar',
@@ -152,6 +204,15 @@ export const TABS: TabDef[] = [
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'] },
     ],
     docs: DOCS.filter((d) => d.tab === 'iio'),
+    letterhead: true,
+    requireKey: 'full_name',
+  },
+  {
+    id: 'court', label: 'Sud arizalari',
+    intro: 'Sudlarga ariza va iltimosnomalar: nusxa olish, muddatni tiklash, buyruqni bekor qilish, majlisni qoldirish. Har bir hujjatning oʻz maydonlari.',
+    groups: [],
+    docs: DOCS.filter((d) => d.tab === 'court'),
+    requireKey: 'court',
   },
 ]
 

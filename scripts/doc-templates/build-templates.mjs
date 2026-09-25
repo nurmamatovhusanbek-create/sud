@@ -10,7 +10,9 @@ const SRC = '/root/.claude/uploads/eefe577e-0365-5422-b318-9c523988a4c3'
 const OUT = process.argv[2] || '/tmp/out-templates'
 fs.mkdirSync(OUT, { recursive: true })
 
-const unesc = (s) => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+// nbsp → normal space so targets typed with normal spaces still match (only
+// affects runs a replacement actually rewrites).
+const unesc = (s) => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/ /g,' ')
 const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 
 function tokenize(xml){
@@ -254,7 +256,7 @@ await build('court_postpone', 'e0eb5ba2-sud_majlisini_keyinga_qoldirish_to_g_ris
   xml = paraReplace(xml, 'Fozilova Yulduz Olimovna', '{{judge}}')
   xml = paraReplace(xml, '4-1001-2609/51959', '{{case_number}}', 'all')
   // reason paragraph BEFORE company (it contains the company name)
-  xml = paraReplace(xml, 'Hozirgi kunda “ARTIKUL AZIYA KABEL” MCHJ QK oldida qarzdor “CHIMQURG‘ON SERVIS INVEST” MCHJga nisbatan toʻlovga qobiliyatsizlik toʻgʻrisidagi ish yuritulayotgan boʻlib, aynan sud majlisi kuni mazkur toʻlovga qobiliyatsizlik ishi boʻyicha kreditorlar yigʻilishida ishtirok etishimiz zarur boʻlib qolmoqda.', '{{reason}}')
+  xml = paraReplace(xml, 'Hozirgi kunda “ARTIKUL AZIYA KABEL” MCHJ QK oldida qarzdor “CHIMQURG‘ON SERVIS INVEST” MCHJga nisbatan toʻlovga qobiliyatsizlik toʻgʻrisidagi ish yuritilayotgan boʻlib, aynan sud majlisi kuni mazkur toʻlovga qobiliyatsizlik ishi boʻyicha kreditorlar yigʻilishida ishtirok etishimiz zarur boʻlib qolmoqda.', '{{reason}}')
   xml = paraReplace(xml, '“ARTIKUL AZIYA KABEL” MCHJ QK', '{{company}}', 'all')
   xml = paraReplace(xml, 'Sobirov Baxriddin', '{{rep_name}}')
   xml = paraReplace(xml, 'Toshkent shahar, Yangihayot tumani, Janubiy sanoat hududi, Fayzli MFY', '{{address}}')

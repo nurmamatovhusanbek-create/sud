@@ -48,10 +48,19 @@ export interface GeneratedDoc {
   filename: string
 }
 
+export interface GenerateOpts {
+  /** Uploaded per-company letterhead (base64 PNG) — replaces the banner. */
+  letterhead?: string
+  /** When no letterhead is given, blank the embedded banner (leave space) —
+   *  used by categories that offer the uploader (visa/iio). Categories with no
+   *  uploader (court petitions) omit it so an embedded letterhead is kept. */
+  blankIfNone?: boolean
+}
+
 export async function generateDocx(
   docId: string,
   values: Record<string, string>,
-  letterheadPngBase64?: string,
+  opts: GenerateOpts = {},
 ): Promise<GeneratedDoc> {
   const def = docById(docId)
   if (!def) throw new Error('Nomaʼlum hujjat turi')
@@ -68,12 +77,13 @@ export async function generateDocx(
   const xml = await docXmlFile.async('string')
   zip.file('word/document.xml', fillXml(xml, values))
 
-  // Letterhead: the templates embed a banner at word/media/image1.png. We
-  // always replace it — with the uploaded PNG when given (the client sends a
-  // canvas-encoded PNG so it is already valid), otherwise with a blank
-  // transparent PNG so the space is kept but no branding is imposed.
+  // Letterhead swap (only when the template embeds a banner):
+  //  - uploaded PNG   → use it
+  //  - none + blank   → transparent PNG (keep the space, drop the branding)
+  //  - none, no blank → leave the embedded banner untouched
   if (zip.file('word/media/image1.png')) {
-    zip.file('word/media/image1.png', decodePng(letterheadPngBase64) ?? BLANK_PNG)
+    const png = decodePng(opts.letterhead) ?? (opts.blankIfNone ? BLANK_PNG : null)
+    if (png) zip.file('word/media/image1.png', png)
   }
 
   const buffer = await zip.generateAsync({
@@ -82,7 +92,7 @@ export async function generateDocx(
     compressionOptions: { level: 6 },
   })
 
-  const person = slug(values.full_name || 'hujjat')
+  const person = slug(values.full_name || values.applicant_person || values.rep_name || values.case_number || 'hujjat')
   const filename = `${def.slug}-${person}-${stamp()}.docx`
   return { buffer, filename }
 }

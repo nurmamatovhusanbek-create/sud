@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   FileDown, FileText, Building2, UserRound, Loader2, ImagePlus, X,
-  Plane, Landmark, ChevronRight, ArrowLeft,
+  Plane, Landmark, Scale, ChevronRight, ArrowLeft,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -31,6 +31,7 @@ import { generateDocument } from '@/lib/api-client'
 const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
   iio: <Landmark />,
+  court: <Scale />,
 }
 
 // ---- a single field --------------------------------------------------------
@@ -142,15 +143,16 @@ function LetterheadRow({ value, onChange }: { value: string; onChange: (v: strin
 // ---- one document card -----------------------------------------------------
 
 function DocCard({
-  doc, values, set, busy, onGenerate,
+  doc, values, set, busy, blocked, blockHint, onGenerate,
 }: {
   doc: DocDef
   values: Record<string, string>
   set: (k: string, v: string) => void
   busy: boolean
+  blocked: boolean
+  blockHint?: string
   onGenerate: () => void
 }) {
-  const missingName = !values.full_name?.trim()
   return (
     <div className="p-card rise-c doc-card">
       <div className="card-h">
@@ -175,8 +177,8 @@ function DocCard({
         className="btn btn-primary"
         style={{ width: '100%', marginTop: 14 }}
         onClick={onGenerate}
-        disabled={busy || missingName}
-        title={missingName ? 'Avval F.I.Sh kiriting' : undefined}
+        disabled={busy || blocked}
+        title={blocked ? blockHint : undefined}
       >
         {busy ? <Loader2 className="spin" style={{ width: 16, height: 16 }} /> : <FileDown />}
         <span>Word (.docx) yuklab olish</span>
@@ -193,14 +195,18 @@ function CategoryForm({ tab, letterhead, onLetterhead }: { tab: TabDef; letterhe
 
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
 
+  const reqKey = tab.requireKey
+  const blocked = reqKey ? !values[reqKey]?.trim() : false
+  const blockHint = reqKey ? `Avval «${FIELDS[reqKey]?.label ?? reqKey}» maydonini toʻldiring` : undefined
+
   const generate = async (doc: DocDef) => {
-    if (!values.full_name?.trim()) {
-      toast.error('Avval chet ellik xodimning F.I.Sh sini kiriting')
+    if (reqKey && !values[reqKey]?.trim()) {
+      toast.error(blockHint!)
       return
     }
     setBusy(doc.id)
     try {
-      await generateDocument(doc.id, values, letterhead || undefined)
+      await generateDocument(doc.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
       toast.success(`${doc.title} tayyor — yuklab olindi`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi')
@@ -224,7 +230,7 @@ function CategoryForm({ tab, letterhead, onLetterhead }: { tab: TabDef; letterhe
               <Field key={k} def={FIELDS[k]} value={values[k] ?? ''} onChange={(v) => set(k, v)} />
             ))}
           </div>
-          {g.title === 'Korxona' && <LetterheadRow value={letterhead} onChange={onLetterhead} />}
+          {g.title === 'Korxona' && tab.letterhead && <LetterheadRow value={letterhead} onChange={onLetterhead} />}
         </div>
       ))}
 
@@ -243,6 +249,8 @@ function CategoryForm({ tab, letterhead, onLetterhead }: { tab: TabDef; letterhe
             values={values}
             set={set}
             busy={busy === doc.id}
+            blocked={blocked}
+            blockHint={blockHint}
             onGenerate={() => void generate(doc)}
           />
         ))}
@@ -281,7 +289,7 @@ export function DocumentsView() {
       <div className="hero" style={{ marginBottom: 18 }}>
         <div className="eyebrow">Hujjat generatori</div>
         <h1>Hujjatlar</h1>
-        <p>Chet ellik xodimlar uchun hujjatlarni korxona blankasida yarating. Toifani tanlang.</p>
+        <p>Viza, ichki ishlar va sud hujjatlarini tayyor shablonlar asosida yarating. Toifani tanlang.</p>
       </div>
 
       {!activeTab ? (

@@ -199,18 +199,19 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
 }
 
 /** Document engine — fill a .docx template and download it (Hujjatlar).
- *  `letterhead` (optional base64 image) replaces the embedded banner. */
+ *  `opts.letterhead` (base64 image) replaces the embedded banner; `opts.blank`
+ *  blanks it when none is given (categories that offer the uploader). */
 export async function generateDocument(
   docId: string,
   values: Record<string, string>,
-  letterhead?: string,
+  opts: { letterhead?: string; blank?: boolean } = {},
 ): Promise<void> {
   let res: Response
   try {
     res = await fetch('/api/documents/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ docId, values, letterhead: letterhead || undefined }),
+      body: JSON.stringify({ docId, values, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank }),
     })
   } catch {
     throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
