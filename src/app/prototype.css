@@ -669,4 +669,6 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .sortsel { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-2); transition: border-color .15s, box-shadow .15s; }
 .sortsel svg { width: 15px; height: 15px; color: var(--text-3); flex: 0 0 auto; }
 .sortsel select { border: none; background: none; outline: none; color: var(--text-1); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; padding-right: 2px; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+/* the outer box already shows the focus ring — kill the control's own glow */
+.sortsel select:focus, .sortsel select:focus-visible { outline: none; box-shadow: none; }
 .sortsel:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
