@@ -699,7 +699,9 @@ export function parseSortDate(v: string | number | null | undefined): number {
   return Number.isNaN(t) ? 0 : t
 }
 
-const sortCollator = new Intl.Collator('uz', { numeric: true, sensitivity: 'base' })
+// Plain alphabetical (by letter) — A–Z / Z–A order strictly by character,
+// not numerically, so the letter order is exactly what the label promises.
+const sortCollator = new Intl.Collator('uz', { sensitivity: 'base' })
 
 /** Return a NEW array sorted by the chosen mode. `getDate` → epoch ms, `getText` → label. */
 export function applySort<T>(
