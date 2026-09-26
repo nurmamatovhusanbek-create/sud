@@ -90,10 +90,17 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
        </div>`
     : ''
 
+  // Append the resolved STIR when the on-screen detail already looked it up
+  // (tinCache is filled by PartyRow) so the PDF matches what's shown.
+  const partyVal = (name?: string) => {
+    if (!name || name === '-' || name === '—') return '-'
+    const tin = tinCache.get(name)
+    return tin && /^\d{9}$/.test(tin) ? `${name} · STIR ${tin}` : name
+  }
   const parties = `
     <div class="pr-sec">Tomonlar</div>
-    ${kv('Daʼvogar', g?.plaintiff)}
-    ${kv('Javobgar', g?.defendant)}`
+    ${kv('Daʼvogar', partyVal(g?.plaintiff))}
+    ${kv('Javobgar', partyVal(g?.defendant))}`
 
   const decisionSec = lastDecision
     ? `<div class="pr-sec">Oxirgi qaror${lastDecision.date ? ` · ${escapeHtml(lastDecision.date)}` : ''}</div>
@@ -152,17 +159,61 @@ function caseListHtml(
 
 // ---- Case detail drawer --------------------------------------------------------
 
-function partyLink(name: string | undefined, tin: string | undefined, onClose: () => void) {
-  if (!name || name === '—' || name === '-') return <span className="faint">-</span>
-  const known = tin && /^\d{9}$/.test(tin)
-  const open = () => {
-    onClose()
-    if (known) {
-      useAppStore.getState().openCompany(tin)
-      return
-    }
+// The sud.uz case-detail API returns party NAMES but not their STIRs, so we
+// resolve them the same way the party link does — by name, via orginfo search.
+// One party is usually the company being viewed, so we shortcut that with the
+// known STIR; the counterparty resolves on mount (cached per name).
+const tinCache = new Map<string, string | null>()
+
+function normParty(s?: string): string {
+  return (s || '')
+    .toLowerCase()
+    .replace(/["«»“”„'’‘ʼ]/g, '')
+    .replace(/\b(mchj|aj|qk|ooo|oao|мчж|аж|ак|акж|xk|xususiy korxona)\b/g, '')
+    .replace(/[^a-zа-яё0-9 ]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+function sameParty(a?: string, b?: string): boolean {
+  const x = normParty(a), y = normParty(b)
+  if (x.length < 3 || y.length < 3) return false
+  return x === y || x.includes(y) || y.includes(x)
+}
+
+function PartyRow({ label, name, companyName, companyStir, onClose }: {
+  label: string
+  name?: string
+  companyName?: string
+  companyStir?: string
+  onClose: () => void
+}) {
+  const empty = !name || name === '-' || name === '—'
+  const seed = !empty && sameParty(name, companyName) && /^\d{9}$/.test(companyStir || '')
+    ? (companyStir as string)
+    : (name ? tinCache.get(name) || '' : '')
+  const [tin, setTin] = useState<string>(seed || '')
+
+  useEffect(() => {
+    // seed already captured any cached tin at mount; a cached null means we
+    // resolved it before and found none — either way, don't re-search.
+    if (empty || tin || !name || tinCache.has(name)) return
+    let alive = true
     void (async () => {
       const res = await searchCompanies(name)
+      const t = res.ok ? res.data.results?.[0]?.tin : undefined
+      const val = t && /^\d{9}$/.test(t) ? t : null
+      tinCache.set(name, val)
+      if (alive && val) setTin(val)
+    })()
+    return () => { alive = false }
+  }, [name, tin, empty])
+
+  const valid = /^\d{9}$/.test(tin)
+  const open = () => {
+    onClose()
+    if (valid) { useAppStore.getState().openCompany(tin); return }
+    void (async () => {
+      const res = await searchCompanies(name || '')
       if (res.ok && res.data.results?.length) {
         useAppStore.getState().openCompany(res.data.results[0].tin, { name: res.data.results[0].name })
       } else {
@@ -170,18 +221,25 @@ function partyLink(name: string | undefined, tin: string | undefined, onClose: (
       }
     })()
   }
+
   return (
-    <button
-      className="btn btn-ghost btn-xs"
-      style={{ padding: 0, height: 'auto', color: 'var(--info-text)' }}
-      onClick={open}
-    >
-      {name} <Link2 />
-    </button>
+    <div className="dfield">
+      <div className="k">{label}</div>
+      <div className="v">
+        {empty ? (
+          <span className="faint">-</span>
+        ) : (
+          <button className="btn btn-ghost btn-xs" style={{ padding: 0, height: 'auto', color: 'var(--info-text)' }} onClick={open}>
+            {name} <Link2 />
+          </button>
+        )}
+      </div>
+      {valid ? <div className="faint mono" style={{ fontSize: 11, marginTop: 2 }}>STIR {tin}</div> : null}
+    </div>
   )
 }
 
-function openCaseDetail(caseNumber: string, courtType: CourtType) {
+function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
   openProtoDrawer(
     `Ish ${caseNumber}`,
     <div style={{ textAlign: 'center', padding: '30px 0' }}>
@@ -266,16 +324,8 @@ function openCaseDetail(caseNumber: string, courtType: CourtType) {
         <div className="detail-sec">
           <span className="eyebrow">Tomonlar</span>
           <div className="dstrip">
-            <div className="dfield">
-              <div className="k">Daʼvogar</div>
-              <div className="v">{partyLink(g?.plaintiff, g?.plaintiffTin, close)}</div>
-              {g?.plaintiffTin ? <div className="faint mono" style={{ fontSize: 11, marginTop: 2 }}>STIR {g.plaintiffTin}</div> : null}
-            </div>
-            <div className="dfield">
-              <div className="k">Javobgar</div>
-              <div className="v">{partyLink(g?.defendant, g?.defendantTin, close)}</div>
-              {g?.defendantTin ? <div className="faint mono" style={{ fontSize: 11, marginTop: 2 }}>STIR {g.defendantTin}</div> : null}
-            </div>
+            <PartyRow label="Daʼvogar" name={g?.plaintiff} companyName={company?.name} companyStir={company?.stir} onClose={close} />
+            <PartyRow label="Javobgar" name={g?.defendant} companyName={company?.name} companyStir={company?.stir} onClose={close} />
           </div>
         </div>
 
@@ -366,7 +416,7 @@ export function CasesSection() {
   useEffect(() => {
     const openCase = (e: Event) => {
       const d = (e as CustomEvent).detail as { caseNumber?: string; courtType?: string }
-      if (d?.caseNumber) openCaseDetail(d.caseNumber, (d.courtType as CourtType) || 'economic')
+      if (d?.caseNumber) openCaseDetail(d.caseNumber, (d.courtType as CourtType) || 'economic', company ?? undefined)
     }
     window.addEventListener('sud:open-case', openCase)
     return () => window.removeEventListener('sud:open-case', openCase)
@@ -572,7 +622,7 @@ export function CasesSection() {
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
           <div className="list">
             {paged.map(({ c, courtType }, i) => (
-              <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType)}>
+              <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
                 <div className="lead">
                   <Gavel />
                 </div>
