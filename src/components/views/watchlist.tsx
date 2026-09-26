@@ -41,8 +41,7 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
       .finally(() => setRefreshing(false))
   }
   return (
-    <div className={`ccard${meta?.mibHasDebt ? ' has-debt' : ''}`} onClick={() => openCompany(rec.stir, { name: rec.name })}>
-      {meta?.mibHasDebt && <span className="debt-flag" title="Ijro qarzdorligi (MIB) mavjud" aria-label="Ijro qarzdorligi mavjud" />}
+    <div className="ccard" onClick={() => openCompany(rec.stir, { name: rec.name })}>
       <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
         <div className="cc-id">

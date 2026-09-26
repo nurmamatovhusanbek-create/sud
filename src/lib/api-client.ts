@@ -17,7 +17,6 @@ import type {
   FullCaseData,
   UpcomingHearingsData,
 } from './api-types'
-import type { MibDebtResult } from './mib-types'
 
 /** Operator may set NEXT_PUBLIC_APP_API_TOKEN for an authed deployment. */
 const TOKEN = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_APP_API_TOKEN || '') : ''
@@ -79,25 +78,6 @@ export function getCaseDetail(courtType: string, caseNumber: string, signal?: Ab
 
 export function getUpcomingHearings(tin: string, signal?: AbortSignal) {
   return request<UpcomingHearingsData>(`/api/upcoming-hearings?tin=${tin}`, signal)
-}
-
-/** MIB debt — parse a mib.uz result page the operator brought back (see mib.ts). */
-export async function parseMibDebt(tin: string, html: string): Promise<ApiResult<MibDebtResult>> {
-  try {
-    const res = await fetch('/api/mib-debt/parse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ tin, html }),
-    })
-    const json = await res.json().catch(() => null)
-    if (!json) return { ok: false, error: `Server javob bermadi (${res.status})`, status: res.status }
-    if (json.ok === false) return { ok: false, error: json.error || 'Xatolik', status: res.status }
-    const { ok: _ok, ...rest } = json
-    return { ok: true, data: rest as MibDebtResult }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e
-    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
-  }
 }
 
 export function searchCompanies(query: string, signal?: AbortSignal) {

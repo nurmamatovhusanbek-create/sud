@@ -674,28 +674,6 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .sortsel select:focus, .sortsel select:focus-visible { outline: none; box-shadow: none; }
 .sortsel:focus-within { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent-ring); }
 
-/* ---- MIB debt: watchlist red flag + Statistika card ------------------------ */
-@keyframes debt-glow {
-  0%, 100% { box-shadow: var(--elev-1); border-color: var(--neg-base); }
-  50% { box-shadow: 0 0 0 1px var(--neg-base), 0 0 16px 1px rgba(192, 74, 104, .38); border-color: var(--neg-base); }
-}
-@keyframes debt-ping {
-  0% { box-shadow: 0 0 0 0 rgba(192, 74, 104, .55); }
-  70% { box-shadow: 0 0 0 8px rgba(192, 74, 104, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(192, 74, 104, 0); }
-}
-.ccard.has-debt { border-color: var(--neg-base); animation: debt-glow 1.9s ease-in-out infinite; }
-.debt-flag { position: absolute; top: 11px; left: 11px; width: 9px; height: 9px; border-radius: 50%; background: var(--neg-base, #c04a68); animation: debt-ping 1.5s ease-out infinite; z-index: 2; }
-
-.mib-tot { display: flex; gap: 24px; flex-wrap: wrap; padding: 12px 2px 8px; margin-top: 4px; border-top: 1px solid var(--border-subtle); }
-.mib-tot > div { display: flex; flex-direction: column; gap: 3px; }
-.mib-tot .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
-.mib-tot b { font-size: 15px; }
-.mib-flow { margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 14px; }
-.mib-steps { margin: 0 0 12px; padding-left: 20px; list-style: decimal; font-size: 13px; color: var(--text-2); }
-.mib-steps li { line-height: 1.45; margin-bottom: 14px; }
-.mib-steps li::marker { color: var(--text-3); font-weight: 700; }
-
 /* ---- Hujjatlar: search + document tiles ------------------------------------ */
 .doc-search { display: flex; align-items: center; gap: 10px; height: 48px; max-width: 560px; padding: 0 14px; margin-bottom: 20px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-inset); transition: border-color .15s, box-shadow .15s; }
 .doc-search svg { width: 18px; height: 18px; color: var(--text-3); flex: 0 0 auto; }
@@ -717,18 +695,6 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 
 /* textareas span the whole aligned grid row */
 .doc-field-wide { grid-column: 1 / -1; }
-
-/* MIB debt card beside the «Oylik faollik» chart */
-.mib-card { display: flex; flex-direction: column; }
-.mib-card.has-debt { border-color: var(--neg-base); }
-.mib-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; padding: 14px 6px 6px; }
-.mib-body p { margin: 0; font-size: 12.5px; line-height: 1.45; }
-.mib-icowrap { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; background: var(--surface-inset); color: var(--text-3); margin-bottom: 4px; }
-.mib-icowrap svg { width: 23px; height: 23px; }
-.mib-icowrap.mib-ok { background: var(--pos-soft); color: var(--pos-text); }
-.mib-lead { font-size: 14px; font-weight: 650; color: var(--text-1); }
-.mib-body-debt { justify-content: center; }
-.mib-total { font-size: 24px; font-weight: 700; color: var(--neg-text); letter-spacing: -.02em; }
 
 /* clickable «Yaqinlashayotgan majlislar» header (watchlist → all hearings) */
 .section-head.sh-click { cursor: pointer; }
