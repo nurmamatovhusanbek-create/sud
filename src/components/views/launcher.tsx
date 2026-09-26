@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X, CheckSquare, Check } from 'lucide-react'
+import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
 import { recents, removeRecent, removeRecord, allRecords } from '@/lib/registry'
@@ -26,13 +26,10 @@ const isKnownActive = (s?: string) =>
 const isKnownInactive = (s?: string) =>
   !!s && /тўхтатилган|тугатилган|to'xtatilgan|to‘xtatilgan|tugatilgan|suspended|liquidat/i.test(s)
 
-function CompanyCard({ rec, onRefresh, onDelete, selectMode, selected, onToggleSelect }: {
+function CompanyCard({ rec, onRefresh, onDelete }: {
   rec: CompanyRecord
   onRefresh: (stir: string) => Promise<void>
   onDelete: (stir: string) => void
-  selectMode: boolean
-  selected: boolean
-  onToggleSelect: (stir: string) => void
 }) {
   const openCompany = useAppStore((s) => s.openCompany)
   const [refreshing, setRefreshing] = useState(false)
@@ -46,31 +43,22 @@ function CompanyCard({ rec, onRefresh, onDelete, selectMode, selected, onToggleS
       .catch(() => toast.error('Yangilashda xatolik — manbalar javob bermadi'))
       .finally(() => setRefreshing(false))
   }
-  const onClick = () => {
-    if (selectMode) onToggleSelect(rec.stir)
-    else openCompany(rec.stir, { name: rec.name })
-  }
 
   return (
-    <div
-      className={`ccard${selectMode ? ' selectable' : ''}${selected ? ' selected' : ''}`}
-      data-open={rec.stir}
-      onClick={onClick}
-    >
-      {selectMode && (
-        <span className={`cc-check${selected ? ' on' : ''}`} aria-hidden>{selected && <Check />}</span>
-      )}
+    <div className="ccard" data-open={rec.stir} onClick={() => openCompany(rec.stir, { name: rec.name })}>
       <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
         <div className="cc-id">
           <div className="nm">{rec.name || `STIR ${grp(rec.stir)}`}</div>
           <div className="tin">{grp(rec.stir)}</div>
         </div>
-        {!selectMode && (
-          <div className="ccard-tools">
-            <button className="ccard-act" title="Yangilash" aria-label="Yangilash" onClick={refresh}>
-              {refreshing ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
-            </button>
+        <div className="ccard-tools">
+          <button className="ccard-act" title="Yangilash" aria-label="Yangilash" onClick={refresh}>
+            {refreshing ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
+          </button>
+          {/* Delete only removes a searched company from this list — watched
+              companies are managed in Kuzatuv, so they show no delete here. */}
+          {!rec.watched && (
             <button
               className="ccard-act ccard-act-danger"
               title="Roʻyxatdan oʻchirish"
@@ -79,8 +67,8 @@ function CompanyCard({ rec, onRefresh, onDelete, selectMode, selected, onToggleS
             >
               <X />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
     </div>
@@ -96,8 +84,6 @@ export function Launcher() {
   const [filter, setFilter] = useState<'all' | 'active' | 'risk'>('all')
   const [searching, setSearching] = useState(false)
   const [refreshingAll, setRefreshingAll] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
   const rv = useRegistryVersion()
 
   // Hydration-safe listing: registry is localStorage-backed (renders after
@@ -199,33 +185,23 @@ export function Launcher() {
     toast.success(`${ok}/${filtered.length} kompaniya yangilandi`)
   }
 
+  // Delete removes a single searched (non-watched) company from the list.
   const deleteOne = (stir: string) => {
     removeRecord(stir)
-    setSelected((s) => { const n = new Set(s); n.delete(stir); return n })
     toast.success('Roʻyxatdan oʻchirildi')
   }
 
-  const toggleSelect = (stir: string) =>
-    setSelected((s) => {
-      const n = new Set(s)
-      if (n.has(stir)) n.delete(stir)
-      else n.add(stir)
-      return n
-    })
-
-  const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
-
-  const deleteSelected = () => {
-    const n = selected.size
-    if (n === 0) return
-    selected.forEach((stir) => removeRecord(stir))
-    toast.success(`${n} ta kompaniya oʻchirildi`)
-    exitSelect()
+  // «Tozalash» clears every searched company but keeps the ones in Kuzatuv.
+  const searchedCount = companies.filter((c) => !c.watched).length
+  const clearSearched = () => {
+    const searched = companies.filter((c) => !c.watched)
+    if (searched.length === 0) {
+      toast('Tozalash uchun qidirilgan kompaniya yoʻq')
+      return
+    }
+    searched.forEach((c) => removeRecord(c.stir))
+    toast.success(`${searched.length} ta qidirilgan kompaniya tozalandi`)
   }
-
-  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.stir))
-  const toggleSelectAll = () =>
-    setSelected(allSelected ? new Set() : new Set(filtered.map((c) => c.stir)))
 
   return (
     <div>
@@ -325,48 +301,28 @@ export function Launcher() {
         <h2>Kompaniyalar</h2>
         <span className="count">{filtered.length}</span>
         <div className="sp" />
-        {selectMode ? (
-          <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <span className="faint" style={{ fontSize: 12.5 }}>{selected.size} tanlandi</span>
-            <button className="btn btn-outline btn-sm" onClick={toggleSelectAll}>
-              <CheckSquare />{allSelected ? 'Bekor qilish' : 'Barchasi'}
-            </button>
-            <button className="btn btn-danger btn-sm" disabled={selected.size === 0} onClick={deleteSelected}>
-              <Trash2 />Oʻchirish ({selected.size})
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={exitSelect}>Yopish</button>
-          </div>
-        ) : (
-          <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
-              {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
-            </button>
-            <button className="btn btn-outline btn-sm" onClick={() => setSelectMode(true)} disabled={companies.length === 0}>
-              <CheckSquare />Tanlash
-            </button>
-            <Seg
-              options={[
-                { key: 'all', label: 'Barchasi' },
-                { key: 'active', label: 'Faol' },
-                { key: 'risk', label: 'Xavfli' },
-              ]}
-              value={filter}
-              onChange={(k) => setFilter(k as typeof filter)}
-            />
-          </div>
-        )}
+        <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
+            {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
+            <Trash2 />Tozalash
+          </button>
+          <Seg
+            options={[
+              { key: 'all', label: 'Barchasi' },
+              { key: 'active', label: 'Faol' },
+              { key: 'risk', label: 'Xavfli' },
+            ]}
+            value={filter}
+            onChange={(k) => setFilter(k as typeof filter)}
+          />
+        </div>
       </div>
       <div className="ccards">
         {filtered.map((c, i) => (
           <div key={c.stir} className="rise" style={{ ['--i' as string]: Math.min(i, 10) }}>
-            <CompanyCard
-              rec={c}
-              onRefresh={refreshOne}
-              onDelete={deleteOne}
-              selectMode={selectMode}
-              selected={selected.has(c.stir)}
-              onToggleSelect={toggleSelect}
-            />
+            <CompanyCard rec={c} onRefresh={refreshOne} onDelete={deleteOne} />
           </div>
         ))}
         {filtered.length === 0 && (
