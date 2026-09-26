@@ -487,8 +487,10 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
-      {/* mini filter cards → Sud ishlari */}
-      <div className="kpis" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginTop: 16 }}>
+      {/* mini filter cards → Sud ishlari. No inline grid override: inherit the
+          responsive .kpis columns/gap so this row reflows in sync with the KPI
+          row above (2-up ≤1080, 1-up ≤560) instead of staying a cramped 4-up. */}
+      <div className="kpis" style={{ marginTop: 16 }}>
         {[
           { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
           { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
