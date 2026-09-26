@@ -701,3 +701,54 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .section-head.sh-click:hover .sh-hint { color: var(--accent); }
 .sh-hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; transition: color .15s; }
 .sh-hint svg { width: 14px; height: 14px; }
+
+/* ---- Pretenziya (akt sverka) upload flow ----------------------------------- */
+.pz-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 40px 20px; border: 1.5px dashed var(--border-default); border-radius: var(--r-lg); background: var(--surface-inset); cursor: pointer; transition: border-color .15s, background .15s; }
+.pz-drop:hover { border-color: var(--accent); background: var(--surface); }
+.pz-drop.busy { pointer-events: none; opacity: .8; }
+.pz-drop b { font-size: 15px; color: var(--text-1); }
+.pz-drop-ico { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 4px; }
+.pz-drop-ico svg { width: 25px; height: 25px; }
+.pz-alert { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 11px 14px; border-radius: var(--radius-md); background: var(--neg-soft); color: var(--neg-text); font-size: 13px; }
+.pz-alert svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.pz-note { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12px; }
+
+.pz-summary { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 22px; padding: 16px 18px; margin-bottom: 16px; border: 1px solid var(--border-subtle); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--elev-1); }
+.pz-summary > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pz-summary .lbl { display: flex; align-items: center; gap: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 600; }
+.pz-summary b { font-size: 14px; color: var(--text-1); }
+.pz-summary-date { margin-left: auto; }
+.pz-summary-date .dinput { height: 34px; width: 170px; }
+
+.pz-table { display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; }
+.pz-th, .pz-tr { display: grid; grid-template-columns: 40px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 14px; }
+.pz-th { background: var(--surface-inset); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); font-weight: 600; }
+.pz-tr { border-top: 1px solid var(--border-subtle); transition: background .12s; }
+.pz-tr.on { background: var(--accent-soft); }
+.pz-c-sel { display: grid; place-items: center; }
+.pz-c-sel input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.pz-c-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pz-c-name b { font-size: 13.5px; }
+.pz-c-name .faint { font-size: 11.5px; }
+.pz-c-num { text-align: right; font-size: 13px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.pz-c-date { display: flex; align-items: center; gap: 8px; }
+.pz-c-date .dinput { height: 32px; width: 140px; }
+.pz-c-date .faint { font-size: 11.5px; white-space: nowrap; }
+.pz-cap { font-size: 10px; font-weight: 700; color: var(--neg-text); background: var(--neg-soft); border-radius: 5px; padding: 1px 5px; }
+
+.pz-consts { margin-top: 16px; border: 1px solid var(--border-subtle); border-radius: var(--r-lg); padding: 4px 16px 14px; background: var(--surface); }
+.pz-consts summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 12px 2px; list-style: none; }
+.pz-consts summary::-webkit-details-marker { display: none; }
+.pz-consts summary::before { content: '▸'; margin-right: 8px; color: var(--text-3); }
+.pz-consts[open] summary::before { content: '▾'; }
+.pz-const-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding-top: 6px; }
+
+.pz-actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+.pz-actions .faint { font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .pz-th { display: none; }
+  .pz-tr { grid-template-columns: 32px 1fr; row-gap: 6px; }
+  .pz-c-num, .pz-c-date { grid-column: 2; justify-content: flex-start; text-align: left; }
+  .pz-summary-date { margin-left: 0; }
+}

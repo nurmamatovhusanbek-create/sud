@@ -207,6 +207,35 @@ export async function generateDocument(
   await saveBlob(res, 'hujjat.docx')
 }
 
+/** Претензия engine — generate one .docx per contract (or a .zip) and download.
+ *  The xlsx is parsed on the client; only the derived figures are posted. */
+export async function generatePretenzia(payload: {
+  claimDate: string
+  constants: Record<string, string>
+  contracts: { no: string; date: string; mainDebtTiyin: number; paymentTiyin: number; delayStart: string }[]
+  terms?: { ratePerDay: number; capFraction: number }
+}): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch('/api/pretenzia/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+  if (!res.ok) {
+    let msg = 'Hujjatni yaratib boʻlmadi'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+    } catch { /* binary */ }
+    throw new Error(msg)
+  }
+  await saveBlob(res, 'pretenziya.docx')
+}
+
 async function saveBlob(res: Response, fallbackName: string): Promise<void> {
   const blob = await res.blob()
   const cd = res.headers.get('content-disposition') || ''
