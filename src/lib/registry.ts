@@ -6,8 +6,6 @@
  * Legacy migration: the three old keys are read ONCE, merged, and written
  * into the new store; the old keys are left untouched for rollback.
  */
-import type { MibDebt } from './mib-types'
-
 export interface CompanyRecord {
   stir: string
   name?: string
@@ -42,13 +40,6 @@ export interface CompanyMeta {
   paidTotal?: number
   overdueTotal?: number
   billsLoadedAt?: number
-  /** MIB (enforcement) debt — cached from the last manual mib.uz check.
-   *  Feeds the watchlist red flag + the «qarzdor» filter. */
-  mibHasDebt?: boolean
-  mibTotalDebt?: number
-  mibCurrentDebt?: number
-  mibDebts?: MibDebt[]
-  mibCheckedAt?: number
 }
 
 const REGISTRY_KEY = 'sud-registry-v1'

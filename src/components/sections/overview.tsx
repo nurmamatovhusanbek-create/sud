@@ -62,7 +62,6 @@ import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
 import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
-import { MibCard } from '@/components/sections/mib-card'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 
@@ -524,26 +523,23 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
-      <div className="dash" style={{ gridTemplateColumns: 'minmax(0, 1.55fr) minmax(0, 1fr)' }}>
-        <div className="p-card rise-c">
-          <div className="card-h">
-            <div className="ico"><Activity /></div>
-            <h3>Oylik faollik</h3>
-            <div className="sp" />
-            <span className="badge b-neu">{new Date().getFullYear()}</span>
-          </div>
-          <BarChart
-            data={trend.map((t) => t.count)}
-            labels={trend.map((t) => t.label)}
-            hotIdx={hotIdx}
-            unit=" ish"
-            onBarClick={(_, v, l) => toast(`${l} · ${v} ish`)}
-          />
-          <div className="faint" style={{ fontSize: 11.5, marginTop: 6, textAlign: 'center' }}>
-            Ustunni bosing · oʻsha oydagi ishlar
-          </div>
+      <div className="p-card rise-c">
+        <div className="card-h">
+          <div className="ico"><Activity /></div>
+          <h3>Oylik faollik</h3>
+          <div className="sp" />
+          <span className="badge b-neu">{new Date().getFullYear()}</span>
         </div>
-        <MibCard stir={stir} />
+        <BarChart
+          data={trend.map((t) => t.count)}
+          labels={trend.map((t) => t.label)}
+          hotIdx={hotIdx}
+          unit=" ish"
+          onBarClick={(_, v, l) => toast(`${l} · ${v} ish`)}
+        />
+        <div className="faint" style={{ fontSize: 11.5, marginTop: 6, textAlign: 'center' }}>
+          Ustunni bosing · oʻsha oydagi ishlar
+        </div>
       </div>
 
       <div className="dash" style={{ gridTemplateColumns: '1fr 1fr' }}>
