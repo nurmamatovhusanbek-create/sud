@@ -211,6 +211,7 @@ export async function generateDocument(
  *  The xlsx is parsed on the client; only the derived figures are posted. */
 export async function generatePretenzia(payload: {
   claimDate: string
+  lang: 'ru' | 'uz'
   constants: Record<string, string>
   contracts: { no: string; date: string; mainDebtTiyin: number; paymentTiyin: number; delayStart: string }[]
   terms?: { ratePerDay: number; capFraction: number }

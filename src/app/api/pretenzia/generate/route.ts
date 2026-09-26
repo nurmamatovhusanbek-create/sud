@@ -43,6 +43,7 @@ async function POST_impl(req: NextRequest) {
   const claimDate = asDate(body.claimDate)
   if (!claimDate) return NextResponse.json({ ok: false, error: 'Sana notoʻgʻri' }, { status: 400 })
 
+  const lang = body.lang === 'uz' ? 'uz' : 'ru'
   const c = (body.constants ?? {}) as Record<string, unknown>
   const constants: ClaimConstants = {
     creditorName: asString(c.creditorName),
@@ -53,6 +54,7 @@ async function POST_impl(req: NextRequest) {
     executor: asString(c.executor),
     executorPhone: asString(c.executorPhone),
     claimDate,
+    lang,
   }
 
   const terms = body.terms as Record<string, unknown> | undefined

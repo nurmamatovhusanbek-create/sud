@@ -20,14 +20,28 @@ import { parseSverka, type SverkaParseResult } from '@/lib/pretenzia/parse'
 import { computeClaim, addBankingDays, formatSum, formatDate } from '@/core/pretenzia'
 import { generatePretenzia } from '@/lib/api-client'
 
-const DEFAULTS: Record<string, string> = {
-  creditorName: 'ARTIKUL AZIYA KABEL',
-  debtorName: 'HUDUDIY ELEKTR TARMOQLARI',
-  debtorAddress: 'Юнусабадский район ул. Осиё 8-дом',
-  courtName: 'Ташкентский межрайонный экономический суд',
-  director: 'Тургунов Ш.А.',
-  executor: 'Нурмаматов Ҳ.',
-  executorPhone: '+998 91 773 22 72',
+type Lang = 'ru' | 'uz'
+
+/** Sample-value defaults (ghost placeholders + blank fallback), per language. */
+const DEFAULTS: Record<Lang, Record<string, string>> = {
+  ru: {
+    creditorName: 'ARTIKUL AZIYA KABEL',
+    debtorName: 'HUDUDIY ELEKTR TARMOQLARI',
+    debtorAddress: 'Юнусабадский район ул. Осиё 8-дом',
+    courtName: 'Ташкентский межрайонный экономический суд',
+    director: 'Тургунов Ш.А.',
+    executor: 'Нурмаматов Ҳ.',
+    executorPhone: '+998 91 773 22 72',
+  },
+  uz: {
+    creditorName: 'ARTIKUL AZIYA KABEL',
+    debtorName: 'HUDUDIY ELEKTR TARMOQLARI',
+    debtorAddress: 'Toshkent sh., Yunusobod tumani, Osiyo koʻchasi, 8-uy',
+    courtName: 'Toshkent tumanlararo iqtisodiy sudi',
+    director: 'Turgunov Sh.A.',
+    executor: 'Nurmamatov H.',
+    executorPhone: '+998 91 773 22 72',
+  },
 }
 
 const CONST_FIELDS: { key: string; label: string }[] = [
@@ -61,6 +75,7 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
   const [rows, setRows] = useState<Record<string, Row>>({})
   const [claimDate, setClaimDate] = useState(toInput(new Date()))
   const [consts, setConsts] = useState<Record<string, string>>({})
+  const [lang, setLang] = useState<Lang>('ru')
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -107,7 +122,7 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
 
   const resolvedConstants = (): Record<string, string> => {
     const out: Record<string, string> = {}
-    for (const { key } of CONST_FIELDS) out[key] = (consts[key]?.trim() || DEFAULTS[key])
+    for (const { key } of CONST_FIELDS) out[key] = (consts[key]?.trim() || DEFAULTS[lang][key])
     return out
   }
 
@@ -122,6 +137,7 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
     try {
       await generatePretenzia({
         claimDate: claim.toISOString(),
+        lang,
         constants: resolvedConstants(),
         contracts: selected.map((c) => ({
           no: c.no,
@@ -133,8 +149,8 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
       })
       toast.success(
         selected.length > 1
-          ? `${selected.length} ta pretenziya (ZIP) yuklab olindi`
-          : 'Pretenziya yuklab olindi',
+          ? `${selected.length} ta talabnoma (ZIP) yuklab olindi`
+          : 'Talabnoma yuklab olindi',
       )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi')
@@ -147,8 +163,8 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
     <div>
       <div className="hero" style={{ marginBottom: 18 }}>
         <div className="eyebrow">Hujjat generatori</div>
-        <h1>Pretenziya (Akt sverka)</h1>
-        <p>«Акт сверки» faylini yuklang — dastur qarzdor shartnomalarni aniqlaydi, asosiy qarz va penyani hisoblab, har biri uchun pretenziya (talabnoma) tayyorlaydi.</p>
+        <h1>Talabnoma (akt-sverka asosida)</h1>
+        <p>«Акт сверки» faylini yuklang — dastur qarzdor shartnomalarni aniqlaydi, asosiy qarz va penyani hisoblab, har biri uchun talabnoma (pretenziya) tayyorlaydi. Hujjat tilini tanlashingiz mumkin.</p>
       </div>
 
       <div className="doc-crumb">
@@ -175,17 +191,17 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
         <>
           <div className="pz-summary">
             <div>
-              <span className="lbl">Kreditor</span><b>{result.creditorName || DEFAULTS.creditorName}</b>
+              <span className="lbl">Kreditor</span><b>{result.creditorName || DEFAULTS[lang].creditorName}</b>
             </div>
             <div>
-              <span className="lbl">Qarzdor</span><b>{result.debtorName || DEFAULTS.debtorName}</b>
+              <span className="lbl">Qarzdor</span><b>{result.debtorName || DEFAULTS[lang].debtorName}</b>
             </div>
             <div>
               <span className="lbl">Qarzdor shartnomalar</span>
               <b>{result.contracts.length} <span className="faint" style={{ fontWeight: 400 }}>/ {result.totalBlocks} shartnoma</span></b>
             </div>
             <div className="pz-summary-date">
-              <span className="lbl"><CalendarDays style={{ width: 13, height: 13 }} /> Pretenziya sanasi</span>
+              <span className="lbl"><CalendarDays style={{ width: 13, height: 13 }} /> Talabnoma sanasi</span>
               <input type="date" className="dinput" value={claimDate} onChange={(e) => setClaimDate(e.target.value)} />
             </div>
             <button className="btn btn-ghost btn-sm" onClick={reset}><X />Boshqa fayl</button>
@@ -243,7 +259,7 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
                   <input
                     className="dinput"
                     value={consts[key] ?? ''}
-                    placeholder={DEFAULTS[key]}
+                    placeholder={DEFAULTS[lang][key]}
                     onChange={(e) => setConsts((s) => ({ ...s, [key]: e.target.value }))}
                   />
                 </label>
@@ -255,9 +271,14 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
           </details>
 
           <div className="pz-actions">
+            <div className="pz-lang" role="group" aria-label="Hujjat tili">
+              <span className="faint">Til:</span>
+              <button className={`pz-lang-btn${lang === 'ru' ? ' on' : ''}`} onClick={() => setLang('ru')}>Ruscha</button>
+              <button className={`pz-lang-btn${lang === 'uz' ? ' on' : ''}`} onClick={() => setLang('uz')}>Oʻzbekcha</button>
+            </div>
             <button className="btn btn-primary" onClick={() => void generate()} disabled={busy || selectedCount === 0}>
               {busy ? <Loader2 className="spin" /> : <FileDown />}
-              {selectedCount > 1 ? `${selectedCount} ta pretenziya yaratish (ZIP)` : 'Pretenziya yaratish'}
+              {selectedCount > 1 ? `${selectedCount} ta talabnoma yaratish (ZIP)` : 'Talabnoma yaratish'}
             </button>
             <span className="faint">{selectedCount} / {result.contracts.length} tanlandi</span>
           </div>

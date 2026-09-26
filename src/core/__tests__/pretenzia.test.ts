@@ -4,6 +4,8 @@ import {
   formatSum,
   spellInteger,
   spellMoney,
+  spellIntegerUz,
+  spellMoneyUz,
   addBankingDays,
   delayDays,
   dayWord,
@@ -89,6 +91,36 @@ describe('delayDays — inclusive, to claim date', () => {
     expect(delayDays(new Date(2026, 5, 12), claim)).toBe(98)
     expect(delayDays(new Date(2026, 5, 26), claim)).toBe(84)
     expect(delayDays(new Date(2026, 6, 14), claim)).toBe(66)
+  })
+})
+
+describe('spellIntegerUz / spellMoneyUz — Uzbek', () => {
+  test('plain concatenation, «ming» drops «bir»', () => {
+    expect(spellIntegerUz(5_538_730_518)).toBe(
+      'besh milliard besh yuz oʻttiz sakkiz million yetti yuz oʻttiz ming besh yuz oʻn sakkiz',
+    )
+    expect(spellIntegerUz(240_144_154)).toBe(
+      'ikki yuz qirq million yuz qirq toʻrt ming yuz ellik toʻrt',
+    )
+    expect(spellIntegerUz(1000)).toBe('ming')
+    expect(spellIntegerUz(1_000_000)).toBe('bir million')
+    expect(spellIntegerUz(2100)).toBe('ikki ming yuz')
+    expect(spellIntegerUz(0)).toBe('nol')
+  })
+  test('spellMoneyUz adds soʻm / tiyin', () => {
+    expect(spellMoneyUz(toTiyin(5538730518.42))).toBe(
+      'besh milliard besh yuz oʻttiz sakkiz million yetti yuz oʻttiz ming besh yuz oʻn sakkiz soʻm 42 tiyin',
+    )
+    expect(spellMoneyUz(toTiyin(240144154.6))).toBe(
+      'ikki yuz qirq million yuz qirq toʻrt ming yuz ellik toʻrt soʻm 60 tiyin',
+    )
+  })
+})
+
+describe('paymentClause — uz', () => {
+  test('partial / none', () => {
+    expect(paymentClause(toTiyin(58700600), 'uz')).toBe('(qisman toʻlov 58 700 600,00 soʻmni tashkil etgan)')
+    expect(paymentClause(0, 'uz')).toBe('(toʻlov amalga oshirilmagan)')
   })
 })
 
