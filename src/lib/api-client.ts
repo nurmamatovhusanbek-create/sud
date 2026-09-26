@@ -212,6 +212,8 @@ export async function generateDocument(
 export async function generatePretenzia(payload: {
   claimDate: string
   lang: 'ru' | 'uz'
+  letterhead?: string
+  blankLetterhead?: boolean
   constants: Record<string, string>
   contracts: { no: string; date: string; mainDebtTiyin: number; paymentTiyin: number; delayStart: string }[]
   terms?: { ratePerDay: number; capFraction: number }

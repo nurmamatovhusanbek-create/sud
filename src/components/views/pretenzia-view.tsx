@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { parseSverka, type SverkaParseResult } from '@/lib/pretenzia/parse'
 import { computeClaim, addBankingDays, formatSum, formatDate } from '@/core/pretenzia'
 import { generatePretenzia } from '@/lib/api-client'
+import { LetterheadRow } from '@/components/proto/letterhead'
 
 type Lang = 'ru' | 'uz'
 
@@ -68,9 +69,14 @@ interface Row {
   delayStart: string // yyyy-mm-dd
 }
 
-export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
+export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
+  onBack: () => void
+  letterhead: string
+  onLetterhead: (v: string) => void
+}) {
   const [parsing, setParsing] = useState(false)
   const [err, setErr] = useState('')
+  const [dragOver, setDragOver] = useState(false)
   const [result, setResult] = useState<SverkaParseResult | null>(null)
   const [rows, setRows] = useState<Record<string, Row>>({})
   const [claimDate, setClaimDate] = useState(toInput(new Date()))
@@ -103,6 +109,16 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
     } finally {
       setParsing(false)
     }
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (parsing) return
+    const f = e.dataTransfer.files?.[0]
+    if (!f) return
+    if (!/\.xlsx$/i.test(f.name)) { setErr('Faqat .xlsx fayl qabul qilinadi.'); return }
+    void loadFile(f)
   }
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +154,8 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
       await generatePretenzia({
         claimDate: claim.toISOString(),
         lang,
+        letterhead: letterhead || undefined,
+        blankLetterhead: !letterhead,
         constants: resolvedConstants(),
         contracts: selected.map((c) => ({
           no: c.no,
@@ -173,10 +191,15 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
 
       {!result ? (
         <>
-          <label className={`pz-drop${parsing ? ' busy' : ''}`}>
+          <label
+            className={`pz-drop${parsing ? ' busy' : ''}${dragOver ? ' over' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); if (!parsing) setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+          >
             <input ref={inputRef} type="file" accept=".xlsx" onChange={onPick} hidden disabled={parsing} />
             <div className="pz-drop-ico">{parsing ? <Loader2 className="spin" /> : <FileUp />}</div>
-            <b>{parsing ? 'Oʻqilmoqda…' : 'Akt sverka (.xlsx) faylini tanlang'}</b>
+            <b>{parsing ? 'Oʻqilmoqda…' : dragOver ? 'Faylni shu yerga tashlang' : 'Akt sverka (.xlsx) faylini tanlang yoki shu yerga tashlang'}</b>
             <span className="faint">Fayl brauzeringizda oʻqiladi — hech qayerga yuborilmaydi.</span>
           </label>
           {err && (
@@ -251,7 +274,10 @@ export function PretenziyaFlow({ onBack }: { onBack: () => void }) {
           </div>
 
           <details className="pz-consts">
-            <summary>Hujjat rekvizitlari (kreditor, sud, imzo) — oʻzgartirish ixtiyoriy</summary>
+            <summary>Hujjat rekvizitlari (blanka, kreditor, sud, imzo) — oʻzgartirish ixtiyoriy</summary>
+            <div style={{ padding: '4px 0 14px' }}>
+              <LetterheadRow value={letterhead} onChange={onLetterhead} />
+            </div>
             <div className="pz-const-grid">
               {CONST_FIELDS.map(({ key, label }) => (
                 <label className="doc-field" key={key}>

@@ -84,9 +84,12 @@ async function POST_impl(req: NextRequest) {
     contracts.push({ no, date, delayStart, mainDebtTiyin, paymentTiyin: Math.max(0, paymentTiyin) })
   }
 
+  const letterhead = typeof body.letterhead === 'string' ? body.letterhead : undefined
+  const blankLetterhead = body.blankLetterhead === true
+
   let out
   try {
-    out = await generatePretenzia(contracts, constants)
+    out = await generatePretenzia(contracts, constants, { letterhead, blankIfNone: blankLetterhead })
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi' },
