@@ -7,13 +7,14 @@
  * filter. Cards render registry-cached meta; unknown values stay neutral.
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { BarChart3, CalendarDays, Gavel, Search, Users, Wallet, X } from 'lucide-react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
+import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X, CheckSquare, Check } from 'lucide-react'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
-import { recents, removeRecent, allRecords } from '@/lib/registry'
+import { recents, removeRecent, removeRecord, allRecords } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { searchCompanies } from '@/lib/api-client'
+import { enrichCompany } from '@/lib/enrich'
 import { toast } from 'sonner'
 import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
 import type { CompanyRecord } from '@/lib/registry'
@@ -25,17 +26,61 @@ const isKnownActive = (s?: string) =>
 const isKnownInactive = (s?: string) =>
   !!s && /тўхтатилган|тугатилган|to'xtatilgan|to‘xtatilgan|tugatilgan|suspended|liquidat/i.test(s)
 
-function CompanyCard({ rec }: { rec: CompanyRecord }) {
+function CompanyCard({ rec, onRefresh, onDelete, selectMode, selected, onToggleSelect }: {
+  rec: CompanyRecord
+  onRefresh: (stir: string) => Promise<void>
+  onDelete: (stir: string) => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: (stir: string) => void
+}) {
   const openCompany = useAppStore((s) => s.openCompany)
+  const [refreshing, setRefreshing] = useState(false)
   const meta = rec.meta
+
+  const refresh = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (refreshing) return
+    setRefreshing(true)
+    void onRefresh(rec.stir)
+      .catch(() => toast.error('Yangilashda xatolik — manbalar javob bermadi'))
+      .finally(() => setRefreshing(false))
+  }
+  const onClick = () => {
+    if (selectMode) onToggleSelect(rec.stir)
+    else openCompany(rec.stir, { name: rec.name })
+  }
+
   return (
-    <div className="ccard" data-open={rec.stir} onClick={() => openCompany(rec.stir, { name: rec.name })}>
+    <div
+      className={`ccard${selectMode ? ' selectable' : ''}${selected ? ' selected' : ''}`}
+      data-open={rec.stir}
+      onClick={onClick}
+    >
+      {selectMode && (
+        <span className={`cc-check${selected ? ' on' : ''}`} aria-hidden>{selected && <Check />}</span>
+      )}
       <div className="cc-head">
         <div className="mono-tile">{initials(rec.name || '')}</div>
         <div className="cc-id">
           <div className="nm">{rec.name || `STIR ${grp(rec.stir)}`}</div>
           <div className="tin">{grp(rec.stir)}</div>
         </div>
+        {!selectMode && (
+          <div className="ccard-tools">
+            <button className="ccard-act" title="Yangilash" aria-label="Yangilash" onClick={refresh}>
+              {refreshing ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
+            </button>
+            <button
+              className="ccard-act ccard-act-danger"
+              title="Roʻyxatdan oʻchirish"
+              aria-label="Oʻchirish"
+              onClick={(e) => { e.stopPropagation(); onDelete(rec.stir) }}
+            >
+              <X />
+            </button>
+          </div>
+        )}
       </div>
       <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
     </div>
@@ -50,6 +95,9 @@ export function Launcher() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'active' | 'risk'>('all')
   const [searching, setSearching] = useState(false)
+  const [refreshingAll, setRefreshingAll] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const rv = useRegistryVersion()
 
   // Hydration-safe listing: registry is localStorage-backed (renders after
@@ -135,6 +183,49 @@ export function Launcher() {
     if (filter === 'risk') return isKnownInactive(c.meta?.status) || (c.meta?.overdueTotal ?? 0) > 0
     return true
   })
+
+  // ---- refresh + delete --------------------------------------------------
+  const refreshOne = (stir: string): Promise<void> =>
+    enrichCompany(stir, true).then((ok) => { if (!ok) throw new Error('refresh failed') })
+
+  const refreshAll = async () => {
+    if (refreshingAll || filtered.length === 0) return
+    setRefreshingAll(true)
+    let ok = 0
+    for (const c of filtered) {
+      if (await enrichCompany(c.stir, true)) ok++
+    }
+    setRefreshingAll(false)
+    toast.success(`${ok}/${filtered.length} kompaniya yangilandi`)
+  }
+
+  const deleteOne = (stir: string) => {
+    removeRecord(stir)
+    setSelected((s) => { const n = new Set(s); n.delete(stir); return n })
+    toast.success('Roʻyxatdan oʻchirildi')
+  }
+
+  const toggleSelect = (stir: string) =>
+    setSelected((s) => {
+      const n = new Set(s)
+      if (n.has(stir)) n.delete(stir)
+      else n.add(stir)
+      return n
+    })
+
+  const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
+
+  const deleteSelected = () => {
+    const n = selected.size
+    if (n === 0) return
+    selected.forEach((stir) => removeRecord(stir))
+    toast.success(`${n} ta kompaniya oʻchirildi`)
+    exitSelect()
+  }
+
+  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.stir))
+  const toggleSelectAll = () =>
+    setSelected(allSelected ? new Set() : new Set(filtered.map((c) => c.stir)))
 
   return (
     <div>
@@ -234,20 +325,48 @@ export function Launcher() {
         <h2>Kompaniyalar</h2>
         <span className="count">{filtered.length}</span>
         <div className="sp" />
-        <Seg
-          options={[
-            { key: 'all', label: 'Barchasi' },
-            { key: 'active', label: 'Faol' },
-            { key: 'risk', label: 'Xavfli' },
-          ]}
-          value={filter}
-          onChange={(k) => setFilter(k as typeof filter)}
-        />
+        {selectMode ? (
+          <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <span className="faint" style={{ fontSize: 12.5 }}>{selected.size} tanlandi</span>
+            <button className="btn btn-outline btn-sm" onClick={toggleSelectAll}>
+              <CheckSquare />{allSelected ? 'Bekor qilish' : 'Barchasi'}
+            </button>
+            <button className="btn btn-danger btn-sm" disabled={selected.size === 0} onClick={deleteSelected}>
+              <Trash2 />Oʻchirish ({selected.size})
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={exitSelect}>Yopish</button>
+          </div>
+        ) : (
+          <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
+              {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={() => setSelectMode(true)} disabled={companies.length === 0}>
+              <CheckSquare />Tanlash
+            </button>
+            <Seg
+              options={[
+                { key: 'all', label: 'Barchasi' },
+                { key: 'active', label: 'Faol' },
+                { key: 'risk', label: 'Xavfli' },
+              ]}
+              value={filter}
+              onChange={(k) => setFilter(k as typeof filter)}
+            />
+          </div>
+        )}
       </div>
       <div className="ccards">
         {filtered.map((c, i) => (
           <div key={c.stir} className="rise" style={{ ['--i' as string]: Math.min(i, 10) }}>
-            <CompanyCard rec={c} />
+            <CompanyCard
+              rec={c}
+              onRefresh={refreshOne}
+              onDelete={deleteOne}
+              selectMode={selectMode}
+              selected={selected.has(c.stir)}
+              onToggleSelect={toggleSelect}
+            />
           </div>
         ))}
         {filtered.length === 0 && (
