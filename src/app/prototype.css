@@ -752,3 +752,11 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
   .pz-c-num, .pz-c-date { grid-column: 2; justify-content: flex-start; text-align: left; }
   .pz-summary-date { margin-left: 0; }
 }
+
+/* Talabnoma language toggle */
+.pz-lang { display: inline-flex; align-items: center; gap: 6px; }
+.pz-lang > .faint { font-size: 12.5px; margin-right: 2px; }
+.pz-lang-btn { height: 34px; padding: 0 13px; border: 1px solid var(--border-default); background: var(--surface); color: var(--text-2); border-radius: var(--radius-md); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .12s; }
+.pz-lang-btn:hover { border-color: var(--accent); color: var(--text-1); }
+.pz-lang-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (max-width: 720px) { .pz-actions { flex-wrap: wrap; } }

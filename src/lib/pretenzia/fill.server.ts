@@ -9,7 +9,9 @@ import path from 'node:path'
 import JSZip from 'jszip'
 import { renderClaimValues, type ClaimConstants, type ClaimContractInput } from './render'
 
-const TEMPLATE = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates', 'pretenzia.docx')
+const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
+const TEMPLATE_FILE = { ru: 'pretenzia.docx', uz: 'talabnoma-uz.docx' } as const
+const NAME_PREFIX = { ru: 'Pretenziya', uz: 'Talabnoma' } as const
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -49,17 +51,15 @@ export interface GeneratedFile {
 }
 
 /** Fill one contract's .docx and return its bytes + a per-contract filename. */
-async function fillOne(templateXml: string, base: JSZip, c: ClaimContractInput, k: ClaimConstants): Promise<{ buffer: Buffer; name: string }> {
+async function fillOne(templateXml: string, base: JSZip, c: ClaimContractInput, k: ClaimConstants, prefix: string): Promise<{ buffer: Buffer; name: string }> {
   const values = renderClaimValues(c, k)
-  // clone the loaded zip by re-writing document.xml on a fresh load is costly;
-  // instead reuse the base zip object per call by swapping document.xml.
   base.file('word/document.xml', fillXml(templateXml, values))
   const buffer = await base.generateAsync({
     type: 'nodebuffer',
     compression: 'DEFLATE',
     compressionOptions: { level: 6 },
   })
-  return { buffer, name: `Pretenziya-${slug(c.no)}-${stamp(k.claimDate)}.docx` }
+  return { buffer, name: `${prefix}-${slug(c.no)}-${stamp(k.claimDate)}.docx` }
 }
 
 export async function generatePretenzia(
@@ -68,7 +68,9 @@ export async function generatePretenzia(
 ): Promise<GeneratedFile> {
   if (contracts.length === 0) throw new Error('Shartnoma tanlanmadi')
 
-  const raw = await fs.readFile(TEMPLATE)
+  const lang = constants.lang ?? 'ru'
+  const prefix = NAME_PREFIX[lang]
+  const raw = await fs.readFile(path.join(TEMPLATE_DIR, TEMPLATE_FILE[lang]))
   const zip = await JSZip.loadAsync(raw)
   const docXml = zip.file('word/document.xml')
   if (!docXml) throw new Error('Shablon buzilgan')
@@ -78,7 +80,7 @@ export async function generatePretenzia(
   for (const c of contracts) {
     // reload a clean zip per document so each keeps the full template payload
     const perZip = await JSZip.loadAsync(raw)
-    files.push(await fillOne(templateXml, perZip, c, constants))
+    files.push(await fillOne(templateXml, perZip, c, constants, prefix))
   }
 
   if (files.length === 1) {
@@ -92,5 +94,5 @@ export async function generatePretenzia(
     compression: 'DEFLATE',
     compressionOptions: { level: 6 },
   })
-  return { buffer, filename: `Pretenziya-${files.length}-dona-${stamp(constants.claimDate)}.zip`, zipped: true }
+  return { buffer, filename: `${prefix}-${files.length}-dona-${stamp(constants.claimDate)}.zip`, zipped: true }
 }

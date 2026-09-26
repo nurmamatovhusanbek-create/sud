@@ -120,6 +120,58 @@ export function spellMoney(tiyin: number): string {
   return `${spellInteger(whole)} сум ${String(frac).padStart(2, '0')} тийин`
 }
 
+// ---- Uzbek number-to-words (soʻm) ------------------------------------------
+// Uzbek cardinals have no gender or case agreement, so the triplet spelling is
+// a plain concatenation. Only «ming» drops the leading «bir» (1000 → «ming»,
+// but 1 000 000 → «bir million»).
+
+const ONES_UZ = ['nol', 'bir', 'ikki', 'uch', 'toʻrt', 'besh', 'olti', 'yetti', 'sakkiz', 'toʻqqiz']
+const TENS_UZ = ['', 'oʻn', 'yigirma', 'oʻttiz', 'qirq', 'ellik', 'oltmish', 'yetmish', 'sakson', 'toʻqson']
+const SCALES_UZ = ['', 'ming', 'million', 'milliard', 'trillion']
+
+function tripletUz(n: number): string[] {
+  const out: string[] = []
+  const h = Math.floor(n / 100)
+  const t = Math.floor((n % 100) / 10)
+  const u = n % 10
+  if (h) out.push(h === 1 ? 'yuz' : `${ONES_UZ[h]} yuz`)
+  if (t) out.push(TENS_UZ[t])
+  if (u) out.push(ONES_UZ[u])
+  return out
+}
+
+/** Spell a non-negative integer in Uzbek. */
+export function spellIntegerUz(value: number): string {
+  let n = Math.floor(Math.abs(value))
+  if (n === 0) return 'nol'
+  const triplets: number[] = []
+  while (n > 0) {
+    triplets.push(n % 1000)
+    n = Math.floor(n / 1000)
+  }
+  const parts: string[] = []
+  for (let i = triplets.length - 1; i >= 0; i--) {
+    const t = triplets[i]
+    if (t === 0) continue
+    const scale = SCALES_UZ[i] ?? SCALES_UZ[SCALES_UZ.length - 1]
+    if (i === 1 && t === 1) {
+      parts.push('ming') // 1000 → «ming», not «bir ming»
+    } else {
+      parts.push(...tripletUz(t))
+      if (scale) parts.push(scale)
+    }
+  }
+  return parts.join(' ')
+}
+
+/** Uzbek «propisyu» of a money amount in tiyin: «… soʻm 42 tiyin». */
+export function spellMoneyUz(tiyin: number): string {
+  const abs = Math.abs(tiyin)
+  const whole = Math.floor(abs / 100)
+  const frac = abs % 100
+  return `${spellIntegerUz(whole)} soʻm ${String(frac).padStart(2, '0')} tiyin`
+}
+
 // ---- dates -----------------------------------------------------------------
 
 /** Add `n` banking days (skipping Sat/Sun) to `d`. Returns a new Date. */
@@ -223,12 +275,19 @@ export function computeClaim(input: ClaimInput): ClaimResult {
   }
 }
 
+export type Lang = 'ru' | 'uz'
+
 /**
  * The parenthetical payment clause after the supplied-total sentence:
- *   payment > 0 → «(частичная оплата составила X сум)»
- *   payment = 0 → «(оплата не производилась)»
+ *   ru: «(частичная оплата составила X сум)» / «(оплата не производилась)»
+ *   uz: «(qisman toʻlov X soʻmni tashkil etgan)» / «(toʻlov amalga oshirilmagan)»
  */
-export function paymentClause(paymentTiyin: number): string {
+export function paymentClause(paymentTiyin: number, lang: Lang = 'ru'): string {
+  if (lang === 'uz') {
+    return paymentTiyin > 0
+      ? `(qisman toʻlov ${formatSum(paymentTiyin)} soʻmni tashkil etgan)`
+      : '(toʻlov amalga oshirilmagan)'
+  }
   return paymentTiyin > 0
     ? `(частичная оплата составила ${formatSum(paymentTiyin)} сум)`
     : '(оплата не производилась)'

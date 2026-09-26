@@ -465,8 +465,8 @@ export function DocumentsView() {
           <button className="doc-cat rise-c" onClick={() => setPretenzia(true)}>
             <div className="doc-cat-ico"><FileSpreadsheet /></div>
             <div className="doc-cat-body">
-              <b>Pretenziya (Akt sverka)</b>
-              <span>«Акт сверки» xlsx yuklang — qarzdor shartnomalar boʻyicha talabnoma (penya bilan) yaratiladi.</span>
+              <b>Talabnoma (akt-sverka asosida)</b>
+              <span>«Акт сверки» xlsx yuklang — qarzdor shartnomalar boʻyicha talabnoma (penya bilan, ruscha yoki oʻzbekcha) yaratiladi.</span>
               <span className="doc-cat-meta"><FileSpreadsheet />xlsx orqali</span>
             </div>
             <ChevronRight className="doc-cat-arrow" />

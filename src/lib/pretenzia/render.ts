@@ -9,9 +9,11 @@ import {
   formatSum,
   formatDate,
   spellMoney,
+  spellMoneyUz,
   dayWord,
   paymentClause,
   type PenaltyTerms,
+  type Lang,
 } from '@/core/pretenzia'
 
 /** Party/office constants — blank falls back to the sample default at the UI. */
@@ -25,6 +27,8 @@ export interface ClaimConstants {
   executorPhone: string
   /** Date the claim is issued (header + day count). */
   claimDate: Date
+  /** Output language — selects template + word spelling. Default 'ru'. */
+  lang?: Lang
   terms?: PenaltyTerms
 }
 
@@ -38,6 +42,7 @@ export interface ClaimContractInput {
 }
 
 export function renderClaimValues(c: ClaimContractInput, k: ClaimConstants): Record<string, string> {
+  const lang: Lang = k.lang ?? 'ru'
   const r = computeClaim({
     mainDebtTiyin: c.mainDebtTiyin,
     paymentTiyin: c.paymentTiyin,
@@ -45,6 +50,7 @@ export function renderClaimValues(c: ClaimContractInput, k: ClaimConstants): Rec
     claimDate: k.claimDate,
     terms: k.terms,
   })
+  const words = lang === 'uz' ? spellMoneyUz : spellMoney
   return {
     claim_date: formatDate(k.claimDate),
     creditor_name: k.creditorName,
@@ -57,13 +63,14 @@ export function renderClaimValues(c: ClaimContractInput, k: ClaimConstants): Rec
     contract_no: c.no,
     contract_date: formatDate(c.date),
     supplied: formatSum(r.suppliedTiyin),
-    payment_clause: paymentClause(r.paymentTiyin),
+    payment_clause: paymentClause(r.paymentTiyin, lang),
     main_debt: formatSum(r.mainDebtTiyin),
-    main_debt_words: spellMoney(r.mainDebtTiyin),
+    main_debt_words: words(r.mainDebtTiyin),
     penalty: formatSum(r.penaltyTiyin),
-    penalty_words: spellMoney(r.penaltyTiyin),
+    penalty_words: words(r.penaltyTiyin),
     delay_start: formatDate(c.delayStart),
     days: String(r.days),
-    day_word: dayWord(r.days),
+    // ru template uses the agreeing day noun; the uz template hard-codes «kun».
+    day_word: lang === 'uz' ? 'kun' : dayWord(r.days),
   }
 }
