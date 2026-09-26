@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   FileDown, FileText, Building2, UserRound, Loader2, ImagePlus, X,
-  Plane, Landmark, Scale, ChevronRight, ArrowLeft, Search,
+  Plane, Landmark, Scale, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -36,6 +36,7 @@ import {
   type FieldDef,
 } from '@/lib/documents/registry'
 import { generateDocument } from '@/lib/api-client'
+import { PretenziyaFlow } from './pretenzia-view'
 
 const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
@@ -356,6 +357,7 @@ function DocTile({ doc, onOpen }: { doc: DocDef; onOpen: () => void }) {
 export function DocumentsView() {
   const [active, setActive] = useState<DocTab | null>(null)
   const [activeDoc, setActiveDoc] = useState<string | null>(null)
+  const [pretenzia, setPretenzia] = useState(false)
   const [query, setQuery] = useState('')
 
   const [letterhead, setLetterhead] = useState<string>(() => {
@@ -390,6 +392,11 @@ export function DocumentsView() {
     // separate categories; otherwise just open the category's combined form.
     setActiveDoc(tabById(d.tab)?.separate ? d.id : null)
     setQuery('')
+  }
+
+  // ---- Pretenziya (akt sverka) upload flow
+  if (pretenzia) {
+    return <PretenziyaFlow onBack={() => setPretenzia(false)} />
   }
 
   // ---- single document form
@@ -455,6 +462,15 @@ export function DocumentsView() {
       ) : (
         <div className="doc-cat-cards">
           {TABS.map((t) => <CategoryCard key={t.id} tab={t} onOpen={() => setActive(t.id)} />)}
+          <button className="doc-cat rise-c" onClick={() => setPretenzia(true)}>
+            <div className="doc-cat-ico"><FileSpreadsheet /></div>
+            <div className="doc-cat-body">
+              <b>Pretenziya (Akt sverka)</b>
+              <span>«Акт сверки» xlsx yuklang — qarzdor shartnomalar boʻyicha talabnoma (penya bilan) yaratiladi.</span>
+              <span className="doc-cat-meta"><FileSpreadsheet />xlsx orqali</span>
+            </div>
+            <ChevronRight className="doc-cat-arrow" />
+          </button>
         </div>
       )}
     </div>
