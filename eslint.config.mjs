@@ -16,9 +16,15 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "@typescript-eslint/prefer-as-const": "off",
     "@typescript-eslint/no-unused-disable-directive": "off",
     
-    // React rules
+    // React rules — the React Compiler advisory family (eslint-plugin-react-hooks
+    // v6). These flag intentional, correct patterns in this app: hydration
+    // guards (useEffect(() => setHydrated(true), [])) and useRef(fn).current
+    // memoization. Disabled to match the rest of the family already off below.
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",
+    "react-hooks/set-state-in-effect": "off",
+    "react-hooks/refs": "off",
+    "react-hooks/use-memo": "off",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",
