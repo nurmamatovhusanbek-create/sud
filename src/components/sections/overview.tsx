@@ -401,7 +401,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   const pieKind = pieMode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'
 
   return (
-    <div>
+    <div className="stat-flow">
       <div className="kpis">
         <Kpi label="Jami sud ishlari" icon={<Gavel />} foot={<>{s.win} yutgan / {s.total} ish</>}>
           <span>{s.total}</span>
@@ -489,8 +489,9 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
 
       {/* mini filter cards → Sud ishlari. No inline grid override: inherit the
           responsive .kpis columns/gap so this row reflows in sync with the KPI
-          row above (2-up ≤1080, 1-up ≤560) instead of staying a cramped 4-up. */}
-      <div className="kpis" style={{ marginTop: 16 }}>
+          row above (2-up ≤1080, 1-up ≤560) instead of staying a cramped 4-up.
+          Vertical gap is owned by .stat-flow (the root), not per-block. */}
+      <div className="kpis">
         {[
           { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
           { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },

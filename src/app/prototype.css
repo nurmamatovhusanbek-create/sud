@@ -153,6 +153,15 @@ html, body { height: 100%; }
 .dash { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; }
 @media (max-width: 1000px) { .dash { grid-template-columns: 1fr; } }
 
+/* Statistika vertical rhythm. The section stacks .kpis / .dash / bare .p-card
+   blocks; spacing USED to live on each block (ad-hoc margin-top:16 or the
+   .dash rule), so any block that forgot it — e.g. the "Oylik faollik" chart —
+   sat flush (0px) against the row above. Own the rhythm at the container: every
+   block after the first gets one consistent 16px, and no block can go flush
+   again. Blocks that want a bigger break (e.g. a .section-head) still set their
+   own inline margin, which wins over this rule. */
+.stat-flow > * + * { margin-top: 16px; }
+
 /* ---------- bar chart + tooltip ---------- */
 .bars { display: flex; align-items: flex-end; gap: clamp(4px, 1vw, 10px); height: 170px; padding-top: 10px; }
 .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; cursor: pointer; }
