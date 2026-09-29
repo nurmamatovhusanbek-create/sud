@@ -207,6 +207,18 @@ export async function generateDocument(
   await saveBlob(res, 'hujjat.docx')
 }
 
+/** Raw .docx template for the live preview (placeholders intact). */
+export async function fetchDocTemplate(docId: string): Promise<ArrayBuffer> {
+  let res: Response
+  try {
+    res = await fetch(`/api/documents/template?id=${encodeURIComponent(docId)}`, { headers: authHeaders() })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+  if (!res.ok) throw new Error('Shablonni yuklab boʻlmadi')
+  return res.arrayBuffer()
+}
+
 /** Претензия engine — generate one .docx per contract (or a .zip) and download.
  *  The xlsx is parsed on the client; only the derived figures are posted. */
 export async function generatePretenzia(payload: {

@@ -4,247 +4,40 @@
  * Hujjatlar — the document-generation engine.
  *
  * Landing: a search box + category cards. A category is either
- *  - combined (visa, iio): opens ONE shared form (company + applicant panels)
- *    that generates every document in the category (fill once, generate all); or
+ *  - combined (visa, iio): opens ONE editor — a shared form beside a live
+ *    preview of the real document — that drives every document in the category
+ *    (fill once, preview and download each); or
  *  - separate (court): opens a grid of document cards, and each document opens
- *    its own full-window form.
+ *    the same editor for just that document.
  * The search box finds a document type across categories and opens it directly.
  *
- * Data model lives in src/lib/documents/registry.ts; the fill happens server
- * side at /api/documents/generate.
+ * The editor (doc-editor.tsx) previews the template live in the browser; the
+ * data model lives in src/lib/documents/registry.ts and the downloaded file is
+ * filled server side at /api/documents/generate (same fill function).
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  FileDown, FileText, Building2, UserRound, Loader2, X,
-  Plane, Landmark, Scale, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
+  X, Plane, Landmark, Scale, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import {
   TABS,
   DOCS,
-  FIELDS,
   tabById,
   docsByTab,
   docById,
-  docExtraFields,
-  categoryDefaults,
-  docDefaults,
   type DocTab,
   type TabDef,
   type DocDef,
-  type FieldDef,
 } from '@/lib/documents/registry'
-import { generateDocument } from '@/lib/api-client'
 import { PretenziyaFlow } from './pretenzia-view'
-import { LetterheadRow, useLetterhead } from '@/components/proto/letterhead'
+import { DocEditor } from './doc-editor'
+import { useLetterhead } from '@/components/proto/letterhead'
 
 const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
   iio: <Landmark />,
   court: <Scale />,
-}
-
-// ---- a single field --------------------------------------------------------
-
-function Field({ def, value, onChange }: { def: FieldDef; value: string; onChange: (v: string) => void }) {
-  const wide = def.kind === 'textarea'
-  return (
-    <label className={`doc-field${wide ? ' doc-field-wide' : ''}`}>
-      <span className="doc-field-label">{def.label}</span>
-      {wide ? (
-        <textarea
-          className={`dinput${def.mono ? ' mono' : ''}`}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={def.placeholder}
-          rows={2}
-        />
-      ) : (
-        <input
-          className={`dinput${def.mono ? ' mono' : ''}`}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={def.placeholder}
-        />
-      )}
-      {def.hint && <span className="doc-field-hint">{def.hint}</span>}
-    </label>
-  )
-}
-
-function FieldGrid({ keys, values, set }: { keys: string[]; values: Record<string, string>; set: (k: string, v: string) => void }) {
-  return (
-    <div className="doc-grid">
-      {keys.map((k) => (
-        <Field key={k} def={FIELDS[k]} value={values[k] ?? ''} onChange={(v) => set(k, v)} />
-      ))}
-    </div>
-  )
-}
-
-
-// ---- generate button (shared) ----------------------------------------------
-
-function GenerateButton({ busy, blocked, blockHint, onClick, full = true }: {
-  busy: boolean; blocked: boolean; blockHint?: string; onClick: () => void; full?: boolean
-}) {
-  return (
-    <button
-      className="btn btn-primary"
-      style={{ width: full ? '100%' : undefined, marginTop: 14 }}
-      onClick={onClick}
-      disabled={busy || blocked}
-      title={blocked ? blockHint : undefined}
-    >
-      {busy ? <Loader2 className="spin" style={{ width: 16, height: 16 }} /> : <FileDown />}
-      <span>Word (.docx) yuklab olish</span>
-    </button>
-  )
-}
-
-// ---- single-document full-window form (separate categories) -----------------
-
-function DocForm({ doc, letterhead, onLetterhead, onBack }: {
-  doc: DocDef; letterhead: string; onLetterhead: (v: string) => void; onBack: () => void
-}) {
-  const tab = tabById(doc.tab)!
-  const [values, setValues] = useState<Record<string, string>>(() => docDefaults(doc))
-  const [busy, setBusy] = useState(false)
-  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
-
-  const reqKey = tab.requireKey
-  const blocked = reqKey ? !values[reqKey]?.trim() : false
-  const blockHint = reqKey ? `Avval «${FIELDS[reqKey]?.label ?? reqKey}» maydonini toʻldiring` : undefined
-
-  const generate = async () => {
-    if (blocked) { toast.error(blockHint!); return }
-    setBusy(true)
-    try {
-      await generateDocument(doc.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
-      toast.success(`${doc.title} tayyor — yuklab olindi`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div>
-      <div className="doc-crumb">
-        <button className="btn btn-ghost btn-sm" onClick={onBack}><ArrowLeft />Orqaga</button>
-        <div className="doc-crumb-title">
-          <span className="doc-crumb-ico">{CAT_ICON[doc.tab]}</span>
-          <b>{doc.title}</b>
-          <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{doc.lang}</span>
-        </div>
-      </div>
-
-      <div className="p-card rise-c">
-        <div className="card-h">
-          <div className="ico"><FileText /></div>
-          <div style={{ minWidth: 0 }}>
-            <h3 style={{ marginBottom: 2 }}>{doc.title}</h3>
-            <div className="faint" style={{ fontSize: 12 }}>{doc.subtitle}</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <FieldGrid keys={doc.fields} values={values} set={set} />
-        </div>
-        {tab.letterhead && <LetterheadRow value={letterhead} onChange={onLetterhead} />}
-        <GenerateButton busy={busy} blocked={blocked} blockHint={blockHint} onClick={() => void generate()} />
-      </div>
-    </div>
-  )
-}
-
-// ---- combined-category form (visa, iio): one form → many documents ----------
-
-function CombinedDocCard({ doc, tab, values, set, busy, blocked, blockHint, onGenerate }: {
-  doc: DocDef; tab: TabDef; values: Record<string, string>; set: (k: string, v: string) => void
-  busy: boolean; blocked: boolean; blockHint?: string; onGenerate: () => void
-}) {
-  const extra = docExtraFields(doc, tab)
-  return (
-    <div className="p-card rise-c doc-card">
-      <div className="card-h">
-        <div className="ico"><FileText /></div>
-        <div style={{ minWidth: 0 }}>
-          <h3 style={{ marginBottom: 2 }}>{doc.title}</h3>
-          <div className="faint" style={{ fontSize: 12 }}>{doc.subtitle}</div>
-        </div>
-        <div className="sp" />
-        <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{doc.lang}</span>
-      </div>
-      {extra.length > 0 && <div style={{ marginTop: 12 }}><FieldGrid keys={extra} values={values} set={set} /></div>}
-      <GenerateButton busy={busy} blocked={blocked} blockHint={blockHint} onClick={onGenerate} />
-    </div>
-  )
-}
-
-function CategoryForm({ tab, letterhead, onLetterhead }: { tab: TabDef; letterhead: string; onLetterhead: (v: string) => void }) {
-  const [values, setValues] = useState<Record<string, string>>(() => categoryDefaults(tab))
-  const [busy, setBusy] = useState<string | null>(null)
-  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
-  const docs = docsByTab(tab.id)
-
-  const reqKey = tab.requireKey
-  const blocked = reqKey ? !values[reqKey]?.trim() : false
-  const blockHint = reqKey ? `Avval «${FIELDS[reqKey]?.label ?? reqKey}» maydonini toʻldiring` : undefined
-
-  const generate = async (doc: DocDef) => {
-    if (blocked) { toast.error(blockHint!); return }
-    setBusy(doc.id)
-    try {
-      await generateDocument(doc.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
-      toast.success(`${doc.title} tayyor — yuklab olindi`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const groupIcon = (title: string) => (title === 'Korxona' ? <Building2 /> : <UserRound />)
-
-  return (
-    <div>
-      {(tab.groups ?? []).map((g) => (
-        <div className="p-card rise-c" style={{ marginBottom: 16 }} key={g.title}>
-          <div className="card-h">
-            <div className="ico">{groupIcon(g.title)}</div>
-            <h3>{g.title}</h3>
-          </div>
-          <div style={{ marginTop: 12 }}><FieldGrid keys={g.keys} values={values} set={set} /></div>
-          {g.title === 'Korxona' && tab.letterhead && <LetterheadRow value={letterhead} onChange={onLetterhead} />}
-        </div>
-      ))}
-
-      <div className="section-head" style={{ margin: '22px 0 14px' }}>
-        <h2>Hujjatlar</h2>
-        <span className="count">{docs.length}</span>
-        <div className="sp" />
-        <span className="faint" style={{ fontSize: 12 }}>tahrirlanadigan .docx</span>
-      </div>
-
-      <div className="doc-cards">
-        {docs.map((doc) => (
-          <CombinedDocCard
-            key={doc.id}
-            doc={doc}
-            tab={tab}
-            values={values}
-            set={set}
-            busy={busy === doc.id}
-            blocked={blocked}
-            blockHint={blockHint}
-            onGenerate={() => void generate(doc)}
-          />
-        ))}
-      </div>
-    </div>
-  )
 }
 
 // ---- cards -----------------------------------------------------------------
@@ -321,15 +114,37 @@ export function DocumentsView() {
 
   // ---- single document form
   if (doc) {
+    const docTab = tabById(doc.tab)!
     return (
-      <div>
-        <Hero />
-        <DocForm doc={doc} letterhead={letterhead} onLetterhead={updateLetterhead} onBack={() => setActiveDoc(null)} />
-      </div>
+      <DocEditor
+        key={doc.id}
+        tab={docTab}
+        doc={doc}
+        letterhead={letterhead}
+        onLetterhead={updateLetterhead}
+        onBack={() => setActiveDoc(null)}
+        backLabel="Orqaga"
+        icon={CAT_ICON[doc.tab]}
+      />
     )
   }
 
-  // ---- a category
+  // ---- a combined category → one editor for all its documents
+  if (activeTab && !activeTab.separate) {
+    return (
+      <DocEditor
+        key={activeTab.id}
+        tab={activeTab}
+        letterhead={letterhead}
+        onLetterhead={updateLetterhead}
+        onBack={() => setActive(null)}
+        backLabel="Barcha toifalar"
+        icon={CAT_ICON[activeTab.id]}
+      />
+    )
+  }
+
+  // ---- a separate category → its document tiles
   if (activeTab) {
     return (
       <div>
@@ -341,18 +156,12 @@ export function DocumentsView() {
             <b>{activeTab.label}</b>
           </div>
         </div>
-        {activeTab.separate ? (
-          <>
-            <p className="faint" style={{ fontSize: 13, margin: '0 0 16px' }}>{activeTab.intro}</p>
-            <div className="doc-tiles">
-              {docsByTab(activeTab.id).map((d) => (
-                <DocTile key={d.id} doc={d} onOpen={() => setActiveDoc(d.id)} />
-              ))}
-            </div>
-          </>
-        ) : (
-          <CategoryForm key={activeTab.id} tab={activeTab} letterhead={letterhead} onLetterhead={updateLetterhead} />
-        )}
+        <p className="faint" style={{ fontSize: 13, margin: '0 0 16px' }}>{activeTab.intro}</p>
+        <div className="doc-tiles">
+          {docsByTab(activeTab.id).map((d) => (
+            <DocTile key={d.id} doc={d} onOpen={() => setActiveDoc(d.id)} />
+          ))}
+        </div>
       </div>
     )
   }
