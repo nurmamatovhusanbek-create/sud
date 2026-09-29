@@ -70,13 +70,13 @@ function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
 /**
  * The signature chart: a "verdict wheel". A ring of rounded, separated arcs — one per
  * outcome, sized by its share of all cases — inside a dial of 50 ticks whose lit ticks
- * (2% each, in the "won" color) read the win rate, starting at 12 o'clock. The total and
+ * (2% each, in the "won" color) read the win rate (won ÷ (won + lost)), starting at 12 o'clock. The total and
  * the win rate sit in the middle so the chart is readable without its legend.
  */
 function verdictWheel(
   segs: { value: number; color: string }[],
   total: number,
-  winRate: number,
+  winRate: number | null,
   t: ReportTheme,
 ): string {
   const cx = 100
@@ -105,7 +105,7 @@ function verdictWheel(
   }
 
   const N = 50
-  const lit = Math.max(0, Math.min(N, Math.round((winRate / 100) * N)))
+  const lit = Math.max(0, Math.min(N, Math.round(((winRate ?? 0) / 100) * N)))
   const ticks = Array.from({ length: N }, (_, i) => {
     const a = ((i / N) * 360 - 90) * (Math.PI / 180)
     const r1 = 84
@@ -114,7 +114,7 @@ function verdictWheel(
     return `<line x1="${(cx + r1 * Math.cos(a)).toFixed(2)}" y1="${(cx + r1 * Math.sin(a)).toFixed(2)}" x2="${(cx + r2 * Math.cos(a)).toFixed(2)}" y2="${(cx + r2 * Math.sin(a)).toFixed(2)}" stroke="${on ? t.tone.pos.fg : t.border}" stroke-width="2.2" stroke-linecap="round"/>`
   }).join('')
 
-  return `<svg class="rp-wheel" viewBox="0 0 200 200" role="img" aria-label="${fmtInt(total)} ta ish, yutuq darajasi ${winRate}%">
+  return `<svg class="rp-wheel" viewBox="0 0 200 200" role="img" aria-label="${fmtInt(total)} ta ish, ${winRate === null ? 'hal qilingan ish yoʻq' : `yutuq darajasi ${winRate}%`}">
     ${ticks}
     <circle cx="${cx}" cy="${cx}" r="${r + w / 2 + 1}" fill="none" stroke="${t.borderSoft}" stroke-width="1"/>
     <circle cx="${cx}" cy="${cx}" r="${r - w / 2 - 1}" fill="${t.inset}" stroke="${t.borderSoft}" stroke-width="1"/>
@@ -123,7 +123,7 @@ function verdictWheel(
     <path d="M100 1.5 L104.2 8.6 L95.8 8.6 Z" fill="${t.accent}"/>
     <text x="${cx}" y="106" text-anchor="middle" class="rp-wheel-n" fill="${t.t1}">${fmtInt(total)}</text>
     <text x="${cx}" y="120" text-anchor="middle" class="rp-wheel-s" fill="${t.t3}">TA ISH</text>
-    <text x="${cx}" y="139" text-anchor="middle" class="rp-wheel-w"><tspan fill="${t.t1}">${winRate}%</tspan><tspan fill="${t.t3}" dx="3">yutuq</tspan></text>
+    <text x="${cx}" y="139" text-anchor="middle" class="rp-wheel-w"><tspan fill="${t.t1}">${winRate === null ? '–' : `${winRate}%`}</tspan><tspan fill="${t.t3}" dx="3">yutuq</tspan></text>
   </svg>`
 }
 
@@ -205,7 +205,7 @@ function signature(m: ReportModel, t: ReportTheme): string {
       <div class="rp-legend">${CLASS_ROWS.map(
         (r) => `<div><i style="background:${t.tone[r.tone].fg}"></i><span class="n">${r.label}</span><b>${fmtInt(c[r.key])}</b><span class="p">${pct(c[r.key])}</span></div>`,
       ).join('')}
-        <div class="cap">Aylana — natijalar ulushi. Tashqi shkala — yutuq darajasi, har belgi 2%.</div>
+        <div class="cap">Aylana — natijalar ulushi. Tashqi shkala — yutuq darajasi (hal qilingan ishlar ichida), har belgi 2%.</div>
       </div>
     </div></section>`
 }

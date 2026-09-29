@@ -8,9 +8,10 @@
  * Rules the model enforces:
  *  - A source that FAILED is reported in `notes`; it is never turned into a zero.
  *  - A field with no value is dropped, never printed as «-».
- *  - Numbers match the Statistika page (win rate = win / total).
+ *  - Numbers match the Statistika page (win rate = win ÷ (win + lose), core/rates.ts).
  */
 
+import { winRate } from '@/core/rates'
 import type { CompanyInfoData, CompanyStats, CourtCase, UpcomingHearingsData } from '@/lib/api-types'
 import type { CompanyMeta } from '@/lib/registry'
 import { dateKey, daysUntil, formatDmy } from '@/core/dates'
@@ -86,8 +87,8 @@ export interface CasesBlock {
   win: number
   lose: number
   neutral: number
-  /** win / total, whole percent — same definition as Statistika */
-  winRate: number
+  /** won ÷ (won + lost), whole percent — the app-wide definition (core/rates.ts); null = nothing decided */
+  winRate: number | null
   asPlaintiff: number
   asDefendant: number
   byCourt: { label: string; count: number }[]
@@ -292,9 +293,9 @@ export function buildReportModel(input: ReportInput): ReportModel {
     block
       ? {
           label: 'Yutuq darajasi',
-          value: `${block.winRate}%`,
+          value: block.winRate === null ? '–' : `${block.winRate}%`,
           // deliberately no colour: any good/bad threshold would be an editorial judgement
-          sub: `${fmtInt(block.win)} yutgan · ${fmtInt(block.lose)} yutqazgan`,
+          sub: block.winRate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(block.win)} yutgan · ${fmtInt(block.win + block.lose)} ta hal qilingan ishdan`,
         }
       : { label: 'Yutuq darajasi', ...na('maʼlumot olinmadi') },
     block?.claim
@@ -406,7 +407,7 @@ function buildCases(stats: CompanyStats, list: CourtCase[] | null, now: Date): C
     win,
     lose,
     neutral,
-    winRate: total ? Math.round((win / total) * 100) : 0,
+    winRate: winRate(win, lose),
     asPlaintiff: s?.asPlaintiff ?? all.filter((c) => c.role === 'plaintiff').length,
     asDefendant: s?.asDefendant ?? all.filter((c) => c.role === 'defendant').length,
     byCourt,

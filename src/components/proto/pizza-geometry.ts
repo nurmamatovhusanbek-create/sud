@@ -1,15 +1,20 @@
 /**
- * Pizza chart geometry — ported 1:1 from sud-tizimi-ui-v18.html.
+ * Pizza chart geometry — "radial stack".
  *
- * ONE circle = 100%. Each wedge = a slice (court type OR case category), one
- * hue. FILLED radius = won share of decided cases; empty remainder = lost.
+ * ONE circle = 100% of the cases. Each wedge = a slice (court type OR case category),
+ * one hue, equal angle. The wedge's radius is that slice's OWN 100%, stacked outward
+ * from the hub: yutgan → yutqazgan → neytral → jarayonda, each band as thick as its
+ * share of the slice's cases. So every case is drawn, the pill total (all cases) equals
+ * the sum of the bands, and nothing is hidden the way the old «won ÷ decided» fill did.
+ * Status is told by fill DENSITY in the slice's hue (solid · tint · hatch · dashed), not
+ * by hue, so it never clashes with the slice colours and survives colour blindness.
  * Navy dotted seams part the slices; the total sits in a pill just outside.
- * Numbers: won inside the fill, lost inside the empty band; slice names live
- * in the legend, not on the pie. Do NOT re-derive the math — it is tuned.
+ *
+ * The win rate is NOT drawn as a radius any more — it is the number next to the chart
+ * (src/core/rates.ts: won ÷ (won + lost)).
  *
  * Pure module (no React/DOM) so src/core/__tests__ can verify the contract:
- * N items → N wedges + N seams, fill ratio = won/(won+lost), radius inside
- * [r0, R].
+ * N items → N wedges + N seams, bands sum to the total, band radii nest in [r0, R].
  */
 
 import type { CaseWithClassification } from '@/lib/stats'
@@ -21,12 +26,13 @@ export interface PizzaItem {
   full: string
   won: number
   lost: number
-  /** wedge fill (validated categorical palette hex — do not inline new colours) */
+  /** wedge hue (validated categorical palette hex — do not inline new colours) */
   col: string
   /** pill fill (darker step of the same hue) */
   pill: string
-  /** extra context for the detail panel (non-decided cases) */
+  /** cases still being heard */
   pending?: number
+  /** decided without a winner (qaytarilgan …) */
   neutral?: number
 }
 
@@ -59,14 +65,36 @@ export function annSector(cx: number, cy: number, r0: number, r1: number, a0: nu
   )
 }
 
+export type PizzaStatus = 'won' | 'lost' | 'neutral' | 'pending'
+
+/** Centre → rim. Won first: it is the number people look for. */
+export const PIZZA_STATUS_ORDER: PizzaStatus[] = ['won', 'lost', 'neutral', 'pending']
+
+export const PIZZA_STATUS_LABEL: Record<PizzaStatus, string> = {
+  won: 'Yutgan',
+  lost: 'Yutqazgan',
+  neutral: 'Neytral',
+  pending: 'Jarayonda',
+}
+
+/** A band's number is printed only when the band is at least this thick (viewBox units). */
+export const MIN_LABEL_THICKNESS = 11
+
+export interface PizzaBand {
+  status: PizzaStatus
+  value: number
+  /** inner / outer radius of the band */
+  rIn: number
+  rOut: number
+  path: string
+  /** the count, printed inside the band — null when the band is too thin to hold it */
+  text: { x: number; y: number; v: number } | null
+}
+
 export interface PizzaWedge {
   index: number
-  /** empty band (lost share) */
-  lostPath: string
-  /** filled share (won) — null when won === 0 */
-  wonPath: string | null
-  wonText: { x: number; y: number; v: number } | null
-  lostText: { x: number; y: number; v: number } | null
+  /** only the non-empty bands, hub → rim */
+  bands: PizzaBand[]
   pill: { x: number; y: number; v: number; fill: string }
   aria: string
 }
@@ -84,11 +112,20 @@ export interface PizzaModel {
   seams: PizzaSeam[]
 }
 
+/** Every status count of an item, in stacking order. */
+export function pizzaCounts(it: PizzaItem): Record<PizzaStatus, number> {
+  return { won: it.won, lost: it.lost, neutral: it.neutral ?? 0, pending: it.pending ?? 0 }
+}
+
+/** Total of ALL cases in an item (what the pill shows). */
+export const pizzaTotal = (it: PizzaItem): number => it.won + it.lost + (it.neutral ?? 0) + (it.pending ?? 0)
+
 /** Build the full SVG model for one pizza — N items → N wedges + N seams. */
 export function pizzaModel(items: PizzaItem[]): PizzaModel {
   const { cx, cy, R, r0 } = PIZZA_GEOM
   const N = items.length
   const step = 360 / Math.max(1, N)
+  // guide rings at every 20% of a slice's own total
   const rings = Array.from({ length: 5 }, (_, p) => ({
     r: +(r0 + ((R - r0) * (p + 1)) / 5).toFixed(1),
     edge: p === 4,
@@ -97,29 +134,44 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
   const seams: PizzaSeam[] = []
   for (let i = 0; i < N; i++) {
     const it = items[i]
-    // decided drives the win-rate fill; total (all statuses) is the case count
-    // shown in the pill — pending/neutral cases still count toward the total.
-    const decided = it.won + it.lost
-    const tot = decided + (it.pending ?? 0) + (it.neutral ?? 0)
-    const wr = decided ? it.won / decided : 0
+    const counts = pizzaCounts(it)
+    const tot = pizzaTotal(it)
     const a0 = -90 + i * step
     // Cap a wedge's span just under a full turn: a single item (N=1) spans 360°,
     // whose arc start/end coincide and the sector degenerates to nothing (the
     // pie wouldn't fill). 359.9° renders a full donut with a hairline seam.
     const a1 = a0 + Math.min(step, 359.9)
     const mid = (a0 + a1) / 2
-    const fillR = r0 + (R - r0) * wr
+
+    const bands: PizzaBand[] = []
+    let cum = 0
+    if (tot > 0) {
+      for (const status of PIZZA_STATUS_ORDER) {
+        const v = counts[status]
+        if (v <= 0) continue
+        const rIn = r0 + ((R - r0) * cum) / tot
+        cum += v
+        const rOut = r0 + ((R - r0) * cum) / tot
+        const mp = polarPt(cx, cy, (rIn + rOut) / 2, mid)
+        bands.push({
+          status,
+          value: v,
+          rIn: +rIn.toFixed(2),
+          rOut: +rOut.toFixed(2),
+          path: annSector(cx, cy, rIn, rOut, a0, a1),
+          text: rOut - rIn >= MIN_LABEL_THICKNESS ? { x: +mp[0].toFixed(1), y: +(mp[1] + 3).toFixed(1), v } : null,
+        })
+      }
+    }
     const pill = polarPt(cx, cy, R + 15, mid)
-    const wp = polarPt(cx, cy, Math.max(r0 + 11, (r0 + fillR) / 2), mid)
-    const lp = polarPt(cx, cy, Math.min(R - 9, (fillR + R) / 2), mid)
     wedges.push({
       index: i,
-      lostPath: annSector(cx, cy, fillR, R, a0, a1),
-      wonPath: wr > 0 ? annSector(cx, cy, r0, fillR, a0, a1) : null,
-      wonText: it.won > 0 ? { x: +wp[0].toFixed(1), y: +(wp[1] + 4).toFixed(1), v: it.won } : null,
-      lostText: it.lost > 0 ? { x: +lp[0].toFixed(1), y: +(lp[1] + 3.5).toFixed(1), v: it.lost } : null,
+      bands,
       pill: { x: +pill[0].toFixed(1), y: +pill[1].toFixed(1), v: tot, fill: it.pill },
-      aria: `${it.full}, ${tot}, ${Math.round(wr * 100)}%`,
+      aria:
+        `${it.full}, ${tot} ish: ${counts.won} yutgan, ${counts.lost} yutqazgan` +
+        (counts.neutral ? `, ${counts.neutral} neytral` : '') +
+        (counts.pending ? `, ${counts.pending} jarayonda` : ''),
     })
     const sb = polarPt(cx, cy, r0, a0)
     const se = polarPt(cx, cy, R + 7, a0)

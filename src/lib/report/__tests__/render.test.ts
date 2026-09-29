@@ -64,7 +64,7 @@ describe('signature chart and sources', () => {
     const live = ['win', 'lose', 'inProgress', 'neutral'].filter((k) => FULL_MODEL.cases![k as 'win' | 'lose' | 'inProgress' | 'neutral'] > 0).length
     expect((svg.match(/stroke-linecap="round" stroke-dasharray/g) ?? []).length).toBe(live)
     const lit = (svg.match(new RegExp(`stroke="${reportTheme(false).tone.pos.fg}" stroke-width="2.2"`, 'g')) ?? []).length
-    expect(lit).toBe(Math.round((FULL_MODEL.cases!.winRate / 100) * 50))
+    expect(lit).toBe(Math.round((FULL_MODEL.cases!.winRate! / 100) * 50))
   })
   test('outcome colors are distinct and each outcome keeps one color across both themes', () => {
     for (const dark of [false, true]) {

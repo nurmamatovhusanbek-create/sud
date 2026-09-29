@@ -7,7 +7,7 @@
  * All colors flow through the semantic tokens (color = signal only).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
@@ -480,12 +480,38 @@ export function CardStats({
 
 // ==== v18 additions — interactive pizza chart + win-rate ring ==================
 
-import { pizzaModel, winRing as winRingGeom, PIZZA_GEOM, type PizzaItem } from '@/components/proto/pizza-geometry'
+import {
+  pizzaCounts,
+  pizzaModel,
+  pizzaTotal,
+  winRing as winRingGeom,
+  PIZZA_GEOM,
+  PIZZA_STATUS_LABEL,
+  PIZZA_STATUS_ORDER,
+  type PizzaItem,
+  type PizzaStatus,
+} from '@/components/proto/pizza-geometry'
+import { winRate } from '@/core/rates'
+
+/** SVG paint for one status band, in the slice's hue — density (not hue) carries the status. */
+function bandPaint(status: PizzaStatus, col: string, hatch: string) {
+  switch (status) {
+    case 'won':
+      return { fill: col, stroke: 'var(--surface)', strokeWidth: 0.8 }
+    case 'lost':
+      return { fill: col, fillOpacity: 0.34, stroke: 'var(--surface)', strokeWidth: 0.8 }
+    case 'neutral':
+      return { fill: hatch, stroke: 'var(--surface)', strokeWidth: 0.8 }
+    default:
+      return { fill: col, fillOpacity: 0.07, stroke: col, strokeWidth: 1, strokeDasharray: '3 2.2' }
+  }
+}
 
 /**
- * Pizza — the v18 radial won/lost chart. Each wedge = one slice (court type
- * or category): filled radius = won share, empty band = lost, total in a pill
- * just outside, navy dotted seams part the slices.
+ * Pizza — radial stack. Each wedge = one slice (court type or category); its radius
+ * is the slice's own 100%, stacked from the hub: yutgan, yutqazgan, neytral, jarayonda
+ * (solid · tint · hatch · dashed, all in the slice's hue). Total in a pill just outside,
+ * navy dotted seams part the slices.
  *
  * Controlled: `selected` (index, or -1 for "nothing selected") is owned by the
  * parent. With nothing selected every slice shows crisp (good for a share/
@@ -505,6 +531,7 @@ export function Pizza({
   size?: number
 }) {
   const model = useMemo(() => pizzaModel(items), [items])
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   const { cx, cy, r0 } = PIZZA_GEOM
   const hasSel = selected >= 0 && selected < items.length
 
@@ -520,8 +547,16 @@ export function Pizza({
       height={size}
       viewBox="0 0 340 340"
       role="img"
-      aria-label="Ishlar taqsimoti, yutuq ulushi bilan"
+      aria-label="Ishlar taqsimoti, holatlar boʻyicha"
     >
+      <defs>
+        {items.map((it, i) => (
+          <pattern key={i} id={`${uid}h${i}`} width={4.5} height={4.5} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={4.5} height={4.5} fill={it.col} fillOpacity={0.1} />
+            <line x1={0} y1={0} x2={0} y2={4.5} stroke={it.col} strokeWidth={1.8} strokeOpacity={0.75} />
+          </pattern>
+        ))}
+      </defs>
       {model.rings.map((r, i) => (
         <circle key={i} className={`cring${r.edge ? ' edge' : ''}`} cx={cx} cy={cy} r={r.r} />
       ))}
@@ -549,29 +584,32 @@ export function Pizza({
               }
             }}
           >
-            <path className="lost" d={w.lostPath} fill={it.col} fillOpacity={0.14} />
-            {w.wonPath && <path className="won" d={w.wonPath} fill={it.col} />}
-            {w.wonText && (
-              <text className="cwon" x={w.wonText.x} y={w.wonText.y}>
-                {w.wonText.v}
-              </text>
-            )}
-            {w.lostText && (
-              <text className="clost" x={w.lostText.x} y={w.lostText.y}>
-                {w.lostText.v}
-              </text>
+            {w.bands.map((b) => (
+              <path
+                key={b.status}
+                className={`cband ${b.status}`}
+                d={b.path}
+                {...bandPaint(b.status, it.col, `url(#${uid}h${w.index})`)}
+              />
+            ))}
+            {w.bands.map((b) =>
+              b.text ? (
+                <text key={b.status} className={b.status === 'won' ? 'cwon' : 'cnum'} x={b.text.x} y={b.text.y}>
+                  {b.text.v}
+                </text>
+              ) : null,
             )}
             <rect
-              x={w.pill.x - 14.5}
-              y={w.pill.y - 10.5}
-              width={29}
-              height={21}
-              rx={7}
+              x={w.pill.x - 12}
+              y={w.pill.y - 8}
+              width={24}
+              height={16}
+              rx={6}
               fill={w.pill.fill}
               stroke="var(--surface)"
               strokeWidth={1.5}
             />
-            <text className="ctot" x={w.pill.x} y={w.pill.y + 4}>
+            <text className="ctot" x={w.pill.x} y={w.pill.y + 3.6}>
               {w.pill.v}
             </text>
           </g>
@@ -586,10 +624,10 @@ export function Pizza({
 }
 
 /** Win-rate ring — the prototypeʼs ringSvg2 (88px detail-panel gauge). */
-export function WinRing({ pct, col, size = 88 }: { pct: number; col: string; size?: number }) {
-  const g = winRingGeom(pct, col)
+export function WinRing({ pct, col, size = 88 }: { pct: number | null; col: string; size?: number }) {
+  const g = winRingGeom(pct ?? 0, col)
   return (
-    <svg width={size} height={size} viewBox="0 0 88 88" aria-label={`Yutuq ${pct}%`}>
+    <svg width={size} height={size} viewBox="0 0 88 88" aria-label={pct === null ? 'Hal qilingan ish yoʻq' : `Yutuq ${pct}%`}>
       <circle cx={44} cy={44} r={g.track} fill="none" stroke="var(--surface-inset)" strokeWidth={8} />
       <circle
         cx={44}
@@ -611,7 +649,7 @@ export function WinRing({ pct, col, size = 88 }: { pct: number; col: string; siz
         fill="var(--text-1)"
         fontFamily="var(--font-mono)"
       >
-        {pct}
+        {pct ?? '–'}
       </text>
     </svg>
   )
@@ -627,24 +665,15 @@ export function PizzaDetail({
   kind: string
   action?: React.ReactNode
 }) {
-  // «Jami» is ALL cases; the win-rate ring is over DECIDED cases, but the
-  // stackbar + rows now break the full total into its FOUR statuses, each with
-  // its own colour — so pending/neutral cases stop being invisible next to the
-  // total (design bible: green won · rose lost · brand-blue in-progress · grey
-  // neutral — no orange).
+  // «Jami» is ALL cases and the bands/rows below break it into its four statuses, drawn exactly
+  // like the pie (the slice's hue; solid · tint · hatch · dashed). The win rate is the ONE app-wide
+  // definition (core/rates.ts): won ÷ (won + lost) — neutral and in-progress cases are not in it.
+  const counts = pizzaCounts(item)
+  const total = pizzaTotal(item)
   const decided = item.won + item.lost
-  const pending = item.pending ?? 0
-  const neutral = item.neutral ?? 0
-  const total = decided + pending + neutral
-  const wr = decided ? Math.round((item.won / decided) * 100) : 0
+  const wr = winRate(item.won, item.lost)
   const seg = (v: number) => (total ? (v / total) * 100 : 0)
-
-  const rows: { nm: string; v: number; c: string }[] = [
-    { nm: 'Yutgan', v: item.won, c: 'var(--status-positive-solid)' },
-    { nm: 'Yutqazgan', v: item.lost, c: 'var(--status-negative-solid)' },
-  ]
-  if (pending) rows.push({ nm: 'Jarayonda', v: pending, c: 'var(--status-warning-solid)' })
-  if (neutral) rows.push({ nm: 'Neytral', v: neutral, c: 'var(--status-neutral-base)' })
+  const rows = PIZZA_STATUS_ORDER.filter((st) => counts[st] > 0 || st === 'won' || st === 'lost')
 
   return (
     <div>
@@ -654,29 +683,46 @@ export function PizzaDetail({
       </div>
       <div className="det-name">{item.full}</div>
       <div className="det-sub">
-        Jami {total} ish · yutuq {wr}% (hal qilingan ishlar boʻyicha)
+        Jami {total} ish ·{' '}
+        {wr === null ? 'hal qilingan ish yoʻq' : `yutuq ${wr}% (${decided} ta hal qilingan ishdan)`}
       </div>
       <div className="det-ring">
         <WinRing pct={wr} col={item.col} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="stackbar">
-            {rows.map((r) => (r.v > 0 ? <i key={r.nm} style={{ width: `${seg(r.v)}%`, background: r.c }} /> : null))}
+          <div className="stackbar" style={{ ['--sw' as string]: item.col }}>
+            {rows.map((st) =>
+              counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ width: `${seg(counts[st])}%` }} /> : null,
+            )}
           </div>
           <div className="det-sub" style={{ marginTop: 8 }}>
             Barcha holatlar boʻyicha taqsimot
           </div>
         </div>
       </div>
-      <div className="det-rows">
-        {rows.map((r) => (
-          <div className="r" key={r.nm}>
-            <span className="sw" style={{ background: r.c }} />
-            <span className="nm">{r.nm}</span>
-            <span className="vl tnum">{r.v}</span>
+      <div className="det-rows" style={{ ['--sw' as string]: item.col }}>
+        {rows.map((st) => (
+          <div className="r" key={st}>
+            <span className={`sw st ${st}`} />
+            <span className="nm">{PIZZA_STATUS_LABEL[st]}</span>
+            <span className="vl tnum">{counts[st]}</span>
           </div>
         ))}
       </div>
       {action}
+    </div>
+  )
+}
+
+/** Compact status key for under a pizza — the four fills, in the given hue. */
+export function PizzaKey({ col = 'var(--text-3)' }: { col?: string }) {
+  return (
+    <div className="pie-key" style={{ ['--sw' as string]: col }} aria-hidden="true">
+      {PIZZA_STATUS_ORDER.map((st) => (
+        <span key={st}>
+          <i className={`st ${st}`} />
+          {PIZZA_STATUS_LABEL[st]}
+        </span>
+      ))}
     </div>
   )
 }

@@ -61,9 +61,9 @@ capital, founders, OKED) plus the `chamber.uz` contractor rating (0–100 score,
 
 **Statistika (Overview)** — win/lose/neutral/pending classification judged from the company's side
 (claim granted: plaintiff wins, defendant loses; claim rejected: plaintiff loses, defendant wins;
-returned: neutral for both), trend chart, and the
-interactive "pizza" chart (by court type or case category) that breaks the total into
-its four statuses. Plus win-rate by court and side-by-side company comparison.
+returned: neutral for both), one win-rate definition everywhere (won ÷ (won + lost)), trend chart, and the
+interactive "pizza" chart (by court type or case category): a radial stack that draws every
+case, each slice split into its four statuses (won · lost · neutral · in progress). Plus win-rate by court and side-by-side company comparison.
 
 **Kuzatuv (Watchlist)** — multi-company monitoring with hearings-due-soon alerts,
 persisted client-side (localStorage registry, keyed by STIR).

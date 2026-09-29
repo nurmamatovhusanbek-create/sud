@@ -7,6 +7,7 @@ import {
   turkumItems,
   winRing,
   PIZZA_GEOM,
+  MIN_LABEL_THICKNESS,
   type PizzaItem,
 } from '../../components/proto/pizza-geometry'
 
@@ -45,26 +46,55 @@ describe('pizza geometry (v18 port)', () => {
     expect(m.rings[4].edge).toBe(true)
   })
 
-  it('fill radius follows won/(won+lost): full win → fillR = R; zero win → fillR = r0', () => {
-    const full = pizzaModel([item('A', 10, 0)]).wedges[0]
-    const none = pizzaModel([item('B', 0, 10)]).wedges[0]
-    // wonPath present only when won > 0; its outer radius encodes the share
-    expect(full.wonPath).toBeTruthy()
-    expect(none.wonPath).toBeNull()
-    // won text sits at the mid of [r0, fillR] → farther from centre on a full win
-    const rFull = Math.hypot(full.wonText!.x - PIZZA_GEOM.cx, full.wonText!.y - PIZZA_GEOM.cy)
-    const rNone = Math.hypot(none.lostText!.x - PIZZA_GEOM.cx, none.lostText!.y - PIZZA_GEOM.cy)
-    expect(rFull).toBeGreaterThan(rNone)
+  const item4 = (label: string, won: number, lost: number, neutral: number, pending: number): PizzaItem => ({ ...item(label, won, lost), neutral, pending })
+
+  it('radial stack: the four statuses nest hub → rim, each as thick as its share of the slice', () => {
+    const w = pizzaModel([item4('A', 1, 4, 1, 1)]).wedges[0] // 7 cases
+    expect(w.bands.map((b) => b.status)).toEqual(['won', 'lost', 'neutral', 'pending'])
+    const span = PIZZA_GEOM.R - PIZZA_GEOM.r0
+    // contiguous, starting at the hub and ending at the rim
+    expect(w.bands[0].rIn).toBeCloseTo(PIZZA_GEOM.r0, 1)
+    expect(w.bands[3].rOut).toBeCloseTo(PIZZA_GEOM.R, 1)
+    for (let i = 1; i < w.bands.length; i++) expect(w.bands[i].rIn).toBeCloseTo(w.bands[i - 1].rOut, 1)
+    // thickness ∝ count
+    expect(w.bands[1].rOut - w.bands[1].rIn).toBeCloseTo((span * 4) / 7, 1)
   })
 
-  it('pill total is ALL cases (won+lost+pending+neutral); win % is over decided', () => {
-    const w = pizzaModel([item('A', 7, 3)]).wedges[0]
-    expect(w.pill.v).toBe(10)
-    expect(w.aria).toContain('70%')
-    // pending + neutral count toward the total but not the win rate
-    const w2 = pizzaModel([{ ...item('B', 2, 0), pending: 3, neutral: 2 }]).wedges[0]
-    expect(w2.pill.v).toBe(7) // 2 + 0 + 3 + 2
-    expect(w2.aria).toContain('100%') // 2/(2+0) decided
+  it('EVERY case is drawn: band counts sum to the pill total, and nothing is dropped', () => {
+    for (const it of [item4('A', 1, 4, 1, 1), item4('B', 0, 0, 0, 6), item4('C', 22, 6, 5, 9), item4('D', 0, 1, 0, 0)]) {
+      const w = pizzaModel([it]).wedges[0]
+      expect(w.bands.reduce((a, b) => a + b.value, 0)).toBe(w.pill.v)
+      expect(w.pill.v).toBe(it.won + it.lost + (it.neutral ?? 0) + (it.pending ?? 0))
+    }
+  })
+
+  it('a slice with only in-progress cases is still a full wedge (the old chart drew an empty circle)', () => {
+    const w = pizzaModel([item4('A', 0, 0, 0, 6)]).wedges[0]
+    expect(w.bands).toHaveLength(1)
+    expect(w.bands[0]).toMatchObject({ status: 'pending', value: 6 })
+    expect(w.bands[0].rIn).toBeCloseTo(PIZZA_GEOM.r0, 1)
+    expect(w.bands[0].rOut).toBeCloseTo(PIZZA_GEOM.R, 1)
+  })
+
+  it('numbers stay quiet: a count is printed only where its band is thick enough to hold it', () => {
+    const w = pizzaModel([item4('A', 1, 60, 0, 0)]).wedges[0]
+    expect(w.bands[0].text).toBeNull() // 1 of 61 → a sliver
+    expect(w.bands[1].text?.v).toBe(60)
+    for (const b of w.bands) if (b.text) expect(b.rOut - b.rIn).toBeGreaterThanOrEqual(MIN_LABEL_THICKNESS)
+  })
+
+  it('aria reads all statuses', () => {
+    const w = pizzaModel([item4('A', 1, 4, 1, 1)]).wedges[0]
+    expect(w.aria).toContain('7 ish')
+    expect(w.aria).toContain('1 yutgan')
+    expect(w.aria).toContain('4 yutqazgan')
+    expect(w.aria).toContain('1 neytral')
+    expect(w.aria).toContain('1 jarayonda')
+  })
+
+  it('pill total is ALL cases (won+lost+pending+neutral)', () => {
+    expect(pizzaModel([item('A', 7, 3)]).wedges[0].pill.v).toBe(10)
+    expect(pizzaModel([{ ...item('B', 2, 0), pending: 3, neutral: 2 }]).wedges[0].pill.v).toBe(7)
   })
 
   it('single item (N=1) fills: wedge spans a near-full turn, not a degenerate 360°', () => {
@@ -72,13 +102,10 @@ describe('pizza geometry (v18 port)', () => {
     // type must still fill the pie, so the span is capped just under a full turn.
     const m = pizzaModel([item('A', 10, 0)])
     expect(m.wedges.length).toBe(1)
-    const w = m.wedges[0]
-    // full win → wonPath present and drawn with the large-arc flag (span > 180°)
-    expect(w.wonPath).toBeTruthy()
-    expect(w.wonPath).toMatch(/A120 120 0 1 1/)
-    // and its two arc endpoints must differ (a degenerate sector coincides)
-    const pts = w.wonPath!.match(/-?\d+\.\d+ -?\d+\.\d+/g) ?? []
-    expect(pts[0]).not.toBe(pts[1])
+    const b = m.wedges[0].bands[0]
+    expect(b.path).toMatch(/A120 120 0 1 1/) // outer arc drawn with the large-arc flag (span > 180°)
+    const pts = b.path.match(/-?\d+\.\d+ -?\d+\.\d+/g) ?? []
+    expect(pts[0]).not.toBe(pts[1]) // and its two arc endpoints differ
   })
 
   it('selection contract: wedge index maps 1:1 to items order', () => {
