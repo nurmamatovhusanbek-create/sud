@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
-import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
+import { openProtoDrawer, closeProtoDrawer, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
@@ -66,21 +66,19 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
   const d = (b.detail || null) as CheckStatusResponse | null
   const status = d?.invoiceStatus ?? b.invoiceStatus
   const fam = billStatusFamilySafe(status)
-  const rows: [string, React.ReactNode][] = [
-    ['Toʻlovchi', <span className="v sans" key="payer">{d?.payer || '-'}</span>],
-    ['Sud', <span className="v sans" key="court">{d?.court || courtTypeLabel(d?.courtType) || '-'}</span>],
-    ['Instansiya', <span className="v sans" key="inst">{d?.instance || '-'}</span>],
-    ['Kategoriya', <span className="v sans" key="cat">{d?.payCategory ? categoryLabel(d.payCategory).label : '-'}</span>],
-    ['Ish raqami', <span className="v" key="case">{d?.claimCaseNumber || '-'}</span>],
-    ['Sana', <span className="v" key="date">{formatDate(b.issued)}</span>],
-    ['Maqsad', <span className="v sans" key="purpose" style={{ maxWidth: '60%', textAlign: 'right' }}>{d?.purpose || d?.description || '-'}</span>],
-    ['Toʻlangan', <span className="v" key="paid">{formatSum(d?.paidAmount)} soʻm</span>],
-    ['Balans', <span className="v" key="balance">{formatSum(d?.balance)} soʻm</span>],
+  const rows: DwRow[] = [
+    ['Toʻlovchi', d?.payer],
+    ['Sud', d?.court || courtTypeLabel(d?.courtType)],
+    ['Instansiya', d?.instance],
+    ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : ''],
+    ['Ish raqami', d?.claimCaseNumber, { mono: true }],
+    ['Sana', formatDate(b.issued), { mono: true }],
+    ['Maqsad', d?.purpose || d?.description],
+    ['Toʻlangan', d ? `${formatSum(d.paidAmount)} soʻm` : '', { mono: true }],
+    ['Balans', d ? `${formatSum(d.balance)} soʻm` : '', { mono: true }],
+    ['Muddati oʻtgan', d?.overdue && d.overdue > 0 ? `${formatSum(d.overdue)} soʻm` : '', { mono: true, tone: 'neg' }],
+    ['Foydasiga', d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? 'Yoʻq' : ''],
   ]
-  if (d?.overdue && d.overdue > 0) {
-    rows.push(['Muddati oʻtgan', <span className="v" key="overdue" style={{ color: 'var(--neg-text)' }}>{formatSum(d.overdue)} soʻm</span>])
-  }
-  rows.push(['Foydasiga', <span className="v sans" key="favor">{d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? "Yoʻq" : '-'}</span>])
 
   // v204 (P-C): real print dialog for the receipt (was a fake toast).
   const printReceipt = () => {
@@ -116,64 +114,58 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
     }
   }
 
+  const subline = [formatDate(b.issued), d?.payCategory ? categoryLabel(d.payCategory).label : '']
+    .filter((x) => x && x !== '-')
+    .join(' · ')
+  const openCase = d?.claimCaseNumber
+    ? () => {
+        closeProtoDrawer()
+        if (activeStir) useAppStore.getState().openCompany(activeStir)
+        useAppStore.getState().setSection('cases')
+        setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent('sud:open-case', { detail: { caseNumber: d.claimCaseNumber, courtType: d.courtType } }),
+            ),
+          350,
+        )
+      }
+    : null
+
   openProtoDrawer(
     'Kvitansiya',
-    <div>
-      <div className="receipt">
-        <div className="rc-h">
+    <div style={{ marginTop: 22 }}>
+      <div className="dw-ticket">
+        <div className="dw-ticket-h">
           <div>
-            <div className="eyebrow">billing.sud.uz</div>
-            <div className="rc-num">{b.number}</div>
+            <div className="eb">billing.sud.uz</div>
+            <div className="num">{b.number}</div>
             <Barcode seed={b.number} />
           </div>
           <span className={`badge ${familyBadgeClass(fam)}`}>{statusLabel(status)}</span>
         </div>
-        <div style={{ padding: '8px 0' }}>
-          {rows.map(([k, v]) => (
-            <div className="rc-line" key={k}>
-              <span className="k">{k}</span>
-              {v}
-            </div>
-          ))}
-        </div>
-        <div className="rc-total">
-          <span>Jami summa</span>
-          <span className="v">{formatSum(d?.amount)} soʻm</span>
-        </div>
-      </div>
-      <div className="p-row" style={{ marginTop: 16, gap: 10 }}>
-        <button
-          className="btn btn-outline btn-sm"
-          style={{ flex: 1 }}
-          onClick={printReceipt}
-        >
-          <Download />
-          <span>PDF</span>
-        </button>
-        {d?.claimCaseNumber ? (
-          <button
-            className="btn btn-outline btn-sm"
-            style={{ flex: 1 }}
-            onClick={() => {
-              closeProtoDrawer()
-              if (activeStir) useAppStore.getState().openCompany(activeStir)
-              useAppStore.getState().setSection('cases')
-              setTimeout(
-                () =>
-                  window.dispatchEvent(
-                    new CustomEvent('sud:open-case', { detail: { caseNumber: d.claimCaseNumber, courtType: d.courtType } }),
-                  ),
-                350,
-              )
-            }}
-          >
-            <Gavel />
-            <span>Ishni ochish</span>
-          </button>
-        ) : null}
+        <DwKv rows={rows} />
+        <DwFig label="Jami summa" value={formatSum(d?.amount)} unit="soʻm" />
       </div>
     </div>,
-    b.number,
+    subline,
+    {
+      eyebrow: 'Toʻlov kvitansiyasi',
+      footer: (
+        <>
+          <button className={`btn ${openCase ? 'btn-outline' : 'btn-primary'}`} onClick={printReceipt}>
+            <Download />
+            <span>PDF</span>
+          </button>
+          {openCase ? (
+            <button className="btn btn-primary" onClick={openCase}>
+              <Gavel />
+              <span>Ishni ochish</span>
+            </button>
+          ) : null}
+        </>
+      ),
+    },
   )
 }
 

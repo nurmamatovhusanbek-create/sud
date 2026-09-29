@@ -71,7 +71,10 @@ export function useResource<T>(
       const timer = setInterval(() => setElapsed(Date.now() - t0), 500)
       try {
         const res = await fetcherRef.current(ac.signal)
-        if (ac.signal.aborted) return
+        // Superseded/unmounted while the response was in flight. This used to
+        // `return` with the interval still running: every 500ms it re-rendered
+        // the owning component (e.g. the whole cases list) forever.
+        if (ac.signal.aborted) { clearInterval(timer); return }
         clearInterval(timer)
         setElapsed(Date.now() - t0)
         if (res.ok) {

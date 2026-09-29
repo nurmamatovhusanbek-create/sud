@@ -25,7 +25,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { ArcGauge, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
-import { openProtoDrawer } from '@/components/proto/drawer'
+import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
 import { getTorStatus } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -368,7 +368,10 @@ function WorkersTab() {
     setLoading(true)
     try {
       const res = await fetch('/api/settings/workers')
-      setData(await res.json())
+      const json = await res.json()
+      // An error body (401 with APP_API_TOKEN set, 429, 500…) has no `workers`;
+      // treating it as data crashed the whole Settings page on `.workers.length`.
+      setData(json && Array.isArray(json.workers) ? json : null)
     } catch {
       setData(null)
     } finally {
@@ -478,7 +481,7 @@ function WorkersTab() {
       <div className="p-card rise-c" style={{ padding: 8 }}>
         <div className="filterbar" style={{ margin: '8px 8px 4px' }}>
           <span className="badge b-neu"><Server />Manba: {src}</span>
-          <span className="faint" style={{ fontSize: 12 }}>{data?.workers.length ?? 0} worker</span>
+          <span className="faint" style={{ fontSize: 12 }}>{data?.workers?.length ?? 0} worker</span>
           <div style={{ flex: 1 }} />
           <button
             className="btn btn-outline btn-sm"
@@ -641,47 +644,52 @@ function HealthTab() {
   const hotVol = vol.data.indexOf(Math.max(...vol.data))
 
   const openWorker = (w: WorkerHealth) => {
-    const failIdx = w.history.map((h, i) => (h.ok ? -1 : i)).filter((i) => i >= 0)
     openProtoDrawer(
       w.label || w.workerUrl,
       <div>
-        <div style={{ marginBottom: 16, display: 'flex', gap: 6 }}>
-          <span className={`badge ${w.successRate >= 0.9 ? 'b-pos' : w.successRate >= 0.6 ? 'b-warn' : 'b-neg'}`} style={{ height: 28 }}>
-            Muvaffaqiyat {Math.round(w.successRate * 100)}%
-          </span>
-          <span className="badge b-neu" style={{ height: 28 }}>{w.totalRequests} soʻrov</span>
-          <span className={`badge ${w.status === 'alive' ? 'b-pos' : 'b-neg'}`} style={{ height: 28 }}>{w.status === 'alive' ? 'Faol' : "Oʻlik"}</span>
-        </div>
-        <div className="detail-sec">
-          <span className="eyebrow">Soʻnggi soʻrovlar</span>
-          {w.history.slice(-12).reverse().map((r, i) => (
-            <div className="reqline" key={i}>
-              <span className={`p-dot ${r.ok ? 'd-pos' : 'd-neg'}`} />
-              <span className="mono faint">{new Date(r.ts).toLocaleTimeString('uz-UZ', { hour12: false })}</span>
-              <span style={{ flex: 1, fontSize: 12 }}>{r.origin}</span>
-              {r.ok ? <span className="mono faint">{r.ms}ms</span> : <span className="badge b-neg" style={{ height: 20 }}>xato</span>}
+        <DwSection title="Soʻnggi soʻrovlar">
+          {w.history.length === 0 ? (
+            <div className="faint" style={{ fontSize: 12 }}>Tarix boʻsh</div>
+          ) : (
+            <div className="dw-req">
+              {w.history.slice(-12).reverse().map((r, i) => (
+                <div key={i}>
+                  <span className={`p-dot ${r.ok ? 'd-pos' : 'd-neg'}`} />
+                  <span className="mono faint">{new Date(r.ts).toLocaleTimeString('uz-UZ', { hour12: false })}</span>
+                  <span className="o">{r.origin}</span>
+                  {r.ok ? <span className="mono faint">{r.ms}ms</span> : <span className="badge b-neg" style={{ height: 20 }}>xato</span>}
+                </div>
+              ))}
             </div>
-          ))}
-          {w.history.length === 0 && <div className="faint" style={{ fontSize: 12 }}>Tarix boʻsh</div>}
-        </div>
-        <div className="detail-sec">
-          <span className="eyebrow">Faollik</span>
+          )}
+        </DwSection>
+        <DwSection title="Faollik">
           <div className="spark" style={{ height: 44 }}>
             {w.history.slice(-24).map((r, i) => (
               <i key={i} className={r.ok ? '' : 'f'} style={{ height: Math.min(44, 10 + r.ms / 8) }} />
             ))}
           </div>
-        </div>
-        <button
-          className="btn btn-outline"
-          style={{ width: '100%' }}
-          onClick={() => toast(`${w.label || w.workerUrl}: test yuborildi`)}
-        >
-          <FlaskConical />
-          <span>Workerni sinash</span>
-        </button>
+        </DwSection>
       </div>,
       w.workerUrl,
+      {
+        eyebrow: 'Worker',
+        badges: (
+          <>
+            <span className={`badge ${w.status === 'alive' ? 'b-pos' : 'b-neg'}`} style={{ height: 26 }}>{w.status === 'alive' ? 'Faol' : "Oʻlik"}</span>
+            <span className={`badge ${w.successRate >= 0.9 ? 'b-pos' : w.successRate >= 0.6 ? 'b-warn' : 'b-neg'}`} style={{ height: 26 }}>
+              Muvaffaqiyat {Math.round(w.successRate * 100)}%
+            </span>
+            <span className="badge b-neu" style={{ height: 26 }}>{w.totalRequests} soʻrov</span>
+          </>
+        ),
+        footer: (
+          <button className="btn btn-primary" onClick={() => toast(`${w.label || w.workerUrl}: test yuborildi`)}>
+            <FlaskConical />
+            <span>Workerni sinash</span>
+          </button>
+        ),
+      },
     )
   }
 

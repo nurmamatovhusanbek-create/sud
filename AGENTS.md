@@ -64,6 +64,7 @@ preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
 | Touch the shell / navigation / ⌘K | `src/components/shell/app-shell.tsx`, `command-palette.tsx` | Nav is `WORKSPACE_NAV` + the "Tizim" group (Hujjatlar, Sozlamalar). |
 | Edit a data section | `src/components/sections/` (`bills`, `cases`, `hearings`, `profile`, `overview`) | |
 | Edit a full-surface view | `src/components/views/` (`launcher`, `watchlist`, `documents-view`, `doc-editor`, `pretenzia-view`, `settings-view`) | The launcher is the home surface. |
+| Change a slide-over panel (case detail, receipt, worker) | `src/components/proto/drawer.tsx` + the `.drawer*` / `.dw-*` block in `prototype.css`; callers: `openCaseDetail` (`sections/cases.tsx`), `openReceipt` (`sections/bills.tsx`), `openWorker` (`views/settings-view.tsx`) | One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title block, accent section labels with a rule, zebra rows, accent-soft key figure). Open it with `openProtoDrawer(title, content, sub, { eyebrow, badges, footer })` and build the body from `DwSection` / `DwKv` / `DwFig` so every panel matches. `DwKv` **drops rows with no value** — never render a «-» row. New panels get the look for free; don't hand-style a one-off. |
 | Change colors, spacing, tokens, dark mode | `src/app/globals.css` + `src/app/prototype.css` | **Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components. |
 | Lay out a responsive card grid | reuse the `.kpis` / `.ccards` breakpoints | **Grid gotcha (learned the hard way):** `repeat(N, 1fr)` = `minmax(auto, 1fr)`, so non-wrapping content (company names, STIRs) forces horizontal overflow off-screen. Use `minmax(0, 1fr)` **and** `min-width: 0` on the items. |
 | Add a "themed PDF" export | `src/lib/print.ts` | `buildPrintDoc(title, body, dark)` renders an app-themed sheet that adapts to the active theme; uses `print-color-adjust: exact` so brand colors survive "Save as PDF". |
@@ -132,6 +133,28 @@ is required in production.
   landed on top of the page — the "breaks at half screen" bug (half of 1920 = 960). If you
   touch either rule, keep them together, and test 1080 / 960 / 820 / 700, not just phone
   and desktop.
+- **Performance rules (each one was measured, not guessed).**
+  - **Never put `backdrop-filter` (or any blur) over a page that has a running animation.** The drawer
+    scrim had `backdrop-filter: blur(2px)` on top of the sidebar's always-running status pulse: the
+    browser re-blurred the whole viewport every frame and the app fell from 60 → ~25 fps whenever a
+    panel was open (worst frame 83 ms). Use a plain semi-opaque scrim.
+  - **Anything that runs forever may animate only `transform` and `opacity`.** The pulse used to animate
+    `box-shadow`, which can't be composited, so the sidebar repainted every frame for the life of the
+    tab (4.3% of the main thread + 60 restyles/s while *idle*; now 0.2%). Same rule for spinners and shimmers.
+  - **Every `setInterval`/listener needs a cleanup on every exit path** (`use-resource.ts` skipped
+    `clearInterval` on its abort branch → a 500 ms timer re-rendering the owning list forever).
+  - `bun run dev` runs the dev build of React, roughly 2× slower on interactions than `bun run start`;
+    judge performance on a production build. (`next build` needs Google Fonts, which sandboxes block —
+    to measure here, stub the two `next/font/google` imports in `layout.tsx` temporarily and revert.)
+  - Measure with Playwright + CDP `Performance.getMetrics` (TaskDuration, RecalcStyleCount, LayoutCount)
+    and a frame-gap sampler, A/B-ing CSS with `page.addStyleTag`. Beware: a `requestAnimationFrame`
+    sampler makes the browser tick every animation each frame — compare like with like.
+- **Hearing dates from sud.uz are `dd.mm.yyyy` — never compare them as strings** (`'10.01.2023' < '15.12.2022'`).
+  Use `hearingKey` / `byHearingDate` / `pickUpcoming` in `sections/cases.tsx`; «next hearing» must also be
+  in the future (a past hearing still marked scheduled is not «next»).
+- **Validate the shape of every raw `fetch()` response before storing it.** An error body (401 with
+  `APP_API_TOKEN` set, 429, 500) is valid JSON with no data fields; `settings-view` once did
+  `setData(json)` and then `data.workers.length`, which white-screened the whole Settings page.
 - **Stale `.next` types** can break `typecheck` after you delete a page/route. Clear with
   `rm -rf .next/dev/types .next/types` and re-run.
 - **Never commit secrets.** Network captures the owner pastes may contain live cookies

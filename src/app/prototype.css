@@ -355,29 +355,114 @@ html, body { height: 100%; }
 .phase.active .pd { background: var(--accent); color: var(--accent-contrast); }
 
 /* ---------- receipt cheque ---------- */
-.receipt { background: var(--surface); border-radius: var(--r-md); padding: 22px; position: relative; box-shadow: var(--elev-1); }
-.rc-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px dashed var(--border-default); padding-bottom: 14px; }
-.rc-num { font-family: var(--font-mono); font-size: 16px; font-weight: 700; letter-spacing: 2px; }
 .rc-barcode { height: 34px; display: flex; gap: 1.5px; margin-top: 8px; align-items: flex-end; }
 .rc-barcode i { width: 2px; background: var(--text-1); display: block; }
-.rc-line { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 13px; }
-.rc-line:last-child { border-bottom: none; }
-.rc-line .k { color: var(--text-2); }
-.rc-line .v { font-family: var(--font-mono); font-weight: 600; text-align: right; }
-.rc-line .v.sans { font-family: var(--font-sans); font-weight: 500; }
-.rc-total { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 2px dashed var(--border-default); font-weight: 700; }
-.rc-total .v { font-family: var(--font-mono); font-size: 18px; }
 
 /* ---------- drawer ---------- */
-.drawer-scrim { position: fixed; inset: 0; background: rgba(10, 12, 15, .42); backdrop-filter: blur(2px); z-index: 90; opacity: 0; pointer-events: none; transition: opacity .25s; }
+/* Styled after the themed PDF (src/lib/print.ts). --dw-a / --dw-soft are its accent pair: the
+   navy/indigo of the PDF in light, the brighter indigo in dark (the app's own --accent turns
+   near-white in dark, which is too loud for labels). */
+.drawer { --dw-a: #1a2350; --dw-soft: var(--accent-soft); }
+[data-theme='dark'] .drawer { --dw-a: #8ea2f5; --dw-soft: rgba(109, 132, 236, .16); }
+/* No backdrop-filter here — see the note in proto/drawer.tsx (it cost ~35 fps). */
+.drawer-scrim { position: fixed; inset: 0; background: rgba(10, 12, 24, .5); z-index: 90; opacity: 0; pointer-events: none; transition: opacity .25s; }
 .drawer-scrim.open { opacity: 1; pointer-events: auto; }
-.drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 94vw); background: var(--surface); z-index: 95; box-shadow: var(--elev-4); transform: translateX(100%); transition: transform .32s var(--ease-emph); display: flex; flex-direction: column; overscroll-behavior: contain; }
-.drawer.open { transform: none; }
-.drawer-h { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); flex: 0 0 auto; }
-.drawer-h .dt { flex: 1; min-width: 0; }
-.drawer-h .dt b { font-size: 15px; display: block; }
-.drawer-h .dt span { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); }
-.drawer-body { flex: 1; overflow-y: auto; padding: 20px; overscroll-behavior: contain; }
+/* visibility:hidden while closed keeps the off-screen panel out of the Tab order and skips painting its shadow */
+.drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 94vw); background: var(--surface); z-index: 95; box-shadow: var(--elev-4); transform: translateX(100%); visibility: hidden; transition: transform .32s var(--ease-emph), visibility 0s linear .32s; display: flex; flex-direction: column; overscroll-behavior: contain; }
+.drawer.open { transform: none; visibility: visible; transition: transform .32s var(--ease-emph), visibility 0s; }
+.drawer-mast { display: flex; align-items: center; gap: 10px; padding: 11px 14px 11px 20px; background: linear-gradient(180deg, #1c2657 0%, #171f47 100%); color: #cfd6f4; flex: 0 0 auto; }
+.drawer-mast .logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #3b5bdb, #6d84ec); display: grid; place-items: center; color: #fff; flex: none; }
+.drawer-mast .logo svg { width: 14px; height: 14px; }
+.drawer-mast .eb { flex: 1; min-width: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drawer-mast .x { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #cfd6f4; background: rgba(255, 255, 255, .08); transition: background .15s, color .15s; flex: none; }
+.drawer-mast .x:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+.drawer-mast .x svg { width: 16px; height: 16px; }
+.drawer-title { padding: 18px 22px 16px; border-bottom: 1px solid var(--border-subtle); flex: 0 0 auto; }
+.drawer-title h2 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1.18; color: var(--text-1); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.drawer-title .sub { margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-2); overflow-wrap: anywhere; }
+.drawer-title .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 22px 24px; overscroll-behavior: contain; }
+.drawer-foot { flex: 0 0 auto; display: flex; gap: 10px; padding: 12px 22px; border-top: 1px solid var(--border-subtle); background: var(--surface); }
+.drawer-foot .btn { flex: 1; }
+
+/* building blocks (proto/drawer.tsx: DwSection / DwKv / DwFig) */
+.dw-sec { margin-top: 22px; }
+.dw-sec-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--dw-a); }
+.dw-sec-h::after { content: ""; order: 1; flex: 1; height: 1px; background: var(--border-subtle); }
+.dw-sec-h .n { order: 2; font-weight: 700; letter-spacing: .04em; color: var(--text-3); }
+.dw-kv { border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; }
+.dw-kv > div { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 9px 14px; font-size: 13px; }
+.dw-kv > div:nth-child(even) { background: var(--surface-inset); }
+.dw-kv .k { color: var(--text-2); font-weight: 500; }
+.dw-kv .v { color: var(--text-1); font-weight: 600; overflow-wrap: anywhere; }
+.dw-kv .v.mono { font-family: var(--font-mono); font-weight: 500; font-size: 12.5px; }
+.dw-kv .v.neg { color: var(--neg-text); }
+.dw-kv .v.pos { color: var(--pos-text); }
+.dw-fig { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid var(--border-default); border-radius: 12px; background: var(--dw-soft); }
+.dw-fig .k { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--dw-a); }
+.dw-fig .v { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--dw-a); text-align: right; overflow-wrap: anywhere; }
+.dw-fig .v small { margin-left: 5px; font-size: 12px; font-weight: 600; opacity: .8; }
+
+/* next hearing — the PDF's left-accent card */
+.dw-next { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--border-default); border-left: 3px solid var(--dw-a); border-radius: 12px; background: var(--surface-inset); }
+.dw-next .d { font-size: 16px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.dw-next .m { margin-top: 2px; font-size: 12px; color: var(--text-2); }
+.dw-next .days { margin-left: auto; flex: none; }
+
+/* parties */
+.dw-party { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 12px; }
+.dw-party + .dw-party { margin-top: 8px; }
+.dw-party .body { flex: 1; min-width: 0; }
+.dw-party .r { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+.dw-party .n { display: block; margin-top: 3px; padding: 0; border: 0; background: none; text-align: left; font: inherit; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--text-1); overflow-wrap: anywhere; }
+.dw-party button.n { cursor: pointer; }
+.dw-party button.n:hover { color: var(--info-text); text-decoration: underline; text-underline-offset: 3px; }
+.dw-party .stir { display: inline-block; margin-top: 7px; padding: 2px 8px; border-radius: 6px; background: var(--surface-inset); font: 500 11.5px var(--font-mono); color: var(--text-2); }
+.dw-party .go { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--text-3); }
+
+/* hearing history */
+.dw-hist > div { display: flex; align-items: baseline; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+.dw-hist > div:last-child { border-bottom: 0; }
+.dw-hist b { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dw-hist .m { flex: 1; min-width: 0; color: var(--text-2); font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+.dw-more { margin-top: 6px; width: 100%; }
+
+/* decisions */
+.dw-quote { padding: 2px 0 2px 14px; border-left: 3px solid var(--border-strong); }
+.dw-quote + .dw-quote { margin-top: 12px; }
+.dw-quote .d { font: 700 11.5px var(--font-mono); color: var(--text-3); letter-spacing: .02em; }
+.dw-quote p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text-1); overflow-wrap: anywhere; }
+
+/* instances: a three-step track instead of three cards of filler text */
+.dw-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dw-step { position: relative; padding-top: 24px; text-align: center; min-width: 0; }
+.dw-step::before { content: ""; position: absolute; top: 4px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border-strong); z-index: 1; }
+.dw-step::after { content: ""; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--border-default); }
+.dw-step:last-child::after { display: none; }
+.dw-step.done::before { background: var(--dw-a); border-color: var(--dw-a); }
+.dw-step.done::after { background: var(--dw-a); }
+.dw-step b { display: block; font-size: 12.5px; font-weight: 700; }
+.dw-step span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
+.dw-step.done span { color: var(--text-2); }
+
+/* receipt ticket */
+.dw-ticket { border: 1px solid var(--border-default); border-radius: 16px; overflow: hidden; background: var(--surface); }
+.dw-ticket-h { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 18px; background: var(--dw-soft); border-bottom: 2px dashed var(--border-default); }
+.dw-ticket-h::before, .dw-ticket-h::after { content: ""; position: absolute; bottom: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border-default); }
+.dw-ticket-h::before { left: -9px; }
+.dw-ticket-h::after { right: -9px; }
+.dw-ticket-h .eb { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--dw-a); }
+.dw-ticket-h .num { margin-top: 4px; font: 700 17px var(--font-mono); letter-spacing: 1.5px; color: var(--text-1); }
+.dw-ticket .dw-kv { border: 0; border-radius: 0; }
+.dw-ticket .dw-fig { margin: 4px 14px 14px; }
+.dw-ticket .rc-barcode { margin-top: 10px; }
+
+/* worker requests */
+.dw-req > div { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 12px; }
+.dw-req > div:nth-child(even) { background: var(--surface-inset); }
+.dw-req { border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; }
+.dw-req .o { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .detail-sec { margin-bottom: 22px; }
 .detail-sec > .eyebrow { margin-bottom: 10px; display: block; }
 .timeline { position: relative; padding-left: 22px; }
@@ -476,6 +561,7 @@ html, body { height: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   .rise, .rise-c, .gseg-shown { animation: none !important; transition: none !important; opacity: 1 !important; }
+  .sysstat .pulse::after { animation: none; opacity: 0; }
 }
 
 /* ============================================================================
@@ -513,10 +599,14 @@ html, body { height: 100%; }
 .sysstat { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, .05);
   border: 1px solid rgba(255, 255, 255, .07); color: #c3ccf6; transition: background .18s; width: 100%; }
 .sysstat:hover { background: rgba(255, 255, 255, .09); }
-.sysstat .pulse { width: 9px; height: 9px; border-radius: 50%; background: #38c48f; box-shadow: 0 0 0 0 rgba(56, 196, 143, .6); animation: sys-pulse 2.4s infinite; flex: none; }
+/* The ring animates transform + opacity ONLY, on its own compositor layer. It used to animate
+   box-shadow, which cannot be composited: the sidebar repainted every frame forever (60 restyles/s
+   at idle), and with a blurred drawer backdrop on top the page dropped to ~25 fps. */
+.sysstat .pulse { position: relative; width: 9px; height: 9px; border-radius: 50%; background: #38c48f; flex: none; }
+.sysstat .pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #38c48f; opacity: .55; will-change: transform, opacity; animation: sys-pulse 2.4s ease-out infinite; }
 .sysstat b { color: #fff; font-size: 12.5px; font-weight: 700; display: block; }
 .sysstat small { font-size: 11px; color: #8b96cf; }
-@keyframes sys-pulse { 0% { box-shadow: 0 0 0 0 rgba(56, 196, 143, .55); } 70% { box-shadow: 0 0 0 7px rgba(56, 196, 143, 0); } 100% { box-shadow: 0 0 0 0 rgba(56, 196, 143, 0); } }
+@keyframes sys-pulse { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
 .side-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .side-foot .rail-mini { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .1); color: #c3ccf6; }
 .side-foot .rail-mini:hover { background: rgba(255, 255, 255, .12); }

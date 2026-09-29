@@ -21,14 +21,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
-import { openProtoDrawer, closeProtoDrawer } from '@/components/proto/drawer'
+import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
-import type { CourtType, CourtCase, FullCaseData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
+import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
 import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
@@ -57,6 +57,37 @@ function hearingDone(s: string | null | undefined): boolean {
 
 type CaseRow = CourtCase & { hearingTime?: string }
 
+// ---- Hearing dates ------------------------------------------------------------
+// sud.uz sends dd.mm.yyyy. Comparing those as STRINGS orders by day first
+// ('10.01.2023' < '15.12.2022'), which broke "next hearing" and the history order.
+
+/** Sortable key `yyyy-mm-dd hh:mm` for a hearing (ISO dates pass through). */
+function hearingKey(h: { date?: string; time?: string }): string {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(h.date || '')
+  const day = m ? `${m[3]}-${m[2]}-${m[1]}` : (h.date || '')
+  return `${day} ${h.time || ''}`
+}
+const byHearingDate = (a: { date?: string; time?: string }, b: { date?: string; time?: string }) =>
+  hearingKey(a).localeCompare(hearingKey(b))
+
+/** Whole days from today to a hearing date (dd.mm.yyyy or ISO), or null if unparseable. */
+function daysUntil(s?: string): number | null {
+  if (!s) return null
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(s)
+  const i = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  const d = m ? new Date(+m[3], +m[2] - 1, +m[1]) : i ? new Date(+i[1], +i[2] - 1, +i[3]) : null
+  if (!d) return null
+  const t = new Date()
+  t.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - t.getTime()) / 86_400_000)
+}
+
+/** The earliest hearing that has not been held AND is not in the past. A past hearing
+ *  still marked "scheduled" (postponed / status never updated) is not "next". */
+function pickUpcoming<T extends { date?: string; status?: string | null }>(sorted: T[]): T | undefined {
+  return sorted.find((h) => !hearingDone(h.status) && (daysUntil(h.date) ?? 0) >= 0)
+}
+
 // ---- Print helpers (v204 P-C) ----------------------------------------------------
 
 function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
@@ -71,12 +102,12 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
     ...(fi?.hearings ?? []),
     ...(ap?.hearings ?? []),
     ...(ca?.hearings ?? []),
-  ].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+  ].sort(byHearingDate)
 
-  // The next hearing = the earliest one not yet held. When one exists we show
-  // it prominently instead of dumping the whole majlislar history (which is the
-  // "too much unnecessary info" the sheet used to carry).
-  const nextHearing = allHearings.find((h) => !hearingDone(h.status))
+  // The next hearing = the earliest one not yet held and not in the past. When one
+  // exists we show it prominently instead of dumping the whole majlislar history
+  // (which is the "too much unnecessary info" the sheet used to carry).
+  const nextHearing = pickUpcoming(allHearings)
 
   // Only the most recent decision is meaningful on a one-page sheet.
   const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
@@ -223,38 +254,62 @@ function PartyRow({ label, name, companyName, companyStir, onClose }: {
   }
 
   return (
-    <div className="dfield">
-      <div className="k">{label}</div>
-      <div className="v">
+    <div className="dw-party">
+      <div className="body">
+        <div className="r">{label}</div>
         {empty ? (
-          <span className="faint">-</span>
+          <span className="n faint">-</span>
         ) : (
-          <button className="btn btn-ghost btn-xs" style={{ padding: 0, height: 'auto', color: 'var(--info-text)' }} onClick={open}>
-            {name} <Link2 />
-          </button>
+          <button className="n" onClick={open}>{name}</button>
         )}
+        {valid ? <span className="stir">STIR {tin}</span> : null}
       </div>
-      {valid ? <div className="faint mono" style={{ fontSize: 11, marginTop: 2 }}>STIR {tin}</div> : null}
+      {!empty && <Link2 className="go" aria-hidden />}
     </div>
   )
 }
 
+const HIST_SHOWN = 4
+
+/** Past hearings, newest first; only the latest few until expanded. */
+function HearingHistory({ items }: { items: Hearing[] }) {
+  const [all, setAll] = useState(false)
+  const ordered = useMemo(() => [...items].reverse(), [items])
+  const shown = all ? ordered : ordered.slice(0, HIST_SHOWN)
+  return (
+    <>
+      <div className="dw-hist">
+        {shown.map((h, i) => (
+          <div key={i}>
+            <b>{h.date}{h.time ? ` · ${h.time}` : ''}</b>
+            <span className="m">{hearingEn(h.status) || h.status || '-'}{h.courtroom ? ` · ${h.courtroom}` : ''}</span>
+          </div>
+        ))}
+      </div>
+      {ordered.length > HIST_SHOWN && (
+        <button className="btn btn-ghost btn-sm dw-more" onClick={() => setAll((v) => !v)}>
+          {all ? 'Kamroq koʻrsatish' : `Barchasi (${ordered.length})`}
+        </button>
+      )}
+    </>
+  )
+}
+
 function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
+  const EYEBROW = 'Ish tafsiloti'
   openProtoDrawer(
-    `Ish ${caseNumber}`,
-    <div style={{ textAlign: 'center', padding: '30px 0' }}>
-      <span className="spinner" />
-      <div className="faint" style={{ marginTop: 10, fontSize: 12.5 }}>Ish tafsilotlari yuklanmoqda…</div>
-    </div>,
-    '',
+    caseNumber,
+    <div style={{ marginTop: 22 }}><SkRows n={5} /></div>,
+    'Yuklanmoqda…',
+    { eyebrow: EYEBROW },
   )
 
   void (async () => {
     const res = await getCaseDetail(courtType, caseNumber)
     if (!res.ok) {
       openProtoDrawer(
-        `Ish ${caseNumber}`,
-        <div className="alert err">
+        caseNumber,
+        <div className="alert err" style={{ marginTop: 22 }}>
           <Gavel />
           <div className="at">
             <b>Tafsilotlar olinmadi</b>
@@ -262,6 +317,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
           </div>
         </div>,
         '',
+        { eyebrow: EYEBROW },
       )
       return
     }
@@ -272,20 +328,43 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     const ca = d.cassation
     const close = () => closeProtoDrawer()
 
-    // Merge hearings across instances into one timeline (sorted by date)
+    // One hearing list across instances, oldest → newest. The first one not yet
+    // held is the «keyingi majlis» (its own card); the rest is history.
     const allHearings = [
       ...(fi?.hearings ?? []),
       ...(ap?.hearings ?? []),
       ...(ca?.hearings ?? []),
-    ].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    ].sort(byHearingDate)
+    const upcoming = pickUpcoming(allHearings)
+    const history = upcoming ? allHearings.filter((h) => h !== upcoming) : allHearings
+    const left = upcoming ? daysUntil(upcoming.date) : null
 
     const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
 
-    const instances: { name: string; badge?: string; hasData: boolean }[] = [
-      { name: 'Birinchi instansiya', badge: fi?.decision?.text ? 'Koʻrib chiqilgan' : fi?.appellateOutcome, hasData: (fi?.hearings.length ?? 0) > 0 || !!fi?.decision },
-      { name: 'Apellyatsiya', badge: ap?.decision?.text ? 'Koʻrib chiqilgan' : ap?.appellateOutcome, hasData: (ap?.hearings.length ?? 0) > 0 || !!ap?.decision },
-      { name: 'Kassatsiya', badge: ca?.decision?.text ? 'Koʻrib chiqilgan' : ca?.appellateOutcome, hasData: (ca?.hearings.length ?? 0) > 0 || !!ca?.decision },
+    const steps: { name: string; state: string; done: boolean }[] = [
+      { name: 'Birinchi', inst: fi },
+      { name: 'Apellyatsiya', inst: ap },
+      { name: 'Kassatsiya', inst: ca },
+    ].map(({ name, inst }) => {
+      const done = (inst?.hearings.length ?? 0) > 0 || !!inst?.decision
+      return { name, done, state: done ? (inst?.decision?.text ? 'Koʻrib chiqilgan' : inst?.appellateOutcome || 'Yozuv bor') : 'Yoʻq' }
+    })
+
+    const rows: DwRow[] = [
+      ['Sudya', g?.judge],
+      ['Kotib', g?.secretary],
+      ['Ish turi', g?.caseType],
+      ['Daʼvo predmeti', g?.claimSubject],
+      ['Uchinchi shaxs', g?.thirdParty],
+      ['Vakil', g?.representative],
+      ['Prokuror', g?.prosecutor],
+      ['Ariza sanasi', g?.applicationDate, { mono: true }],
+      ['Qoʻzgatilgan', g?.initiatedDate, { mono: true }],
+      ['Muddat', g?.deadlineDate, { mono: true }],
+      ['Davlat boji', g?.stateDuty, { mono: true }],
     ]
+    const amount = (g?.claimAmount || '').trim()
+    const numeric = /^[\d\s.,]+$/.test(amount)
 
     const printCase = () => {
       try {
@@ -295,95 +374,83 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       }
     }
 
+    const statusColor = g?.caseStatus ? CASE_STATUSES[g.caseStatus]?.color : undefined
     openProtoDrawer(
-      `Ish ${caseNumber}`,
+      caseNumber,
       <div>
-        <div style={{ marginBottom: 18, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {g?.caseStatus && <span className={`badge ${familyBadgeClass('neutral')}`} style={{ height: 28, fontSize: 13 }}>{statusEn(g.caseStatus) || g.caseStatus}</span>}
-          {g?.caseType && <span className="badge b-neu" style={{ height: 28, fontSize: 13 }}>{g.caseType}</span>}
-        </div>
-
-        <div className="detail-sec">
-          <span className="eyebrow">Umumiy maʼlumot</span>
-          <div className="dstrip">
-            <div className="dfield">
-              <div className="k"><User />Sudya</div>
-              <div className="v">{g?.judge || '-'}</div>
-            </div>
-            <div className="dfield">
-              <div className="k"><Wallet />Daʼvo summasi</div>
-              <div className="v mono">{g?.claimAmount || '-'}</div>
-            </div>
-            <div className="dfield" style={{ minWidth: '100%' }}>
-              <div className="k"><Scale />Sud</div>
-              <div className="v">{g?.court || '-'}</div>
-            </div>
+        {amount && amount !== '-' && (
+          <div style={{ marginTop: 22 }}>
+            <DwFig label="Daʼvo summasi" value={amount} unit={numeric ? 'soʻm' : undefined} />
           </div>
-        </div>
+        )}
 
-        <div className="detail-sec">
-          <span className="eyebrow">Tomonlar</span>
-          <div className="dstrip">
-            <PartyRow label="Daʼvogar" name={g?.plaintiff} companyName={company?.name} companyStir={company?.stir} onClose={close} />
-            <PartyRow label="Javobgar" name={g?.defendant} companyName={company?.name} companyStir={company?.stir} onClose={close} />
-          </div>
-        </div>
-
-        {allHearings.length > 0 && (
-          <div className="detail-sec">
-            <span className="eyebrow">Majlislar tarixi</span>
-            <div className="timeline">
-              {allHearings.map((h, i) => {
-                const done = hearingDone(h.status)
-                return (
-                  <div className={`tl-item ${done ? 'done' : 'next'}`} key={i}>
-                    <b>{h.date} · {h.time || '-'}</b>
-                    <div className="m">{hearingEn(h.status) || h.status || '-'}{h.courtroom ? ` · ${h.courtroom}` : ''}</div>
-                  </div>
-                )
-              })}
+        {upcoming && (
+          <DwSection title="Keyingi majlis">
+            <div className="dw-next">
+              <div>
+                <div className="d">{upcoming.date}{upcoming.time ? ` · ${upcoming.time}` : ''}</div>
+                <div className="m">{hearingEn(upcoming.status) || upcoming.status || 'Rejalashtirilgan'}{upcoming.courtroom ? ` · ${upcoming.courtroom} zal` : ''}</div>
+              </div>
+              {left !== null && left >= 0 && (
+                <span className="badge b-info days">{left === 0 ? 'Bugun' : `${left} kun qoldi`}</span>
+              )}
             </div>
-          </div>
+          </DwSection>
+        )}
+
+        <DwSection title="Umumiy maʼlumot">
+          <DwKv rows={rows} />
+        </DwSection>
+
+        <DwSection title="Tomonlar">
+          <PartyRow label="Daʼvogar" name={g?.plaintiff} companyName={company?.name} companyStir={company?.stir} onClose={close} />
+          <PartyRow label="Javobgar" name={g?.defendant} companyName={company?.name} companyStir={company?.stir} onClose={close} />
+        </DwSection>
+
+        {history.length > 0 && (
+          <DwSection title="Majlislar tarixi" count={history.length}>
+            <HearingHistory items={history} />
+          </DwSection>
         )}
 
         {decisions.length > 0 && (
-          <div className="detail-sec">
-            <span className="eyebrow">Qarorlar</span>
-            <div className="list">
-              {decisions.map((dec, i) => (
-                <div className="lrow" style={{ cursor: 'default' }} key={i}>
-                  <div className="lead"><Gavel /></div>
-                  <div className="main-c">
-                    <b>{dec!.date || '-'}</b>
-                    <div className="sub" style={{ whiteSpace: 'normal' }}>{dec!.text || '-'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <DwSection title={decisions.length > 1 ? 'Qarorlar' : 'Qaror'}>
+            {decisions.map((dec, i) => (
+              <div className="dw-quote" key={i}>
+                <div className="d">{dec!.date || '-'}</div>
+                <p>{dec!.text || '-'}</p>
+              </div>
+            ))}
+          </DwSection>
         )}
 
-        <div className="detail-sec">
-          <span className="eyebrow">Instansiyalar</span>
-          <div className="instances">
-            {instances.map((inst) => (
-              <div className="inst" key={inst.name}>
-                <div className="inst-h">
-                  <b>{inst.name}</b>
-                  {inst.badge ? <span className="badge b-neu">{inst.badge}</span> : !inst.hasData ? <span className="badge b-neu">Maʼlumot yoʻq</span> : null}
-                </div>
-                <div className="faint mono" style={{ fontSize: 12 }}>{inst.hasData ? `${inst.name.toLowerCase()} boʻyicha yozuvlar bor` : 'Yozuv topilmadi'}</div>
+        <DwSection title="Instansiyalar">
+          <div className="dw-track">
+            {steps.map((st) => (
+              <div className={`dw-step${st.done ? ' done' : ''}`} key={st.name}>
+                <b>{st.name}</b>
+                <span>{st.state}</span>
               </div>
             ))}
           </div>
-        </div>
-
-        <button className="btn btn-outline" style={{ width: '100%' }} onClick={printCase}>
-          <Download />
-          <span>Ish tafsilotini PDF qilish</span>
-        </button>
+        </DwSection>
       </div>,
       g?.court || '',
+      {
+        eyebrow: EYEBROW,
+        badges: g?.caseStatus ? (
+          <span className="badge b-neu" style={{ height: 26 }}>
+            <i className="p-dot" style={{ background: statusColor }} />
+            {statusEn(g.caseStatus) || g.caseStatus}
+          </span>
+        ) : undefined,
+        footer: (
+          <button className="btn btn-primary" onClick={printCase}>
+            <Download />
+            <span>PDF sifatida saqlash</span>
+          </button>
+        ),
+      },
     )
   })()
 }
