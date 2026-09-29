@@ -14,7 +14,7 @@
  * (.pr-next-date/.pr-next-meta), .pr-text, table.pr-table.
  */
 
-interface Palette {
+export interface Palette {
   bg: string; surface: string; inset: string
   t1: string; t2: string; t3: string
   border: string; borderSoft: string
@@ -22,7 +22,7 @@ interface Palette {
   pos: string; neg: string
 }
 
-function palette(dark: boolean): Palette {
+export function palette(dark: boolean): Palette {
   return dark
     ? {
         bg: '#0f1326', surface: '#161b34', inset: '#1b2140',
@@ -114,7 +114,7 @@ function stamp(): string {
 }
 
 /** Read the app's active theme from <html data-theme>. Defaults to light. */
-function isDarkTheme(): boolean {
+export function isDarkTheme(): boolean {
   if (typeof document === 'undefined') return false
   return document.documentElement.getAttribute('data-theme') === 'dark'
 }
@@ -131,18 +131,21 @@ export function buildPrintDoc(title: string, bodyHtml: string, dark = isDarkThem
 </body></html>`
 }
 
-/**
- * Open a print window with `bodyHtml` under `title`. Throws when the popup
- * is blocked so the caller can surface a toast instead of failing silently.
- */
-export function printHtml(title: string, bodyHtml: string): void {
+/** The longest the print dialog waits for web fonts. */
+const FONT_WAIT_MS = 2500
+
+/** Open the blank print window. Call this synchronously inside the user's click. */
+export function openPrintWindow(features = 'width=920,height=1000'): Window {
   if (typeof window === 'undefined') throw new Error('printHtml — faqat brauzerda')
-  const w = window.open('', '_blank', 'width=920,height=1000')
-  if (!w) {
-    throw new Error('Brauzer chop etish oynasini blokladi — pop-up ruxsatini bering')
-  }
+  const w = window.open('', '_blank', features)
+  if (!w) throw new Error('Brauzer chop etish oynasini blokladi — pop-up ruxsatini bering')
+  return w
+}
+
+/** Write a finished document into `w`, wait for it to paint (and its fonts), print, close. */
+export function printIntoWindow(w: Window, fullHtml: string): void {
   w.document.open()
-  w.document.write(buildPrintDoc(title, bodyHtml))
+  w.document.write(fullHtml)
   w.document.close()
 
   const doPrint = () => {
@@ -157,6 +160,22 @@ export function printHtml(title: string, bodyHtml: string): void {
       }, 400)
     }
   }
-  if (w.document.readyState === 'complete') setTimeout(doPrint, 150)
-  else w.addEventListener('load', () => setTimeout(doPrint, 150), { once: true })
+  const go = () => {
+    // Web fonts should be in before the browser lays the pages out — but never let them
+    // block printing: a font that stalls or 404s keeps `document.fonts.ready` pending
+    // forever, which used to mean the print dialog simply never opened.
+    const ready = (w.document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready
+    const cap = new Promise<void>((r) => setTimeout(r, FONT_WAIT_MS))
+    void Promise.race([Promise.resolve(ready).catch(() => undefined), cap]).then(() => setTimeout(doPrint, 150))
+  }
+  if (w.document.readyState === 'complete') go()
+  else w.addEventListener('load', go, { once: true })
+}
+
+/**
+ * Open a print window with `bodyHtml` under `title`. Throws when the popup
+ * is blocked so the caller can surface a toast instead of failing silently.
+ */
+export function printHtml(title: string, bodyHtml: string): void {
+  printIntoWindow(openPrintWindow(), buildPrintDoc(title, bodyHtml))
 }

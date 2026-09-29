@@ -25,6 +25,7 @@ import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow }
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
+import { dateKey, daysUntil } from '@/core/dates'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
@@ -58,29 +59,15 @@ function hearingDone(s: string | null | undefined): boolean {
 type CaseRow = CourtCase & { hearingTime?: string }
 
 // ---- Hearing dates ------------------------------------------------------------
-// sud.uz sends dd.mm.yyyy. Comparing those as STRINGS orders by day first
-// ('10.01.2023' < '15.12.2022'), which broke "next hearing" and the history order.
+// sud.uz sends dd.mm.yyyy; comparing those as STRINGS orders by day first. The date
+// helpers live in core/dates.ts (tested) — use them, never raw string comparison.
 
-/** Sortable key `yyyy-mm-dd hh:mm` for a hearing (ISO dates pass through). */
+/** Sortable `yyyy-mm-dd hh:mm` for a hearing. */
 function hearingKey(h: { date?: string; time?: string }): string {
-  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(h.date || '')
-  const day = m ? `${m[3]}-${m[2]}-${m[1]}` : (h.date || '')
-  return `${day} ${h.time || ''}`
+  return `${dateKey(h.date)} ${h.time || ''}`
 }
 const byHearingDate = (a: { date?: string; time?: string }, b: { date?: string; time?: string }) =>
   hearingKey(a).localeCompare(hearingKey(b))
-
-/** Whole days from today to a hearing date (dd.mm.yyyy or ISO), or null if unparseable. */
-function daysUntil(s?: string): number | null {
-  if (!s) return null
-  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(s)
-  const i = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
-  const d = m ? new Date(+m[3], +m[2] - 1, +m[1]) : i ? new Date(+i[1], +i[2] - 1, +i[3]) : null
-  if (!d) return null
-  const t = new Date()
-  t.setHours(0, 0, 0, 0)
-  return Math.round((d.getTime() - t.getTime()) / 86_400_000)
-}
 
 /** The earliest hearing that has not been held AND is not in the past. A past hearing
  *  still marked "scheduled" (postponed / status never updated) is not "next". */

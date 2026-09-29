@@ -53,6 +53,10 @@ export interface CompanyInfoMapped {
   thsht: string
   dbibt: string
   ifut: string
+  /** orginfo «Toifa» */
+  sustainabilityRating: string
+  /** orginfo «Yirik soliq» */
+  largeTaxpayer: string
   founders: { name?: string; share?: string }[]
   orgInfoUrl: string
 }
@@ -120,6 +124,8 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
             thsht: company.thsht || '',
             dbibt: company.dbibt || '',
             ifut: company.ifut || '',
+            sustainabilityRating: company.sustainabilityRating || '',
+            largeTaxpayer: company.largeTaxpayer || '',
             founders: company.founders || [],
             orgInfoUrl: company.orgInfoUrl || '',
           } as CompanyInfoMapped)

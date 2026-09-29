@@ -50,6 +50,7 @@ import { PartialBanner } from '@/components/ui-custom/states'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { courtItems, turkumItems, type PizzaItem } from '@/components/proto/pizza-geometry'
 import { useResource } from '@/hooks/use-resource'
+import { monthlyTrend } from '@/core/trend'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { clearCached } from '@/lib/cache'
 import type { CompanyStats } from '@/lib/api-types'
@@ -81,23 +82,6 @@ const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band
   lose: { icon: <CircleX />, label: 'Yutqazgan', band: 'negative', text: "Daʼvo qanoatlantirilmadi" },
   pending: { icon: <Clock />, label: 'Jarayonda', band: 'warning', text: "Koʻrib chiqilmoqda" },
   neutral: { icon: <Minus />, label: 'Neytral', band: 'neutral', text: "Neytral yakunlangan" },
-}
-
-function computeTrend(cases: CompanyStats['cases']): { label: string; count: number }[] {
-  const now = new Date()
-  const buckets: { label: string; count: number; key: string }[] = []
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    buckets.push({ label: MONTHS[d.getMonth()], count: 0, key: `${d.getFullYear()}-${d.getMonth()}` })
-  }
-  for (const c of cases) {
-    const m = c.regDate.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
-    if (!m) continue
-    const key = `${m[3]}-${Number(m[2]) - 1}`
-    const b = buckets.find((x) => x.key === key)
-    if (b) b.count++
-  }
-  return buckets
 }
 
 function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
@@ -324,7 +308,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   const setCaseCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const s = data.summary
   const winRate = s.total ? Math.round((s.win / s.total) * 100) : 0
-  const trend = computeTrend(data.cases)
+  const trend = monthlyTrend(data.cases)
   const hotIdx = trend.reduce((best, t, i) => (t.count > trend[best].count ? i : best), 0)
 
   // v18 pizza state: mode (Sud turi ↔ Turkum) + selected wedge

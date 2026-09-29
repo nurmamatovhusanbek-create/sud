@@ -67,6 +67,7 @@ preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
 | Change a slide-over panel (case detail, receipt, worker) | `src/components/proto/drawer.tsx` + the `.drawer*` / `.dw-*` block in `prototype.css`; callers: `openCaseDetail` (`sections/cases.tsx`), `openReceipt` (`sections/bills.tsx`), `openWorker` (`views/settings-view.tsx`) | One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title block, accent section labels with a rule, zebra rows, accent-soft key figure). Open it with `openProtoDrawer(title, content, sub, { eyebrow, badges, footer })` and build the body from `DwSection` / `DwKv` / `DwFig` so every panel matches. `DwKv` **drops rows with no value** — never render a «-» row. New panels get the look for free; don't hand-style a one-off. |
 | Change colors, spacing, tokens, dark mode | `src/app/globals.css` + `src/app/prototype.css` | **Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components. |
 | Lay out a responsive card grid | reuse the `.kpis` / `.ccards` breakpoints | **Grid gotcha (learned the hard way):** `repeat(N, 1fr)` = `minmax(auto, 1fr)`, so non-wrapping content (company names, STIRs) forces horizontal overflow off-screen. Use `minmax(0, 1fr)` **and** `min-width: 0` on the items. |
+| Change the **company report** («Hisobot», PDF) | `src/lib/report/` — `model.ts` (pure: raw data → report model, tested) · `render.ts` (model → HTML sections) · `doc.ts` (page shell, `@page`, theme) · `fonts.ts` · `generate.ts` (`openCompanyReport`, called from `company/context-bar.tsx`) | Split on purpose: put logic in `model.ts` and cover it in `report/__tests__/`; `render.ts` only draws. A failed source is recorded in `model.notes` and shown **in place** — never print a zero for missing data. Sections with no data source are omitted, not faked. `generate.ts` opens the print window **first** (synchronously in the click, or popup blockers reject it), then gathers data with a per-source timeout. |
 | Add a "themed PDF" export | `src/lib/print.ts` | `buildPrintDoc(title, body, dark)` renders an app-themed sheet that adapts to the active theme; uses `print-color-adjust: exact` so brand colors survive "Save as PDF". |
 
 **Two UI rules the owner has stated explicitly — honor them:**
@@ -176,6 +177,14 @@ is required in production.
   `rm -rf .next/dev/types .next/types` and re-run.
 - **Never commit secrets.** Network captures the owner pastes may contain live cookies
   or keys — read them, act on them, but never store or commit them.
+- **Print windows (report, themed PDF).** The window is written with `document.open/write`, which
+  **removes event listeners** — check for CSP/network problems from outside (Playwright popup
+  `console`/`requestfailed`), not with a listener inside the popup. Fonts: `@font-face` URLs are relative to
+  the **stylesheet**, not the page (dev emits `../media/…`), so `report/fonts.ts` resolves each rule against its
+  own `sheet.href`; resolving against the page 404s, keeps `document.fonts.ready` pending forever and the print
+  dialog never opened. `printIntoWindow` therefore caps the font wait (`FONT_WAIT_MS`). Keep
+  `@page { background }` set or the margin band stays white in dark mode; `@bottom-right` page counters are
+  Chrome/Edge 131+ only. In e2e tests block `window.close` in the popup (it closes itself after printing).
 - **`bun run dev` runs under a supervisor** (`scripts/supervisor.mjs`) that restarts on
   crash; `dev:once` / `start:once` run the raw server if you need clean logs.
 
