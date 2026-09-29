@@ -200,6 +200,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
   const [sideOpen, setSideOpen] = useState(false)
+  // Escape closes the drawer (it covers its own hamburger; the scrim also closes it).
+  useEffect(() => {
+    if (!sideOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSideOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sideOpen])
   const [workerStat, setWorkerStat] = useState<{ alive: number; total: number } | null>(null)
   // Post-hydration registry read via useSyncExternalStore: server snapshot is 0,
   // the client snapshot re-checks after hydration.
@@ -284,6 +291,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-frame">
+      {sideOpen && <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden />}
       <aside className={cn('side', sideOpen && 'open')} aria-label="Global navigatsiya">
         <button className="brand" onClick={goLauncher} aria-label="Bosh sahifa">
           <span className="logo" aria-hidden>
