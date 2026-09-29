@@ -32,7 +32,7 @@ making changes.
 ```bash
 bun run typecheck      # must be clean — types are enforced at build time
 bun run lint           # must be 0 problems
-bun test src/core      # pure-core math/logic tests (pretenzia penalty, classify, status, pizza)
+bun test src/core src/lib   # pure-core math/logic (pretenzia, classify, status, pizza) + scraper error handling (network mocked)
 ```
 
 **Live scraping does not work in a sandbox** (the sud.uz / orginfo endpoints are
@@ -152,6 +152,12 @@ is required in production.
 - **Hearing dates from sud.uz are `dd.mm.yyyy` — never compare them as strings** (`'10.01.2023' < '15.12.2022'`).
   Use `hearingKey` / `byHearingDate` / `pickUpcoming` in `sections/cases.tsx`; «next hearing» must also be
   in the future (a past hearing still marked scheduled is not «next»).
+- **A scraper must never return an upstream error body as if it were data.** billing.sud.uz answers
+  rejected searches with HTTP 400/422 and a JSON body (`{ requestStatus: … }`, no `content`).
+  `searchBillsByInn` once returned that body, so `getFullBillData` did `[...search.content]` and crashed
+  with «Spread syntax requires ...iterable not be null or undefined», hiding the real reason. Validate
+  the shape (`isSearchResponse`), keep the upstream's message (`rejectionReason`), and fail loudly with it.
+  Scraper tests mock `fetchViaWorkers` (`src/lib/__tests__/billing-search.test.ts`) — copy that pattern.
 - **Validate the shape of every raw `fetch()` response before storing it.** An error body (401 with
   `APP_API_TOKEN` set, 429, 500) is valid JSON with no data fields; `settings-view` once did
   `setData(json)` and then `data.workers.length`, which white-screened the whole Settings page.

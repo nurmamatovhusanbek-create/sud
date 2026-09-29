@@ -186,6 +186,11 @@ async function fetchJsonWithRetry<T>(
       }
       // 4xx — the server responded, parse the body (billing returns usable JSON on 4xx)
       const parsed = (await res.json()) as T
+      // Keep the upstream's own explanation. It used to be discarded, so a rejected
+      // search showed up only as "HTTP 400" with no clue why.
+      if (res.status >= 400) {
+        console.error(`[billing] ${label} rejected: HTTP ${res.status} ${JSON.stringify(parsed).slice(0, 300)}`)
+      }
       // Validate billing search responses: real responses have `content` array.
       // BUT: 422 captcha-fail has requestStatus but no content — that's valid.
       if (isBillingUrl && parsed && typeof parsed === 'object' && !Array.isArray((parsed as any).content)) {
@@ -383,6 +388,18 @@ export async function getCaptchaToken(
 
 // ---- Billing API -------------------------------------------------------
 
+/** A real bill list — as opposed to an error body ({ requestStatus: … }, HTTP 400/422). */
+function isSearchResponse(r: unknown): r is SearchResponse {
+  const o = r as Partial<SearchResponse> | null
+  return !!o && typeof o === 'object' && Array.isArray(o.content) && typeof o.totalElements === 'number'
+}
+
+/** The upstream's own explanation for a rejected search, for logs and the UI. */
+function rejectionReason(r: unknown): string {
+  const o = (r ?? {}) as { requestStatus?: { code?: number; message?: string }; message?: string; error?: string }
+  return o.requestStatus?.message || o.message || o.error || (o.requestStatus?.code ? `kod ${o.requestStatus.code}` : 'sabab koʻrsatilmagan')
+}
+
 /**
  * Search all bills for a legal entity (Yuridik shaxs) by INN.
  *
@@ -434,6 +451,19 @@ export async function searchBillsByInn(
           { headers: searchHeaders },
           3, // fewer internal retries (fetchJsonWithRetry handles 521 rotation)
         )
+        // billing answered with an error body instead of a bill list (e.g. HTTP 400/422:
+        // captcha rejected, bad request). Returning it as a "result" made the caller
+        // spread `undefined` and crash, and hid the reason. Treat it as a rejection,
+        // keep the upstream's explanation, and try a fresh captcha.
+        if (!isSearchResponse(result)) {
+          const reason = rejectionReason(result)
+          console.error(`[billing] search rejected by billing.sud.uz: ${reason}`)
+          lastErr = new Error(`billing.sud.uz qidiruvni rad etdi: ${reason}`)
+          if (tokenAttempt < MAX_TOKEN_ATTEMPTS - 1) {
+            await new Promise((r) => setTimeout(r, 800))
+          }
+          break // → new captcha (or, on the last attempt, throw lastErr below)
+        }
         // If we got results, return them.
         if (result.totalElements > 0) {
           return result
@@ -625,7 +655,7 @@ export async function getFullBillData(
 
   // NO bill limit — process ALL bills. The ProxyPool + retry loop below
   // handles failures by switching to alive proxies until every bill succeeds.
-  const allItems = [...search.content]
+  const allItems = [...(search.content ?? [])]
   const items = [...allItems]
 
   const bills: EnrichedBill[] = []
