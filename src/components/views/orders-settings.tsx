@@ -5,15 +5,13 @@
  * orders are fetched only for the cases the owner cares about, once, and kept). Three cards:
  *  1. Automatic check of the Kuzatuv companies (idle switch, run now, pause/resume)
  *  2. The queue that is (or was) working: progress, pause / resume / cancel
- *  3. What the local cache holds, and a button to forget it
+ *  3. What the local cache holds and where it lives (it is never deleted: only added to and updated)
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { Database, ListChecks, Pause, Play, RefreshCw, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { Database, ListChecks, Pause, Play, RefreshCw, X } from 'lucide-react'
 import {
   cancelPublicOrdersJob,
-  clearPublicOrdersCache,
   getPublicOrdersCache,
   pausePublicOrdersJob,
   resumePublicOrdersJob,
@@ -46,7 +44,6 @@ export function OrdersTab() {
   const [cache, setCache] = useState<OrdersCacheStats | null>(null)
   const [auto, setAuto] = useState(true)
   const [lastAuto, setLastAuto] = useState(0)
-  const [confirmClear, setConfirmClear] = useState(false)
   const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
 
   const loadCache = useCallback(async () => {
@@ -73,14 +70,6 @@ export function OrdersTab() {
     const t = setInterval(() => void loadCache(), 15_000)
     return () => clearInterval(t)
   }, [busy, loadCache])
-
-  const clear = async () => {
-    setConfirmClear(false)
-    const r = await clearPublicOrdersCache()
-    if (r.ok) toast.success('Kesh tozalandi — qarorlar kerak boʻlganda qayta yuklanadi')
-    else toast.error(r.error)
-    await load()
-  }
 
   const st = STATE[job?.state ?? 'idle']
   const collecting = runner.phase === 'collecting'
@@ -195,18 +184,9 @@ export function OrdersTab() {
         )}
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '10px 0 10px' }}>
           Faqat qaror haqidagi kichik yozuvlar saqlanadi (ish raqami, instansiya, sud, sudya, natija, PDF havolasi). Qaror matni faqat PDF ni bosganingizda olinadi.
+          Kesh hech qachon oʻchirilmaydi: faqat yangi yozuvlar qoʻshiladi va oʻzgargan ishlar yangilanadi, chunki uni qayta yigʻish uzoq davom etadi.
         </p>
-        {confirmClear ? (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12.5 }}>Hamma saqlangan yozuvlar oʻchadi. Davom etamizmi?</span>
-            <button className="btn btn-outline btn-sm" onClick={() => void clear()}><Trash2 /><span>Ha, tozalash</span></button>
-            <button className="btn btn-outline btn-sm" onClick={() => setConfirmClear(false)}><span>Yoʻq</span></button>
-          </div>
-        ) : (
-          <button className="btn btn-outline btn-sm" disabled={!cache || (cache.cases === 0 && cache.orders === 0)} onClick={() => setConfirmClear(true)}>
-            <Trash2 /><span>Keshni tozalash</span>
-          </button>
-        )}
+        {cache && <div className="kv"><span className="k">Saqlanadigan joy</span><span className="mono" style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{cache.dir}</span></div>}
       </div>
     </div>
   )

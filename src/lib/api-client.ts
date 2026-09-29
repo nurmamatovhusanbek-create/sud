@@ -391,15 +391,3 @@ export const retryPublicOrdersJob = () => jobAction('retry')
 export function getPublicOrdersCache(signal?: AbortSignal) {
   return request<OrdersCacheStats>('/api/public-orders/cache', signal)
 }
-
-/** Forget the local cache (everything can be fetched again). */
-export async function clearPublicOrdersCache(): Promise<ApiResult<{ cleared: true }>> {
-  try {
-    const res = await fetch('/api/public-orders/cache', { method: 'DELETE', headers: authHeaders() })
-    const json = await res.json().catch(() => null)
-    if (json?.ok === true && json.data) return { ok: true, data: json.data }
-    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
-  } catch {
-    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
-  }
-}

@@ -2,20 +2,20 @@ import 'server-only'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
+import { dataDir } from './data-dir'
 import type { OrdersCacheStats } from './types'
+
+export { dataDir }
 
 /**
  * The local index of published orders: append-only JSONL, sharded by a hash of the case number so
- * a lookup reads ONE small file (~1.3k rows) instead of ~680k. Lives on the operator's disk
- * (`data/public-orders/`, git-ignored) — this is a cache of public metadata, not a database:
- * delete the folder and re-run the sync and you get it back.
- *
- * Re-crawled rows simply append again; a read keeps the last copy of each order id.
+ * a lookup reads ONE small file instead of everything. Lives on the operator's disk OUTSIDE the project
+ * (see data-dir.ts) and is NEVER deleted by the app: rebuilding it costs ~10 s per case, so it is only
+ * added to and updated. A re-fetched order or a re-checked case simply appends a newer line; a read keeps the
+ * last copy of each order id / case number.
  */
 
 export const SHARDS = 512
-
-export const dataDir = (): string => process.env.PUBLIC_ORDERS_DIR || path.join(process.cwd(), 'data', 'public-orders')
 
 /** FNV-1a over the normalised case number → shard 0..511 */
 export function shardOf(caseNumber: string): number {
@@ -167,13 +167,5 @@ export async function cacheStats(): Promise<OrdersCacheStats> {
       orders += ids.size
     }
   } catch { /* no shards yet */ }
-  return { cases: checked.size, withOrders, orders, failed, bytes, lastCheckedAt: last ? new Date(last).toISOString() : null }
-}
-
-/** Delete the whole cache; every case is «never checked» again. */
-export function clearCache(): Promise<void> {
-  return serial(async () => {
-    await fs.rm(dataDir(), { recursive: true, force: true })
-    checkedCache = null
-  })
+  return { dir: dataDir(), cases: checked.size, withOrders, orders, failed, bytes, lastCheckedAt: last ? new Date(last).toISOString() : null }
 }

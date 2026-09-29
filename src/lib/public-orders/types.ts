@@ -29,6 +29,8 @@ export interface PublicOrdersStatus {
 
 /** What the local cache holds (Settings › Qarorlar). */
 export interface OrdersCacheStats {
+  /** where the cache lives (outside the project; never deleted by the app) */
+  dir: string
   /** cases that were looked up at least once */
   cases: number
   /** cases with at least one published order */

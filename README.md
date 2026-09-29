@@ -101,7 +101,9 @@ the bottom of every screen offers «Boshlash», then shows «N qaror yuklanmoqda
 order and «Davom ettirish» continues from the same case). Settings › Qarorlar is the control panel: the idle auto-check
 switch, run now, the queue (pause / resume / cancel) and the local cache (numbers, clear). A case
 drawer shows *Eʼlon qilingan qarorlar* (instance, court, judge, result, PDF on click) and *Eʼlon qilinmagan qarorlar*
-(decisions the court data gives us that have no published order). There is no full-library copy.
+(decisions the court data gives us that have no published order). There is no full-library copy. What was fetched is
+kept in `~/.sud-tizimi/public-orders` (outside the project, so re-cloning the app never loses it) and is never deleted,
+only added to and updated.
 
 **Hujjat tayyorlash** — from a case drawer, the court petitions (nusxa olish, majlisni qoldirish) open in Hujjatlar
 already filled with that case's court, judge, number, claimant, subject and next hearing (Cyrillic converted to Latin).

@@ -43,6 +43,6 @@ The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
 - The queue can be paused (the case in flight finishes, the rest keeps its order), resumed (same counters) or cancelled; Settings › Qarorlar shows and controls it.
 - Who triggers it: the **Kuzatuv** page («Qarorlarni tekshirish»), the same page's «Boʻsh vaqtda avto» switch (runs when the app has been idle
   3 min or the tab is hidden, at most every 6 h, only while the app is open), Sud ishlari «Qarorlar», or a drawer's «Tekshirish» (forced).
-- Storage: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `checked.jsonl` (one record per case). Delete the folder to reset.
+- Storage: `~/.sud-tizimi/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `checked.jsonl` (one record per case), outside the project on purpose. **It is never deleted by the app**, only appended to (a newer line wins on read); an older in-project `data/public-orders` is copied over once.
 - The API is called directly from the machine (`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
 - The date filter's meaning (publication vs decision date) is **unverified**; nothing depends on it now.
