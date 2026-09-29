@@ -5,8 +5,8 @@
  * legacy shapes) into ApiResult<T>.
  */
 
-import type { StoredOrder, PublicCourtType } from '@/core/public-orders'
-import type { PublicOrdersCoverage, PublicOrdersStatus } from '@/lib/public-orders/types'
+import type { StoredOrder } from '@/core/public-orders'
+import type { PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
   BillDetailData,
@@ -312,36 +312,18 @@ async function downloadPost(url: string, body: unknown): Promise<void> {
 export interface PublicOrdersData {
   caseNumber: string
   orders: StoredOrder[]
-  checked: { at: string; found: number; error: string | null } | null
+  /** when this case was last looked up in the library (null = never); `seen` = instances with a published order */
+  checked: { at: string; error: string | null; seen: string[] } | null
   downloading: boolean
-  coverage: PublicOrdersCoverage
 }
 
-/** Instant: reads the local index. */
+/** Instant: reads the local cache. */
 export function getPublicOrders(caseNumber: string, signal?: AbortSignal) {
   return request<PublicOrdersData>(`/api/public-orders/orders?caseNumber=${encodeURIComponent(caseNumber)}`, signal)
 }
 
 export function getPublicOrdersStatus(signal?: AbortSignal) {
   return request<PublicOrdersStatus>('/api/public-orders/status', signal)
-}
-
-export async function syncPublicOrders(action: 'start' | 'pause', courtTypes?: PublicCourtType[]): Promise<ApiResult<{ crawl: PublicOrdersStatus['crawl'] }>> {
-  try {
-    const res = await fetch('/api/public-orders/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action, courtTypes }),
-    })
-    const json = await res.json().catch(() => null)
-    if (json?.ok === true && json.data) {
-      window.dispatchEvent(new CustomEvent('sud:orders-job')) // wake the global loader
-      return { ok: true, data: json.data }
-    }
-    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
-  } catch {
-    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
-  }
 }
 
 /**
@@ -372,12 +354,15 @@ export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<
 }
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
-export async function fetchPublicOrders(cases: { caseNumber: string; courtType: string }[]): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number }>> {
+export async function fetchPublicOrders(
+  cases: { caseNumber: string; courtType: string; sig?: string }[],
+  opts: { force?: boolean } = {},
+): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number }>> {
   try {
     const res = await fetch('/api/public-orders/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action: 'start', cases }),
+      body: JSON.stringify({ action: 'start', cases, force: opts.force === true }),
     })
     const json = await res.json().catch(() => null)
     if (json?.ok === true && json.data) {

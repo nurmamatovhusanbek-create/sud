@@ -31,15 +31,16 @@ Maps 1:1 onto `core/classify.ts` (granted / rad etilgan / qaytarilgan / ko'rmasd
 - Dates are ISO here (`YYYY-MM-DD`), unlike the `dd.mm.yyyy` from jadval.sud.uz.
 
 ## What we built on it
-- **Date-window list = fast** (probe #4): 50–240 ms per page of 100, ~219 rows/s sequential, 3 parallel pages tolerated.
-  Whole-year and case-number combinations are slow or return nothing useful. So `lib/public-orders/engine.ts` crawls one
-  DAY at a time (`startDate = endDate`), newest first, until 60 empty days in a row; each day is checked against the API's own total.
-- The date filter's exact meaning (publication vs decision date) is **unverified** — the known order (decided 12 May 2026) was not
-  inside 11–19 May for its court. It does not matter for a full crawl (every order sits in some day window), only for guessing a window.
-- Index: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `state.json` (progress). Delete the folder to reset.
-
-## Update: per-case download is the default, the full crawl is optional
-The full crawl is disk-heavy (~200 B a row: ~40 MB economic, ~90 MB civil, ~15 MB administrative) and was not wanted on the owner's laptop.
-The default is now `lib/public-orders/company-job.ts`: only the cases the user asks for are looked up (`case_number` + `instance`, ~10 s each,
-3 instances in parallel, one case at a time), in the background, with a «checked» marker per case. The API is called directly from the machine
-(`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
+Only the orders of the cases the owner cares about are fetched (no library copy: the full day-by-day crawl was measured at ~40–90 MB
+per court type and was dropped). `lib/public-orders/engine.ts` (`lookupCase`) asks `case_number` + `instance` (~10 s) for FIRST, APPEAL
+and CASSATION in parallel, in the background, and keeps only rows whose case number equals the case's (the search is a «contains»).
+The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
+- **A published order is permanent.** Once an instance has one it is never asked about again; when all three are stored the case is done for good.
+- A case is re-checked only when its **signature** (status + result + hearing date) changes, e.g. it was appealed, or by a
+  publication-lag back-off (3 d, 14 d, 45 d after the last fruitless check, then it waits for a change).
+- A failed search is an error retried after 10 minutes, never a false «no orders».
+- Who triggers it: the **Kuzatuv** page («Qarorlarni tekshirish»), the same page's «Boʻsh vaqtda avto» switch (runs when the app has been idle
+  3 min or the tab is hidden, at most every 6 h, only while the app is open), Sud ishlari «Qarorlar», or a drawer's «Tekshirish» (forced).
+- Storage: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `checked.jsonl` (one record per case). Delete the folder to reset.
+- The API is called directly from the machine (`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
+- The date filter's meaning (publication vs decision date) is **unverified**; nothing depends on it now.

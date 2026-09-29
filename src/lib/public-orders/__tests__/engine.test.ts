@@ -1,198 +1,132 @@
 import { describe, expect, test } from 'bun:test'
-import { runCrawl, type CrawlDeps } from '../engine'
-import { emptyProgress, type CrawlState } from '../types'
-import type { ListParams } from '../source'
-import type { RawPublication } from '@/core/public-orders'
+import type { CaseCheck, RawPublication, StoredOrder } from '@/core/public-orders'
+import { lookupCase, type CaseLookupDeps } from '../engine'
 
-/** A fake library: rows per day per court type, served in pages like the real API. */
-function fake(days: Record<string, number>, opts: { today?: string; failOn?: (p: ListParams) => boolean; totalLies?: boolean } = {}) {
-  const calls: ListParams[] = []
-  const saved: CrawlState[] = []
-  const stored: string[] = []
-  let state: CrawlState = { version: 1, updatedAt: '', types: {} }
-  const deps: CrawlDeps = {
-    async listPage(p) {
-      calls.push(p)
-      if (opts.failOn?.(p)) throw new Error('boom')
-      const n = days[p.startDate] ?? 0
-      const from = p.page * (p.size ?? 100)
-      const rows: RawPublication[] = Array.from({ length: Math.max(0, Math.min(p.size ?? 100, n - from)) }, (_, i) => ({
-        id: `${p.courtType}-${p.startDate}-${from + i}`,
-        case_number: `4-1-${p.startDate}/${from + i}`,
-        instance: 'FIRST',
-        result: 'FULFILLED',
-      }))
-      return { rows, total: n === 0 ? null : opts.totalLies ? n + 1 : n }
-    },
-    async append(o) {
-      stored.push(...o.map((x) => x.id))
-    },
-    async load() {
-      return structuredClone(state)
-    },
-    async save(s) {
-      state = structuredClone(s)
-      saved.push(structuredClone(s))
-    },
-    today: () => opts.today ?? '2026-06-10',
-    sleep: async () => {},
-  }
-  return { deps, calls, stored, saved, get state() { return state }, set state(s: CrawlState) { state = s } }
-}
+const DAY = 86_400_000
+const CN = '4-1001-2619/21743'
+const T0 = Date.parse('2026-06-01T10:00:00Z')
 
-const run = (f: ReturnType<typeof fake>, o: Partial<Parameters<typeof runCrawl>[1]> = {}) =>
-  runCrawl(f.deps, { courtTypes: ['ECONOMIC'], signal: new AbortController().signal, emptyLimit: 3, pageSize: 2, ...o })
-
-describe('crawl engine', () => {
-  test('walks days newest → oldest, page by page, and stops after N empty days (the start of the library)', async () => {
-    const f = fake({ '2026-06-10': 3, '2026-06-09': 2, '2026-06-08': 0, '2026-06-07': 1 })
-    const out = await run(f)
-    expect(out.status).toBe('done')
-    const seen = [...new Set(f.calls.map((c) => c.startDate))]
-    // 10, 9, 8(empty 1), 7, 6(empty 1), 5(empty 2), 4(empty 3) → complete
-    expect(seen).toEqual(['2026-06-10', '2026-06-09', '2026-06-08', '2026-06-07', '2026-06-06', '2026-06-05', '2026-06-04'])
-    // 3 rows at page size 2 = 2 pages; 2 rows = exactly one full page then a short/empty second? (2 rows: page 0 full, total says 2 → stop)
-    expect(f.calls.filter((c) => c.startDate === '2026-06-10').map((c) => c.page)).toEqual([0, 1])
-    expect(f.calls.filter((c) => c.startDate === '2026-06-09').map((c) => c.page)).toEqual([0])
-    expect(f.stored).toHaveLength(6)
-    const p = f.state.types.ECONOMIC!
-    expect(p).toMatchObject({ newest: '2026-06-10', oldest: '2026-06-04', complete: true, rows: 6, mismatches: 0 })
-  })
-
-  test('progress is saved after every day, and an aborted run resumes exactly where it stopped', async () => {
-    const f = fake({ '2026-06-10': 1, '2026-06-09': 1, '2026-06-08': 3, '2026-06-07': 1 })
-    const ac = new AbortController()
-    let n = 0
-    const orig = f.deps.listPage
-    f.deps.listPage = async (p) => {
-      if (++n === 3) ac.abort() // pause while day 8 (2 pages) is half read
-      return orig(p)
-    }
-    const first = await run(f, { signal: ac.signal, emptyLimit: 2 })
-    expect(first.status).toBe('paused')
-    expect(f.state.types.ECONOMIC).toMatchObject({ newest: '2026-06-10', oldest: '2026-06-09' }) // days 10, 9 done; day 8 NOT marked
-    f.deps.listPage = orig
-    const before = f.calls.length
-    await run(f, { emptyLimit: 2 })
-    // second run: top-up (today back to newest−2) then backfill from the day below the oldest covered (06-08)
-    const resumed = f.calls.slice(before).map((c) => c.startDate)
-    expect(resumed.filter((d, i) => resumed.indexOf(d) === i)).toEqual(['2026-06-10', '2026-06-09', '2026-06-08', '2026-06-07', '2026-06-06', '2026-06-05'])
-    expect(f.state.types.ECONOMIC!.complete).toBe(true)
-  })
-
-  test('top-up: a later run re-reads the last 2 days and only counts genuinely new rows', async () => {
-    const f = fake({ '2026-06-10': 2, '2026-06-09': 1, '2026-06-08': 1 }, { today: '2026-06-10' })
-    await run(f, { emptyLimit: 1 })
-    const rowsAfterFirst = f.state.types.ECONOMIC!.rows
-    // next day: a new day appears, and yesterday grew (a late publication)
-    const f2 = fake({ '2026-06-11': 2, '2026-06-10': 3, '2026-06-09': 1, '2026-06-08': 1 }, { today: '2026-06-11' })
-    f2.state = f.state
-    await run(f2, { emptyLimit: 1 })
-    const days = [...new Set(f2.calls.map((c) => c.startDate))]
-    expect(days.slice(0, 4)).toEqual(['2026-06-11', '2026-06-10', '2026-06-09', '2026-06-08']) // top-up window = newest−2 … today
-    expect(f2.state.types.ECONOMIC!.newest).toBe('2026-06-11')
-    expect(f2.state.types.ECONOMIC!.rows).toBe(rowsAfterFirst + 2) // only 06-11's two rows are new
-    expect(f2.state.types.ECONOMIC!.complete).toBe(true) // already was; not crawled again downward
-    expect(days).not.toContain('2026-06-07')
-  })
-
-  test('a day whose row count disagrees with the API total is recorded, not hidden', async () => {
-    const f = fake({ '2026-06-10': 2 }, { totalLies: true })
-    await run(f, { emptyLimit: 1 })
-    expect(f.state.types.ECONOMIC!.mismatches).toBe(1)
-  })
-
-  test('a failing page is retried, then the run stops with an error and keeps its progress', async () => {
-    const f = fake({ '2026-06-10': 1, '2026-06-09': 1 }, { failOn: (p) => p.startDate === '2026-06-09' })
-    const out = await run(f, { retryDelaysMs: [0, 0] })
-    expect(out).toEqual({ status: 'error', error: 'boom' })
-    expect(f.calls.filter((c) => c.startDate === '2026-06-09')).toHaveLength(3) // 1 try + 2 retries
-    expect(f.state.types.ECONOMIC).toMatchObject({ newest: '2026-06-10', oldest: '2026-06-10' })
-  })
-
-  test('the floor date ends a backfill', async () => {
-    const f = fake({ '2026-06-10': 1, '2026-06-09': 1, '2026-06-08': 1 })
-    await run(f, { floor: '2026-06-09', emptyLimit: 99 })
-    expect(f.state.types.ECONOMIC).toMatchObject({ oldest: '2026-06-09', complete: true })
-  })
-
-  test('each court type keeps its own progress', async () => {
-    const f = fake({ '2026-06-10': 1 })
-    await run(f, { courtTypes: ['ECONOMIC', 'CIVIL'], emptyLimit: 1 })
-    expect(Object.keys(f.state.types).sort()).toEqual(['CIVIL', 'ECONOMIC'])
-    expect(f.state.types.CIVIL!.rows).toBe(1)
-  })
+const row = (id: string, instance: string, caseNumber = CN): RawPublication => ({
+  id,
+  case_number: caseNumber,
+  instance,
+  result: 'FULFILLED',
+  pdf: { id: 'pdf-' + id, name: id + '.pdf', size: 10 },
 })
 
-test('emptyProgress starts clean', () => expect(emptyProgress()).toMatchObject({ newest: null, oldest: null, complete: false, rows: 0 }))
-
-import { lookupCase, LOOKUP_INSTANCES, type CaseLookupDeps } from '../engine'
-
-describe('lookupCase — the background per-case download', () => {
-  const row = (cn: string, instance: string, id: string): RawPublication => ({ id, case_number: cn, instance, result: 'FULFILLED' })
-  function deps(answers: Record<string, RawPublication[] | Error>, prev: { at: string; error?: string } | null = null) {
-    const appended: string[] = []
-    const marks: { caseNumber: string; found: number; error?: string }[] = []
-    const asked: string[] = []
-    const d: CaseLookupDeps = {
-      async search(cn, _ct, instance) {
-        asked.push(instance)
-        const a = answers[instance] ?? []
-        if (a instanceof Error) throw a
-        return a
-      },
-      async append(o) { appended.push(...o.map((x) => x.id)) },
-      async getChecked() { return prev },
-      async markChecked(c) { marks.push(c) },
-      now: () => new Date('2026-06-10T00:00:00Z'),
-    }
-    return { d, appended, marks, asked }
+function rig(searchImpl: (cn: string, ct: string, instance: string) => Promise<RawPublication[]>, start = T0) {
+  let clock = start
+  const stored: StoredOrder[] = []
+  const checks = new Map<string, CaseCheck>()
+  const calls: string[] = []
+  const deps: CaseLookupDeps = {
+    search: (cn, ct, instance) => {
+      calls.push(instance)
+      return searchImpl(cn, ct, instance)
+    },
+    append: async (o) => void stored.push(...o),
+    getChecked: async (cn) => checks.get(cn) ?? null,
+    markChecked: async (c) => void checks.set(c.caseNumber, c),
+    now: () => new Date(clock),
   }
-  const job = { caseNumber: '4-1001-2619/21743', courtType: 'ECONOMIC' as const }
+  return { deps, stored, checks, calls, advance: (ms: number) => (clock += ms) }
+}
+const job = { caseNumber: CN, courtType: 'ECONOMIC' as const, sig: 'a' }
 
-  test('asks every instance, keeps the hits, marks the case checked', async () => {
-    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a')], APPEAL: [row('4-1001-2619/21743', 'APPEAL', 'b')] })
-    const r = await lookupCase(t.d, job)
-    expect(t.asked.sort()).toEqual([...LOOKUP_INSTANCES].sort())
-    expect(r).toMatchObject({ found: 2, skipped: false })
-    expect(t.appended.sort()).toEqual(['a', 'b'])
-    expect(t.marks[0]).toMatchObject({ caseNumber: '4-1001-2619/21743', found: 2 })
-    expect(t.marks[0].error).toBeUndefined()
+describe('lookupCase', () => {
+  test('a first check asks every instance and stores what it finds', async () => {
+    const r = rig(async (_c, _t, i) => (i === 'FIRST' ? [row('o1', 'FIRST')] : []))
+    const out = await lookupCase(r.deps, job)
+    expect(out.skipped).toBe(false)
+    expect(out.found).toBe(1)
+    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION', 'FIRST'])
+    expect(r.stored.map((o) => o.id)).toEqual(['o1'])
+    expect(r.checks.get(CN)?.seen).toEqual(['FIRST'])
   })
 
-  test('the upstream search is a «contains»: rows of OTHER cases are dropped', async () => {
-    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a'), row('4-1001-2619/217430', 'FIRST', 'other')] })
-    await lookupCase(t.d, job)
-    expect(t.appended).toEqual(['a'])
+  test('once an instance has a published order it is never asked again', async () => {
+    const r = rig(async (_c, _t, i) => (i === 'FIRST' ? [row('o1', 'FIRST')] : []))
+    await lookupCase(r.deps, job)
+    r.calls.length = 0
+    r.advance(4 * DAY)
+    await lookupCase(r.deps, { ...job, sig: 'b' })
+    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION'])
   })
 
-  test('nothing published is a real, recorded answer (found 0, no error)', async () => {
-    const t = deps({})
-    const r = await lookupCase(t.d, job)
-    expect(r).toMatchObject({ found: 0, error: undefined })
-    expect(t.marks[0]).toMatchObject({ found: 0 })
+  test('all instances published: permanently done, no request even when forced', async () => {
+    const r = rig(async (_c, _t, i) => [row('o-' + i, i)])
+    await lookupCase(r.deps, job)
+    r.calls.length = 0
+    r.advance(400 * DAY)
+    const out = await lookupCase(r.deps, { ...job, sig: 'zzz' }, { force: true })
+    expect(out.skipped).toBe(true)
+    expect(out.reason).toBe('done')
+    expect(r.calls).toEqual([])
   })
 
-  test('every search failing is an ERROR, never a false «no orders»', async () => {
-    const t = deps({ FIRST: new Error('timeout'), APPEAL: new Error('timeout'), CASSATION: new Error('timeout') })
-    const r = await lookupCase(t.d, job)
-    expect(r.error).toBe('timeout')
-    expect(t.marks[0].error).toBe('timeout')
+  test('an unchanged case with nothing published waits, then backs off 3 d, 14 d, 45 d, then stops', async () => {
+    const r = rig(async () => [])
+    await lookupCase(r.deps, job) // misses 1
+    const steps: [number, boolean][] = [[1, false], [3, true], [10, false], [14, true], [30, false], [45, true], [400, false]]
+    for (const [days, ran] of steps) {
+      r.advance(days * DAY)
+      const out = await lookupCase(r.deps, job)
+      expect(out.skipped).toBe(!ran)
+    }
   })
 
-  test('a partial failure keeps the hits but flags the case for a retry', async () => {
-    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a')], APPEAL: new Error('boom') })
-    const r = await lookupCase(t.d, job)
-    expect(r.found).toBe(1)
-    expect(r.error).toContain('1/3')
+  test('a changed case (appealed, result set) is re-checked at once and the back-off starts over', async () => {
+    const r = rig(async () => [])
+    await lookupCase(r.deps, job)
+    r.advance(1000)
+    const out = await lookupCase(r.deps, { ...job, sig: 'appealed' })
+    expect(out.skipped).toBe(false)
+    expect(out.reason).toBe('sig-changed')
+    expect(r.checks.get(CN)?.misses).toBe(0)
   })
 
-  test('a recently checked case is skipped, an errored or old one is not, and force re-checks', async () => {
-    const recent = deps({}, { at: '2026-06-09T00:00:00Z' })
-    expect((await lookupCase(recent.d, job)).skipped).toBe(true)
-    expect(recent.asked).toHaveLength(0)
-    expect((await lookupCase(deps({}, { at: '2026-06-09T00:00:00Z', error: 'x' }).d, job)).skipped).toBe(false)
-    expect((await lookupCase(deps({}, { at: '2026-05-01T00:00:00Z' }).d, job)).skipped).toBe(false)
-    expect((await lookupCase(deps({}, { at: '2026-06-09T00:00:00Z' }).d, job, { force: true })).skipped).toBe(false)
+  test('a failed search is an error to retry after 10 minutes, never «no orders», and does not eat a back-off step', async () => {
+    let fail = true
+    const r = rig(async () => {
+      if (fail) throw new Error('upstream 504')
+      return []
+    })
+    const bad = await lookupCase(r.deps, job)
+    expect(bad.error).toBe('upstream 504')
+    expect(r.checks.get(CN)?.misses).toBe(0)
+    r.advance(60_000)
+    expect((await lookupCase(r.deps, job)).skipped).toBe(true)
+    r.advance(11 * 60_000)
+    fail = false
+    const ok = await lookupCase(r.deps, job)
+    expect(ok.skipped).toBe(false)
+    expect(ok.error).toBeUndefined()
+    expect(r.checks.get(CN)?.misses).toBe(0)
+  })
+
+  test('one instance failing keeps the orders the others found and flags the run', async () => {
+    const r = rig(async (_c, _t, i) => {
+      if (i === 'APPEAL') throw new Error('timeout')
+      return i === 'FIRST' ? [row('o1', 'FIRST')] : []
+    })
+    const out = await lookupCase(r.deps, job)
+    expect(out.found).toBe(1)
+    expect(out.error).toBeTruthy()
+    expect(r.checks.get(CN)?.seen).toEqual(['FIRST'])
+  })
+
+  test('the search is a «contains»: rows of a longer case number are ignored', async () => {
+    const r = rig(async (_c, _t, i) => (i === 'FIRST' ? [row('x', 'FIRST', CN + '9'), row('ok', 'FIRST')] : []))
+    await lookupCase(r.deps, job)
+    expect(r.stored.map((o) => o.id)).toEqual(['ok'])
+  })
+
+  test('force re-checks a waiting case', async () => {
+    const r = rig(async () => [])
+    await lookupCase(r.deps, job)
+    r.calls.length = 0
+    const out = await lookupCase(r.deps, job, { force: true })
+    expect(out.reason).toBe('forced')
+    expect(r.calls).toHaveLength(3)
   })
 })

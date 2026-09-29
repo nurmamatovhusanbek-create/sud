@@ -60,13 +60,6 @@ describe('shard store', () => {
     expect((await lookupOrders('4-4-2601/9')).map((o) => o.id)).toEqual(['ok'])
   })
 
-  test('crawl state round-trips through disk atomically', async () => {
-    const { loadState, saveState } = await import('../store')
-    expect((await loadState()).types).toEqual({})
-    await saveState({ version: 1, updatedAt: '', types: { ECONOMIC: { newest: '2026-06-10', oldest: '2026-06-01', emptyRun: 0, complete: false, rows: 5, days: 3, mismatches: 0 } } })
-    expect((await loadState()).types.ECONOMIC?.rows).toBe(5)
-  })
-
   test('the same case number always lands in the same shard, and shards spread across the space', async () => {
     const { shardOf, SHARDS } = await import('../store')
     expect(shardOf('4-1001-2619/21743')).toBe(shardOf(' 4-1001-2619/21743 '))

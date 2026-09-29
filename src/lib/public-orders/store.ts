@@ -1,8 +1,7 @@
 import 'server-only'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { normalizeCaseNumber, sortOrders, type StoredOrder } from '@/core/public-orders'
-import type { CrawlState } from './types'
+import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
 
 /**
  * The local index of published orders: append-only JSONL, sharded by a hash of the case number so
@@ -75,53 +74,20 @@ export async function lookupOrders(caseNumber: string): Promise<StoredOrder[]> {
   return sortOrders([...byId.values()])
 }
 
-// ---- crawl state (types live in ./types so the engine and the UI can share them) ------------
-
-const stateFile = () => path.join(dataDir(), 'state.json')
-
-export async function loadState(): Promise<CrawlState> {
-  try {
-    const s = JSON.parse(await fs.readFile(stateFile(), 'utf8')) as CrawlState
-    if (s && s.version === 1 && s.types) return s
-  } catch {
-    /* first run */
-  }
-  return { version: 1, updatedAt: new Date(0).toISOString(), types: {} }
-}
-
-export async function saveState(s: CrawlState): Promise<void> {
-  await serial(async () => {
-    await fs.mkdir(dataDir(), { recursive: true })
-    const tmp = stateFile() + '.tmp'
-    await fs.writeFile(tmp, JSON.stringify({ ...s, updatedAt: new Date().toISOString() }, null, 1), 'utf8')
-    await fs.rename(tmp, stateFile())
-  })
-}
-
-// ---- «checked» markers: which cases we already asked the library about --------------------------
-// Lets the UI tell «none published» from «never checked», and lets a re-run skip finished cases.
-
-export interface CheckedCase {
-  caseNumber: string
-  /** ISO time of the check */
-  at: string
-  /** published orders found */
-  found: number
-  /** set when the check failed (network/timeout) — it is retried next time */
-  error?: string
-}
+// ---- per-case check records (core/public-orders → CaseCheck) ------------------------------------
+// Lets the UI tell «none published» from «never checked», and the policy skip what is already known.
 
 const checkedFile = () => path.join(dataDir(), 'checked.jsonl')
-let checkedCache: Map<string, CheckedCase> | null = null
+let checkedCache: Map<string, CaseCheck> | null = null
 
-async function loadChecked(): Promise<Map<string, CheckedCase>> {
+async function loadChecked(): Promise<Map<string, CaseCheck>> {
   if (checkedCache) return checkedCache
-  const m = new Map<string, CheckedCase>()
+  const m = new Map<string, CaseCheck>()
   try {
     for (const line of (await fs.readFile(checkedFile(), 'utf8')).split('\n')) {
       if (!line) continue
       try {
-        const c = JSON.parse(line) as CheckedCase
+        const c = JSON.parse(line) as CaseCheck
         if (c.caseNumber) m.set(c.caseNumber, c) // last write wins
       } catch { /* torn line */ }
     }
@@ -130,11 +96,11 @@ async function loadChecked(): Promise<Map<string, CheckedCase>> {
   return m
 }
 
-export async function getChecked(caseNumber: string): Promise<CheckedCase | null> {
+export async function getChecked(caseNumber: string): Promise<CaseCheck | null> {
   return (await loadChecked()).get(normalizeCaseNumber(caseNumber)) ?? null
 }
 
-export async function markChecked(c: CheckedCase): Promise<void> {
+export async function markChecked(c: CaseCheck): Promise<void> {
   const m = await loadChecked()
   const rec = { ...c, caseNumber: normalizeCaseNumber(c.caseNumber) }
   m.set(rec.caseNumber, rec)
