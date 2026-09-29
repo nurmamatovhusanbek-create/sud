@@ -21,8 +21,6 @@ export type Tone = 'pos' | 'neg' | 'warn' | 'info' | 'neu'
 
 const TONE: Record<StatusFamily, Tone> = { positive: 'pos', negative: 'neg', warning: 'warn', info: 'info', neutral: 'neu' }
 
-export const REPORT_SOURCES = 'orginfo.uz · chamber.uz · sud.uz · billing.sud.uz'
-
 // ---- input / output ---------------------------------------------------------
 
 export interface ReportInput {
@@ -313,8 +311,8 @@ export function buildReportModel(input: ReportInput): ReportModel {
 
   // ---- gaps are stated, not hidden
   const notes: ReportModel['notes'] = []
-  if (!info) notes.push({ section: 'Kompaniya profili', message: failed.info || 'orginfo.uz / chamber.uz javob bermadi' })
-  if (!stats) notes.push({ section: 'Sud ishlari', message: failed.stats || 'sud.uz javob bermadi' })
+  if (!info) notes.push({ section: 'Kompaniya profili', message: failed.info || 'javob bermadi' })
+  if (!stats) notes.push({ section: 'Sud ishlari', message: failed.stats || 'javob bermadi' })
   if (hearings === null) notes.push({ section: 'Yaqin majlislar', message: failed.hearings || 'majlislar jadvali olinmadi' })
 
   return {

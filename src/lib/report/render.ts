@@ -7,19 +7,21 @@
  *
  * The look follows the app's themed PDF (src/lib/print.ts): the navy/indigo brand,
  * uppercase accent section labels with a hairline rule, zebra rows, accent-soft
- * key figures. It adapts to the app theme; charts use the same semantic tones as
- * the rest of the app (green won · rose lost · blue in progress · gray neutral).
+ * key figures. It adapts to the app theme. Outcomes have ONE color each everywhere
+ * on the page (teal won · vermilion lost · indigo in progress · slate neutral) —
+ * chosen to stay apart under color-blind simulation (checked with the dataviz
+ * validator in both themes); the navy→indigo ramp is only for magnitude and shares.
  */
 
 import { escapeHtml as h, palette, type Palette } from '@/lib/print'
 import { formatDmy } from '@/core/dates'
-import { fmtInt, REPORT_SOURCES, shortSum, type ReportModel, type Tone } from './model'
+import { fmtInt, shortSum, type ReportModel, type Tone } from './model'
 
 // ---- theme -------------------------------------------------------------------
 
 export interface ReportTheme extends Palette {
   tone: Record<Tone, { fg: string; bg: string }>
-  /** share-bar / donut ramp, strongest first */
+  /** navy ramp for magnitude / shares, strongest first (kept apart from the outcome hues) */
   ramp: string[]
 }
 
@@ -29,24 +31,24 @@ export function reportTheme(dark: boolean): ReportTheme {
     ? {
         ...p,
         tone: {
-          pos: { fg: '#4ec08a', bg: 'rgba(78,192,138,.16)' },
-          neg: { fg: '#e06a86', bg: 'rgba(224,106,134,.16)' },
+          pos: { fg: '#1aa593', bg: 'rgba(26,165,147,.17)' },
+          neg: { fg: '#e2544c', bg: 'rgba(226,84,76,.17)' },
           warn: { fg: '#e2a94a', bg: 'rgba(226,169,74,.16)' },
-          info: { fg: '#7f9bff', bg: 'rgba(127,155,255,.16)' },
-          neu: { fg: '#9aa3c7', bg: 'rgba(154,163,199,.14)' },
+          info: { fg: '#6f85ea', bg: 'rgba(111,133,234,.18)' },
+          neu: { fg: '#8f98bf', bg: 'rgba(143,152,191,.15)' },
         },
-        ramp: ['#8ea2f5', '#6d84ec', '#4d63c9', '#3d4fa6', '#2f3d80', '#26326a'],
+        ramp: ['#a9b6f2', '#8093d9', '#6072b8', '#465694', '#34427a', '#2a3563'],
       }
     : {
         ...p,
         tone: {
-          pos: { fg: '#2f8f5b', bg: '#e6f4ec' },
-          neg: { fg: '#c04a68', bg: '#fbe9ee' },
+          pos: { fg: '#0f9d8f', bg: '#e0f4f1' },
+          neg: { fg: '#d8443c', bg: '#fce9e7' },
           warn: { fg: '#b7791f', bg: '#fdf3df' },
-          info: { fg: '#2f5bd0', bg: '#e8eefc' },
-          neu: { fg: '#6b7392', bg: '#eceef6' },
+          info: { fg: '#4c5fd5', bg: '#e8ebfb' },
+          neu: { fg: '#7d86ab', bg: '#eceef6' },
         },
-        ramp: ['#1a2350', '#3b5bdb', '#6d84ec', '#a4b3f5', '#c9d2fa', '#e3e8fc'],
+        ramp: ['#1a2350', '#34427c', '#5f6fa8', '#9aa6cf', '#c7cee6', '#e3e7f3'],
       }
 }
 
@@ -65,29 +67,63 @@ function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
   </svg>`
 }
 
-/** Ring chart. Segments with a zero value are skipped; a hairline gap separates the rest. */
-function donut(segs: { value: number; color: string }[], center: string, sub: string, t: ReportTheme): string {
-  const r = 44
+/**
+ * The signature chart: a "verdict wheel". A ring of rounded, separated arcs — one per
+ * outcome, sized by its share of all cases — inside a dial of 50 ticks whose lit ticks
+ * (2% each, in the "won" color) read the win rate, starting at 12 o'clock. The total and
+ * the win rate sit in the middle so the chart is readable without its legend.
+ */
+function verdictWheel(
+  segs: { value: number; color: string }[],
+  total: number,
+  winRate: number,
+  t: ReportTheme,
+): string {
+  const cx = 100
+  const r = 62
+  const w = 18 // ring thickness = the round cap's diameter
   const c = 2 * Math.PI * r
-  const total = segs.reduce((a, s) => a + s.value, 0)
-  const live = segs.filter((s) => s.value > 0)
-  const gap = live.length > 1 ? 1.6 : 0
-  let offset = 0
-  const arcs = total
-    ? live
-        .map((s) => {
-          const seg = (s.value / total) * c
-          const out = `<circle cx="60" cy="60" r="${r}" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${Math.max(0, seg - gap).toFixed(2)} ${(c - Math.max(0, seg - gap)).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 60 60)"/>`
-          offset += seg
-          return out
-        })
-        .join('')
-    : ''
-  return `<svg class="rp-donut" viewBox="0 0 120 120" role="img" aria-label="${h(center)} ${h(sub)}">
-    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${t.borderSoft}" stroke-width="20"/>
+  const gap = 4
+  const sum = segs.reduce((a, x) => a + x.value, 0)
+  const live = segs.filter((x) => x.value > 0)
+
+  let arcs = ''
+  if (sum > 0 && live.length === 1) {
+    arcs = `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${live[0].color}" stroke-width="${w}"/>`
+  } else if (sum > 0) {
+    let at = 0
+    arcs = live
+      .map((x) => {
+        const len = (x.value / sum) * c
+        // a round cap adds w/2 at each end, so the visible dash is shortened by w + gap
+        const dash = Math.max(0.01, len - w - gap)
+        const start = at + (w + gap) / 2
+        at += len
+        return `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${x.color}" stroke-width="${w}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" stroke-dashoffset="${(-start).toFixed(2)}" transform="rotate(-90 ${cx} ${cx})"/>`
+      })
+      .join('')
+  }
+
+  const N = 50
+  const lit = Math.max(0, Math.min(N, Math.round((winRate / 100) * N)))
+  const ticks = Array.from({ length: N }, (_, i) => {
+    const a = ((i / N) * 360 - 90) * (Math.PI / 180)
+    const r1 = 84
+    const r2 = i % 5 === 0 ? 96 : 92
+    const on = i < lit
+    return `<line x1="${(cx + r1 * Math.cos(a)).toFixed(2)}" y1="${(cx + r1 * Math.sin(a)).toFixed(2)}" x2="${(cx + r2 * Math.cos(a)).toFixed(2)}" y2="${(cx + r2 * Math.sin(a)).toFixed(2)}" stroke="${on ? t.tone.pos.fg : t.border}" stroke-width="2.2" stroke-linecap="round"/>`
+  }).join('')
+
+  return `<svg class="rp-wheel" viewBox="0 0 200 200" role="img" aria-label="${fmtInt(total)} ta ish, yutuq darajasi ${winRate}%">
+    ${ticks}
+    <circle cx="${cx}" cy="${cx}" r="${r + w / 2 + 1}" fill="none" stroke="${t.borderSoft}" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cx}" r="${r - w / 2 - 1}" fill="${t.inset}" stroke="${t.borderSoft}" stroke-width="1"/>
+    ${sum > 0 ? '' : `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${t.borderSoft}" stroke-width="${w}"/>`}
     ${arcs}
-    <text x="60" y="61" text-anchor="middle" class="rp-donut-n" fill="${t.t1}">${h(center)}</text>
-    <text x="60" y="76" text-anchor="middle" class="rp-donut-s" fill="${t.t3}">${h(sub)}</text>
+    <path d="M100 1.5 L104.2 8.6 L95.8 8.6 Z" fill="${t.accent}"/>
+    <text x="${cx}" y="106" text-anchor="middle" class="rp-wheel-n" fill="${t.t1}">${fmtInt(total)}</text>
+    <text x="${cx}" y="120" text-anchor="middle" class="rp-wheel-s" fill="${t.t3}">TA ISH</text>
+    <text x="${cx}" y="139" text-anchor="middle" class="rp-wheel-w"><tspan fill="${t.t1}">${winRate}%</tspan><tspan fill="${t.t3}" dx="3">yutuq</tspan></text>
   </svg>`
 }
 
@@ -102,7 +138,7 @@ function monthly(points: { label: string; count: number }[], t: ReportTheme): st
       const hgt = p.count ? Math.max(4, (p.count / max) * 58) : 2
       const y = 84 - hgt
       const last = i === points.length - 1
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${hgt.toFixed(1)}" rx="4" fill="${last ? t.accent : p.count ? t.ramp[2] : t.borderSoft}"/>
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${hgt.toFixed(1)}" rx="4" fill="${last ? t.ramp[0] : p.count ? t.ramp[2] : t.borderSoft}"/>
       ${p.count ? `<text x="${(x + bw / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" class="rp-bar-v" fill="${t.t2}">${p.count}</text>` : ''}
       <text x="${(x + bw / 2).toFixed(1)}" y="101" text-anchor="middle" class="rp-bar-l" fill="${last ? t.t1 : t.t3}">${h(p.label)}</text>`
     })
@@ -126,7 +162,7 @@ const pill = (text: string, tone: Tone, t: ReportTheme, dot = true) =>
   `<span class="rp-pill" style="color:${t.tone[tone].fg};background:${t.tone[tone].bg}">${dot ? `<i style="background:${t.tone[tone].fg}"></i>` : ''}${h(text)}</span>`
 
 const note = (n: { section: string; message: string }) =>
-  `<div class="rp-note"><b>${h(n.section)}:</b> maʼlumot olinmadi <span>(${h(n.message)})</span></div>`
+  `<div class="rp-note"><b>${h(n.section)}:</b> maʼlumot olinmadi</div>`
 
 const CLASS_ROWS: { key: 'win' | 'lose' | 'inProgress' | 'neutral'; label: string; tone: Tone }[] = [
   { key: 'win', label: 'Yutgan', tone: 'pos' },
@@ -146,7 +182,7 @@ function hero(m: ReportModel, t: ReportTheme): string {
     <div class="rp-hero-r">
       ${
         r
-          ? `<div class="rp-rate">${gauge(r.score, r.tone, t)}${pill(r.category, r.tone, t, false)}<div class="rp-rate-c">Hamkor reytingi · chamber.uz</div></div>`
+          ? `<div class="rp-rate">${gauge(r.score, r.tone, t)}${pill(r.category, r.tone, t, false)}<div class="rp-rate-c">Hamkor reytingi</div></div>`
           : `<div class="rp-rate rp-rate-none"><div class="rp-rate-c">Reyting mavjud emas</div></div>`
       }
     </div>
@@ -156,6 +192,22 @@ function hero(m: ReportModel, t: ReportTheme): string {
       (k) => `<div class="rp-kpi"><div class="l">${h(k.label)}</div><div class="v"${k.tone ? ` style="color:${t.tone[k.tone].fg}"` : ''}>${h(k.value)}</div>${k.sub ? `<div class="s">${h(k.sub)}</div>` : ''}</div>`,
     )
     .join('')}</section>`
+}
+
+function signature(m: ReportModel, t: ReportTheme): string {
+  const c = m.cases
+  if (!c) return ''
+  const seg = CLASS_ROWS.map((r) => ({ value: c[r.key], color: t.tone[r.tone].fg }))
+  const pct = (n: number) => (c.total ? `${(Math.round((n / c.total) * 1000) / 10).toString().replace('.', ',')}%` : '–')
+  return `<section class="rp-block rp-sig rp-avoid">${sec('Sud ishlari bir qarashda', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}
+    <div class="rp-sig-card">
+      <div class="rp-wheel-wrap">${verdictWheel(seg, c.total, c.winRate, t)}</div>
+      <div class="rp-legend">${CLASS_ROWS.map(
+        (r) => `<div><i style="background:${t.tone[r.tone].fg}"></i><span class="n">${r.label}</span><b>${fmtInt(c[r.key])}</b><span class="p">${pct(c[r.key])}</span></div>`,
+      ).join('')}
+        <div class="cap">Aylana — natijalar ulushi. Tashqi shkala — yutuq darajasi, har belgi 2%.</div>
+      </div>
+    </div></section>`
 }
 
 function profile(m: ReportModel): string {
@@ -192,22 +244,18 @@ function founders(m: ReportModel, t: ReportTheme): string {
 function courts(m: ReportModel, t: ReportTheme): string {
   const c = m.cases
   if (!c) return ''
-  const seg = CLASS_ROWS.map((r) => ({ value: c[r.key], color: t.tone[r.tone].fg }))
-  const pct = (n: number) => (c.total ? `${(Math.round((n / c.total) * 1000) / 10).toString().replace('.', ',')}%` : '–')
   const roleTotal = Math.max(1, c.asPlaintiff + c.asDefendant)
   const courtMax = Math.max(1, ...c.byCourt.map((x) => x.count))
 
-  return `<section class="rp-block">${sec('Sud ishlari', `jami ${fmtInt(c.total)} · joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}
+  return `<section class="rp-block">${sec('Sud ishlari tafsiloti', `jami ${fmtInt(c.total)}`)}
     <div class="rp-court-top rp-avoid">
-      <div class="rp-donut-wrap">${donut(seg, fmtInt(c.total), 'ta ish', t)}</div>
-      <div class="rp-legend">${CLASS_ROWS.map(
-        (r) => `<div><i style="background:${t.tone[r.tone].fg}"></i><span class="n">${r.label}</span><b>${fmtInt(c[r.key])}</b><span class="p">${pct(c[r.key])}</span></div>`,
-      ).join('')}</div>
-      <div class="rp-side">
+      <div>
         <div class="rp-mini-h">Rol</div>
-        <div class="rp-stack rp-stack-s"><i style="width:${((c.asPlaintiff / roleTotal) * 100).toFixed(1)}%;background:${t.ramp[1]}"></i><i style="width:${((c.asDefendant / roleTotal) * 100).toFixed(1)}%;background:${t.ramp[3]}"></i></div>
-        <div class="rp-role"><span><i style="background:${t.ramp[1]}"></i>Daʼvogar <b>${fmtInt(c.asPlaintiff)}</b></span><span><i style="background:${t.ramp[3]}"></i>Javobgar <b>${fmtInt(c.asDefendant)}</b></span></div>
-        <div class="rp-mini-h" style="margin-top:12px">Sud turi boʻyicha</div>
+        <div class="rp-stack rp-stack-s"><i style="width:${((c.asPlaintiff / roleTotal) * 100).toFixed(1)}%;background:${t.ramp[0]}"></i><i style="width:${((c.asDefendant / roleTotal) * 100).toFixed(1)}%;background:${t.ramp[3]}"></i></div>
+        <div class="rp-role"><span><i style="background:${t.ramp[0]}"></i>Daʼvogar <b>${fmtInt(c.asPlaintiff)}</b></span><span><i style="background:${t.ramp[3]}"></i>Javobgar <b>${fmtInt(c.asDefendant)}</b></span></div>
+      </div>
+      <div class="rp-side">
+        <div class="rp-mini-h">Sud turi boʻyicha</div>
         ${c.byCourt
           .map(
             (x) => `<div class="rp-hb"><span class="n">${h(x.label)}</span><span class="bar"><i style="width:${((x.count / courtMax) * 100).toFixed(1)}%;background:${t.ramp[1]}"></i></span><b>${fmtInt(x.count)}</b></div>`,
@@ -273,7 +321,7 @@ function bills(m: ReportModel): string {
 
 /** The report body (everything between the running header and footer). */
 export function renderReportBody(m: ReportModel, t: ReportTheme): string {
-  return [hero(m, t), profile(m), founders(m, t), bills(m), courts(m, t), hearings(m, t), m.notes.map(note).join('')].join('\n')
+  return [hero(m, t), signature(m, t), profile(m), founders(m, t), bills(m), courts(m, t), hearings(m, t), m.notes.map(note).join('')].join('\n')
 }
 
 /** Running header: brand, report title, company + date. Repeats on every printed page. */
@@ -284,9 +332,9 @@ export function renderReportHeader(m: ReportModel): string {
   </div>`
 }
 
-/** Running footer: sources + disclaimer. */
+/** Running footer: the disclaimer (no source names — the reader doesn't need the plumbing). */
 export function renderReportFooter(): string {
-  return `<div class="rp-foot"><span>Manba: ${h(REPORT_SOURCES)}. Hisobot tuzilgan paytdagi holatni aks ettiradi va rasmiy hujjat hisoblanmaydi.</span></div>`
+  return `<div class="rp-foot"><span>Hisobot tuzilgan paytdagi holatni aks ettiradi va rasmiy hujjat hisoblanmaydi.</span></div>`
 }
 
 // ---- CSS ---------------------------------------------------------------------
@@ -379,17 +427,26 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-founders .p { font-weight: 800; font-variant-numeric: tabular-nums; }
 
   /* court cases */
-  .rp-court-top { display: grid; grid-template-columns: 36mm 1fr 58mm; gap: 14px; align-items: center; }
-  .rp-donut { width: 100%; height: auto; display: block; }
-  .rp-donut-n { font: 800 20px ${fontStack}; }
-  .rp-donut-s { font: 500 8px ${fontStack}; letter-spacing: .04em; }
+  .rp-court-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+
+  /* signature: the verdict wheel */
+  .rp-sig-card { display: grid; grid-template-columns: 54mm minmax(0, 1fr); gap: 18px; align-items: center; padding: 12px 18px 12px 12px; border: 1px solid var(--bd); border-radius: 14px; background: var(--in); }
+  .rp-wheel { display: block; width: 100%; height: auto; }
+  .rp-wheel-n { font: 800 34px ${fontStack}; letter-spacing: -.02em; }
+  .rp-wheel-s { font: 700 7.5px ${fontStack}; letter-spacing: .16em; }
+  .rp-wheel-w { font: 800 10.5px ${fontStack}; }
+  .rp-sig .rp-legend > div { padding: 8px 0; font-size: 12px; }
+  .rp-sig .rp-legend i { width: 11px; height: 11px; border-radius: 50%; }
+  .rp-sig .rp-legend b { font-size: 16px; letter-spacing: -.01em; }
+  .rp-sig .rp-legend .p { width: 46px; font-size: 11px; }
+  .rp-sig .rp-legend > .cap { display: block; padding: 9px 0 0; border: 0; font-size: 8.5px; line-height: 1.4; color: var(--t3); }
   .rp-legend > div { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--bs); font-size: 11px; }
   .rp-legend > div:last-child { border-bottom: 0; }
   .rp-legend i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
   .rp-legend .n { flex: 1; }
   .rp-legend b { font-variant-numeric: tabular-nums; }
   .rp-legend .p { width: 38px; text-align: right; color: var(--t3); font-variant-numeric: tabular-nums; }
-  .rp-side { padding-left: 12px; border-left: 1px solid var(--bs); }
+  .rp-side { padding-left: 14px; border-left: 1px solid var(--bs); }
   .rp-mini-h { margin-bottom: 6px; font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
   .rp-role { display: flex; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--t2); }
   .rp-role i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
