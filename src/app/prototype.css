@@ -809,7 +809,7 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .dprev { position: relative; flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .dprev-host { transform-origin: top center; }
 .dprev-stage { position: absolute; left: -99999px; top: 0; width: 1400px; visibility: hidden; pointer-events: none; }
-.dprev-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.dprev-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 24px; text-align: center; font-size: 13px; font-weight: 600; line-height: 1.5; color: var(--text-2); }
 .dprev-err { color: var(--neg-text); }
 /* docx-preview draws its own grey wrapper + heavy shadow; make it sit on our canvas */
 .dprev .docx-wrapper { background: transparent !important; padding: 20px 0 6px !important; }
