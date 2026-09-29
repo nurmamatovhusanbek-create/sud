@@ -125,6 +125,13 @@ is required in production.
   for the cached-snapshot pattern.
 - **Hydration:** `reactStrictMode` is off on purpose (double-invoke would double real
   scrapes). Re-enable only after request de-duplication exists.
+- **The sidebar's column and its drawer share ONE breakpoint (1080px, `prototype.css`).**
+  `.app-frame` drops to a single column and `.side` becomes an off-canvas drawer (hamburger
+  + click-away `.side-scrim` + Escape) in the same `@media` block. They were once split
+  across 1080/820, so between those widths the sidebar had no column *and* no drawer and
+  landed on top of the page — the "breaks at half screen" bug (half of 1920 = 960). If you
+  touch either rule, keep them together, and test 1080 / 960 / 820 / 700, not just phone
+  and desktop.
 - **Stale `.next` types** can break `typecheck` after you delete a page/route. Clear with
   `rm -rf .next/dev/types .next/types` and re-run.
 - **Never commit secrets.** Network captures the owner pastes may contain live cookies
