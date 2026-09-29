@@ -5,6 +5,8 @@
  * legacy shapes) into ApiResult<T>.
  */
 
+import type { StoredOrder, PublicCourtType } from '@/core/public-orders'
+import type { PublicOrdersCoverage, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
   BillDetailData,
@@ -302,4 +304,64 @@ async function downloadPost(url: string, body: unknown): Promise<void> {
     throw new Error(msg)
   }
   await saveBlob(res, 'export.xlsx')
+}
+
+
+// ---- public court-order library (local index) ----------------------------------------------------
+
+export interface PublicOrdersData {
+  caseNumber: string
+  orders: StoredOrder[]
+  coverage: PublicOrdersCoverage
+}
+
+/** Instant: reads the local index. */
+export function getPublicOrders(caseNumber: string, signal?: AbortSignal) {
+  return request<PublicOrdersData>(`/api/public-orders/orders?caseNumber=${encodeURIComponent(caseNumber)}`, signal)
+}
+
+export function getPublicOrdersStatus(signal?: AbortSignal) {
+  return request<PublicOrdersStatus>('/api/public-orders/status', signal)
+}
+
+export async function syncPublicOrders(action: 'start' | 'pause', courtTypes?: PublicCourtType[]): Promise<ApiResult<{ crawl: PublicOrdersStatus['crawl'] }>> {
+  try {
+    const res = await fetch('/api/public-orders/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action, courtTypes }),
+    })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+
+/**
+ * Open an order's PDF. The window is opened FIRST (inside the click, or popup blockers reject it),
+ * then pointed at the file once it has arrived — the same trick the company report uses.
+ */
+export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<void> {
+  const win = window.open('', '_blank')
+  if (!win) throw new Error('Brauzer oynani blokladi — pop-up ruxsatini bering')
+  win.document.title = 'Qaror yuklanmoqda…'
+  win.document.body.textContent = 'Qaror yuklanmoqda…'
+  try {
+    const res = await fetch(`/api/public-orders/file?id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}`, { headers: authHeaders() })
+    if (!res.ok) {
+      let msg = 'Qarorni olib boʻlmadi'
+      try {
+        const j = await res.json()
+        if (j?.error) msg = j.error
+      } catch { /* not JSON */ }
+      throw new Error(msg)
+    }
+    const blob = await res.blob()
+    win.location.href = URL.createObjectURL(blob)
+  } catch (e) {
+    try { win.close() } catch { /* already closed */ }
+    throw e
+  }
 }

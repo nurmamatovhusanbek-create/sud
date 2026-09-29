@@ -76,6 +76,8 @@ const sudProxyWorker = {
       'chamber.uz',
       'admin.chamber.uz',
       'ihamkor.uz',
+      // public court-order library (anonymous JSON API behind public.sud.uz)
+      'adolatapi1.sud.uz',
     ]
     if (!ALLOWED_HOSTS.includes(target.hostname)) {
       return new Response(
@@ -119,6 +121,11 @@ const sudProxyWorker = {
       headers.set('Sec-GPC', '1')
       headers.set('Origin', 'https://my.sud.uz')
       headers.set('Referer', 'https://my.sud.uz/')
+      // the public library's API belongs to public.sud.uz, not my.sud.uz
+      if (target.hostname === 'adolatapi1.sud.uz') {
+        headers.set('Origin', 'https://public.sud.uz')
+        headers.set('Referer', 'https://public.sud.uz/')
+      }
 
       const response = await fetch(targetUrl, {
         method: request.method,

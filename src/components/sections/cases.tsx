@@ -22,6 +22,7 @@ import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } 
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
+import { CaseOrders } from '@/components/proto/case-orders'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
@@ -410,6 +411,8 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
             ))}
           </DwSection>
         )}
+
+        <CaseOrders caseNumber={caseNumber} />
 
         <DwSection title="Instansiyalar">
           <div className="dw-track">

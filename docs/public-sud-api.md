@@ -29,3 +29,11 @@ Maps 1:1 onto `core/classify.ts` (granted / rad etilgan / qaytarilgan / ko'rmasd
   Narrow it (`court_id`, a date window, `instance`) — see probe #3 for which combination is fast.
 - List pages take ~1–2 s at size 30–100; counts 0.1–2.6 s; a PDF 0.1–0.2 s.
 - Dates are ISO here (`YYYY-MM-DD`), unlike the `dd.mm.yyyy` from jadval.sud.uz.
+
+## What we built on it
+- **Date-window list = fast** (probe #4): 50–240 ms per page of 100, ~219 rows/s sequential, 3 parallel pages tolerated.
+  Whole-year and case-number combinations are slow or return nothing useful. So `lib/public-orders/engine.ts` crawls one
+  DAY at a time (`startDate = endDate`), newest first, until 60 empty days in a row; each day is checked against the API's own total.
+- The date filter's exact meaning (publication vs decision date) is **unverified** — the known order (decided 12 May 2026) was not
+  inside 11–19 May for its court. It does not matter for a full crawl (every order sits in some day window), only for guessing a window.
+- Index: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `state.json` (progress). Delete the folder to reset.
