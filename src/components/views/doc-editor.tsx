@@ -76,7 +76,7 @@ function Field({ def, value, unused, onChange, onFocus }: {
 
 // ---- the editor -------------------------------------------------------------
 
-export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabel, icon }: {
+export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabel, icon, initialValues }: {
   tab: TabDef
   /** set for a separate category's single document; omit for a combined category */
   doc?: DocDef
@@ -85,9 +85,11 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   onBack: () => void
   backLabel: string
   icon: React.ReactNode
+  /** values laid over the document's defaults (e.g. prefilled from a scraped case) */
+  initialValues?: Record<string, string>
 }) {
   const docs = useMemo(() => (doc ? [doc] : docsByTab(tab.id)), [doc, tab.id])
-  const [values, setValues] = useState<Record<string, string>>(() => (doc ? docDefaults(doc) : categoryDefaults(tab)))
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(doc ? docDefaults(doc) : categoryDefaults(tab)), ...(initialValues ?? {}) }))
   const [curId, setCurId] = useState(docs[0].id)
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)

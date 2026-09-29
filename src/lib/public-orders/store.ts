@@ -97,3 +97,54 @@ export async function saveState(s: CrawlState): Promise<void> {
     await fs.rename(tmp, stateFile())
   })
 }
+
+// ---- «checked» markers: which cases we already asked the library about --------------------------
+// Lets the UI tell «none published» from «never checked», and lets a re-run skip finished cases.
+
+export interface CheckedCase {
+  caseNumber: string
+  /** ISO time of the check */
+  at: string
+  /** published orders found */
+  found: number
+  /** set when the check failed (network/timeout) — it is retried next time */
+  error?: string
+}
+
+const checkedFile = () => path.join(dataDir(), 'checked.jsonl')
+let checkedCache: Map<string, CheckedCase> | null = null
+
+async function loadChecked(): Promise<Map<string, CheckedCase>> {
+  if (checkedCache) return checkedCache
+  const m = new Map<string, CheckedCase>()
+  try {
+    for (const line of (await fs.readFile(checkedFile(), 'utf8')).split('\n')) {
+      if (!line) continue
+      try {
+        const c = JSON.parse(line) as CheckedCase
+        if (c.caseNumber) m.set(c.caseNumber, c) // last write wins
+      } catch { /* torn line */ }
+    }
+  } catch { /* first run */ }
+  checkedCache = m
+  return m
+}
+
+export async function getChecked(caseNumber: string): Promise<CheckedCase | null> {
+  return (await loadChecked()).get(normalizeCaseNumber(caseNumber)) ?? null
+}
+
+export async function markChecked(c: CheckedCase): Promise<void> {
+  const m = await loadChecked()
+  const rec = { ...c, caseNumber: normalizeCaseNumber(c.caseNumber) }
+  m.set(rec.caseNumber, rec)
+  await serial(async () => {
+    await fs.mkdir(dataDir(), { recursive: true })
+    await fs.appendFile(checkedFile(), JSON.stringify(rec) + '\n', 'utf8')
+  })
+}
+
+/** Test hook: forget the in-memory cache (the file stays). */
+export function resetCheckedCache(): void {
+  checkedCache = null
+}

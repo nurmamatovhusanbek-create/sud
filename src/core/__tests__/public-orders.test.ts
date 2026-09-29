@@ -9,6 +9,7 @@ import {
   parseMultipartFile,
   pdfFileName,
   sortOrders,
+  splitDecisions,
   type StoredOrder,
 } from '../public-orders'
 
@@ -114,5 +115,26 @@ describe('small guards', () => {
   test('orders sort first instance → appeal → cassation', () => {
     const o = (instance: string, id: string) => ({ instance, id }) as StoredOrder
     expect(sortOrders([o('CASSATION', 'c'), o('FIRST', 'a'), o('APPEAL', 'b')]).map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('splitDecisions — published PDFs vs decisions we only know from the case data', () => {
+  const known = [
+    { instance: 'FIRST' as const, date: '01.06.2026', text: 'Daʼvo qanoatlantirilsin' },
+    { instance: 'APPEAL' as const, date: '12.05.2026', text: 'Apellyatsiya rad etilsin' },
+  ]
+  const pub = (instance: string, id: string) => ({ id, instance }) as StoredOrder
+
+  test('a decision with a published order of the same instance is published, the rest are unpublished', () => {
+    const v = splitDecisions(known, [pub('APPEAL', 'b')])
+    expect(v.published.map((p) => [p.order.id, p.decision?.date])).toEqual([['b', '12.05.2026']])
+    expect(v.unpublished.map((d) => d.instance)).toEqual(['FIRST'])
+  })
+  test('nothing published: every known decision is unpublished; nothing known: empty views', () => {
+    expect(splitDecisions(known, []).unpublished).toHaveLength(2)
+    expect(splitDecisions([], [])).toEqual({ published: [], unpublished: [] })
+  })
+  test('a published order without a case-data decision keeps decision = null', () => {
+    expect(splitDecisions([], [pub('CASSATION', 'c')]).published[0].decision).toBeNull()
   })
 })

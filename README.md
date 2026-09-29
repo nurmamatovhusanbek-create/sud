@@ -89,10 +89,15 @@ out is stated in place on the page instead of printing a misleading zero. Sectio
 data source (subsidiaries, licences, audits, pledges, trademarks…) are intentionally left out.
 Page numbers need Chrome/Edge 131+.
 
-**Qarorlar (published court orders)** — Settings › Qarorlar copies the small metadata rows of the public
-court-order library (public.sud.uz) to this machine with a polite background crawl (pausable, resumable).
-A case's drawer then lists its published orders (instance, court, judge, result) instantly and opens the
-PDF on click. The upstream search is too slow to call live, so lookups only ever read the local index.
+**Qarorlar (published court orders)** — the *Qarorlar* button on Sud ishlari (or *Tekshirish* in a case drawer) looks
+up the published orders of the listed cases on public.sud.uz **in the background**, one case at a time, and keeps the
+results in a small local cache. A small pill at the bottom of every screen shows «N qaror yuklanmoqda» while it works,
+so you can keep using the app. A case drawer then shows two cards: *Eʼlon qilingan qarorlar* (instance, court, judge,
+result, PDF on click) and *Eʼlon qilinmagan qarorlar* (decisions the court data gives us that have no published order).
+A full-library copy exists in Settings › Qarorlar but is optional and heavy on disk.
+
+**Hujjat tayyorlash** — from a case drawer, the court petitions (nusxa olish, majlisni qoldirish) open in Hujjatlar
+already filled with that case's court, judge, number, claimant, subject and next hearing (Cyrillic converted to Latin).
 
 **Sozlamalar (Settings)** — self-update from GitHub, Cloudflare Worker management, and a
 live health dashboard (per-worker success gauges, sparklines, request timelines).

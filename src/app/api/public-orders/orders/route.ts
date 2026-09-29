@@ -1,7 +1,8 @@
 import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
 import { crawlStatus } from '@/lib/public-orders/crawler'
-import { loadState, lookupOrders } from '@/lib/public-orders/store'
+import { getChecked, loadState, lookupOrders } from '@/lib/public-orders/store'
+import { caseJobStatus } from '@/lib/public-orders/company-job'
 import { normalizeCaseNumber } from '@/core/public-orders'
 
 export const dynamic = 'force-dynamic'
@@ -18,12 +19,15 @@ export const GET = guard(async (req) => {
   const raw = new URL(req.url).searchParams.get('caseNumber') ?? ''
   const caseNumber = normalizeCaseNumber(raw)
   if (!CASE_NUMBER_RE.test(caseNumber)) return jsonFail('Ish raqami notoʻgʻri', 'bad_request', 400)
-  const [orders, state] = await Promise.all([lookupOrders(caseNumber), loadState()])
+  const [orders, state, checked] = await Promise.all([lookupOrders(caseNumber), loadState(), getChecked(caseNumber)])
   const progress = Object.values(state.types)
   const dated = progress.filter((p) => p && p.oldest)
   return jsonOk({
     caseNumber,
     orders,
+    /** when THIS case was looked up in the library (null = never) — tells «none published» from «not checked» */
+    checked: checked ? { at: checked.at, found: checked.found, error: checked.error ?? null } : null,
+    downloading: caseJobStatus().state === 'running',
     coverage: {
       indexed: dated.length > 0,
       since: dated.map((p) => p!.oldest!).sort()[0] ?? null,

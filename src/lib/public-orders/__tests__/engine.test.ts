@@ -125,3 +125,74 @@ describe('crawl engine', () => {
 })
 
 test('emptyProgress starts clean', () => expect(emptyProgress()).toMatchObject({ newest: null, oldest: null, complete: false, rows: 0 }))
+
+import { lookupCase, LOOKUP_INSTANCES, type CaseLookupDeps } from '../engine'
+
+describe('lookupCase — the background per-case download', () => {
+  const row = (cn: string, instance: string, id: string): RawPublication => ({ id, case_number: cn, instance, result: 'FULFILLED' })
+  function deps(answers: Record<string, RawPublication[] | Error>, prev: { at: string; error?: string } | null = null) {
+    const appended: string[] = []
+    const marks: { caseNumber: string; found: number; error?: string }[] = []
+    const asked: string[] = []
+    const d: CaseLookupDeps = {
+      async search(cn, _ct, instance) {
+        asked.push(instance)
+        const a = answers[instance] ?? []
+        if (a instanceof Error) throw a
+        return a
+      },
+      async append(o) { appended.push(...o.map((x) => x.id)) },
+      async getChecked() { return prev },
+      async markChecked(c) { marks.push(c) },
+      now: () => new Date('2026-06-10T00:00:00Z'),
+    }
+    return { d, appended, marks, asked }
+  }
+  const job = { caseNumber: '4-1001-2619/21743', courtType: 'ECONOMIC' as const }
+
+  test('asks every instance, keeps the hits, marks the case checked', async () => {
+    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a')], APPEAL: [row('4-1001-2619/21743', 'APPEAL', 'b')] })
+    const r = await lookupCase(t.d, job)
+    expect(t.asked.sort()).toEqual([...LOOKUP_INSTANCES].sort())
+    expect(r).toMatchObject({ found: 2, skipped: false })
+    expect(t.appended.sort()).toEqual(['a', 'b'])
+    expect(t.marks[0]).toMatchObject({ caseNumber: '4-1001-2619/21743', found: 2 })
+    expect(t.marks[0].error).toBeUndefined()
+  })
+
+  test('the upstream search is a «contains»: rows of OTHER cases are dropped', async () => {
+    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a'), row('4-1001-2619/217430', 'FIRST', 'other')] })
+    await lookupCase(t.d, job)
+    expect(t.appended).toEqual(['a'])
+  })
+
+  test('nothing published is a real, recorded answer (found 0, no error)', async () => {
+    const t = deps({})
+    const r = await lookupCase(t.d, job)
+    expect(r).toMatchObject({ found: 0, error: undefined })
+    expect(t.marks[0]).toMatchObject({ found: 0 })
+  })
+
+  test('every search failing is an ERROR, never a false «no orders»', async () => {
+    const t = deps({ FIRST: new Error('timeout'), APPEAL: new Error('timeout'), CASSATION: new Error('timeout') })
+    const r = await lookupCase(t.d, job)
+    expect(r.error).toBe('timeout')
+    expect(t.marks[0].error).toBe('timeout')
+  })
+
+  test('a partial failure keeps the hits but flags the case for a retry', async () => {
+    const t = deps({ FIRST: [row('4-1001-2619/21743', 'FIRST', 'a')], APPEAL: new Error('boom') })
+    const r = await lookupCase(t.d, job)
+    expect(r.found).toBe(1)
+    expect(r.error).toContain('1/3')
+  })
+
+  test('a recently checked case is skipped, an errored or old one is not, and force re-checks', async () => {
+    const recent = deps({}, { at: '2026-06-09T00:00:00Z' })
+    expect((await lookupCase(recent.d, job)).skipped).toBe(true)
+    expect(recent.asked).toHaveLength(0)
+    expect((await lookupCase(deps({}, { at: '2026-06-09T00:00:00Z', error: 'x' }).d, job)).skipped).toBe(false)
+    expect((await lookupCase(deps({}, { at: '2026-05-01T00:00:00Z' }).d, job)).skipped).toBe(false)
+    expect((await lookupCase(deps({}, { at: '2026-06-09T00:00:00Z' }).d, job, { force: true })).skipped).toBe(false)
+  })
+})

@@ -1,6 +1,7 @@
 import {
   addDays,
   compactPublication,
+  normalizeCaseNumber,
   type PublicCourtType,
   type StoredOrder,
 } from '@/core/public-orders'
@@ -151,3 +152,61 @@ export async function runCrawl(deps: CrawlDeps, opts: CrawlOptions): Promise<Cra
 }
 
 class PausedSignal extends Error {}
+
+// ---- per-case lookup (the slow upstream search, run in the BACKGROUND for one company's cases) ------
+
+export interface JobCase {
+  caseNumber: string
+  courtType: PublicCourtType
+}
+
+export interface CaseLookupDeps {
+  search(caseNumber: string, courtType: PublicCourtType, instance: string): Promise<import('@/core/public-orders').RawPublication[]>
+  append(orders: StoredOrder[]): Promise<void>
+  getChecked(caseNumber: string): Promise<{ at: string; error?: string } | null>
+  markChecked(c: { caseNumber: string; at: string; found: number; error?: string }): Promise<void>
+  now(): Date
+}
+
+/** The instances a case can have orders in; asked separately because the filtered search is far faster. */
+export const LOOKUP_INSTANCES = ['FIRST', 'APPEAL', 'CASSATION'] as const
+
+export interface CaseLookupResult {
+  caseNumber: string
+  skipped: boolean
+  found: number
+  error?: string
+}
+
+/**
+ * Look one case up: the three instance-filtered searches run in parallel (each ~10 s upstream instead of a
+ * 35–113 s bare case-number scan). A case is «checked» once all three answered; if any failed and nothing
+ * was found we record the error and leave it to be retried, never a false «no orders».
+ */
+export async function lookupCase(deps: CaseLookupDeps, job: JobCase, opts: { force?: boolean; recheckAfterMs?: number } = {}): Promise<CaseLookupResult> {
+  const cn = normalizeCaseNumber(job.caseNumber)
+  const prev = await deps.getChecked(cn)
+  const fresh = prev && !prev.error && deps.now().getTime() - Date.parse(prev.at) < (opts.recheckAfterMs ?? 7 * 86_400_000)
+  if (fresh && !opts.force) return { caseNumber: cn, skipped: true, found: 0 }
+
+  const settled = await Promise.allSettled(LOOKUP_INSTANCES.map((i) => deps.search(cn, job.courtType, i)))
+  const orders: StoredOrder[] = []
+  let failed = 0
+  let firstError = ''
+  for (const s of settled) {
+    if (s.status === 'rejected') {
+      failed++
+      firstError ||= s.reason instanceof Error ? s.reason.message : String(s.reason)
+      continue
+    }
+    for (const raw of s.value) {
+      const o = compactPublication(raw, job.courtType)
+      if (o && o.caseNumber === cn) orders.push(o) // the search is a «contains»: keep only THIS case
+    }
+  }
+  if (orders.length) await deps.append(orders)
+  const error = failed && !orders.length ? firstError || 'so‘rov bajarilmadi' : failed ? `${failed}/${LOOKUP_INSTANCES.length} so‘rov bajarilmadi` : undefined
+  // partial failure with hits: keep the hits, mark for a retry so the missing instance is filled in later
+  await deps.markChecked({ caseNumber: cn, at: deps.now().toISOString(), found: orders.length, error })
+  return { caseNumber: cn, skipped: false, found: orders.length, error }
+}

@@ -18,16 +18,19 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
+import type { KnownDecision } from '@/core/public-orders'
+import { caseToDocValues, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
+import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { dateKey, daysUntil } from '@/core/dates'
-import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
+import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx, fetchPublicOrders } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
@@ -327,7 +330,14 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     const history = upcoming ? allHearings.filter((h) => h !== upcoming) : allHearings
     const left = upcoming ? daysUntil(upcoming.date) : null
 
-    const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
+    // the decisions the court-case data already gives us, per instance (the library adds PDFs to some of them)
+    const knownDecisions: KnownDecision[] = (
+      [
+        ['FIRST', fi?.decision],
+        ['APPEAL', ap?.decision],
+        ['CASSATION', ca?.decision],
+      ] as const
+    ).flatMap(([instance, dec]) => (dec && (dec.text || dec.date) ? [{ instance, date: dec.date || '', text: dec.text || '' }] : []))
 
     const steps: { name: string; state: string; done: boolean }[] = [
       { name: 'Birinchi', inst: fi },
@@ -353,6 +363,20 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     ]
     const amount = (g?.claimAmount || '').trim()
     const numeric = /^[\d\s.,]+$/.test(amount)
+
+    // hand the scraped case to the petition forms — nothing else needs to be looked up
+    const prepareDoc = (docId: string) => {
+      const values = caseToDocValues({
+        caseNumber,
+        general: g ? { court: g.court, judge: g.judge, plaintiff: g.plaintiff, claimSubject: g.claimSubject } : null,
+        upcoming: upcoming ? { date: upcoming.date, time: upcoming.time } : null,
+        companyName: company?.name,
+      })
+      const st = useAppStore.getState()
+      st.setDocPrefill({ docId, values })
+      st.setSurface('documents')
+      closeProtoDrawer()
+    }
 
     const printCase = () => {
       try {
@@ -401,18 +425,19 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
           </DwSection>
         )}
 
-        {decisions.length > 0 && (
-          <DwSection title={decisions.length > 1 ? 'Qarorlar' : 'Qaror'}>
-            {decisions.map((dec, i) => (
-              <div className="dw-quote" key={i}>
-                <div className="d">{dec!.date || '-'}</div>
-                <p>{dec!.text || '-'}</p>
-              </div>
-            ))}
-          </DwSection>
-        )}
+        <CaseOrders caseNumber={caseNumber} courtType={courtType} decisions={knownDecisions} />
 
-        <CaseOrders caseNumber={caseNumber} />
+        <DwSection title="Hujjat tayyorlash">
+          <div className="dw-docs">
+            {PREFILLABLE_DOCS.map((id) => (
+              <button className="btn btn-outline btn-sm" key={id} onClick={() => prepareDoc(id)}>
+                <FileText />
+                <span>{docById(id)?.title}</span>
+              </button>
+            ))}
+          </div>
+          <div className="dw-orders-empty" style={{ marginTop: 8 }}>Sud, sudya, ish raqami, daʼvogar, daʼvo predmeti va keyingi majlis shu ishdan avtomatik toʻldiriladi.</div>
+        </DwSection>
 
         <DwSection title="Instansiyalar">
           <div className="dw-track">
@@ -630,6 +655,14 @@ export function CasesSection() {
     })()
   }
 
+  const downloadOrders = () => {
+    void (async () => {
+      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => ({ caseNumber: c.caseNumber, courtType })))
+      if (!r.ok) toast.error(r.error)
+      else toast.success(`${r.data.queued} ta ish uchun qarorlar yuklanmoqda — boshqa ishingizni davom ettiring`)
+    })()
+  }
+
   return (
     <div className="p-card rise-c">
       <div className="filterbar">
@@ -655,6 +688,15 @@ export function CasesSection() {
         >
           {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
           <span>Excel</span>
+        </button>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={filtered.length === 0}
+          onClick={downloadOrders}
+          title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
+        >
+          <FileText />
+          <span>Qarorlar</span>
         </button>
       </div>
 

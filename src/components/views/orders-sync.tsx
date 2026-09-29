@@ -15,9 +15,9 @@ import { PUBLIC_COURT_TYPES, type PublicCourtType } from '@/core/public-orders'
 import type { PublicOrdersStatus } from '@/lib/public-orders/types'
 
 const TYPE_LABEL: Record<PublicCourtType, string> = {
-  ECONOMIC: 'Iqtisodiy sud (~184 ming qaror)',
-  CIVIL: 'Fuqarolik sudi (~429 ming qaror)',
-  ADMINISTRATIVE: 'Maʼmuriy sud (~64 ming qaror)',
+  ECONOMIC: 'Iqtisodiy sud (~184 ming qaror, diskda ~40 MB)',
+  CIVIL: 'Fuqarolik sudi (~429 ming qaror, diskda ~90 MB)',
+  ADMINISTRATIVE: 'Maʼmuriy sud (~64 ming qaror, diskda ~15 MB)',
 }
 
 const TYPE_SHORT: Record<PublicCourtType, string> = { ECONOMIC: 'Iqtisodiy', CIVIL: 'Fuqarolik', ADMINISTRATIVE: 'Maʼmuriy' }
@@ -74,13 +74,17 @@ export function OrdersTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Library /></div>
-          <h3>Qarorlar kutubxonasi</h3>
+          <h3>Qarorlar kutubxonasini toʻliq koʻchirish (ixtiyoriy)</h3>
           <div className="sp" />
           <span className={`badge ${st.cls}`}>{st.text}</span>
         </div>
 
+        <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 8px' }}>
+          Odatda kerak emas: <b>Sud ishlari</b> roʻyxatidagi «Qarorlar» tugmasi faqat kerakli ishlarning qarorlarini orqa fonda yuklaydi
+          (kichik, kompyuterni ogʻirlashtirmaydi).
+        </p>
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
-          public.sud.uz dagi eʼlon qilingan qarorlarning kichik yozuvlari (ish raqami, instansiya, sud, sudya, natija) shu kompyuterga
+          Toʻliq koʻchirish ixtiyoriy: public.sud.uz dagi eʼlon qilingan qarorlarning kichik yozuvlari (ish raqami, instansiya, sud, sudya, natija) shu kompyuterga
           koʻchiriladi. Shundan soʻng ish oynasida qarorlar darhol chiqadi. Qaror matni faqat bosganingizda olinadi. Koʻchirish sekin va
           ehtiyotkor: bir vaqtda bitta sahifa, pauza qilsangiz joyidan davom etadi.
         </p>
