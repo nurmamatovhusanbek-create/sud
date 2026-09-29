@@ -624,12 +624,15 @@ html, body { height: 100%; }
 .cwedge:focus { outline: none; }
 .pie-wrap.has-sel .cwedge:not(.sel) { filter: blur(2.6px); }
 .pie-wrap.has-sel .cwedge:not(.sel):hover { filter: blur(.6px); }
-.ctot { font-family: var(--font-mono); font-weight: 800; font-size: 11.5px; fill: #fff; text-anchor: middle; }
-.cwon { font-family: var(--font-mono); font-weight: 800; font-size: 11.5px; fill: #fff; stroke: rgba(18, 24, 58, .34); stroke-width: .7; paint-order: stroke; text-anchor: middle; }
-.clost { font-family: var(--font-mono); font-weight: 700; font-size: 10px; fill: var(--pie-lost-ink, #454f78); stroke: rgba(255, 255, 255, .72); stroke-width: 1.8; paint-order: stroke; text-anchor: middle; }
+/* numbers are deliberately quiet: small mono, no weight fights with the shapes */
+.ctot { font-family: var(--font-mono); font-weight: 700; font-size: 10px; fill: #fff; text-anchor: middle; }
+.cwon { font-family: var(--font-mono); font-weight: 700; font-size: 9px; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6; paint-order: stroke; text-anchor: middle; }
+.cnum { font-family: var(--font-mono); font-weight: 600; font-size: 8.5px; fill: var(--pie-lost-ink, #454f78); stroke: var(--surface); stroke-opacity: .8; stroke-width: 1.5; paint-order: stroke; text-anchor: middle; }
+.cband { pointer-events: all; }
+.cband.lost { fill-opacity: var(--pie-lost-op, .34); }
 .pie-hub { fill: var(--surface); stroke: var(--border-subtle); }
 [data-theme='dark'] {
-  --pie-track: #39406a; --pie-track-edge: #4a5386; --pie-seam: #8fa1e8; --pie-lost-ink: #c9d3f5;
+  --pie-track: #39406a; --pie-track-edge: #4a5386; --pie-seam: #8fa1e8; --pie-lost-ink: #c9d3f5; --pie-lost-op: .5;
 }
 .petal-legend { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-2); font-weight: 600; }
 .petal-legend span { display: inline-flex; align-items: center; }
@@ -649,6 +652,15 @@ html, body { height: 100%; }
 .det-ring { display: flex; align-items: center; gap: 16px; margin: 14px 0 6px; }
 .stackbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin: 14px 0 4px; background: var(--surface-inset); }
 .stackbar i { display: block; height: 100%; transition: width .5s var(--ease); }
+/* the four statuses, drawn in one hue (--sw) — same fills as the pizza bands */
+.st { --st-soft: color-mix(in srgb, var(--sw, #3b5bdb) 10%, transparent); }
+.st.won { background: var(--sw, #3b5bdb); }
+.st.lost { background: color-mix(in srgb, var(--sw, #3b5bdb) calc(var(--pie-lost-op, .34) * 100%), transparent); }
+.st.neutral { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--sw, #3b5bdb) 75%, transparent) 0 1.4px, var(--st-soft) 1.4px 3.4px); }
+.st.pending { background: color-mix(in srgb, var(--sw, #3b5bdb) 7%, transparent); border: 1.2px dashed var(--sw, #3b5bdb); box-sizing: border-box; }
+.pie-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 4px; font-size: 11px; color: var(--text-3); }
+.pie-key span { display: inline-flex; align-items: center; gap: 5px; }
+.pie-key i { width: 12px; height: 9px; border-radius: 3px; display: inline-block; }
 .det-rows .r { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); }
 .det-rows .r:last-child { border-bottom: 0; }
 .det-rows .r .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }

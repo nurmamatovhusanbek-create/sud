@@ -41,6 +41,7 @@ import {
   EmptyBlock,
   Pizza,
   PizzaDetail,
+  PizzaKey,
   WinRing,
   grp,
   initials,
@@ -49,6 +50,7 @@ import {
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { courtItems, turkumItems, type PizzaItem } from '@/components/proto/pizza-geometry'
+import { winRate as calcWinRate, winRateText } from '@/core/rates'
 import { useResource } from '@/hooks/use-resource'
 import { monthlyTrend } from '@/core/trend'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
@@ -86,17 +88,17 @@ const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band
 
 function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
   const byCourt = useMemo(() => {
-    const map = new Map<string, { win: number; total: number }>()
+    const map = new Map<string, { win: number; lose: number }>()
     for (const c of cases) {
-      const e = map.get(c.courtType) || { win: 0, total: 0 }
-      e.total++
+      const e = map.get(c.courtType) || { win: 0, lose: 0 }
       if (c.classification === 'win') e.win++
+      else if (c.classification === 'lose') e.lose++
       map.set(c.courtType, e)
     }
     return [...map.entries()].map(([k, v]) => ({
       key: k,
       label: k === 'economic' ? 'Iqtisodiy' : k === 'civil' ? 'Fuqarolik' : k === 'administrative' ? "Maʼmuriy" : k,
-      rate: v.total ? Math.round((v.win / v.total) * 100) : 0,
+      rate: calcWinRate(v.win, v.lose), // won ÷ (won + lost); null = nothing decided
     }))
   }, [cases])
   if (!byCourt.length) return <div className="faint" style={{ fontSize: 12.5 }}>Maʼlumot yoʻq</div>
@@ -108,10 +110,10 @@ function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
           <div className="wr-track">
             <div
               className="wr-fill"
-              style={{ width: `${c.rate}%`, background: c.rate >= 60 ? 'var(--pos-base)' : c.rate >= 40 ? 'var(--warn-base)' : 'var(--neg-base)' }}
+              style={{ width: `${c.rate ?? 0}%`, background: (c.rate ?? 0) >= 60 ? 'var(--pos-base)' : (c.rate ?? 0) >= 40 ? 'var(--warn-base)' : 'var(--neg-base)' }}
             />
           </div>
-          <span className="wr-val">{c.rate}%</span>
+          <span className="wr-val">{c.rate === null ? '–' : `${c.rate}%`}</span>
         </div>
       ))}
     </div>
@@ -120,12 +122,12 @@ function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
 
 // ---- v18: side-by-side comparison (inside Statistika) --------------------------
 
-const BAND_HEX = (wr: number) => (wr >= 60 ? '#0f9070' : wr >= 40 ? '#3b5bdb' : '#c04a68')
+const BAND_HEX = (wr: number | null) => (wr === null ? '#7d86ab' : wr >= 60 ? '#0f9070' : wr >= 40 ? '#3b5bdb' : '#c04a68')
 
 /** One compact company dashboard: identity + KPIs + interactive pizza + bars. */
 function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | null }) {
   const s = d.summary
-  const wr = s.total ? Math.round((s.win / s.total) * 100) : 0
+  const wr = calcWinRate(s.win, s.lose)
   const [mode, setMode] = useState<'court' | 'turkum'>('court')
   const items = useMemo(
     () => (mode === 'court' ? courtItems(d.cases) : turkumItems(d.cases)),
@@ -148,7 +150,7 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
       </div>
       <div className="co-kpis">
         <div className="co-kpi"><div className="k">Jami ishlar</div><div className="v">{s.total}</div></div>
-        <div className="co-kpi"><div className="k">Yutuq</div><div className="v" style={{ color: BAND_HEX(wr) }}>{wr}%</div></div>
+        <div className="co-kpi"><div className="k">Yutuq</div><div className="v" style={{ color: BAND_HEX(wr) }}>{winRateText(s.win, s.lose)}</div></div>
         <div className="co-kpi"><div className="k">Jarayonda</div><div className="v">{s.pending}</div></div>
         <div className="co-kpi">
           <div className="k">Reyting</div>
@@ -185,6 +187,7 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           ))}
         </div>
       )}
+      {items.length > 0 && <PizzaKey />}
       <div className="cmp-det">
         {sel ? (
           <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />
@@ -307,7 +310,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   const setSection = useAppStore((s) => s.setSection)
   const setCaseCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const s = data.summary
-  const winRate = s.total ? Math.round((s.win / s.total) * 100) : 0
+  const winRate = calcWinRate(s.win, s.lose)
   const trend = monthlyTrend(data.cases)
   const hotIdx = trend.reduce((best, t, i) => (t.count > trend[best].count ? i : best), 0)
 
@@ -387,11 +390,16 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   return (
     <div className="stat-flow">
       <div className="kpis">
-        <Kpi label="Jami sud ishlari" icon={<Gavel />} foot={<>{s.win} yutgan / {s.total} ish</>}>
+        <Kpi label="Jami sud ishlari" icon={<Gavel />} foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
           <span>{s.total}</span>
         </Kpi>
-        <Kpi label="Yutuq darajasi" icon={<Trophy />} ink foot={<>{s.win} yutgan / {s.lose} yutqazgan</>}>
-          <span>{winRate}%</span>
+        <Kpi
+          label="Yutuq darajasi"
+          icon={<Trophy />}
+          ink
+          foot={winRate === null ? 'Hal qilingan ish yoʻq' : <>{s.win} yutgan / {s.win + s.lose} ta hal qilingan ishdan</>}
+        >
+          <span>{winRateText(s.win, s.lose)}</span>
         </Kpi>
         <Kpi
           label="Kutilayotgan majlis"
@@ -441,6 +449,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
                   <span key={it.label}><i style={{ background: it.col }} />{it.label}</span>
                 ))}
               </div>
+              <PizzaKey />
             </>
           ) : (
             <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
@@ -665,8 +674,8 @@ function OverviewView({
     if (state.status === 'success' || state.status === 'partial') {
       const d = state.data
       if (d.company?.name) patchCompany({ name: d.company.name })
-      const wr = d.summary.total ? Math.round((d.summary.win / d.summary.total) * 100) : 0
-      patchMeta(stir, { cases: d.summary.total, winRate: wr, status: d.company?.status })
+      const wr = calcWinRate(d.summary.win, d.summary.lose)
+      patchMeta(stir, { cases: d.summary.total, winRate: wr ?? undefined, status: d.company?.status })
       setCasesCount({ cases: d.summary.total })
       onData?.(d)
     }

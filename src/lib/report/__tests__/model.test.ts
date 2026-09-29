@@ -17,7 +17,7 @@ describe('court cases block — numbers match Statistika', () => {
   test('counts and win rate (win / total, whole percent)', () => {
     expect(c.total).toBe(6)
     expect(c.win).toBe(2)
-    expect(c.winRate).toBe(Math.round((2 / 6) * 100)) // 33
+    expect(c.winRate).toBe(50) // 2 won ÷ (2 won + 2 lost); neutral + in-progress are not in the base
     expect(c.inProgress).toBe(1)
     expect(c.decided).toBe(5)
     expect(c.asPlaintiff + c.asDefendant).toBe(6)

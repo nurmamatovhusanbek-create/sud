@@ -7,6 +7,7 @@
  * and cached into the registry meta so home cards and the bell stay in sync.
  */
 
+import { winRate } from '@/core/rates'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
@@ -108,7 +109,7 @@ export function WatchlistView() {
           const s = res.data
           patchMeta(stir, {
             cases: s.summary.total,
-            winRate: s.summary.total ? Math.round((s.summary.win / s.summary.total) * 100) : 0,
+            winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
             status: s.company?.status,
             rating: s.rating?.category ?? null,
             score: s.rating?.score ?? null,

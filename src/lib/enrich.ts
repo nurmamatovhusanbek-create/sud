@@ -7,6 +7,7 @@
  * answered, false if both failed (so the caller can toast).
  */
 
+import { winRate } from '@/core/rates'
 import { getStats, getUpcomingHearings } from './api-client'
 import { patchMeta } from './registry'
 
@@ -20,7 +21,7 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
       const s = res.data
       patchMeta(stir, {
         cases: s.summary.total,
-        winRate: s.summary.total ? Math.round((s.summary.win / s.summary.total) * 100) : 0,
+        winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
         status: s.company?.status,
         rating: s.rating?.category ?? null,
         score: s.rating?.score ?? null,
