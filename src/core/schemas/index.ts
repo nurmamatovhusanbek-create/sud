@@ -32,6 +32,9 @@ export const CompanyInfoSchema = z.object({
   thsht: z.string(),
   dbibt: z.string(),
   ifut: z.string(),
+  // extracted by the scraper (orginfo «Toifa» / «Yirik soliq») but previously dropped; .catch('') keeps older cached payloads valid
+  sustainabilityRating: z.string().catch(''),
+  largeTaxpayer: z.string().catch(''),
   founders: z.array(z.object({ name: z.string(), share: z.string() }).passthrough()).catch([]),
   orgInfoUrl: z.string(),
 }).passthrough()

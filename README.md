@@ -79,6 +79,14 @@ company/case data and your input:
   the debt, inclusive delay-day count, 5-banking-day grace). **Russian and Uzbek** output
   via a language switch at the end of the flow; multiple contracts come back as a ZIP.
 
+**Hisobot (Company report)** — the *Hisobot* button in a company's header builds a
+multi-page A4 PDF (own design, follows the app theme): company card and key figures, court
+activity and win-rate breakdown, monthly trend, claim amounts, upcoming hearings and bills.
+It reuses the app's cache and never blocks on a slow source: a source that fails or times
+out is stated in place on the page instead of printing a misleading zero. Sections with no
+data source (subsidiaries, licences, audits, pledges, trademarks…) are intentionally left out.
+Page numbers need Chrome/Edge 131+.
+
 **Sozlamalar (Settings)** — self-update from GitHub, Cloudflare Worker management, and a
 live health dashboard (per-worker success gauges, sparklines, request timelines).
 
@@ -193,10 +201,11 @@ src/
     views/        launcher · watchlist · documents-view · doc-editor · pretenzia-view · settings-view
     proto/        shared prototype-styled widgets (letterhead picker, doc-preview)
     company/ · ui/ · ui-custom/
-  core/           pure domain: classify · status · billing-format · pretenzia (math) · schemas · __tests__
+  core/           pure domain: classify · status · dates · trend · billing-format · pretenzia (math) · schemas · __tests__
   lib/
     documents/    template registry + fill.shared (server+preview) + fill.server + templates/*.docx
     pretenzia/    xlsx parse (client) · render values · fill.server (docx + ZIP)
+    report/       company report: model (pure data) · render (HTML) · doc · fonts · generate (click → print)
     store/        Zustand app-store (nav/surface state)
     net/ · domain/ · registry · enrich · print (themed PDF) · scraper libs (billing, court-case, …)
   sources/        source adapters

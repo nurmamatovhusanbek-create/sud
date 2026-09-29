@@ -7,11 +7,12 @@
  */
 
 import { useState } from 'react'
-import { Copy, Download, RefreshCw, Star } from 'lucide-react'
+import { Copy, Download, FileText, RefreshCw, Star } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/lib/store/app-store'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
 import { isWatched, setWatched } from '@/lib/registry'
+import { openCompanyReport } from '@/lib/report/generate'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { toast } from 'sonner'
 import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
@@ -107,6 +108,11 @@ export function ContextBar() {
             <TooltipContent>Eksport (E)</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        {/* the company dossier as a PDF. Kept a text button (not another icon) so it is discoverable. */}
+        <button className="btn btn-outline btn-sm" data-act="report" onClick={() => void openCompanyReport(company.stir)} title="Kompaniya hisoboti (PDF)">
+          <FileText />
+          <span>Hisobot</span>
+        </button>
         <button className={`btn ${watching ? 'btn-primary' : 'btn-outline'} btn-sm`} data-act="watch" onClick={toggleWatch}>
           <Star />
           <span>{watching ? 'Kuzatuvda' : 'Kuzatish'}</span>
