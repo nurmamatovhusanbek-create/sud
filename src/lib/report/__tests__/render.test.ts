@@ -32,12 +32,12 @@ describe('sections appear only when there is data behind them', () => {
     }
     // match the drawn <svg>, not the class name (the stylesheet always mentions it)
     expect(html).toContain('<svg class="rp-gauge"')
-    expect(html).toContain('<svg class="rp-wheel"')
+    expect(html).toContain('<svg class="rp-pie"')
     expect(html).toContain('<svg class="rp-months"')
   })
   test('sparse: no court/bills/founders/rating sections; the gap is stated', () => {
     const html = doc(SPARSE)
-    expect(html).not.toContain('<svg class="rp-wheel"')
+    expect(html).not.toContain('<svg class="rp-pie"')
     expect(html).not.toContain('<svg class="rp-gauge"')
     expect(html).not.toContain('Taʼsischilar')
     expect(html).not.toContain('Toʻlovlar')
@@ -58,13 +58,23 @@ describe('signature chart and sources', () => {
     const html = doc(FULL)
     for (const src of ['orginfo', 'chamber.uz', 'sud.uz', 'billing.sud', 'Manba']) expect(html).not.toContain(src)
   })
-  test('verdict wheel: one arc per non-empty outcome, lit ticks = win rate / 2%', () => {
+  test('the report draws the Statistika pizza: one wedge per court type, bands sum to the case total', () => {
     const html = doc(FULL)
-    const svg = html.match(/<svg class="rp-wheel"[\s\S]*?<\/svg>/)![0]
-    const live = ['win', 'lose', 'inProgress', 'neutral'].filter((k) => FULL_MODEL.cases![k as 'win' | 'lose' | 'inProgress' | 'neutral'] > 0).length
-    expect((svg.match(/stroke-linecap="round" stroke-dasharray/g) ?? []).length).toBe(live)
-    const lit = (svg.match(new RegExp(`stroke="${reportTheme(false).tone.pos.fg}" stroke-width="2.2"`, 'g')) ?? []).length
-    expect(lit).toBe(Math.round((FULL_MODEL.cases!.winRate! / 100) * 50))
+    const svg = html.match(/<svg class="rp-pie"[\s\S]*?<\/svg>/)![0]
+    const pie = FULL_MODEL.cases!.pie
+    expect(pie.length).toBeGreaterThan(0)
+    // every non-empty status of every slice is one band path (radial-stack geometry, shared with the app)
+    const bands = pie.reduce((a, it) => a + [it.won, it.lost, it.neutral ?? 0, it.pending ?? 0].filter((v) => v > 0).length, 0)
+    expect((svg.match(/<path d="M/g) ?? []).length).toBe(bands)
+    // pills carry the per-slice totals, and together they are ALL cases
+    const pills = [...svg.matchAll(/class="rp-pz-t"[^>]*>(\d+)</g)].map((m) => Number(m[1]))
+    expect(pills.reduce((a, b) => a + b, 0)).toBe(FULL_MODEL.cases!.total)
+  })
+  test('the win rate is the app-wide won ÷ (won + lost), with its base', () => {
+    const c = FULL_MODEL.cases!
+    const html = doc(FULL)
+    expect(html).toContain(`<b>${c.winRate}%</b>`)
+    expect(html).toContain(`${c.win + c.lose} ta hal qilingan ishdan`)
   })
   test('outcome colors are distinct and each outcome keeps one color across both themes', () => {
     for (const dark of [false, true]) {

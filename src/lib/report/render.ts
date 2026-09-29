@@ -15,11 +15,22 @@
 
 import { escapeHtml as h, palette, type Palette } from '@/lib/print'
 import { formatDmy } from '@/core/dates'
+import { winRate as calcWinRate } from '@/core/rates'
+import {
+  PIZZA_GEOM,
+  PIZZA_STATUS_LABEL,
+  PIZZA_STATUS_ORDER,
+  pizzaModel,
+  pizzaTotal,
+  type PizzaItem,
+  type PizzaStatus,
+} from '@/components/proto/pizza-geometry'
 import { fmtInt, shortSum, type ReportModel, type Tone } from './model'
 
 // ---- theme -------------------------------------------------------------------
 
 export interface ReportTheme extends Palette {
+  dark: boolean
   tone: Record<Tone, { fg: string; bg: string }>
   /** navy ramp for magnitude / shares, strongest first (kept apart from the outcome hues) */
   ramp: string[]
@@ -30,6 +41,7 @@ export function reportTheme(dark: boolean): ReportTheme {
   return dark
     ? {
         ...p,
+        dark: true,
         tone: {
           pos: { fg: '#1aa593', bg: 'rgba(26,165,147,.17)' },
           neg: { fg: '#e2544c', bg: 'rgba(226,84,76,.17)' },
@@ -41,6 +53,7 @@ export function reportTheme(dark: boolean): ReportTheme {
       }
     : {
         ...p,
+        dark: false,
         tone: {
           pos: { fg: '#0f9d8f', bg: '#e0f4f1' },
           neg: { fg: '#d8443c', bg: '#fce9e7' },
@@ -68,63 +81,55 @@ function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
 }
 
 /**
- * The signature chart: a "verdict wheel". A ring of rounded, separated arcs — one per
- * outcome, sized by its share of all cases — inside a dial of 50 ticks whose lit ticks
- * (2% each, in the "won" color) read the win rate (won ÷ (won + lost)), starting at 12 o'clock. The total and
- * the win rate sit in the middle so the chart is readable without its legend.
+ * The signature chart: the SAME pizza as Statistika (radial stack) — one wedge per court type,
+ * each wedge's radius its own 100% stacked hub → rim as yutgan · yutqazgan · neytral · jarayonda
+ * (solid · tint · hatch · dashed, in the slice's hue). The geometry is the app's own
+ * (components/proto/pizza-geometry.ts), so the two can never drift; only the paint differs.
  */
-function verdictWheel(
-  segs: { value: number; color: string }[],
-  total: number,
-  winRate: number | null,
-  t: ReportTheme,
-): string {
-  const cx = 100
-  const r = 62
-  const w = 18 // ring thickness = the round cap's diameter
-  const c = 2 * Math.PI * r
-  const gap = 4
-  const sum = segs.reduce((a, x) => a + x.value, 0)
-  const live = segs.filter((x) => x.value > 0)
-
-  let arcs = ''
-  if (sum > 0 && live.length === 1) {
-    arcs = `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${live[0].color}" stroke-width="${w}"/>`
-  } else if (sum > 0) {
-    let at = 0
-    arcs = live
-      .map((x) => {
-        const len = (x.value / sum) * c
-        // a round cap adds w/2 at each end, so the visible dash is shortened by w + gap
-        const dash = Math.max(0.01, len - w - gap)
-        const start = at + (w + gap) / 2
-        at += len
-        return `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${x.color}" stroke-width="${w}" stroke-linecap="round" stroke-dasharray="${dash.toFixed(2)} ${(c - dash).toFixed(2)}" stroke-dashoffset="${(-start).toFixed(2)}" transform="rotate(-90 ${cx} ${cx})"/>`
-      })
-      .join('')
-  }
-
-  const N = 50
-  const lit = Math.max(0, Math.min(N, Math.round(((winRate ?? 0) / 100) * N)))
-  const ticks = Array.from({ length: N }, (_, i) => {
-    const a = ((i / N) * 360 - 90) * (Math.PI / 180)
-    const r1 = 84
-    const r2 = i % 5 === 0 ? 96 : 92
-    const on = i < lit
-    return `<line x1="${(cx + r1 * Math.cos(a)).toFixed(2)}" y1="${(cx + r1 * Math.sin(a)).toFixed(2)}" x2="${(cx + r2 * Math.cos(a)).toFixed(2)}" y2="${(cx + r2 * Math.sin(a)).toFixed(2)}" stroke="${on ? t.tone.pos.fg : t.border}" stroke-width="2.2" stroke-linecap="round"/>`
-  }).join('')
-
-  return `<svg class="rp-wheel" viewBox="0 0 200 200" role="img" aria-label="${fmtInt(total)} ta ish, ${winRate === null ? 'hal qilingan ish yoʻq' : `yutuq darajasi ${winRate}%`}">
-    ${ticks}
-    <circle cx="${cx}" cy="${cx}" r="${r + w / 2 + 1}" fill="none" stroke="${t.borderSoft}" stroke-width="1"/>
-    <circle cx="${cx}" cy="${cx}" r="${r - w / 2 - 1}" fill="${t.inset}" stroke="${t.borderSoft}" stroke-width="1"/>
-    ${sum > 0 ? '' : `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${t.borderSoft}" stroke-width="${w}"/>`}
-    ${arcs}
-    <path d="M100 1.5 L104.2 8.6 L95.8 8.6 Z" fill="${t.accent}"/>
-    <text x="${cx}" y="106" text-anchor="middle" class="rp-wheel-n" fill="${t.t1}">${fmtInt(total)}</text>
-    <text x="${cx}" y="120" text-anchor="middle" class="rp-wheel-s" fill="${t.t3}">TA ISH</text>
-    <text x="${cx}" y="139" text-anchor="middle" class="rp-wheel-w"><tspan fill="${t.t1}">${winRate === null ? '–' : `${winRate}%`}</tspan><tspan fill="${t.t3}" dx="3">yutuq</tspan></text>
-  </svg>`
+function pizza(items: PizzaItem[], t: ReportTheme): string {
+  const model = pizzaModel(items)
+  const { cx, cy, r0 } = PIZZA_GEOM
+  const lostOp = t.dark ? 0.5 : 0.34
+  const paint = (status: PizzaStatus, col: string, hatch: string) =>
+    status === 'won'
+      ? `fill="${col}" stroke="${t.inset}" stroke-width="0.8"`
+      : status === 'lost'
+        ? `fill="${col}" fill-opacity="${lostOp}" stroke="${t.inset}" stroke-width="0.8"`
+        : status === 'neutral'
+          ? `fill="url(#${hatch})" stroke="${t.inset}" stroke-width="0.8"`
+          : `fill="${col}" fill-opacity="0.07" stroke="${col}" stroke-width="1" stroke-dasharray="3 2.2"`
+  const defs = items
+    .map(
+      (it, i) =>
+        `<pattern id="rpz${i}" width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4.5" height="4.5" fill="${it.col}" fill-opacity="0.1"/><line x1="0" y1="0" x2="0" y2="4.5" stroke="${it.col}" stroke-width="1.8" stroke-opacity="0.75"/></pattern>`,
+    )
+    .join('')
+  const rings = model.rings
+    .map(
+      (g) =>
+        `<circle cx="${cx}" cy="${cy}" r="${g.r}" fill="none" stroke="${g.edge ? t.border : t.borderSoft}" stroke-width="1"${g.edge ? '' : ' stroke-dasharray="3 5"'}/>`,
+    )
+    .join('')
+  const wedges = model.wedges
+    .map((w) => {
+      const it = items[w.index]
+      const bands = w.bands.map((b) => `<path d="${b.path}" ${paint(b.status, it.col, `rpz${w.index}`)}/>`).join('')
+      const nums = w.bands
+        .map((b) =>
+          b.text
+            ? `<text x="${b.text.x}" y="${b.text.y}" class="${b.status === 'won' ? 'rp-pz-w' : 'rp-pz-n'}" text-anchor="middle">${b.text.v}</text>`
+            : '',
+        )
+        .join('')
+      const pill = `<rect x="${w.pill.x - 13}" y="${w.pill.y - 9}" width="26" height="18" rx="6" fill="${w.pill.fill}" stroke="${t.inset}" stroke-width="1.5"/><text x="${w.pill.x}" y="${w.pill.y + 4}" class="rp-pz-t" text-anchor="middle">${w.pill.v}</text>`
+      return `<g>${bands}${nums}${pill}</g>`
+    })
+    .join('')
+  const seams = model.seams
+    .map((s) => `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${t.t2}" stroke-width="1.3" stroke-dasharray="1.5 4" stroke-linecap="round" opacity=".8"/>`)
+    .join('')
+  const aria = model.wedges.map((w) => w.aria).join('; ')
+  return `<svg class="rp-pie" viewBox="0 0 340 340" role="img" aria-label="${h(aria)}"><defs>${defs}</defs>${rings}${wedges}<circle cx="${cx}" cy="${cy}" r="${r0}" fill="${t.inset}" stroke="${t.borderSoft}"/>${seams}</svg>`
 }
 
 /** 12 monthly bars; the current (last) month is drawn in the accent. */
@@ -164,13 +169,6 @@ const pill = (text: string, tone: Tone, t: ReportTheme, dot = true) =>
 const note = (n: { section: string; message: string }) =>
   `<div class="rp-note"><b>${h(n.section)}:</b> maʼlumot olinmadi</div>`
 
-const CLASS_ROWS: { key: 'win' | 'lose' | 'inProgress' | 'neutral'; label: string; tone: Tone }[] = [
-  { key: 'win', label: 'Yutgan', tone: 'pos' },
-  { key: 'lose', label: 'Yutqazgan', tone: 'neg' },
-  { key: 'inProgress', label: 'Jarayonda', tone: 'info' },
-  { key: 'neutral', label: 'Neytral', tone: 'neu' },
-]
-
 function hero(m: ReportModel, t: ReportTheme): string {
   const r = m.rating
   return `<section class="rp-hero">
@@ -197,15 +195,20 @@ function hero(m: ReportModel, t: ReportTheme): string {
 function signature(m: ReportModel, t: ReportTheme): string {
   const c = m.cases
   if (!c) return ''
-  const seg = CLASS_ROWS.map((r) => ({ value: c[r.key], color: t.tone[r.tone].fg }))
-  const pct = (n: number) => (c.total ? `${(Math.round((n / c.total) * 1000) / 10).toString().replace('.', ',')}%` : '–')
+  const rate = c.winRate
+  const totals: Record<PizzaStatus, number> = { won: c.win, lost: c.lose, neutral: c.neutral, pending: c.inProgress }
   return `<section class="rp-block rp-sig rp-avoid">${sec('Sud ishlari bir qarashda', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}
     <div class="rp-sig-card">
-      <div class="rp-wheel-wrap">${verdictWheel(seg, c.total, c.winRate, t)}</div>
-      <div class="rp-legend">${CLASS_ROWS.map(
-        (r) => `<div><i style="background:${t.tone[r.tone].fg}"></i><span class="n">${r.label}</span><b>${fmtInt(c[r.key])}</b><span class="p">${pct(c[r.key])}</span></div>`,
-      ).join('')}
-        <div class="cap">Aylana — natijalar ulushi. Tashqi shkala — yutuq darajasi (hal qilingan ishlar ichida), har belgi 2%.</div>
+      <div class="rp-pie-wrap">${pizza(c.pie, t)}</div>
+      <div class="rp-sig-side">
+        <div class="rp-rate-big"><b>${rate === null ? '–' : `${rate}%`}</b><span>yutuq darajasi<small>${rate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(c.win + c.lose)} ta hal qilingan ishdan`}</small></span></div>
+        <div class="rp-slices">${c.pie
+          .map((it) => {
+            const r = calcWinRate(it.won, it.lost)
+            return `<div><i style="background:${it.col}"></i><span class="n">${h(it.full)}</span><b>${fmtInt(pizzaTotal(it))}</b><span class="p">${r === null ? '–' : `${r}%`}</span></div>`
+          })
+          .join('')}</div>
+        <div class="rp-stkey">${PIZZA_STATUS_ORDER.map((st) => `<span><i class="rp-st ${st}"></i>${PIZZA_STATUS_LABEL[st]} <b>${fmtInt(totals[st])}</b></span>`).join('')}</div>
       </div>
     </div></section>`
 }
@@ -430,22 +433,28 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-court-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 
   /* signature: the verdict wheel */
-  .rp-sig-card { display: grid; grid-template-columns: 54mm minmax(0, 1fr); gap: 18px; align-items: center; padding: 12px 18px 12px 12px; border: 1px solid var(--bd); border-radius: 14px; background: var(--in); }
-  .rp-wheel { display: block; width: 100%; height: auto; }
-  .rp-wheel-n { font: 800 34px ${fontStack}; letter-spacing: -.02em; }
-  .rp-wheel-s { font: 700 7.5px ${fontStack}; letter-spacing: .16em; }
-  .rp-wheel-w { font: 800 10.5px ${fontStack}; }
-  .rp-sig .rp-legend > div { padding: 8px 0; font-size: 12px; }
-  .rp-sig .rp-legend i { width: 11px; height: 11px; border-radius: 50%; }
-  .rp-sig .rp-legend b { font-size: 16px; letter-spacing: -.01em; }
-  .rp-sig .rp-legend .p { width: 46px; font-size: 11px; }
-  .rp-sig .rp-legend > .cap { display: block; padding: 9px 0 0; border: 0; font-size: 8.5px; line-height: 1.4; color: var(--t3); }
-  .rp-legend > div { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--bs); font-size: 11px; }
-  .rp-legend > div:last-child { border-bottom: 0; }
-  .rp-legend i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-  .rp-legend .n { flex: 1; }
-  .rp-legend b { font-variant-numeric: tabular-nums; }
-  .rp-legend .p { width: 38px; text-align: right; color: var(--t3); font-variant-numeric: tabular-nums; }
+  .rp-sig-card { display: grid; grid-template-columns: 76mm minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 18px 8px 4px; border: 1px solid var(--bd); border-radius: 14px; background: var(--in); }
+  .rp-pie { display: block; width: 100%; height: auto; }
+  .rp-pz-t { font: 700 11px ${monoStack}; fill: #fff; }
+  .rp-pz-w { font: 700 10.5px ${monoStack}; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6px; paint-order: stroke; }
+  .rp-pz-n { font: 600 10px ${monoStack}; fill: var(--t2); stroke: var(--in); stroke-opacity: .85; stroke-width: 1.6px; paint-order: stroke; }
+  .rp-rate-big { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--bs); }
+  .rp-rate-big b { font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .rp-rate-big span { font-size: 10.5px; font-weight: 700; color: var(--t2); line-height: 1.3; }
+  .rp-rate-big small { display: block; font-size: 9px; font-weight: 500; color: var(--t3); }
+  .rp-slices > div { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bs); font-size: 11px; }
+  .rp-slices i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .rp-slices .n { flex: 1; min-width: 0; }
+  .rp-slices b { font: 700 12px ${monoStack}; font-variant-numeric: tabular-nums; }
+  .rp-slices .p { width: 34px; text-align: right; color: var(--t3); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .rp-stkey { display: flex; flex-wrap: wrap; gap: 5px 14px; padding-top: 9px; font-size: 9.5px; color: var(--t2); --sw: ${t.ramp[1]}; }
+  .rp-stkey span { display: inline-flex; align-items: center; gap: 5px; }
+  .rp-stkey b { font-weight: 800; color: var(--t1); font-variant-numeric: tabular-nums; }
+  .rp-st { display: inline-block; width: 12px; height: 9px; border-radius: 3px; }
+  .rp-st.won { background: var(--sw); }
+  .rp-st.lost { background: color-mix(in srgb, var(--sw) ${t.dark ? 50 : 34}%, transparent); }
+  .rp-st.neutral { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--sw) 75%, transparent) 0 1.4px, color-mix(in srgb, var(--sw) 10%, transparent) 1.4px 3.4px); }
+  .rp-st.pending { background: color-mix(in srgb, var(--sw) 7%, transparent); border: 1.2px dashed var(--sw); box-sizing: border-box; }
   .rp-side { padding-left: 14px; border-left: 1px solid var(--bs); }
   .rp-mini-h { margin-bottom: 6px; font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
   .rp-role { display: flex; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--t2); }
