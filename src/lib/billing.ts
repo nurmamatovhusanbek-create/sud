@@ -26,7 +26,8 @@ const BILLING_API = 'https://billing.sud.uz'
 // enrichment queues under the shared per-origin cap + spacing for
 // billing.sud.uz instead of stampeding it. That shared cap is exactly what
 // stops the rate-limit wall.
-import { fetchViaWorkers } from './net/worker-fetch'
+import { fetchViaWorkers, pickWorker } from './net/worker-fetch'
+import { config } from '@/server/config'
 
 /**
  * billing.sud.uz sits behind its own Cloudflare and blocks many IPs
@@ -94,9 +95,36 @@ function solvePow(challenge: string, difficulty: number): { nonce: string; solve
   }
 }
 
+/**
+ * VLM credentials from the environment (VLM_API_KEY + VLM_BASE_URL, optional
+ * VLM_TOKEN), or null when they are not both set. These variables were defined in
+ * config and documented, but nothing read them: the SDK only knows a
+ * `.z-ai-config` file, which is no longer shipped (it held a committed secret) —
+ * so the math-captcha solver silently could not run.
+ */
+export function vlmCredentials(v: { apiKey: string; baseUrl: string; token: string } = config.vlm) {
+  const apiKey = v.apiKey.trim()
+  const baseUrl = v.baseUrl.trim().replace(/\/+$/, '')
+  if (!apiKey || !baseUrl) return null
+  const token = v.token.trim()
+  return { apiKey, baseUrl, ...(token ? { token } : {}) }
+}
+
 let zaiPromise: Promise<unknown> | null = null
 async function getZai() {
-  if (!zaiPromise) zaiPromise = ZAI.create()
+  if (!zaiPromise) {
+    const creds = vlmCredentials()
+    // Environment first; the SDK's `.z-ai-config` file (project dir, home, /etc) stays
+    // the fallback. The SDK's typings mark the constructor private; at runtime it is a
+    // plain class that takes the same object the file would have held.
+    zaiPromise = (creds
+      ? Promise.resolve(new (ZAI as unknown as new (c: object) => unknown)(creds))
+      : ZAI.create()
+    ).catch((e) => {
+      zaiPromise = null // don't cache a failure: configuring it later must work
+      throw e
+    })
+  }
   return zaiPromise as Promise<Awaited<ReturnType<typeof ZAI.create>>>
 }
 
@@ -145,6 +173,8 @@ async function fetchJsonWithRetry<T>(
   url: string,
   init: RequestInit,
   retries = 6,
+  /** pin every attempt to this worker (no hedging) — see WorkerFetchOptions.worker */
+  worker?: string,
 ): Promise<T> {
   const isBillingUrl = url.includes('billing.sud.uz')
   const isCaptchaUrl = url.includes('recaptcha.sud.uz')
@@ -169,10 +199,11 @@ async function fetchJsonWithRetry<T>(
         timeoutMs: isCaptchaUrl ? 10_000 : 8_000,
         hedgeMs: 900,
         maxAttempts: 2,
+        worker,
       })
       const elapsed = Date.now() - startTime
       const label = url.split('/').pop()?.split('?')[0] ?? url
-      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via scheduler)`)
+      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via ${worker ? workerHost(worker) : 'scheduler'})`)
 
       // 521/522/523 = origin down. The scheduler already hedges to another
       // worker (>=500 counts as a worker/origin failure) — if we still see it,
@@ -215,6 +246,14 @@ async function fetchJsonWithRetry<T>(
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(`fetch failed: ${url}`)
+}
+
+function workerHost(w: string): string {
+  try {
+    return new URL(w).hostname
+  } catch {
+    return w
+  }
 }
 
 class HttpError extends Error {
@@ -280,6 +319,8 @@ export type PhaseCallback = (phase: Phase, detail?: string) => void
 export async function getCaptchaToken(
   maxAttempts = 3,
   onPhase?: PhaseCallback,
+  /** keep the whole session (PoW → analyze → solve) on one worker */
+  worker?: string,
 ): Promise<string> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // 1. PoW challenge
@@ -297,6 +338,7 @@ export async function getCaptchaToken(
         body: JSON.stringify({ siteKey: SITE_KEY }),
       },
       3,
+      worker,
     )
 
     // 2. Solve PoW
@@ -330,6 +372,7 @@ export async function getCaptchaToken(
         }),
       },
       3,
+      worker,
     )
 
     console.log(`[captcha] analyze result: score=${analyze.score}, challengeRequired=${analyze.challengeRequired}, hasToken=${!!analyze.token}, hasChallenge=${!!analyze.challenge}`)
@@ -364,6 +407,7 @@ export async function getCaptchaToken(
             }),
           },
           3,
+          worker,
         )
         if (result.success && result.token) return result.token
       } catch (e) {
@@ -372,7 +416,9 @@ export async function getCaptchaToken(
         // can still succeed if the captcha score was high enough (no challenge
         // needed). The error falls through to the next attempt.
         const msg = e instanceof Error ? e.message : String(e)
-        if (msg.includes('ConnectionRefused') || msg.includes('Unable to connect')) {
+        if (/Configuration file not found|z-ai-config/.test(msg)) {
+          console.error('[captcha] VLM sozlanmagan — matematik captcha yechilmaydi. .env ga VLM_API_KEY va VLM_BASE_URL ni qoʻying (yoki .z-ai-config yarating), soʻng serverni qayta ishga tushiring.')
+        } else if (msg.includes('ConnectionRefused') || msg.includes('Unable to connect')) {
           console.error('[captcha] Vision API isqib bo\'lmadi (internal-api.z.ai). Matematika captchasini yechish o\'tkazib yuborildi.')
         } else {
           console.error(`[captcha] math challenge error: ${msg.slice(0, 150)}`)
@@ -424,9 +470,15 @@ export async function searchBillsByInn(
   const MAX_SEARCH_RETRIES = 3 // retry search with same token up to 6 times (for 521)
 
   let lastErr: unknown = null
+  const triedWorkers: string[] = []
   for (let tokenAttempt = 0; tokenAttempt < MAX_TOKEN_ATTEMPTS; tokenAttempt++) {
     onPhase?.('searching', tokenAttempt === 0 ? `STIR ${inn} uchun toʻlovlar qidirilmoqda…` : `Yangi captcha bilan qayta urinilmoqda (${tokenAttempt + 1}-urinish)…`)
-    const token = await getCaptchaToken(6, onPhase)
+    // One worker for this whole captcha session: PoW, analyze and the search all leave
+    // through the same egress, and the search is never hedged (it consumes the token).
+    // A rejected token is retried on the NEXT worker.
+    const worker = pickWorker(triedWorkers)
+    if (worker) triedWorkers.push(worker)
+    const token = await getCaptchaToken(6, onPhase, worker)
     const params = new URLSearchParams({
       passportNumber: '',
       inn,
@@ -450,6 +502,7 @@ export async function searchBillsByInn(
           searchUrl,
           { headers: searchHeaders },
           3, // fewer internal retries (fetchJsonWithRetry handles 521 rotation)
+          worker,
         )
         // billing answered with an error body instead of a bill list (e.g. HTTP 400/422:
         // captcha rejected, bad request). Returning it as a "result" made the caller

@@ -190,6 +190,14 @@ export interface WorkerFetchOptions {
   maxAttempts?: number
   /** Lane: default interactive; background scans yield to live lookups. */
   priority?: 'interactive' | 'background'
+  /**
+   * Pin this call to ONE worker: no hedged duplicate, no failover. Use it for a
+   * request that is not safe to repeat or must keep one egress — billing's captcha
+   * session (PoW → analyze → search): the search consumes a single-use token, so a
+   * hedged duplicate burns it, and its fast rejection can beat the original.
+   * A worker that is not in the current pool is ignored (normal scheduling).
+   */
+  worker?: string
 }
 function hostOf(t: string) {
   try {
@@ -197,6 +205,18 @@ function hostOf(t: string) {
   } catch {
     return t
   }
+}
+
+/**
+ * The best worker (health/load order) that is not in `exclude`. A caller that
+ * needs a session on one worker picks once and passes it as `opts.worker`; a
+ * retried session passes the workers it already used, so the retry leaves from a
+ * different worker (different egress). Once every worker was tried, the best one.
+ */
+export function pickWorker(exclude: string[] = []): string | undefined {
+  const order = orderedWorkers()
+  const fresh = order.filter((w) => !exclude.includes(w))
+  return (fresh.length ? fresh : order)[0]
 }
 
 /** A worker "worked" if it reached the origin — 2xx/3xx and definitive 4xx count.
@@ -287,8 +307,10 @@ async function attempt(
  */
 export async function fetchViaWorkers(target: string, opts: WorkerFetchOptions = {}): Promise<Response> {
   const origin = opts.originKey ?? hostOf(target)
-  const order = orderedWorkers()
-  const maxAttempts = Math.max(1, Math.min(opts.maxAttempts ?? 3, order.length || 1))
+  const pinned = opts.worker && getCfWorkerUrls().includes(opts.worker) ? opts.worker : undefined
+  const order = pinned ? [pinned] : orderedWorkers()
+  // pinned = exactly one attempt: nothing else may race it or re-send it
+  const maxAttempts = pinned ? 1 : Math.max(1, Math.min(opts.maxAttempts ?? 3, order.length || 1))
   const hedgeMs = opts.hedgeMs ?? 800
   const abort = new AbortController()
   const active = new Set<Promise<Response>>()
