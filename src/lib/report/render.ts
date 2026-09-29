@@ -18,6 +18,7 @@ import { formatDmy } from '@/core/dates'
 import { winRate as calcWinRate } from '@/core/rates'
 import {
   PIZZA_GEOM,
+  PIZZA_PAINT,
   PIZZA_STATUS_LABEL,
   PIZZA_STATUS_ORDER,
   pizzaModel,
@@ -89,7 +90,9 @@ function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
 function pizza(items: PizzaItem[], t: ReportTheme): string {
   const model = pizzaModel(items)
   const { cx, cy, r0 } = PIZZA_GEOM
-  const lostOp = t.dark ? 0.5 : 0.34
+  const lostOp = PIZZA_PAINT.lostOpacity(t.dark)
+  const hz = PIZZA_PAINT.hatch
+  const pd = PIZZA_PAINT.pending
   const paint = (status: PizzaStatus, col: string, hatch: string) =>
     status === 'won'
       ? `fill="${col}" stroke="${t.inset}" stroke-width="0.8"`
@@ -97,11 +100,11 @@ function pizza(items: PizzaItem[], t: ReportTheme): string {
         ? `fill="${col}" fill-opacity="${lostOp}" stroke="${t.inset}" stroke-width="0.8"`
         : status === 'neutral'
           ? `fill="url(#${hatch})" stroke="${t.inset}" stroke-width="0.8"`
-          : `fill="${col}" fill-opacity="0.07" stroke="${col}" stroke-width="1" stroke-dasharray="3 2.2"`
+          : `fill="${col}" fill-opacity="${pd.fillOpacity}" stroke="${col}" stroke-width="${pd.strokeWidth}" stroke-dasharray="${pd.dash}"`
   const defs = items
     .map(
       (it, i) =>
-        `<pattern id="rpz${i}" width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4.5" height="4.5" fill="${it.col}" fill-opacity="0.1"/><line x1="0" y1="0" x2="0" y2="4.5" stroke="${it.col}" stroke-width="1.8" stroke-opacity="0.75"/></pattern>`,
+        `<pattern id="rpz${i}" width="${hz.size}" height="${hz.size}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="${hz.size}" height="${hz.size}" fill="${it.col}" fill-opacity="${hz.groundOpacity}"/><line x1="0" y1="0" x2="0" y2="${hz.size}" stroke="${it.col}" stroke-width="${hz.stripeWidth}" stroke-opacity="${hz.stripeOpacity}"/></pattern>`,
     )
     .join('')
   const rings = model.rings
@@ -122,7 +125,8 @@ function pizza(items: PizzaItem[], t: ReportTheme): string {
         )
         .join('')
       const pill = `<rect x="${w.pill.x - 13}" y="${w.pill.y - 9}" width="26" height="18" rx="6" fill="${w.pill.fill}" stroke="${t.inset}" stroke-width="1.5"/><text x="${w.pill.x}" y="${w.pill.y + 4}" class="rp-pz-t" text-anchor="middle">${w.pill.v}</text>`
-      return `<g>${bands}${nums}${pill}</g>`
+      const split = w.split ? `<path d="${w.split}" fill="${t.inset}"/>` : ''
+      return `<g>${bands}${split}${nums}${pill}</g>`
     })
     .join('')
   const seams = model.seams
@@ -223,7 +227,7 @@ function profile(m: ReportModel): string {
     <div class="rp-block">${sec('Umumiy maʼlumot')}${kv(m.facts)}</div>
     <div>${right}</div>
   </section>
-  ${m.codes.length ? `<section class="rp-block">${sec('Faoliyat kodlari')}<div class="rp-wide">${kv(m.codes)}</div></section>` : ''}`
+  ${m.codes.length ? `<section class="rp-block rp-avoid">${sec('Faoliyat kodlari')}<div class="rp-wide">${kv(m.codes)}</div></section>` : ''}`
 }
 
 function founders(m: ReportModel, t: ReportTheme): string {
@@ -347,14 +351,15 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   :root { --bg:${t.bg}; --ps:${t.surface}; --in:${t.inset}; --t1:${t.t1}; --t2:${t.t2}; --t3:${t.t3}; --bd:${t.border}; --bs:${t.borderSoft}; --a:${t.accent}; --at:${t.accentText}; --as:${t.accentSoft}; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { background: var(--bg); }
-  body { font-family: ${fontStack}; font-size: 11.5px; line-height: 1.45; color: var(--t1); }
+  body { font-family: ${fontStack}; font-size: 11.5px; line-height: 1.5; -webkit-font-smoothing: antialiased; color: var(--t1); }
+  b, strong { font-weight: 600; }
   .m { font-family: ${monoStack}; font-variant-numeric: tabular-nums; }
 
   /* page: the table's thead/tfoot repeat on every printed page */
   /* the bottom margin band holds the page number where the browser supports margin boxes
      (Chrome/Edge 131+). It MUST be painted with @page background: by default the margin band
      stays white, which shows as a bright strip in dark mode. */
-  @page { size: A4; margin: 0 0 9mm; background: ${t.bg}; @bottom-right { content: counter(page) " / " counter(pages); font: 600 8.5px ${fontStack}; color: ${t.t3}; padding-right: 12mm; vertical-align: top; padding-top: 2mm; } }
+  @page { size: A4; margin: 0 0 9mm; background: ${t.bg}; @bottom-right { content: counter(page) " / " counter(pages); font: 500 8.5px ${fontStack}; color: ${t.t3}; padding-right: 12mm; vertical-align: top; padding-top: 2mm; } }
   table.rp { width: 210mm; margin: 0 auto; border-collapse: collapse; }
   table.rp > thead > tr > td { padding: 9mm 12mm 5mm; }
   table.rp > tbody > tr > td { padding: 0 12mm; vertical-align: top; }
@@ -367,10 +372,10 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-brand { display: flex; align-items: center; gap: 9px; }
   .rp-brand .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--a); color: var(--at); display: grid; place-items: center; }
   .rp-brand .logo svg { width: 16px; height: 16px; }
-  .rp-brand b { display: block; font-size: 13px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+  .rp-brand b { display: block; font-size: 13px; font-weight: 700; letter-spacing: -.01em; line-height: 1.1; }
   .rp-brand small { display: block; font-size: 8.5px; color: var(--t3); letter-spacing: .04em; }
   .rp-head-r { text-align: right; font-size: 10px; color: var(--t2); line-height: 1.35; }
-  .rp-head-r b { display: block; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--a); }
+  .rp-head-r b { display: block; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--a); }
 
   /* running footer */
   .rp-foot { padding-top: 6px; border-top: 1px solid var(--bs); font-size: 8.5px; line-height: 1.4; color: var(--t3); }
@@ -378,10 +383,10 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   /* hero */
   .rp-hero { display: flex; justify-content: space-between; gap: 18px; padding: 16px 0 12px; }
   .rp-hero-l { flex: 1; min-width: 0; }
-  .rp-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
-  .rp-hero h1 { margin-top: 5px; font-size: 25px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; overflow-wrap: anywhere; }
+  .rp-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
+  .rp-hero h1 { margin-top: 5px; font-size: 25px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; overflow-wrap: anywhere; }
   .rp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .rp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+  .rp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 600; }
   .rp-pill i { width: 6px; height: 6px; border-radius: 50%; }
   .rp-hero-r { width: 132px; flex: none; }
   .rp-rate { text-align: center; padding: 8px 8px 9px; border: 1px solid var(--bd); border-radius: 14px; background: var(--in); }
@@ -389,32 +394,32 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-rate-c { margin-top: 5px; font-size: 8.5px; color: var(--t3); line-height: 1.3; }
   .rp-rate-none { padding: 22px 8px; border-style: dashed; background: transparent; }
   .rp-gauge { display: block; width: 100%; height: auto; }
-  .rp-gauge-n { font: 800 26px ${fontStack}; }
+  .rp-gauge-n { font: 700 26px ${fontStack}; }
 
   /* KPI tiles */
   .rp-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 2px 0 6px; }
   .rp-kpis-3 { grid-template-columns: repeat(3, 1fr); }
   .rp-kpi { padding: 10px 12px; border: 1px solid var(--bd); border-radius: 12px; background: var(--as); break-inside: avoid; }
-  .rp-kpi .l { font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--a); }
-  .rp-kpi .v { margin-top: 4px; font-size: 21px; line-height: 1.1; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .rp-kpi .l { font-size: 8.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--a); }
+  .rp-kpi .v { margin-top: 4px; font-size: 21px; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .rp-kpi .v[data-neg] { color: ${t.tone.neg.fg}; }
   .rp-kpi .s { margin-top: 3px; font-size: 9.5px; color: var(--t2); }
 
   /* section label: uppercase accent + hairline rule (same as the app's PDF) */
-  .rp-sec { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 9.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--a); break-after: avoid; }
+  .rp-sec { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--a); break-after: avoid; }
   .rp-sec::after { content: ""; order: 1; flex: 1; height: 1px; background: var(--bs); }
-  .rp-sec em { order: 2; font-style: normal; font-weight: 700; letter-spacing: .02em; text-transform: none; color: var(--t3); font-size: 9.5px; }
-  .rp-block { margin-top: 16px; }
+  .rp-sec em { order: 2; font-style: normal; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--t3); font-size: 9.5px; }
+  .rp-block { margin-top: 20px; }
   .rp-avoid { break-inside: avoid; }
   .rp-two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0 16px; }
   .rp-two .rp-block:first-child, .rp-two > div > .rp-block:first-child { margin-top: 16px; }
 
   /* zebra key / value rows */
   .rp-kv { border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; }
-  .rp-kv > div { display: grid; grid-template-columns: 34mm minmax(0, 1fr); gap: 10px; padding: 6px 10px; font-size: 10.5px; align-items: baseline; break-inside: avoid; }
+  .rp-kv > div { display: grid; grid-template-columns: 34mm minmax(0, 1fr); gap: 10px; padding: 7px 10px; font-size: 10.5px; align-items: baseline; break-inside: avoid; }
   .rp-kv > div:nth-child(even) { background: var(--in); }
   .rp-kv .k { color: var(--t2); }
-  .rp-kv .v { font-weight: 600; overflow-wrap: anywhere; }
+  .rp-kv .v { font-weight: 500; overflow-wrap: anywhere; }
   .rp-two .rp-kv > div { grid-template-columns: 29mm minmax(0, 1fr); }
   .rp-wide .rp-kv > div { grid-template-columns: 52mm minmax(0, 1fr); }
 
@@ -426,8 +431,8 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-founders > div { display: flex; align-items: center; gap: 9px; padding: 5px 2px; border-bottom: 1px solid var(--bs); font-size: 10.5px; }
   .rp-founders > div:last-child { border-bottom: 0; }
   .rp-founders i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
-  .rp-founders .n { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-  .rp-founders .p { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .rp-founders .n { flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+  .rp-founders .p { font-weight: 700; font-variant-numeric: tabular-nums; }
 
   /* court cases */
   .rp-court-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -435,28 +440,28 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   /* signature: the verdict wheel */
   .rp-sig-card { display: grid; grid-template-columns: 76mm minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 18px 8px 4px; border: 1px solid var(--bd); border-radius: 14px; background: var(--in); }
   .rp-pie { display: block; width: 100%; height: auto; }
-  .rp-pz-t { font: 700 11px ${monoStack}; fill: #fff; }
-  .rp-pz-w { font: 700 10.5px ${monoStack}; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6px; paint-order: stroke; }
-  .rp-pz-n { font: 600 10px ${monoStack}; fill: var(--t2); stroke: var(--in); stroke-opacity: .85; stroke-width: 1.6px; paint-order: stroke; }
+  .rp-pz-t { font: 600 11px ${monoStack}; fill: #fff; }
+  .rp-pz-w { font: 600 10.5px ${monoStack}; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6px; paint-order: stroke; }
+  .rp-pz-n { font: 500 10px ${monoStack}; fill: var(--t2); stroke: var(--in); stroke-opacity: .85; stroke-width: 1.6px; paint-order: stroke; }
   .rp-rate-big { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--bs); }
-  .rp-rate-big b { font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .rp-rate-big span { font-size: 10.5px; font-weight: 700; color: var(--t2); line-height: 1.3; }
+  .rp-rate-big b { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .rp-rate-big span { font-size: 10.5px; font-weight: 600; color: var(--t2); line-height: 1.3; }
   .rp-rate-big small { display: block; font-size: 9px; font-weight: 500; color: var(--t3); }
   .rp-slices > div { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bs); font-size: 11px; }
   .rp-slices i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .rp-slices .n { flex: 1; min-width: 0; }
-  .rp-slices b { font: 700 12px ${monoStack}; font-variant-numeric: tabular-nums; }
+  .rp-slices b { font: 600 12px ${monoStack}; font-variant-numeric: tabular-nums; }
   .rp-slices .p { width: 34px; text-align: right; color: var(--t3); font-size: 10px; font-variant-numeric: tabular-nums; }
   .rp-stkey { display: flex; flex-wrap: wrap; gap: 5px 14px; padding-top: 9px; font-size: 9.5px; color: var(--t2); --sw: ${t.ramp[1]}; }
   .rp-stkey span { display: inline-flex; align-items: center; gap: 5px; }
-  .rp-stkey b { font-weight: 800; color: var(--t1); font-variant-numeric: tabular-nums; }
+  .rp-stkey b { font-weight: 700; color: var(--t1); font-variant-numeric: tabular-nums; }
   .rp-st { display: inline-block; width: 12px; height: 9px; border-radius: 3px; }
   .rp-st.won { background: var(--sw); }
   .rp-st.lost { background: color-mix(in srgb, var(--sw) ${t.dark ? 50 : 34}%, transparent); }
-  .rp-st.neutral { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--sw) 75%, transparent) 0 1.4px, color-mix(in srgb, var(--sw) 10%, transparent) 1.4px 3.4px); }
-  .rp-st.pending { background: color-mix(in srgb, var(--sw) 7%, transparent); border: 1.2px dashed var(--sw); box-sizing: border-box; }
+  .rp-st.neutral { background: repeating-linear-gradient(45deg, var(--sw) 0 1.5px, color-mix(in srgb, var(--sw) 16%, transparent) 1.5px 3.6px); }
+  .rp-st.pending { background: color-mix(in srgb, var(--sw) 16%, transparent); border: 1.2px dashed var(--sw); box-sizing: border-box; }
   .rp-side { padding-left: 14px; border-left: 1px solid var(--bs); }
-  .rp-mini-h { margin-bottom: 6px; font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
+  .rp-mini-h { break-after: avoid; margin-bottom: 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
   .rp-role { display: flex; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--t2); }
   .rp-role i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
   .rp-role b { color: var(--t1); margin-left: 3px; }
@@ -467,15 +472,15 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-sub { margin-top: 14px; }
   .rp-results > div { display: grid; grid-template-columns: minmax(0, 1fr) 24px 32mm 40px; gap: 10px; align-items: center; padding: 4.5px 0; border-bottom: 1px solid var(--bs); font-size: 10.5px; break-inside: avoid; }
   .rp-results > div:last-child { border-bottom: 0; }
-  .rp-results .c { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .rp-results .c { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
   .rp-results .p { text-align: right; color: var(--t3); font-variant-numeric: tabular-nums; }
   .rp-months { display: block; width: 100%; height: auto; }
-  .rp-bar-v { font: 700 10px ${fontStack}; }
-  .rp-bar-l { font: 600 9.5px ${fontStack}; }
+  .rp-bar-v { font: 600 10px ${fontStack}; }
+  .rp-bar-l { font: 500 9.5px ${fontStack}; }
 
   /* tables */
   .rp-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; font-size: 9.5px; }
-  .rp-table th { text-align: left; padding: 6px 8px; font-size: 8px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--at); background: var(--a); }
+  .rp-table th { text-align: left; padding: 6px 8px; font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--at); background: var(--a); }
   .rp-table td { padding: 6px 8px; border-top: 1px solid var(--bs); vertical-align: top; overflow-wrap: anywhere; }
   .rp-table tbody tr:nth-child(even) td { background: var(--in); }
   .rp-table tr { break-inside: avoid; }
@@ -483,13 +488,13 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-table .nw { white-space: nowrap; }
   .rp-table .sub { display: block; margin-top: 2px; font-size: 8.5px; color: var(--t3); }
   .rp-table .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-  .rp-table .role { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-right: 6px; border-radius: 4px; background: var(--as); color: var(--a); font-size: 8px; font-weight: 800; vertical-align: 1px; }
+  .rp-table .role { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-right: 6px; border-radius: 4px; background: var(--as); color: var(--a); font-size: 8px; font-weight: 700; vertical-align: 1px; }
   .rp-legend-note { margin-top: 5px; font-size: 8.5px; color: var(--t3); }
 
   /* hearings */
   .rp-hearings > div { display: flex; align-items: center; gap: 14px; padding: 8px 12px; margin-bottom: 6px; border: 1px solid var(--bd); border-left: 3px solid var(--a); border-radius: 10px; background: var(--in); break-inside: avoid; }
   .rp-hearings .d { width: 26mm; flex: none; }
-  .rp-hearings .d b { display: block; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .rp-hearings .d b { display: block; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .rp-hearings .d span { font-size: 10px; color: var(--t2); }
   .rp-hearings .w { flex: 1; min-width: 0; }
   .rp-hearings .w b { display: block; font-size: 11px; }
