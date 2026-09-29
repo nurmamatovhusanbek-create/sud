@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { OrdersLoader } from "@/components/shell/orders-loader";
+import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
 import "./globals.css";
 import "./prototype.css";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
           {children}
         </ThemeProvider>
         <OrdersLoader />
+        <OrdersAutoCheck />
         <Toaster position="bottom-right" closeButton />
       </body>
     </html>

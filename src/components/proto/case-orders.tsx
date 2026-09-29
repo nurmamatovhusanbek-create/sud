@@ -62,10 +62,10 @@ export function CaseOrders({ caseNumber, courtType, decisions }: { caseNumber: s
     )
   }
 
-  const { orders, checked, coverage } = state.data
+  const { orders, checked } = state.data
   const view = splitDecisions(decisions, orders)
   // «none published» is only an answer once the library was actually asked about this case
-  const looked = !!checked || coverage.complete
+  const looked = !!checked
   const lookupFailed = !!checked?.error && !orders.length
 
   const open = async (pdfId: string, name: string) => {
@@ -81,7 +81,7 @@ export function CaseOrders({ caseNumber, courtType, decisions }: { caseNumber: s
 
   const check = async () => {
     setQueueing(true)
-    const r = await fetchPublicOrders([{ caseNumber, courtType }])
+    const r = await fetchPublicOrders([{ caseNumber, courtType }], { force: true })
     setQueueing(false)
     if (!r.ok) toast.error(r.error)
     else {
@@ -149,8 +149,8 @@ export function CaseOrders({ caseNumber, courtType, decisions }: { caseNumber: s
           <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
             <span>
               {looked && !lookupFailed
-                ? 'Bu ish boʻyicha eʼlon qilingan qaror topilmadi.'
-                : `Bu ish public.sud.uz da tekshirilmagan${coverage.indexed ? ` (kutubxona ${dmy(coverage.since)} → ${dmy(coverage.until)})` : ''}.`}
+                ? `Bu ish boʻyicha eʼlon qilingan qaror topilmadi (${dmy(checked!.at.slice(0, 10))} da tekshirilgan; ish oʻzgarsa yoki eʼlon kechiksa qayta tekshiriladi).`
+                : 'Bu ish public.sud.uz da tekshirilmagan.'}
             </span>
             {(!looked || lookupFailed) && checkBtn}
           </div>

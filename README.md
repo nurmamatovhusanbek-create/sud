@@ -89,12 +89,14 @@ out is stated in place on the page instead of printing a misleading zero. Sectio
 data source (subsidiaries, licences, audits, pledges, trademarks…) are intentionally left out.
 Page numbers need Chrome/Edge 131+.
 
-**Qarorlar (published court orders)** — the *Qarorlar* button on Sud ishlari (or *Tekshirish* in a case drawer) looks
-up the published orders of the listed cases on public.sud.uz **in the background**, one case at a time, and keeps the
-results in a small local cache. A small pill at the bottom of every screen shows «N qaror yuklanmoqda» while it works,
-so you can keep using the app. A case drawer then shows two cards: *Eʼlon qilingan qarorlar* (instance, court, judge,
-result, PDF on click) and *Eʼlon qilinmagan qarorlar* (decisions the court data gives us that have no published order).
-A full-library copy exists in Settings › Qarorlar but is optional and heavy on disk.
+**Qarorlar (published court orders)** — only for the cases you care about. On the Kuzatuv page, *Qarorlarni tekshirish*
+(or the *Boʻsh vaqtda avto* switch, which runs it while the app is idle and open) looks up the published orders of every
+case of the watched companies on public.sud.uz **in the background** and keeps them in a small local cache; the Sud ishlari
+*Qarorlar* button and a drawer's *Tekshirish* do the same for one list or case. A published order never changes, so it is
+fetched once and never asked about again; a case is looked at again only when its status changes (e.g. appealed) or after a
+short publication-lag back-off. A pill at the bottom of every screen shows «N qaror yuklanmoqda» while it works. A case
+drawer shows *Eʼlon qilingan qarorlar* (instance, court, judge, result, PDF on click) and *Eʼlon qilinmagan qarorlar*
+(decisions the court data gives us that have no published order). There is no full-library copy.
 
 **Hujjat tayyorlash** — from a case drawer, the court petitions (nusxa olish, majlisni qoldirish) open in Hujjatlar
 already filled with that case's court, judge, number, claimant, subject and next hearing (Cyrillic converted to Latin).

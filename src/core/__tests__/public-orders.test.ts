@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
   addDays,
+  caseSignature,
+  CHECK_BACKOFF_MS,
   classifyPublicResult,
   compactPublication,
   daysBetween,
@@ -8,8 +10,10 @@ import {
   normalizeCaseNumber,
   parseMultipartFile,
   pdfFileName,
+  planCheck,
   sortOrders,
   splitDecisions,
+  type CaseCheck,
   type StoredOrder,
 } from '../public-orders'
 
@@ -136,5 +140,47 @@ describe('splitDecisions — published PDFs vs decisions we only know from the c
   })
   test('a published order without a case-data decision keeps decision = null', () => {
     expect(splitDecisions([], [pub('CASSATION', 'c')]).published[0].decision).toBeNull()
+  })
+})
+
+describe('planCheck — published orders are permanent; only a changed case or a publication lag justifies asking again', () => {
+  const D = 86_400_000
+  const T0 = Date.parse('2026-06-10T00:00:00Z')
+  const prev = (over: Partial<CaseCheck> = {}): CaseCheck => ({ caseNumber: 'x', at: new Date(T0).toISOString(), sig: 'a|b|c', seen: [], misses: 0, ...over })
+
+  test('never checked → check all three instances', () => {
+    expect(planCheck(null, 's', T0)).toEqual({ run: true, instances: ['FIRST', 'APPEAL', 'CASSATION'], reason: 'new' })
+  })
+  test('instances that already have an order are never asked again', () => {
+    const p = planCheck(prev({ seen: ['FIRST'], sig: 'old' }), 'new', T0 + 1)
+    expect(p).toMatchObject({ run: true, reason: 'sig-changed' })
+    expect(p.instances).toEqual(['APPEAL', 'CASSATION'])
+  })
+  test('all instances published → done for good, even if the case changes', () => {
+    expect(planCheck(prev({ seen: ['FIRST', 'APPEAL', 'CASSATION'] }), 'changed', T0 + 99 * D)).toMatchObject({ run: false, reason: 'done' })
+  })
+  test('unchanged case, nothing found: wait out the publication lag (3 d, then 14 d, then 45 d, then stop)', () => {
+    const at = (misses: number, age: number) => planCheck(prev({ misses }), 'a|b|c', T0 + age)
+    expect(at(0, 2 * D).run).toBe(false)
+    expect(at(0, 3 * D)).toMatchObject({ run: true, reason: 'backoff' })
+    expect(at(1, 10 * D).run).toBe(false)
+    expect(at(1, 14 * D).run).toBe(true)
+    expect(at(2, 44 * D).run).toBe(false)
+    expect(at(2, 45 * D).run).toBe(true)
+    expect(at(CHECK_BACKOFF_MS.length, 999 * D)).toMatchObject({ run: false, reason: 'waiting' }) // exhausted
+  })
+  test('a changed case is re-checked at once, even after the back-off ran out', () => {
+    expect(planCheck(prev({ misses: 3 }), 'appealed', T0 + 60_000)).toMatchObject({ run: true, reason: 'sig-changed' })
+  })
+  test('a failed check is retried after 10 minutes, not immediately', () => {
+    expect(planCheck(prev({ error: 'timeout' }), 'a|b|c', T0 + 5 * 60_000).run).toBe(false)
+    expect(planCheck(prev({ error: 'timeout' }), 'a|b|c', T0 + 11 * 60_000)).toMatchObject({ run: true, reason: 'retry-error' })
+  })
+  test('force re-checks the missing instances regardless', () => {
+    expect(planCheck(prev(), 'a|b|c', T0 + 1, true)).toMatchObject({ run: true, reason: 'forced' })
+  })
+  test('the signature moves with the case and ignores case/space noise', () => {
+    expect(caseSignature({ caseStatus: ' Ko‘rilmoqda ', result: '', hearingDate: '02.10.2026' })).toBe(caseSignature({ caseStatus: 'ko‘rilmoqda', result: '', hearingDate: '02.10.2026' }))
+    expect(caseSignature({ caseStatus: 'A', result: '', hearingDate: '' })).not.toBe(caseSignature({ caseStatus: 'A', result: 'Apellyatsiya', hearingDate: '' }))
   })
 })

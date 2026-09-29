@@ -8,14 +8,15 @@
  */
 
 import { winRate } from '@/core/rates'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
+import { autoEnabled, checkWatchlistOrders, runnerSnapshot, setAutoEnabled, stopWatchlistCheck, subscribeRunner } from '@/lib/orders-watchlist'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -77,6 +78,8 @@ export function WatchlistView() {
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const rv = useRegistryVersion()
+  const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
+  const [autoOrders, setAutoOrders] = useState(true)
   const [hydrated, setHydrated] = useState(false)
   const [tick, setTick] = useState(0)
   const enrichedRef = useRef<Set<string>>(new Set())
@@ -150,6 +153,10 @@ export function WatchlistView() {
       throw new Error('enrichment failed: both sources unavailable')
     }
   }).current
+
+  useEffect(() => {
+    if (hydrated) setAutoOrders(autoEnabled())
+  }, [hydrated])
 
   useEffect(() => {
     if (!hydrated) return
@@ -348,6 +355,30 @@ export function WatchlistView() {
         <h2>Kuzatuvdagi kompaniyalar</h2>
         <span className="count">{items.length}</span>
         <div className="sp" />
+        <label
+          className="faint"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}
+          title="Ilova ishlatilmayotganda kuzatuvdagi kompaniyalar qarorlarini oʻzi tekshiradi"
+        >
+          <input
+            type="checkbox"
+            checked={autoOrders}
+            onChange={(e) => {
+              setAutoOrders(e.target.checked)
+              setAutoEnabled(e.target.checked)
+            }}
+          />
+          Boʻsh vaqtda avto
+        </label>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={items.length === 0}
+          title="Kuzatuvdagi kompaniyalar ishlarining eʼlon qilingan qarorlarini fonda yuklash"
+          onClick={() => (runner.phase === 'collecting' ? stopWatchlistCheck() : void checkWatchlistOrders({ auto: false }))}
+        >
+          {runner.phase === 'collecting' ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <FileText />}
+          <span>{runner.phase === 'collecting' ? 'Toʻxtatish' : 'Qarorlarni tekshirish'}</span>
+        </button>
         <button
           className="btn btn-outline btn-sm"
           onClick={() => {

@@ -2,22 +2,24 @@ import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
 import { enqueueCases, pauseCases } from '@/lib/public-orders/company-job'
 import { normalizeCaseNumber, PUBLIC_COURT_OF, PUBLIC_COURT_TYPES, type PublicCourtType } from '@/core/public-orders'
+import type { JobCase } from '@/lib/public-orders/engine'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const CASE_NUMBER_RE = /^\d+-[\d-]+\/\d+$/
-const MAX_CASES = 500
+const MAX_CASES = 1500
 
 /**
  * POST /api/public-orders/fetch
- *   { action: 'start', cases: [{ caseNumber, courtType }] }   courtType: economic|civil|administrative (or the API's ECONOMIC…)
+ *   { action: 'start', force?: boolean, cases: [{ caseNumber, courtType, sig? }] }
+ *      courtType: economic|civil|administrative (or the API's ECONOMIC…); sig = caseSignature() of the case data
  *   { action: 'pause' }
  * Queues the given cases for a BACKGROUND lookup of their published orders and returns at once; the global
  * loader and the case drawer follow progress through /status. Requests join one queue.
  */
 export const POST = guard(async (req) => {
-  let body: { action?: string; cases?: unknown } = {}
+  let body: { action?: string; cases?: unknown; force?: unknown } = {}
   try {
     body = await req.json()
   } catch {
@@ -26,13 +28,14 @@ export const POST = guard(async (req) => {
   if (body.action === 'pause') return jsonOk({ job: pauseCases() })
   if (body.action !== 'start' || !Array.isArray(body.cases)) return jsonFail("action 'start' + cases yoki 'pause' kerak", 'bad_request', 400)
 
-  const cases: { caseNumber: string; courtType: PublicCourtType }[] = []
-  for (const c of body.cases.slice(0, MAX_CASES) as { caseNumber?: unknown; courtType?: unknown }[]) {
+  const cases: JobCase[] = []
+  for (const c of body.cases.slice(0, MAX_CASES) as { caseNumber?: unknown; courtType?: unknown; sig?: unknown }[]) {
     const caseNumber = normalizeCaseNumber(typeof c?.caseNumber === 'string' ? c.caseNumber : '')
     const ct = typeof c?.courtType === 'string' ? c.courtType : ''
     const courtType = (PUBLIC_COURT_OF as Record<string, PublicCourtType>)[ct] ?? ((PUBLIC_COURT_TYPES as string[]).includes(ct) ? (ct as PublicCourtType) : null)
-    if (CASE_NUMBER_RE.test(caseNumber) && courtType) cases.push({ caseNumber, courtType })
+    const sig = typeof c?.sig === 'string' ? c.sig.slice(0, 300) : ''
+    if (CASE_NUMBER_RE.test(caseNumber) && courtType) cases.push({ caseNumber, courtType, sig })
   }
   if (!cases.length) return jsonFail('Yaroqli ish raqami topilmadi', 'bad_request', 400)
-  return jsonOk({ job: enqueueCases(cases), queued: cases.length })
+  return jsonOk({ job: enqueueCases(cases, { force: body.force === true }), queued: cases.length })
 })

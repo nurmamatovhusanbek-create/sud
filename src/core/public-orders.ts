@@ -206,3 +206,61 @@ export function splitDecisions(known: KnownDecision[], published: StoredOrder[])
     unpublished: known.filter((d) => !have.has(d.instance)),
   }
 }
+
+// ---- when does a case need (re)checking? ------------------------------------------------------
+//
+// A published order never goes away, so a case's found orders are permanent: they are never asked for again.
+// What CAN change is the case itself — an appeal or cassation adds a new instance, and a decision may be
+// published days or weeks after it is made. So a case is re-checked only when (a) it was never checked,
+// (b) its case data changed (its «signature»), or (c) nothing was found yet and a back-off has elapsed
+// (the publication lag: 3 days, then 14, then 45; after that it waits for the case to change).
+
+/** The instances a case can have orders in; searched separately because the filtered search is far faster. */
+export const LOOKUP_INSTANCES = ['FIRST', 'APPEAL', 'CASSATION'] as const
+
+export const CHECK_BACKOFF_MS = [3, 14, 45].map((d) => d * 86_400_000)
+export const RETRY_ERROR_AFTER_MS = 10 * 60_000
+
+/** What we remember about one case's library lookups. */
+export interface CaseCheck {
+  caseNumber: string
+  /** ISO time of the last attempt */
+  at: string
+  /** the case-data signature at that time */
+  sig: string
+  /** instances with a published order — permanent */
+  seen: string[]
+  /** consecutive full checks that found nothing new (drives the back-off) */
+  misses: number
+  /** set when the last attempt failed (network/timeout) */
+  error?: string
+}
+
+/** Changes whenever the case moves on (status, outcome, next hearing) — the trigger for a re-check. */
+export function caseSignature(c: { caseStatus?: string; result?: string; hearingDate?: string }): string {
+  const n = (v: string | undefined) => clean(v ?? '').toLowerCase()
+  return [n(c.caseStatus), n(c.result), n(c.hearingDate)].join('|')
+}
+
+export type CheckReason = 'new' | 'forced' | 'retry-error' | 'sig-changed' | 'backoff' | 'done' | 'waiting'
+
+export interface CheckPlan {
+  run: boolean
+  /** the instances still worth asking about (published ones are never re-asked) */
+  instances: string[]
+  reason: CheckReason
+}
+
+export function planCheck(prev: CaseCheck | null, sig: string, now: number, force = false): CheckPlan {
+  const seen = new Set(prev?.seen ?? [])
+  const instances = LOOKUP_INSTANCES.filter((i) => !seen.has(i)) as string[]
+  if (!prev) return { run: true, instances, reason: 'new' }
+  if (!instances.length) return { run: false, instances, reason: 'done' } // every instance already published: permanent
+  if (force) return { run: true, instances, reason: 'forced' }
+  const age = now - Date.parse(prev.at)
+  if (prev.error) return age >= RETRY_ERROR_AFTER_MS ? { run: true, instances, reason: 'retry-error' } : { run: false, instances, reason: 'waiting' }
+  if (sig !== prev.sig) return { run: true, instances, reason: 'sig-changed' }
+  const wait = CHECK_BACKOFF_MS[prev.misses]
+  if (wait !== undefined && age >= wait) return { run: true, instances, reason: 'backoff' }
+  return { run: false, instances, reason: 'waiting' }
+}

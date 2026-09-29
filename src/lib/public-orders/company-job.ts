@@ -6,15 +6,16 @@ import type { CaseJobStatus } from './types'
 import { normalizeCaseNumber } from '@/core/public-orders'
 
 /**
- * Background download of the published orders of the cases the user asked for (one company's list, or one
- * case). Small by design: it only touches those cases — no library crawl, no big index. One case at a time
- * (its 3 instance searches run in parallel); new requests join the queue, so the user can press download on
- * several companies and keep working. State is in-process (globalThis, survives dev hot reloads); the
- * «checked» markers on disk make a restart cheap — finished cases are skipped.
+ * Background download of the published orders of the cases the user asked for (a company's list, the whole
+ * watchlist, or one case). One case at a time (its instance searches run in parallel); new requests join
+ * the queue, so the user can keep working. Whether a case actually needs a request is decided by the
+ * policy in core/public-orders (planCheck): published orders are permanent and only a changed case or a
+ * publication-lag back-off triggers another look — so re-running this over the same cases is cheap.
+ * State is in-process (globalThis, survives dev hot reloads); the per-case records on disk survive restarts.
  */
 
 interface Holder {
-  queue: JobCase[]
+  queue: (JobCase & { force?: boolean })[]
   queued: Set<string>
   status: CaseJobStatus
   running: boolean
@@ -28,26 +29,26 @@ const holder = (): Holder =>
     queued: new Set(),
     running: false,
     paused: false,
-    status: { state: 'idle', total: 0, done: 0, found: 0, errors: 0, current: null, startedAt: null, lastError: null },
+    status: { state: 'idle', total: 0, done: 0, searched: 0, found: 0, errors: 0, current: null, startedAt: null, lastError: null },
   })
 
 export const caseJobStatus = (): CaseJobStatus => ({ ...holder().status })
 
-export function enqueueCases(cases: JobCase[]): CaseJobStatus {
+export function enqueueCases(cases: JobCase[], opts: { force?: boolean } = {}): CaseJobStatus {
   const h = holder()
   let added = 0
   for (const c of cases) {
     const cn = normalizeCaseNumber(c.caseNumber)
     if (!cn || h.queued.has(cn)) continue
     h.queued.add(cn)
-    h.queue.push({ ...c, caseNumber: cn })
+    h.queue.push({ ...c, caseNumber: cn, force: opts.force })
     added++
   }
   if (!added && h.running) return caseJobStatus()
   h.paused = false
   if (!h.running) {
     // a fresh run resets the counters; joining an active run just raises `total`
-    h.status = { state: 'running', total: h.queue.length, done: 0, found: 0, errors: 0, current: null, startedAt: new Date().toISOString(), lastError: null }
+    h.status = { state: 'running', total: h.queue.length, done: 0, searched: 0, found: 0, errors: 0, current: null, startedAt: new Date().toISOString(), lastError: null }
     void loop()
   } else h.status.total += added
   return caseJobStatus()
@@ -66,9 +67,23 @@ async function loop() {
   try {
     while (h.queue.length && !h.paused) {
       const job = h.queue.shift()!
-      h.status.current = job.caseNumber
       try {
-        const r = await lookupCase({ search: searchCase, append: appendOrders, getChecked, markChecked, now: () => new Date() }, job)
+        // a skipped case makes no request and must not flash in the loader: only name what is really searched
+        const r = await lookupCase(
+          {
+            search: (cn, ct, inst) => {
+              h.status.current = cn
+              return searchCase(cn, ct, inst)
+            },
+            append: appendOrders,
+            getChecked,
+            markChecked,
+            now: () => new Date(),
+          },
+          job,
+          { force: job.force },
+        )
+        if (!r.skipped) h.status.searched++
         h.status.found += r.found
         if (r.error) {
           h.status.errors++

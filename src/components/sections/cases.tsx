@@ -23,7 +23,7 @@ import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSo
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
-import type { KnownDecision } from '@/core/public-orders'
+import { caseSignature, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValues, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
@@ -657,9 +657,9 @@ export function CasesSection() {
 
   const downloadOrders = () => {
     void (async () => {
-      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => ({ caseNumber: c.caseNumber, courtType })))
+      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => ({ caseNumber: c.caseNumber, courtType, sig: caseSignature({ result: c.result }) })))
       if (!r.ok) toast.error(r.error)
-      else toast.success(`${r.data.queued} ta ish uchun qarorlar yuklanmoqda — boshqa ishingizni davom ettiring`)
+      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi — allaqachon maʼlum boʻlganlari oʻtkazib yuboriladi, boshqa ishingizni davom ettiring`)
     })()
   }
 

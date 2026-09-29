@@ -31,37 +31,6 @@ async function fetchUpstream(path: string, opts: { timeoutMs: number; background
   })
 }
 
-export interface ListPage {
-  rows: RawPublication[]
-  /** the API's own count for this window (null when it reports none) */
-  total: number | null
-}
-
-export interface ListParams {
-  courtType: PublicCourtType
-  /** inclusive ISO days */
-  startDate: string
-  endDate: string
-  page: number
-  size?: number
-}
-
-/** One page of a date window — the fast, indexed query (≈0.1–0.2 s for 100 rows). */
-export async function listPage(p: ListParams): Promise<ListPage> {
-  const qs = new URLSearchParams({
-    court_type: p.courtType,
-    startDate: p.startDate,
-    endDate: p.endDate,
-    size: String(p.size ?? 100),
-    page: String(p.page),
-  })
-  const res = await fetchUpstream(`/publications/list?${qs}`, { timeoutMs: 30_000, background: true })
-  if (!res.ok) throw new Error(`public.sud.uz list: HTTP ${res.status}`)
-  const json = (await res.json()) as { content?: RawPublication[]; totalElements?: number | null }
-  if (!json || !Array.isArray(json.content)) throw new Error('public.sud.uz list: unexpected response shape')
-  return { rows: json.content, total: typeof json.totalElements === 'number' ? json.totalElements : null }
-}
-
 /** The raw multipart-wrapped order file (see core/public-orders.ts → parseMultipartFile). */
 export async function fetchOrderFile(pdfId: string): Promise<Uint8Array> {
   const res = await fetchUpstream(`/public/onStream/${pdfId}`, { timeoutMs: 45_000, background: false })
