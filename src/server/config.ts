@@ -123,6 +123,8 @@ export const config = {
   vlm: {
     apiKey: requiredIn('production', 'VLM_API_KEY'),
     baseUrl: str('VLM_BASE_URL', ''),
+    /** optional X-Token header some z.ai deployments require */
+    token: str('VLM_TOKEN', ''),
   },
 
   /** Side-processes (blueprint §2, §5). Toggles + endpoints, not hardcoded. */

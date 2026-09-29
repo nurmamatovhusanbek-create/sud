@@ -152,6 +152,17 @@ is required in production.
 - **Hearing dates from sud.uz are `dd.mm.yyyy` — never compare them as strings** (`'10.01.2023' < '15.12.2022'`).
   Use `hearingKey` / `byHearingDate` / `pickUpcoming` in `sections/cases.tsx`; «next hearing» must also be
   in the future (a past hearing still marked scheduled is not «next»).
+- **Never hedge (duplicate) a request that consumes a single-use token — pin it.** `fetchViaWorkers`
+  re-sends any call slower than `hedgeMs` (900 ms for billing) through a second worker and takes the
+  first answer. That is right for read-only lookups and wrong for billing's search, which spends the
+  captcha token: the duplicate burns it, and its instant «Failed captcha check» can beat the original.
+  Every failing search in the field took 1.1–1.7 s (over the hedge); every captcha call that worked took
+  under it. A captcha session (PoW → analyze → search) therefore runs on ONE worker via
+  `opts.worker` (`pickWorker(triedWorkers)`), unhedged, and a rejected token retries on a different
+  worker. Court-case/jadval calls are idempotent GETs and are fine to hedge. (`net/__tests__/worker-fetch-pin.test.ts`)
+- **The VLM (math-captcha reader) is configured by env**: `VLM_API_KEY` + `VLM_BASE_URL` (+ optional
+  `VLM_TOKEN`), falling back to the SDK's `.z-ai-config` file. It only runs when recaptcha.sud.uz
+  *demands* a math challenge; when the service issues a token directly the VLM is never involved.
 - **A scraper must never return an upstream error body as if it were data.** billing.sud.uz answers
   rejected searches with HTTP 400/422 and a JSON body (`{ requestStatus: … }`, no `content`).
   `searchBillsByInn` once returned that body, so `getFullBillData` did `[...search.content]` and crashed
