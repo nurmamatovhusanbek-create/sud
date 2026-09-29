@@ -73,6 +73,9 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
   )
 }
 
+const DETECT_EVERY_MS = 30 * 60_000
+let lastDetect = 0
+
 export function WatchlistView() {
   const openCompany = useAppStore((s) => s.openCompany)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
@@ -157,6 +160,17 @@ export function WatchlistView() {
   useEffect(() => {
     if (hydrated) setAutoOrders(autoEnabled())
   }, [hydrated])
+
+  // DETECT which watched cases need their orders looked up (no scraping): the global pill then offers «Boshlash».
+  // At most once per 30 min, so opening this page over and over does not re-read every company.
+  useEffect(() => {
+    if (!hydrated || items.length === 0 || Date.now() - lastDetect < DETECT_EVERY_MS) return
+    const t = setTimeout(() => {
+      lastDetect = Date.now()
+      void checkWatchlistOrders({ auto: true, detect: true })
+    }, 2500) // after the cards' own enrichment has started
+    return () => clearTimeout(t)
+  }, [hydrated, items.length])
 
   useEffect(() => {
     if (!hydrated) return

@@ -477,6 +477,9 @@ interface MergedRow {
   courtType: CourtType
 }
 
+/** lists already detected in this page session (`stir:count`) — detection runs once per list, not per render */
+const detectedLists = new Set<string>()
+
 export function CasesSection() {
   const company = useAppStore((s) => s.activeCompany)
   const storeCourtFilter = useAppStore((s) => s.caseCourtFilter)
@@ -607,6 +610,22 @@ export function CasesSection() {
     )
   }, [merged, query, sort])
 
+  // DETECT: once the list is in, let the server work out which of these cases need a look at public.sud.uz (already
+  // known / still-ongoing ones are not work). Nothing is scraped — the global pill offers «Boshlash».
+  useEffect(() => {
+    if (!merged.length) return
+    const key = `${stir}:${merged.length}`
+    if (detectedLists.has(key)) return
+    const t = setTimeout(() => {
+      detectedLists.add(key)
+      void fetchPublicOrders(
+        merged.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus })),
+        { hold: true, keepPaused: true },
+      )
+    }, 1500) // partial loads (one court type at a time) coalesce into one detection
+    return () => clearTimeout(t)
+  }, [merged, stir])
+
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
@@ -659,8 +678,9 @@ export function CasesSection() {
     void (async () => {
       const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus })))
       if (!r.ok) toast.error(r.error)
-      else if (r.data.queued === 0) toast.info(r.data.ongoing ? `${r.data.ongoing} ta ish hali birinchi instansiyada koʻrilmoqda — qaror yoʻq` : 'Tekshiradigan ish yoʻq')
-      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi${r.data.ongoing ? `, ${r.data.ongoing} tasi hali koʻrilmoqda (qaror yoʻq)` : ''} — boshqa ishingizni davom ettiring`)
+      else if (r.data.queued === 0 && r.data.job.state === 'running') toast.success('Tekshiruv boshlandi — boshqa ishingizni davom ettiring')
+      else if (r.data.queued === 0) toast.info(r.data.ongoing || r.data.known ? `Yangi tekshiradigan ish yoʻq${r.data.known ? `: ${r.data.known} ta ish allaqachon maʼlum` : ''}${r.data.ongoing ? `${r.data.known ? ', ' : ': '}${r.data.ongoing} ta hali birinchi instansiyada koʻrilmoqda` : ''}` : 'Tekshiradigan ish yoʻq')
+      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi${r.data.ongoing ? `, ${r.data.ongoing} tasi hali koʻrilmoqda (qaror yoʻq)` : ''}${r.data.known ? `, ${r.data.known} tasi allaqachon maʼlum` : ''} — boshqa ishingizni davom ettiring`)
     })()
   }
 

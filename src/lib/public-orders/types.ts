@@ -1,8 +1,10 @@
 /** The background download of published orders, as the UI sees it. */
 export interface CaseJobStatus {
-  state: 'idle' | 'running' | 'paused' | 'error' | 'done'
+  state: 'idle' | 'ready' | 'running' | 'paused' | 'error' | 'done'
   /** cases still waiting in the queue (a paused run resumes with exactly these, in this order) */
   remaining: number
+  /** cases whose lookup failed in this run — «Qayta urinish» re-queues them */
+  failed: number
   /** cases queued in this run */
   total: number
   /** cases handled (looked up or skipped by the policy) */
@@ -14,6 +16,8 @@ export interface CaseJobStatus {
   errors: number
   /** cases left out of this run because they are still heard in the first instance (no decision, nothing to publish) */
   ongoing: number
+  /** cases left out because they are already known (published orders are permanent) or waiting out their back-off */
+  known: number
   current: string | null
   startedAt: string | null
   lastError: string | null

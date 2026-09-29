@@ -94,8 +94,10 @@ Page numbers need Chrome/Edge 131+.
 case of the watched companies on public.sud.uz **in the background** and keeps them in a small local cache; the Sud ishlari
 *Qarorlar* button and a drawer's *Tekshirish* do the same for one list or case. A published order never changes, so it is
 fetched once and never asked about again; a case is looked at again only when its status changes (e.g. appealed) or after a
-short publication-lag back-off. Cases still heard in the first instance have no decision yet and are left out. A pill at
-the bottom of every screen shows «N qaror yuklanmoqda» while it works; its button really *pauses* (the queue keeps its
+short publication-lag back-off. Cases still heard in the first instance have no decision yet and are left out. Opening a company's case list or the
+Kuzatuv page first *detects* which cases need a look (nothing is scraped), and the pill at
+the bottom of every screen offers «Boshlash», then shows «N qaror yuklanmoqda» while it works (failed cases get a
+«Qayta urinish» button, no refresh needed; the pill can be dismissed); its button really *pauses* (the queue keeps its
 order and «Davom ettirish» continues from the same case). Settings › Qarorlar is the control panel: the idle auto-check
 switch, run now, the queue (pause / resume / cancel) and the local cache (numbers, clear). A case
 drawer shows *Eʼlon qilingan qarorlar* (instance, court, judge, result, PDF on click) and *Eʼlon qilinmagan qarorlar*

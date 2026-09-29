@@ -356,13 +356,13 @@ export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
 export async function fetchPublicOrders(
   cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],
-  opts: { force?: boolean; keepPaused?: boolean } = {},
-): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number; ongoing: number }>> {
+  opts: { force?: boolean; keepPaused?: boolean; hold?: boolean } = {},
+): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number; ongoing: number; known: number }>> {
   try {
     const res = await fetch('/api/public-orders/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action: 'start', cases, force: opts.force === true, keepPaused: opts.keepPaused === true }),
+      body: JSON.stringify({ action: 'start', cases, force: opts.force === true, keepPaused: opts.keepPaused === true, hold: opts.hold === true }),
     })
     const json = await res.json().catch(() => null)
     if (json?.ok === true && json.data) {
@@ -375,7 +375,7 @@ export async function fetchPublicOrders(
   }
 }
 
-async function jobAction(action: 'pause' | 'resume' | 'cancel'): Promise<void> {
+async function jobAction(action: 'pause' | 'resume' | 'cancel' | 'retry'): Promise<void> {
   try {
     await fetch('/api/public-orders/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action }) })
   } catch { /* the loader refreshes anyway */ }
@@ -385,6 +385,8 @@ async function jobAction(action: 'pause' | 'resume' | 'cancel'): Promise<void> {
 export const pausePublicOrdersJob = () => jobAction('pause')
 export const resumePublicOrdersJob = () => jobAction('resume')
 export const cancelPublicOrdersJob = () => jobAction('cancel')
+/** Re-queue the cases whose lookup failed (no page refresh needed). */
+export const retryPublicOrdersJob = () => jobAction('retry')
 
 export function getPublicOrdersCache(signal?: AbortSignal) {
   return request<OrdersCacheStats>('/api/public-orders/cache', signal)

@@ -57,9 +57,11 @@ export interface RunnerState {
   auto: boolean
   /** paused by the user: no further company is read until resumed */
   paused: boolean
+  /** DETECT only (which cases need a look, nothing scraped): the pill words it differently */
+  detect: boolean
 }
 
-let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false, paused: false }
+let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false, paused: false, detect: false }
 const listeners = new Set<() => void>()
 function emit() {
   for (const l of listeners) l()
@@ -103,7 +105,7 @@ async function waitForJob(signal: AbortSignal): Promise<{ searched: number; foun
     const r = await getPublicOrdersStatus(signal).catch(() => null)
     if (r && r.ok) {
       const st = r.data.job.state
-      if (st === 'paused') return null
+      if (st === 'paused' || st === 'ready') return null
       if (st !== 'running') return r.data.job
     }
     await new Promise((res) => setTimeout(res, 1500))
@@ -113,7 +115,12 @@ async function waitForJob(signal: AbortSignal): Promise<{ searched: number; foun
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
 
-export async function checkWatchlistOrders(opts: { auto: boolean; signal?: AbortSignal }): Promise<void> {
+/**
+ * `detect` = the first half of the sequence only: read the watched companies' cases and let the server work out which
+ * ones really need a look, leaving them «ready» — nothing is scraped until the user presses «Boshlash» on the pill.
+ * Without it the run scrapes at once (the button, or the idle auto-check).
+ */
+export async function checkWatchlistOrders(opts: { auto: boolean; detect?: boolean; signal?: AbortSignal }): Promise<void> {
   if (current) return // one run at a time
   const list = watched()
   if (!list.length) {
@@ -123,10 +130,10 @@ export async function checkWatchlistOrders(opts: { auto: boolean; signal?: Abort
   const ac = new AbortController()
   current = ac
   opts.signal?.addEventListener('abort', () => ac.abort(), { once: true })
-  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto, paused: false })
+  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto, paused: false, detect: opts.detect === true })
 
-  let cases = 0
   let ongoing = 0
+  let known = 0
   try {
     for (const rec of list) {
       while (state.paused && !ac.signal.aborted) await sleep(300) // paused: hold before the next company
@@ -135,10 +142,10 @@ export async function checkWatchlistOrders(opts: { auto: boolean; signal?: Abort
       if (r && r.ok) {
         const items = payloadOf(r.data.cases ?? [])
         if (items.length) {
-          const q = await fetchPublicOrders(items, { keepPaused: true })
+          const q = await fetchPublicOrders(items, { keepPaused: true, hold: opts.detect === true })
           if (q.ok) {
-            cases += q.data.queued
             ongoing += q.data.ongoing
+            known += q.data.known
           }
         }
       }
@@ -146,20 +153,26 @@ export async function checkWatchlistOrders(opts: { auto: boolean; signal?: Abort
     }
   } finally {
     current = null
-    set({ phase: 'idle', paused: false })
+    set({ phase: 'idle', paused: false, detect: false })
   }
+  if (opts.detect) return // detection announces nothing: the pill says what is waiting
   if (opts.auto && !ac.signal.aborted) markAutoRun() // an interrupted run does not use up the 6 h allowance
   // a run the user (or their coming back) cut short says nothing: the queue keeps going and the pill shows it
   if (ac.signal.aborted) return
 
   // tell the user how it went (auto runs stay silent unless something new arrived)
   const note = ongoing ? ` · ${ongoing} ta ish hali birinchi instansiyada koʻrilmoqda (qaror yoʻq)` : ''
-  const job = cases ? await waitForJob(new AbortController().signal) : null
-  if (job) {
-    if (job.found > 0) toast.success(`${job.found} ta yangi qaror yuklandi${note}`)
-    else if (!opts.auto) toast.info((job.searched === 0 ? 'Yangilanish yoʻq — barcha ishlar allaqachon tekshirilgan' : 'Yangi eʼlon qilingan qaror topilmadi') + note)
-    if (job.errors > 0 && !opts.auto) toast.error(`${job.errors} ta ishni tekshirib boʻlmadi — keyinroq qayta uriniladi`)
-  } else if (!cases && !opts.auto) {
-    toast.info(ongoing ? `Tekshiradigan ish yoʻq: ${ongoing} ta ish hali birinchi instansiyada koʻrilmoqda` : 'Kuzatuvdagi kompaniyalarda ish topilmadi')
+  const job = await waitForJob(new AbortController().signal) // null while paused / held: nothing is announced then
+  if (!job) return
+  if (job.found > 0) toast.success(`${job.found} ta yangi qaror yuklandi${note}`)
+  else if (job.searched > 0) {
+    if (!opts.auto) toast.info('Yangi eʼlon qilingan qaror topilmadi' + note)
+  } else if (!opts.auto) {
+    toast.info(
+      known || ongoing
+        ? `Yangi tekshiradigan ish yoʻq${known ? `: ${known} ta ish allaqachon maʼlum` : ''}${ongoing ? `${known ? ', ' : ': '}${ongoing} ta hali birinchi instansiyada koʻrilmoqda` : ''}`
+        : 'Kuzatuvdagi kompaniyalarda ish topilmadi',
+    )
   }
+  if (job.errors > 0 && !opts.auto) toast.error(`${job.errors} ta ishni tekshirib boʻlmadi — “Qayta urinish” tugmasi bilan yana urinish mumkin`)
 }

@@ -18,6 +18,7 @@ import {
   getPublicOrdersStatus,
   pausePublicOrdersJob,
   resumePublicOrdersJob,
+  retryPublicOrdersJob,
 } from '@/lib/api-client'
 import { autoEnabled, checkWatchlistOrders, lastAutoRun, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
 import type { CaseJobStatus, OrdersCacheStats } from '@/lib/public-orders/types'
@@ -33,6 +34,7 @@ const size = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 102
 
 const STATE: Record<CaseJobStatus['state'], { text: string; cls: string }> = {
   idle: { text: 'Boʻsh', cls: 'b-neu' },
+  ready: { text: 'Boshlashni kutmoqda', cls: 'b-info' },
   running: { text: 'Ishlamoqda', cls: 'b-info' },
   paused: { text: 'Pauza', cls: 'b-warn' },
   error: { text: 'Xato', cls: 'b-neg' },
@@ -144,6 +146,7 @@ export function OrdersTab() {
             <div className="kv"><span className="k">Qolgan</span><span className="mono">{num(queued)}</span></div>
             <div className="kv"><span className="k">Public.sud.uz dan soʻralgan</span><span className="mono">{num(job.searched)}</span></div>
             <div className="kv"><span className="k">Yangi qarorlar</span><span className="mono">{num(job.found)}</span></div>
+            {job.known > 0 && <div className="kv"><span className="k">Allaqachon maʼlum (soʻralmaydi)</span><span className="mono">{num(job.known)}</span></div>}
             {job.ongoing > 0 && <div className="kv"><span className="k">Hali koʻrilayotgan (qaror yoʻq)</span><span className="mono">{num(job.ongoing)}</span></div>}
             {job.errors > 0 && <div className="kv"><span className="k">Xatolar</span><span className="mono">{num(job.errors)}</span></div>}
             {job.current && <div className="kv"><span className="k">Hozir</span><span className="mono">{job.current}</span></div>}
@@ -154,12 +157,17 @@ export function OrdersTab() {
                   <Pause /><span>Pauza</span>
                 </button>
               )}
-              {job.state === 'paused' && (
+              {(job.state === 'paused' || job.state === 'ready') && (
                 <button className="btn btn-outline" onClick={() => void resumePublicOrdersJob().then(load)}>
-                  <Play /><span>Davom ettirish</span>
+                  <Play /><span>{job.state === 'ready' ? 'Boshlash' : 'Davom ettirish'}</span>
                 </button>
               )}
-              {(job.state === 'running' || job.state === 'paused') && queued > 0 && (
+              {job.state !== 'running' && job.state !== 'paused' && job.failed > 0 && (
+                <button className="btn btn-outline" onClick={() => void retryPublicOrdersJob().then(load)}>
+                  <RefreshCw /><span>Xatoli ishlarni qayta urinish ({job.failed})</span>
+                </button>
+              )}
+              {(job.state === 'running' || job.state === 'paused' || job.state === 'ready') && queued > 0 && (
                 <button className="btn btn-outline" onClick={() => void cancelPublicOrdersJob().then(load)}>
                   <X /><span>Qolganini bekor qilish</span>
                 </button>

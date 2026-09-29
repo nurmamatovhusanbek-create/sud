@@ -1,86 +1,70 @@
 'use client'
 
 /**
- * The global «N qaror yuklanmoqda» pill. Mounted once in the root layout, so it shows on every screen
- * (launcher, company, Hujjatlar, Sozlamalar…) while published orders download in the background, and stays
- * out of the way: a small pill at the bottom, never over the drawer or a dialog. Orders found so far are
- * usable at once (they are written to the local cache as they arrive), so the user can keep working.
+ * The global orders pill. Mounted once in the root layout, so it shows on every screen while there is something
+ * to know or do, and stays out of the way: a small pill at the bottom, never over the drawer or a dialog.
  *
- * Pause really pauses: the queue stays exactly as it is (the case being searched finishes) and «Davom ettirish»
- * continues from the same case, in the same order — nothing restarts. A paused pill stays until resumed or cancelled.
+ * The sequence it drives:  DETECT which cases need a look (no scraping yet) → the pill says «N ta ish tekshirilishi
+ * kerak» with «Boshlash» → SCRAPE («N qaror yuklanmoqda», pause / continue) → done, or «Qayta urinish» for the
+ * cases that failed (worker / upstream trouble — no page refresh needed).
  *
- * Polling is event-driven: one read on load, one when a download is queued (`sud:orders-job`), and every
- * 2.5 s ONLY while something is running — an idle app makes no repeated requests. A run in which every case
- * was already known (nothing searched) never shows the pill at all.
+ * It is never permanent: a ready / paused / failed pill can be dismissed with ✕ (the queue is kept; Settings ›
+ * Qarorlar and Kuzatuv still control it) and comes back only when the state moves on. A run in which every case was
+ * already known never shows a pill at all; a finished one fades after a few seconds.
+ * Pause really pauses: the case in flight finishes, the queue keeps its order, «Davom ettirish» continues from it.
  */
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { AlertTriangle, Check, Pause, Play, X } from 'lucide-react'
-import { cancelPublicOrdersJob, getPublicOrdersStatus, pausePublicOrdersJob, resumePublicOrdersJob } from '@/lib/api-client'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { AlertTriangle, Check, Pause, Play, RefreshCw, Search, X } from 'lucide-react'
+import { pausePublicOrdersJob, resumePublicOrdersJob, retryPublicOrdersJob } from '@/lib/api-client'
 import { pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, subscribeRunner } from '@/lib/orders-watchlist'
-import type { PublicOrdersStatus } from '@/lib/public-orders/types'
+import { useOrdersJob } from '@/lib/use-orders-job'
 
-const POLL_MS = 2500
 const LINGER_MS = 8000
-
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
 export function OrdersLoader() {
-  const [status, setStatus] = useState<PublicOrdersStatus | null>(null)
-  const [hidden, setHidden] = useState(false)
+  const { job } = useOrdersJob()
+  const [dismissed, setDismissed] = useState<string | null>(null)
   const [lingerOver, setLingerOver] = useState(false)
-  const wasRunning = useRef(false)
+  const wasSearching = useRef(false)
   const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
 
-  const load = useCallback(async () => {
-    const r = await getPublicOrdersStatus().catch(() => null)
-    if (r && r.ok) setStatus(r.data)
-  }, [])
-
-  const job = status?.job
+  const state = job?.state
   // «running» only counts once something is really being searched — skipped (already known) cases are silent
-  const jobRunning = job?.state === 'running'
-  const jobPaused = job?.state === 'paused'
-  const searching = jobRunning && (job!.searched > 0 || job!.current !== null)
+  const searching = state === 'running' && (job!.searched > 0 || job!.current !== null)
+  // a pill's identity: dismissing it hides THIS situation; a new one (state change, more cases) shows again
+  const key = job ? `${state}:${job.startedAt}:${job.total}:${job.failed}` : ''
+  const hidden = dismissed === key
 
-  // a new run un-hides the pill
   useEffect(() => {
     if (searching) {
-      wasRunning.current = true
-      setHidden(false)
+      wasSearching.current = true
       setLingerOver(false)
     }
   }, [searching])
 
-  useEffect(() => {
-    void load()
-    const wake = () => void load()
-    window.addEventListener('sud:orders-job', wake)
-    return () => window.removeEventListener('sud:orders-job', wake)
-  }, [load])
-
-  // a paused run still needs a look until the case it was on has finished
-  const watching = jobRunning || (jobPaused && job!.current !== null)
-  useEffect(() => {
-    if (!watching) return
-    const t = setInterval(() => void load(), POLL_MS)
-    return () => clearInterval(t)
-  }, [watching, load])
-
-  // «finished» lingers briefly, then fades away
-  const finished = !jobRunning && !jobPaused && wasRunning.current && (job?.searched ?? 0) > 0
+  const finished = (state === 'done' || state === 'error') && wasSearching.current && (job?.searched ?? 0) > 0
   useEffect(() => {
     if (!finished) return
     const t = setTimeout(() => setLingerOver(true), LINGER_MS)
     return () => clearTimeout(t)
   }, [finished])
 
+  const dismiss = (label: string) => (
+    <button className="x" title="Yopish (navbat saqlanadi)" aria-label={label} onClick={() => setDismissed(key)}>
+      <X />
+    </button>
+  )
+
+  // 1. the client is reading the watched companies' cases (detecting, or collecting for an explicit run)
   if (runner.phase === 'collecting') {
     return (
       <div className="orders-loader" role="status" aria-live="polite">
         <span className="spinner" />
         <span className="t">
-          Kuzatuv ishlari yigʻilmoqda<span className="s"> · {runner.done}/{runner.total} kompaniya</span>
+          {runner.detect ? 'Tekshiriladigan ishlar aniqlanmoqda' : 'Kuzatuv ishlari yigʻilmoqda'}
+          <span className="s"> · {runner.done}/{runner.total} kompaniya</span>
         </span>
         {runner.paused ? (
           <button className="x" title="Davom ettirish" aria-label="Davom ettirish" onClick={() => void resumeWatchlistCheck()}>
@@ -95,25 +79,26 @@ export function OrdersLoader() {
     )
   }
 
-  if (job && jobPaused && job.remaining > 0) {
+  if (!job || hidden) return null
+
+  // 2. detected, held: nothing is scraped until the user says so
+  if (state === 'ready' && job.remaining > 0) {
     return (
-      <div className="orders-loader paused" role="status" aria-live="polite">
-        <Pause />
+      <div className="orders-loader ready" role="status" aria-live="polite">
+        <Search />
         <span className="t">
-          Pauza<span className="s"> · {job.current ? 'joriy ish tugallanmoqda · ' : ''}{num(job.remaining)} ta ish qoldi</span>
+          {num(job.remaining)} ta ish tekshirilishi kerak
         </span>
-        <button className="x" title="Davom ettirish" aria-label="Davom ettirish" onClick={() => void resumePublicOrdersJob()}>
+        <button className="go" title="Boshlash" aria-label="Tekshirishni boshlash" onClick={() => void resumePublicOrdersJob()}>
           <Play />
+          <span>Boshlash</span>
         </button>
-        <button className="x" title="Qolgan ishlarni bekor qilish" aria-label="Qolgan ishlarni bekor qilish" onClick={() => void cancelPublicOrdersJob()}>
-          <X />
-        </button>
+        {dismiss('Yopish')}
       </div>
     )
   }
 
-  if (!job || hidden) return null
-
+  // 3. scraping
   if (searching) {
     return (
       <div className="orders-loader" role="status" aria-live="polite">
@@ -129,28 +114,46 @@ export function OrdersLoader() {
     )
   }
 
-  if (!finished || lingerOver) return null
-
-  if (job.state === 'error') {
+  // 4. paused: the queue is kept in order
+  if (state === 'paused' && job.remaining > 0) {
     return (
-      <div className="orders-loader err" role="status">
-        <AlertTriangle />
-        <span className="t">Qarorlarni yuklab boʻlmadi<span className="s"> · {job.lastError || 'xato'}</span></span>
-        <button className="x" title="Yopish" aria-label="Yopish" onClick={() => setHidden(true)}>
-          <X />
+      <div className="orders-loader paused" role="status" aria-live="polite">
+        <Pause />
+        <span className="t">
+          Pauza<span className="s"> · {job.current ? 'joriy ish tugallanmoqda · ' : ''}{num(job.remaining)} ta ish qoldi</span>
+        </span>
+        <button className="x" title="Davom ettirish" aria-label="Davom ettirish" onClick={() => void resumePublicOrdersJob()}>
+          <Play />
         </button>
+        {dismiss('Yopish')}
       </div>
     )
   }
+
+  // 5. finished — with failures the user can retry right here (a refresh is never needed)
+  if ((state === 'done' || state === 'error') && job.failed > 0) {
+    return (
+      <div className="orders-loader err" role="status" aria-live="polite">
+        <AlertTriangle />
+        <span className="t">
+          {num(job.failed)} ta ishni tekshirib boʻlmadi<span className="s"> · {job.lastError || 'xato'}</span>
+        </span>
+        <button className="go" title="Qayta urinish" aria-label="Qayta urinish" onClick={() => void retryPublicOrdersJob()}>
+          <RefreshCw />
+          <span>Qayta urinish</span>
+        </button>
+        {dismiss('Yopish')}
+      </div>
+    )
+  }
+
+  if (!finished || lingerOver) return null
+
   return (
     <div className="orders-loader ok" role="status">
       <Check />
-      <span className="t">
-        {job.found > 0 ? <><b>{num(job.found)}</b> qaror yuklandi</> : 'Tekshiruv tugadi — yangi eʼlon qilingan qaror yoʻq'}
-      </span>
-      <button className="x" title="Yopish" aria-label="Yopish" onClick={() => setHidden(true)}>
-        <X />
-      </button>
+      <span className="t">{job.found > 0 ? <><b>{num(job.found)}</b> qaror yuklandi</> : 'Tekshiruv tugadi — yangi eʼlon qilingan qaror yoʻq'}</span>
+      {dismiss('Yopish')}
     </div>
   )
 }
