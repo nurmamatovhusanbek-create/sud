@@ -149,7 +149,15 @@ export function DocPreview({
         const bytes = await z.generateAsync({ type: 'uint8array', compression: 'STORE' })
         if (id !== seq.current) return
 
-        const { renderAsync } = await import('docx-preview')
+        // A pulled update can add this package before `bun install` has run; say so
+        // plainly instead of surfacing the bundler's «Cannot find module». (try/catch,
+        // not .catch — the bundler can throw synchronously before a promise exists.)
+        let renderAsync: typeof import('docx-preview').renderAsync
+        try {
+          renderAsync = (await import('docx-preview')).renderAsync
+        } catch {
+          throw new Error('«docx-preview» kutubxonasi oʻrnatilmagan. Serverni toʻxtating, «bun install» ishga tushiring va «bun run dev» bilan qayta boshlang.')
+        }
         const stage = stageRef.current
         const host = hostRef.current
         const canvas = canvasRef.current
