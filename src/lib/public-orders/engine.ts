@@ -24,6 +24,9 @@ export interface JobCase {
   courtType: PublicCourtType
   /** caseSignature() of the case data at the time — a change triggers a re-check */
   sig: string
+  /** the case's list-row data, only used to leave out cases still heard in the first instance */
+  result?: string
+  caseStatus?: string
 }
 
 export interface CaseLookupDeps {

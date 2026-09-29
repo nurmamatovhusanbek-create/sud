@@ -7,6 +7,7 @@
  *  - «Eʼlon qilinmagan qarorlar» — decisions the court-case data already gives us (date + text) for which the
  *    library has NO published order. If the case was never looked up, they are labelled «tekshirilmagan» and
  *    a button checks them in the background (the global loader shows progress).
+ * A case still heard in the first instance has no decision: it says so instead of offering a pointless check.
  * While the lookup result is loading (or failed) the known decisions show as a plain list, so the drawer
  * never loses information it already had.
  */
@@ -31,7 +32,7 @@ function Quote({ d }: { d: KnownDecision }) {
   )
 }
 
-export function CaseOrders({ caseNumber, courtType, decisions }: { caseNumber: string; courtType: string; decisions: KnownDecision[] }) {
+export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }: { caseNumber: string; courtType: string; decisions: KnownDecision[]; ongoing?: boolean }) {
   const [state, setState] = useState<State>({ status: 'loading' })
   const [opening, setOpening] = useState<string | null>(null)
   const [queueing, setQueueing] = useState(false)
@@ -143,8 +144,15 @@ export function CaseOrders({ caseNumber, courtType, decisions }: { caseNumber: s
         </DwSection>
       )}
 
+      {/* still heard in the first instance: there is no decision, so nothing to look for */}
+      {ongoing && !view.published.length && !view.unpublished.length && (
+        <DwSection title="Qarorlar">
+          <div className="dw-orders-empty">Ish hali birinchi instansiyada koʻrilmoqda — qaror chiqmagan, shuning uchun tekshirish shart emas. Ish oʻzgarganda avtomatik tekshiriladi.</div>
+        </DwSection>
+      )}
+
       {/* nothing known and nothing published: only say so once the library has been asked */}
-      {!view.published.length && !view.unpublished.length && (
+      {!ongoing && !view.published.length && !view.unpublished.length && (
         <DwSection title="Eʼlon qilingan qarorlar">
           <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
             <span>

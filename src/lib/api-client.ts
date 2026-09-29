@@ -6,7 +6,7 @@
  */
 
 import type { StoredOrder } from '@/core/public-orders'
-import type { PublicOrdersStatus } from '@/lib/public-orders/types'
+import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
   BillDetailData,
@@ -355,14 +355,14 @@ export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
 export async function fetchPublicOrders(
-  cases: { caseNumber: string; courtType: string; sig?: string }[],
-  opts: { force?: boolean } = {},
-): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number }>> {
+  cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],
+  opts: { force?: boolean; keepPaused?: boolean } = {},
+): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number; ongoing: number }>> {
   try {
     const res = await fetch('/api/public-orders/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action: 'start', cases, force: opts.force === true }),
+      body: JSON.stringify({ action: 'start', cases, force: opts.force === true, keepPaused: opts.keepPaused === true }),
     })
     const json = await res.json().catch(() => null)
     if (json?.ok === true && json.data) {
@@ -375,9 +375,29 @@ export async function fetchPublicOrders(
   }
 }
 
-export async function pausePublicOrdersJob(): Promise<void> {
+async function jobAction(action: 'pause' | 'resume' | 'cancel'): Promise<void> {
   try {
-    await fetch('/api/public-orders/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action: 'pause' }) })
+    await fetch('/api/public-orders/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action }) })
   } catch { /* the loader refreshes anyway */ }
   window.dispatchEvent(new CustomEvent('sud:orders-job'))
+}
+/** Pause keeps the queue and its order; resume continues from there; cancel drops what is left. */
+export const pausePublicOrdersJob = () => jobAction('pause')
+export const resumePublicOrdersJob = () => jobAction('resume')
+export const cancelPublicOrdersJob = () => jobAction('cancel')
+
+export function getPublicOrdersCache(signal?: AbortSignal) {
+  return request<OrdersCacheStats>('/api/public-orders/cache', signal)
+}
+
+/** Forget the local cache (everything can be fetched again). */
+export async function clearPublicOrdersCache(): Promise<ApiResult<{ cleared: true }>> {
+  try {
+    const res = await fetch('/api/public-orders/cache', { method: 'DELETE', headers: authHeaders() })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
 }

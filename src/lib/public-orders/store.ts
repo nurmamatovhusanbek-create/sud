@@ -2,6 +2,7 @@ import 'server-only'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
+import type { OrdersCacheStats } from './types'
 
 /**
  * The local index of published orders: append-only JSONL, sharded by a hash of the case number so
@@ -113,4 +114,49 @@ export async function markChecked(c: CaseCheck): Promise<void> {
 /** Test hook: forget the in-memory cache (the file stays). */
 export function resetCheckedCache(): void {
   checkedCache = null
+}
+
+// ---- the cache as a whole (Settings › Qarorlar) ---------------------------------------------------
+
+export async function cacheStats(): Promise<OrdersCacheStats> {
+  const checked = await loadChecked()
+  let withOrders = 0
+  let failed = 0
+  let last = 0
+  for (const c of checked.values()) {
+    if (c.seen.length) withOrders++
+    if (c.error) failed++
+    const t = Date.parse(c.at)
+    if (t > last) last = t
+  }
+  let orders = 0
+  let bytes = 0
+  const size = async (f: string) => {
+    try {
+      bytes += (await fs.stat(f)).size
+    } catch { /* absent */ }
+  }
+  await size(checkedFile())
+  try {
+    for (const name of await fs.readdir(path.join(dataDir(), 'shards'))) {
+      const f = path.join(dataDir(), 'shards', name)
+      await size(f)
+      // rows are appended, so a re-fetched order can repeat: count distinct ids
+      const ids = new Set<string>()
+      for (const line of (await fs.readFile(f, 'utf8')).split('\n')) {
+        const m = line.match(/"id":"([^"]+)"/)
+        if (m) ids.add(m[1])
+      }
+      orders += ids.size
+    }
+  } catch { /* no shards yet */ }
+  return { cases: checked.size, withOrders, orders, failed, bytes, lastCheckedAt: last ? new Date(last).toISOString() : null }
+}
+
+/** Delete the whole cache; every case is «never checked» again. */
+export function clearCache(): Promise<void> {
+  return serial(async () => {
+    await fs.rm(dataDir(), { recursive: true, force: true })
+    checkedCache = null
+  })
 }

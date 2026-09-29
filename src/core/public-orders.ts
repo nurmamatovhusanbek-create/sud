@@ -236,10 +236,40 @@ export interface CaseCheck {
   error?: string
 }
 
+// ---- which cases can have an order at all? ---------------------------------------------------
+
+const EMPTY_RESULT = /^[\s\-–—.]*$/
+const APPEAL_STATUS = /апелл|apell|кассац|kassats|назорат|nazorat/i
+const ONGOING_STATUS = /юритув|yurituv|кўриб\s*чиқ|ko[ʻʼ'’`]?rib\s*chiq|қабул|qabul/i
+
+/**
+ * A case still being heard in the FIRST instance (no outcome yet, not in appeal/cassation/supervision) has no
+ * decision, so nothing can be published: asking the library about it is a wasted, slow request. Once it is
+ * decided, or moves to a higher court (whose first-instance order already exists), it is worth a look.
+ * Conservative on purpose: only a recognised «ongoing» status (or none) with an EMPTY result counts as ongoing;
+ * anything else (terminated, suspended, unknown wording) is still checked.
+ */
+export function isOngoingFirstInstance(c: { result?: string; caseStatus?: string }): boolean {
+  if (!EMPTY_RESULT.test(c.result ?? '')) return false
+  const status = clean(c.caseStatus ?? '')
+  if (APPEAL_STATUS.test(status)) return false
+  return EMPTY_RESULT.test(status) || ONGOING_STATUS.test(status)
+}
+
 /** Changes whenever the case moves on (status, outcome, next hearing) — the trigger for a re-check. */
 export function caseSignature(c: { caseStatus?: string; result?: string; hearingDate?: string }): string {
   const n = (v: string | undefined) => clean(v ?? '').toLowerCase()
   return [n(c.caseStatus), n(c.result), n(c.hearingDate)].join('|')
+}
+
+/**
+ * What every caller (Kuzatuv, the Sud ishlari list) sends for a case. ONE shape on purpose: the signature is built
+ * from the same two fields everywhere, so two screens never make each other's «changed» look like a change.
+ */
+export function orderJobCase(c: { caseNumber: string; courtType: string; result?: string; caseStatus?: string }) {
+  const result = c.result ?? ''
+  const caseStatus = c.caseStatus ?? ''
+  return { caseNumber: c.caseNumber, courtType: c.courtType, sig: caseSignature({ caseStatus, result }), result, caseStatus }
 }
 
 export type CheckReason = 'new' | 'forced' | 'retry-error' | 'sig-changed' | 'backoff' | 'done' | 'waiting'

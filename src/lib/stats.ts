@@ -33,6 +33,7 @@ export interface CaseWithClassification {
   courtType: StatsCourtType
   regDate: string            // DD.MM.YYYY (raw)
   result: string             // raw Uzbek outcome (Cyrillic or Latin)
+  caseStatus?: string        // raw status («Ish yurituvda», «Apellyatsiyada»…) — tells an ongoing first-instance case from a decided one
   classification: Classification
   role: PartyRole
   court: string
@@ -363,6 +364,7 @@ function classifyCase(
     courtType: COURT_TYPE_MAP[courtType],
     regDate: raw.dateFiled || '',
     result: raw.result || '',
+    caseStatus: raw.caseStatus && raw.caseStatus !== '-' ? raw.caseStatus : '',
     classification,
     role,
     court: raw.courtName || '',

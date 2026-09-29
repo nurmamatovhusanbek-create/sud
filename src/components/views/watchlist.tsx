@@ -9,14 +9,14 @@
 
 import { winRate } from '@/core/rates'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Plus, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { autoEnabled, checkWatchlistOrders, runnerSnapshot, setAutoEnabled, stopWatchlistCheck, subscribeRunner } from '@/lib/orders-watchlist'
+import { autoEnabled, checkWatchlistOrders, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -374,10 +374,12 @@ export function WatchlistView() {
           className="btn btn-outline btn-sm"
           disabled={items.length === 0}
           title="Kuzatuvdagi kompaniyalar ishlarining eʼlon qilingan qarorlarini fonda yuklash"
-          onClick={() => (runner.phase === 'collecting' ? stopWatchlistCheck() : void checkWatchlistOrders({ auto: false }))}
+          onClick={() =>
+            runner.phase !== 'collecting' ? void checkWatchlistOrders({ auto: false }) : runner.paused ? void resumeWatchlistCheck() : void pauseWatchlistCheck()
+          }
         >
-          {runner.phase === 'collecting' ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <FileText />}
-          <span>{runner.phase === 'collecting' ? 'Toʻxtatish' : 'Qarorlarni tekshirish'}</span>
+          {runner.phase !== 'collecting' ? <FileText /> : runner.paused ? <Play /> : <Pause />}
+          <span>{runner.phase !== 'collecting' ? 'Qarorlarni tekshirish' : runner.paused ? 'Davom ettirish' : 'Pauza'}</span>
         </button>
         <button
           className="btn btn-outline btn-sm"

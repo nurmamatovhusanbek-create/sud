@@ -16,6 +16,7 @@ import {
   Download,
   FlaskConical,
   GitBranch,
+  Library,
   Plus,
   RefreshCw,
   Server,
@@ -29,6 +30,7 @@ import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
 import { getTorStatus } from '@/lib/api-client'
 import { toast } from 'sonner'
+import { OrdersTab } from '@/components/views/orders-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -815,7 +817,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health'
+type SetTab = 'updates' | 'workers' | 'health' | 'orders'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -845,11 +847,16 @@ export function SettingsView() {
           <Activity />
           Holat
         </button>
+        <button className={`set-tab ${tab === 'orders' ? 'on' : ''}`} onClick={() => setTab('orders')}>
+          <Library />
+          Qarorlar
+        </button>
       </div>
 
       {tab === 'updates' && <UpdatesTab />}
       {tab === 'workers' && <WorkersTab />}
       {tab === 'health' && <HealthTab />}
+      {tab === 'orders' && <OrdersTab />}
     </div>
   )
 }

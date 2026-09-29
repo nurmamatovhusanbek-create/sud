@@ -39,6 +39,8 @@ The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
 - A case is re-checked only when its **signature** (status + result + hearing date) changes, e.g. it was appealed, or by a
   publication-lag back-off (3 d, 14 d, 45 d after the last fruitless check, then it waits for a change).
 - A failed search is an error retried after 10 minutes, never a false «no orders».
+- A case still heard in the first instance (no result, status «ish yurituvda» / «koʻrib chiqilmoqda» or none) has no decision, so it is not queued at all (`isOngoingFirstInstance`); one in appeal / cassation / supervision is, because its first-instance order exists. Anything unrecognised is checked (conservative).
+- The queue can be paused (the case in flight finishes, the rest keeps its order), resumed (same counters) or cancelled; Settings › Qarorlar shows and controls it.
 - Who triggers it: the **Kuzatuv** page («Qarorlarni tekshirish»), the same page's «Boʻsh vaqtda avto» switch (runs when the app has been idle
   3 min or the tab is hidden, at most every 6 h, only while the app is open), Sud ishlari «Qarorlar», or a drawer's «Tekshirish» (forced).
 - Storage: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `checked.jsonl` (one record per case). Delete the folder to reset.

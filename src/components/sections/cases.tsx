@@ -23,7 +23,7 @@ import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSo
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
-import { caseSignature, type KnownDecision } from '@/core/public-orders'
+import { isOngoingFirstInstance, orderJobCase, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValues, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
@@ -425,7 +425,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
           </DwSection>
         )}
 
-        <CaseOrders caseNumber={caseNumber} courtType={courtType} decisions={knownDecisions} />
+        <CaseOrders caseNumber={caseNumber} courtType={courtType} decisions={knownDecisions} ongoing={knownDecisions.length === 0 && isOngoingFirstInstance({ caseStatus: g?.caseStatus })} />
 
         <DwSection title="Hujjat tayyorlash">
           <div className="dw-docs">
@@ -657,9 +657,10 @@ export function CasesSection() {
 
   const downloadOrders = () => {
     void (async () => {
-      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => ({ caseNumber: c.caseNumber, courtType, sig: caseSignature({ result: c.result }) })))
+      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus })))
       if (!r.ok) toast.error(r.error)
-      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi — allaqachon maʼlum boʻlganlari oʻtkazib yuboriladi, boshqa ishingizni davom ettiring`)
+      else if (r.data.queued === 0) toast.info(r.data.ongoing ? `${r.data.ongoing} ta ish hali birinchi instansiyada koʻrilmoqda — qaror yoʻq` : 'Tekshiradigan ish yoʻq')
+      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi${r.data.ongoing ? `, ${r.data.ongoing} tasi hali koʻrilmoqda (qaror yoʻq)` : ''} — boshqa ishingizni davom ettiring`)
     })()
   }
 

@@ -89,6 +89,7 @@ export const CaseWithClassificationSchema = z.object({
   courtType: StatsCourtTypeQuery,
   regDate: z.string(),
   result: z.string(),
+  caseStatus: z.string().optional(),
   classification: z.enum(['win', 'lose', 'neutral', 'pending']),
   role: z.enum(['plaintiff', 'defendant']),
   court: z.string(),
