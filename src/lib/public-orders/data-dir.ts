@@ -11,7 +11,7 @@ import path from 'node:path'
  * A cache an earlier version left at `<project>/data/public-orders` is COPIED over once (the old one is left alone).
  */
 
-export const resolveDataDir = (env: { PUBLIC_ORDERS_DIR?: string }, home: string): string => env.PUBLIC_ORDERS_DIR || path.join(home, '.sud-tizimi', 'public-orders')
+export const resolveDataDir = (env: Record<string, string | undefined>, home: string): string => env.PUBLIC_ORDERS_DIR || path.join(home, '.sud-tizimi', 'public-orders')
 
 export const legacyDataDir = (cwd: string): string => path.join(cwd, 'data', 'public-orders')
 
