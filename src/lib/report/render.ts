@@ -87,7 +87,7 @@ function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
  * (solid · tint · hatch · dashed, in the slice's hue). The geometry is the app's own
  * (components/proto/pizza-geometry.ts), so the two can never drift; only the paint differs.
  */
-function pizza(items: PizzaItem[], t: ReportTheme): string {
+function pizza(items: PizzaItem[], t: ReportTheme, id = 'rpz'): string {
   const model = pizzaModel(items)
   const { cx, cy, r0 } = PIZZA_GEOM
   const lostOp = PIZZA_PAINT.lostOpacity(t.dark)
@@ -104,7 +104,7 @@ function pizza(items: PizzaItem[], t: ReportTheme): string {
   const defs = items
     .map(
       (it, i) =>
-        `<pattern id="rpz${i}" width="${hz.size}" height="${hz.size}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="${hz.size}" height="${hz.size}" fill="${it.col}" fill-opacity="${hz.groundOpacity}"/><line x1="0" y1="0" x2="0" y2="${hz.size}" stroke="${it.col}" stroke-width="${hz.stripeWidth}" stroke-opacity="${hz.stripeOpacity}"/></pattern>`,
+        `<pattern id="${id}${i}" width="${hz.size}" height="${hz.size}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="${hz.size}" height="${hz.size}" fill="${it.col}" fill-opacity="${hz.groundOpacity}"/><line x1="0" y1="0" x2="0" y2="${hz.size}" stroke="${it.col}" stroke-width="${hz.stripeWidth}" stroke-opacity="${hz.stripeOpacity}"/></pattern>`,
     )
     .join('')
   const rings = model.rings
@@ -116,7 +116,7 @@ function pizza(items: PizzaItem[], t: ReportTheme): string {
   const wedges = model.wedges
     .map((w) => {
       const it = items[w.index]
-      const bands = w.bands.map((b) => `<path d="${b.path}" ${paint(b.status, it.col, `rpz${w.index}`)}/>`).join('')
+      const bands = w.bands.map((b) => `<path d="${b.path}" ${paint(b.status, it.col, `${id}${w.index}`)}/>`).join('')
       const nums = w.bands
         .map((b) =>
           b.text
@@ -196,24 +196,39 @@ function hero(m: ReportModel, t: ReportTheme): string {
     .join('')}</section>`
 }
 
+/** «name · total · win rate» rows under a pie. */
+function sliceList(items: PizzaItem[]): string {
+  return `<div class="rp-slices">${items
+    .map((it) => {
+      const r = calcWinRate(it.won, it.lost)
+      return `<div><i style="background:${it.col}"></i><span class="n">${h(it.full)}</span><b>${fmtInt(pizzaTotal(it))}</b><span class="p">${r === null ? '–' : `${r}%`}</span></div>`
+    })
+    .join('')}</div>`
+}
+
 function signature(m: ReportModel, t: ReportTheme): string {
   const c = m.cases
   if (!c) return ''
   const rate = c.winRate
   const totals: Record<PizzaStatus, number> = { won: c.win, lost: c.lose, neutral: c.neutral, pending: c.inProgress }
-  return `<section class="rp-block rp-sig rp-avoid">${sec('Sud ishlari bir qarashda', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}
+  const big = `<div class="rp-rate-big"><b>${rate === null ? '–' : `${rate}%`}</b><span>yutuq darajasi<small>${rate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(c.win + c.lose)} ta hal qilingan ishdan`}</small></span></div>`
+  const key = `<div class="rp-stkey">${PIZZA_STATUS_ORDER.map((st) => `<span><i class="rp-st ${st}"></i>${PIZZA_STATUS_LABEL[st]} <b>${fmtInt(totals[st])}</b></span>`).join('')}</div>`
+  const head = sec('Sud ishlari bir qarashda', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)
+
+  // two pies (court type | category) when the category split says something; else the single big one
+  if (c.pieTurkum.length >= 2) {
+    const col = (title: string, items: PizzaItem[], id: string) =>
+      `<div class="rp-pcol"><div class="rp-mini-h">${title}</div><div class="rp-pie-wrap">${pizza(items, t, id)}</div>${sliceList(items)}</div>`
+    return `<section class="rp-block rp-sig rp-avoid">${head}
+    <div class="rp-sig-card rp-sig-2">
+      <div class="rp-sig-top">${big}${key}</div>
+      <div class="rp-pcols">${col('Sud turi boʻyicha', c.pie, 'rpzc')}${col('Turkum boʻyicha', c.pieTurkum, 'rpzt')}</div>
+    </div></section>`
+  }
+  return `<section class="rp-block rp-sig rp-avoid">${head}
     <div class="rp-sig-card">
       <div class="rp-pie-wrap">${pizza(c.pie, t)}</div>
-      <div class="rp-sig-side">
-        <div class="rp-rate-big"><b>${rate === null ? '–' : `${rate}%`}</b><span>yutuq darajasi<small>${rate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(c.win + c.lose)} ta hal qilingan ishdan`}</small></span></div>
-        <div class="rp-slices">${c.pie
-          .map((it) => {
-            const r = calcWinRate(it.won, it.lost)
-            return `<div><i style="background:${it.col}"></i><span class="n">${h(it.full)}</span><b>${fmtInt(pizzaTotal(it))}</b><span class="p">${r === null ? '–' : `${r}%`}</span></div>`
-          })
-          .join('')}</div>
-        <div class="rp-stkey">${PIZZA_STATUS_ORDER.map((st) => `<span><i class="rp-st ${st}"></i>${PIZZA_STATUS_LABEL[st]} <b>${fmtInt(totals[st])}</b></span>`).join('')}</div>
-      </div>
+      <div class="rp-sig-side">${big}${sliceList(c.pie)}${key}</div>
     </div></section>`
 }
 
@@ -411,11 +426,11 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-sec em { order: 2; font-style: normal; font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--t3); font-size: 9.5px; }
   .rp-block { margin-top: 20px; }
   .rp-avoid { break-inside: avoid; }
-  .rp-two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0 16px; }
+  .rp-two { break-inside: avoid; display: grid; grid-template-columns: 1.15fr 1fr; gap: 0 16px; }
   .rp-two .rp-block:first-child, .rp-two > div > .rp-block:first-child { margin-top: 16px; }
 
   /* zebra key / value rows */
-  .rp-kv { border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; }
+  .rp-kv { break-inside: avoid; border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; }
   .rp-kv > div { display: grid; grid-template-columns: 34mm minmax(0, 1fr); gap: 10px; padding: 7px 10px; font-size: 10.5px; align-items: baseline; break-inside: avoid; }
   .rp-kv > div:nth-child(even) { background: var(--in); }
   .rp-kv .k { color: var(--t2); }
@@ -443,6 +458,13 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-pz-t { font: 600 11px ${monoStack}; fill: #fff; }
   .rp-pz-w { font: 600 10.5px ${monoStack}; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6px; paint-order: stroke; }
   .rp-pz-n { font: 500 10px ${monoStack}; fill: var(--t2); stroke: var(--in); stroke-opacity: .85; stroke-width: 1.6px; paint-order: stroke; }
+  .rp-sig-2 { display: block; padding: 12px 16px 10px; }
+  .rp-sig-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--bs); }
+  .rp-sig-top .rp-rate-big { border: 0; padding: 0; }
+  .rp-sig-top .rp-stkey { padding: 0; justify-content: flex-end; }
+  .rp-pcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding-top: 10px; }
+  .rp-pcol .rp-pie-wrap { width: 62mm; margin: 0 auto; }
+  .rp-slices .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rp-rate-big { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--bs); }
   .rp-rate-big b { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
   .rp-rate-big span { font-size: 10.5px; font-weight: 600; color: var(--t2); line-height: 1.3; }

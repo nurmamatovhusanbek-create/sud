@@ -12,7 +12,7 @@
  */
 
 import { winRate } from '@/core/rates'
-import { courtItems, type PizzaItem } from '@/components/proto/pizza-geometry'
+import { courtItems, turkumItems, type PizzaItem } from '@/components/proto/pizza-geometry'
 import type { CompanyInfoData, CompanyStats, CourtCase, UpcomingHearingsData } from '@/lib/api-types'
 import type { CompanyMeta } from '@/lib/registry'
 import { dateKey, daysUntil, formatDmy } from '@/core/dates'
@@ -95,6 +95,8 @@ export interface CasesBlock {
   byCourt: { label: string; count: number }[]
   /** the Statistika pizza's slices (court type × four statuses) — the report draws the same chart */
   pie: PizzaItem[]
+  /** the same pizza grouped by case category (Turkum) — the report shows it when there are ≥ 2 categories */
+  pieTurkum: PizzaItem[]
   results: ResultRow[]
   monthly: TrendPoint[]
   /** sum of claim amounts (soʻm) and how many cases carried one; null = unknown */
@@ -415,6 +417,7 @@ function buildCases(stats: CompanyStats, list: CourtCase[] | null, now: Date): C
     asDefendant: s?.asDefendant ?? all.filter((c) => c.role === 'defendant').length,
     byCourt,
     pie: courtItems(all),
+    pieTurkum: turkumItems(all),
     results,
     monthly: monthlyTrend(all, now),
     claim,
