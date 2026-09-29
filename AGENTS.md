@@ -39,7 +39,7 @@ bun test src/core      # pure-core math/logic tests (pretenzia penalty, classify
 blocked, and the Cloudflare workers aren't configured). To verify UI or flows that need
 data, **seed `localStorage`** via Playwright `page.addInitScript`, **mock the API** with
 `page.route(...).fulfill()`, or render a component against fixture data — don't conclude
-a feature is broken just because a live fetch failed here. Playwright + Chromium are
+a feature is broken just because a live fetch failed here. The document editor needs no live data: run `next dev`, open Hujjatlar, and drive it with Playwright (fill `[data-fk]` inputs, click `.dprev .slot`, capture the download and compare its text to the preview). Playwright + Chromium are
 preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
 
 ---
@@ -63,7 +63,7 @@ preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
 |---|---|---|
 | Touch the shell / navigation / ⌘K | `src/components/shell/app-shell.tsx`, `command-palette.tsx` | Nav is `WORKSPACE_NAV` + the "Tizim" group (Hujjatlar, Sozlamalar). |
 | Edit a data section | `src/components/sections/` (`bills`, `cases`, `hearings`, `profile`, `overview`) | |
-| Edit a full-surface view | `src/components/views/` (`launcher`, `watchlist`, `documents-view`, `pretenzia-view`, `settings-view`) | The launcher is the home surface. |
+| Edit a full-surface view | `src/components/views/` (`launcher`, `watchlist`, `documents-view`, `doc-editor`, `pretenzia-view`, `settings-view`) | The launcher is the home surface. |
 | Change colors, spacing, tokens, dark mode | `src/app/globals.css` + `src/app/prototype.css` | **Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components. |
 | Lay out a responsive card grid | reuse the `.kpis` / `.ccards` breakpoints | **Grid gotcha (learned the hard way):** `repeat(N, 1fr)` = `minmax(auto, 1fr)`, so non-wrapping content (company names, STIRs) forces horizontal overflow off-screen. Use `minmax(0, 1fr)` **and** `min-width: 0` on the items. |
 | Add a "themed PDF" export | `src/lib/print.ts` | `buildPrintDoc(title, body, dark)` renders an app-themed sheet that adapts to the active theme; uses `print-color-adjust: exact` so brand colors survive "Save as PDF". |
@@ -80,8 +80,11 @@ The app fills Word templates server-side and streams them back.
 
 | You want to… | Go to | Why / notes |
 |---|---|---|
-| Add/edit a form-driven document (visa, IIO, court) | `src/lib/documents/registry.ts` | Declares each document (id, template, fields) and each category (label, shared field groups). Fields render automatically in `documents-view.tsx`. |
-| Change how templates are filled | `src/lib/documents/fill.server.ts` | Trivial `{{key}}` string replace inside `word/document.xml` via JSZip. |
+| Add/edit a form-driven document (visa, IIO, court) | `src/lib/documents/registry.ts` | Declares each document (id, template, fields) and each category (label, shared field groups). The editor, its live preview and the download all pick a new document up automatically — every field in `fields` must have a `{{key}}` in the template (and vice versa), or the form and the page disagree. Give fields a `placeholder`: it is what an empty spot shows on the page. |
+| Change how templates are filled | `src/lib/documents/fill.shared.ts` (the substitution) · `fill.server.ts` (download: reads template, swaps letterhead, zips) | Trivial `{{key}}` string replace inside `word/document.xml` via JSZip. **The substitution is isomorphic on purpose:** the server download and the browser live preview both call `fillXml`/`markXml` from `fill.shared.ts`, so the preview can never drift from the file. Change fill behaviour there, never in only one side. |
+| Change the document editor (form ↔ live page) | `src/components/views/doc-editor.tsx` (form, sections, doc switcher, downloads) + `src/components/proto/doc-preview.tsx` (live render) + `.dedit*` / `.dprev*` in `prototype.css` | Split view: fields left, the REAL .docx template rendered right (via `docx-preview`), filled as you type. Click a value on the page → its field focuses; focus a field → its spots highlight. Combined categories (visa, iio) share one form and get a doc switcher + «Barchasi»; court docs get one doc with sectioned fields (`sectionsFor` in the registry). |
+| Change how the preview is drawn | `doc-preview.tsx` | Pipeline per change (debounced): template zip → `markXml` wraps each value in private-use sentinels (U+E000–E002) → letterhead swap → `docx-preview` renders **off-screen** → sentinels become `<span class="slot" data-k>` → DOM swapped in (no flicker, scroll kept). Empty spots show the field's example text (`placeholder`) in italics; the real download still leaves them blank. Slot tints are fixed light colors because the paper is always white, even in dark mode. |
+| Serve a template to the preview | `src/app/api/documents/template/route.ts` (`GET ?id=`) | Guarded like every route; id is validated against the registry (path-traversal ids 404). Returns the raw, unfilled template only. |
 | Work on the **Talabnoma** (akt-sverka → demand letters) flow | `src/lib/pretenzia/` (`parse.ts` client xlsx reader · `render.ts` values · `fill.server.ts`) + `src/components/views/pretenzia-view.tsx` + API `src/app/api/pretenzia/generate/route.ts` | `parse.ts` reads the xlsx client-side and finds debtor contracts; `render.ts` builds RU/UZ values; `fill.server.ts` picks the template by language (`pretenzia.docx` / `talabnoma-uz.docx`), fills, and returns one `.docx` or a ZIP. |
 | Build or repair a `.docx` template | `scripts/doc-templates/` (`build-*.mjs`, `verify-templates.mjs`) → outputs to `src/lib/documents/templates/` | **Placeholders get split across XML runs by Word.** The build scripts do "span surgery": collapse run-fragmented `{{key}}` back into a single run so the fill step can replace it. Run `verify-templates.mjs` after building — it checks every placeholder is present and reachable. Don't hand-edit the binary `.docx`. |
 | Add a letterhead/header image picker | `src/components/proto/letterhead.tsx` | Shared `useLetterhead()` hook + `LetterheadRow`; swaps `word/media/image1.png` (blank transparent PNG / uploaded / keep template's). Reused by both the visa docs and Talabnoma. |
@@ -105,7 +108,7 @@ reads at runtime, add it there too or production won't find it.
 `Permissions-Policy`, COOP, `X-Robots-Tag: noindex`, and `Cache-Control: no-store` on
 `/api/*`. If you add an external origin (script, image, font, fetch), the CSP will
 block it — the correct move is almost always to **bring it same-origin** (self-host it),
-not to loosen the CSP. `guard()` on every API route is the second layer. `APP_API_TOKEN`
+not to loosen the CSP. (The live preview relies on `img-src data:`/`blob:` and inline styles — `docx-preview` embeds images as data URLs and injects a `<style>`; don't tighten those without re-testing the editor.) `guard()` on every API route is the second layer. `APP_API_TOKEN`
 is required in production.
 
 ---

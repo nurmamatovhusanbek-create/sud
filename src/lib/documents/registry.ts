@@ -224,6 +224,31 @@ export const TABS: TabDef[] = [
   },
 ]
 
+// ---- form sections ----------------------------------------------------------
+// Separate categories (court) have no shared panels, so their long field list is
+// split into readable sections in the editor. Unlisted keys fall into "Maʼlumotlar".
+
+const FIELD_SECTION: Record<string, string> = {
+  court: 'Sud va ish', judge: 'Sud va ish', case_number: 'Sud va ish',
+  hearing_date: 'Majlis va asos', hearing_time: 'Majlis va asos', reason: 'Majlis va asos',
+  legal_basis: 'Majlis va asos', order_date: 'Majlis va asos', order_number: 'Majlis va asos',
+  amount: 'Majlis va asos', beneficiary: 'Majlis va asos',
+  company: 'Tomonlar', director: 'Tomonlar', rep_name: 'Tomonlar', address: 'Tomonlar',
+  plaintiff: 'Tomonlar', contract_subject: 'Tomonlar', applicant_person: 'Tomonlar',
+  phone: 'Tomonlar', passport: 'Tomonlar', executor: 'Tomonlar',
+}
+const SECTION_ORDER = ['Sud va ish', 'Tomonlar', 'Majlis va asos', 'Maʼlumotlar']
+
+/** Split a flat field list into ordered, titled sections (empty ones dropped). */
+export function sectionsFor(keys: string[]): { title: string; keys: string[] }[] {
+  const by = new Map<string, string[]>()
+  keys.forEach((k) => {
+    const t = FIELD_SECTION[k] ?? 'Maʼlumotlar'
+    by.set(t, [...(by.get(t) ?? []), k])
+  })
+  return SECTION_ORDER.filter((t) => by.has(t)).map((t) => ({ title: t, keys: by.get(t)! }))
+}
+
 // ---- helpers ----------------------------------------------------------------
 
 export function tabById(id: DocTab): TabDef | undefined {

@@ -68,9 +68,11 @@ persisted client-side (localStorage registry, keyed by STIR).
 
 **Hujjatlar (Documents)** — a document engine that fills `.docx` templates from the
 company/case data and your input:
-- **Viza hujjatlari, Ichki ishlar, Sud arizalari** — form-driven letters and motions;
-  fill the shared fields once, generate every document in the category; each supports a
-  letterhead/header picker.
+- **Viza hujjatlari, Ichki ishlar, Sud arizalari** — form-driven letters and motions with a
+  **live preview**: the form sits beside the real document (letterhead and all), filled as
+  you type. Click a value on the page to jump to its field; focus a field to see where it
+  lands. Fill the shared fields once and switch between (or download all) the documents in
+  the category; visa and IIO support a letterhead/header picker.
 - **Talabnoma (akt-sverka asosida)** — upload an *Акт сверки* `.xlsx`, the app detects
   every debtor contract, you pick which ones, and it generates a demand letter per
   contract with the penalty math auto-computed to the tiyin (0.4%/day, capped at 50% of
@@ -188,12 +190,12 @@ src/
   components/
     shell/        app-shell (nav) · command-palette (⌘K)
     sections/     bills · cases · hearings · profile · overview
-    views/        launcher · watchlist · documents-view · pretenzia-view · settings-view
-    proto/        shared prototype-styled widgets (e.g. letterhead picker)
+    views/        launcher · watchlist · documents-view · doc-editor · pretenzia-view · settings-view
+    proto/        shared prototype-styled widgets (letterhead picker, doc-preview)
     company/ · ui/ · ui-custom/
   core/           pure domain: classify · status · billing-format · pretenzia (math) · schemas · __tests__
   lib/
-    documents/    template registry + server-side .docx fill + templates/*.docx
+    documents/    template registry + fill.shared (server+preview) + fill.server + templates/*.docx
     pretenzia/    xlsx parse (client) · render values · fill.server (docx + ZIP)
     store/        Zustand app-store (nav/surface state)
     net/ · domain/ · registry · enrich · print (themed PDF) · scraper libs (billing, court-case, …)

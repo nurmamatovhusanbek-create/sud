@@ -1,6 +1,7 @@
 /**
  * Server-only .docx filling: load a template, substitute every {{key}} in
  * word/document.xml with the (XML-escaped) form value, and return the bytes.
+ * The substitution itself lives in fill.shared.ts (shared with the preview).
  *
  * The templates already collapse each value into a single {{key}} run
  * (scripts/doc-templates), so this is a plain string replace — no run-merge
@@ -11,37 +12,13 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
 import { docById } from './registry'
+import { BLANK_PNG_B64, fillXml } from './fill.shared'
 
-// A 1×1 fully transparent PNG. When no letterhead is supplied we swap the
-// template's embedded banner for this — the drawing box (and thus the vertical
-// space) is preserved, but no company branding is forced onto the document.
-const BLANK_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64',
-)
+// Transparent banner used when no letterhead is supplied (see fill.shared.ts).
+const BLANK_PNG = Buffer.from(BLANK_PNG_B64, 'base64')
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // keep quotes literal in text nodes (they are valid), but be safe in attrs
-    .replace(/"/g, '&quot;')
-}
-
-/**
- * Replace {{key}} placeholders. Unknown/blank keys collapse to '' so no stray
- * `{{…}}` ever survives into the delivered document.
- */
-function fillXml(xml: string, values: Record<string, string>): string {
-  return xml.replace(/\{\{([a-z_]+)\}\}/g, (_m, key: string) => {
-    const v = values[key]
-    return v ? escapeXml(v) : ''
-  })
-}
 
 export interface GeneratedDoc {
   buffer: Buffer
@@ -57,6 +34,17 @@ export interface GenerateOpts {
   blankIfNone?: boolean
 }
 
+/** Raw bytes of a document's .docx template (also served to the live preview). */
+export async function readTemplate(docId: string): Promise<Buffer> {
+  const def = docById(docId)
+  if (!def) throw new Error('Nomaʼlum hujjat turi')
+
+  const file = path.join(TEMPLATE_DIR, def.file)
+  // guard against path escapes even though docId is validated above
+  if (!file.startsWith(TEMPLATE_DIR)) throw new Error('Nomaʼlum hujjat turi')
+  return fs.readFile(file)
+}
+
 export async function generateDocx(
   docId: string,
   values: Record<string, string>,
@@ -65,11 +53,7 @@ export async function generateDocx(
   const def = docById(docId)
   if (!def) throw new Error('Nomaʼlum hujjat turi')
 
-  const file = path.join(TEMPLATE_DIR, def.file)
-  // guard against path escapes even though docId is validated above
-  if (!file.startsWith(TEMPLATE_DIR)) throw new Error('Nomaʼlum hujjat turi')
-
-  const raw = await fs.readFile(file)
+  const raw = await readTemplate(docId)
   const zip = await JSZip.loadAsync(raw)
   const docXmlFile = zip.file('word/document.xml')
   if (!docXmlFile) throw new Error('Shablon buzilgan')
