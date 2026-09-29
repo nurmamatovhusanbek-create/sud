@@ -7,3 +7,6 @@ out/
 .DS_Store
 *.tsbuildinfo
 .sud-restart
+
+# output of scripts/explore-public-sud.mjs
+sud-explore/
