@@ -81,6 +81,23 @@ export async function lookupOrders(caseNumber: string): Promise<StoredOrder[]> {
 const checkedFile = () => path.join(dataDir(), 'checked.jsonl')
 let checkedCache: Map<string, CaseCheck> | null = null
 
+/**
+ * Records written by an older version of the app (or a hand-edited file) may lack fields; a record that cannot be
+ * trusted is treated as «never checked» rather than crashing every reader.
+ */
+function normalizeCheck(raw: unknown): CaseCheck | null {
+  const r = raw as Partial<CaseCheck> | null
+  if (!r || typeof r.caseNumber !== 'string' || !r.caseNumber || typeof r.at !== 'string' || Number.isNaN(Date.parse(r.at))) return null
+  return {
+    caseNumber: normalizeCaseNumber(r.caseNumber),
+    at: r.at,
+    sig: typeof r.sig === 'string' ? r.sig : '',
+    seen: Array.isArray(r.seen) ? r.seen.filter((x): x is string => typeof x === 'string') : [],
+    misses: typeof r.misses === 'number' && r.misses >= 0 ? r.misses : 0,
+    error: typeof r.error === 'string' && r.error ? r.error : undefined,
+  }
+}
+
 async function loadChecked(): Promise<Map<string, CaseCheck>> {
   if (checkedCache) return checkedCache
   const m = new Map<string, CaseCheck>()
@@ -88,8 +105,8 @@ async function loadChecked(): Promise<Map<string, CaseCheck>> {
     for (const line of (await fs.readFile(checkedFile(), 'utf8')).split('\n')) {
       if (!line) continue
       try {
-        const c = JSON.parse(line) as CaseCheck
-        if (c.caseNumber) m.set(c.caseNumber, c) // last write wins
+        const c = normalizeCheck(JSON.parse(line))
+        if (c) m.set(c.caseNumber, c) // last write wins
       } catch { /* torn line */ }
     }
   } catch { /* first run */ }
