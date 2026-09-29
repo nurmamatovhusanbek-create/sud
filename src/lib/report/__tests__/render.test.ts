@@ -58,17 +58,27 @@ describe('signature chart and sources', () => {
     const html = doc(FULL)
     for (const src of ['orginfo', 'chamber.uz', 'sud.uz', 'billing.sud', 'Manba']) expect(html).not.toContain(src)
   })
-  test('the report draws the Statistika pizza: one wedge per court type, bands sum to the case total', () => {
+  test('the report draws the Statistika pizzas: court type AND category, bands + pills reconcile with the total', () => {
     const html = doc(FULL)
-    const svg = html.match(/<svg class="rp-pie"[\s\S]*?<\/svg>/)![0]
-    const pie = FULL_MODEL.cases!.pie
-    expect(pie.length).toBeGreaterThan(0)
-    // every non-empty status of every slice is one band path (radial-stack geometry, shared with the app)
-    const bands = pie.reduce((a, it) => a + [it.won, it.lost, it.neutral ?? 0, it.pending ?? 0].filter((v) => v > 0).length, 0)
-    expect((svg.match(/<path d="M/g) ?? []).length).toBe(bands)
-    // pills carry the per-slice totals, and together they are ALL cases
-    const pills = [...svg.matchAll(/class="rp-pz-t"[^>]*>(\d+)</g)].map((m) => Number(m[1]))
-    expect(pills.reduce((a, b) => a + b, 0)).toBe(FULL_MODEL.cases!.total)
+    const svgs = html.match(/<svg class="rp-pie"[\s\S]*?<\/svg>/g)!
+    const c = FULL_MODEL.cases!
+    expect(c.pieTurkum.length).toBeGreaterThanOrEqual(2)
+    expect(svgs).toHaveLength(2)
+    for (const [svg, pie] of [[svgs[0], c.pie], [svgs[1], c.pieTurkum]] as const) {
+      // every non-empty status of every slice is one band path (radial-stack geometry, shared with the app)
+      const bands = pie.reduce((a, it) => a + [it.won, it.lost, it.neutral ?? 0, it.pending ?? 0].filter((v) => v > 0).length, 0)
+      expect((svg.match(/<path d="M[^"]*" (fill="[^"]*"( fill-opacity="[^"]*")?|fill="url)/g) ?? []).length).toBeGreaterThanOrEqual(bands)
+      // pills carry the per-slice totals, and together they are ALL cases
+      const pills = [...svg.matchAll(/class="rp-pz-t"[^>]*>(\d+)</g)].map((m) => Number(m[1]))
+      expect(pills.reduce((a, b) => a + b, 0)).toBe(c.total)
+    }
+    expect(html).toContain('Turkum boʻyicha')
+  })
+  test('one category only: the single big pizza, no Turkum column', () => {
+    const one = buildReportModel({ ...FULL, stats: { ...(FULL.stats as object), cases: (FULL.stats as { cases: { category: string }[] }).cases.map((x) => ({ ...x, category: 'Shartnoma' })) } as never })
+    const html = buildReportDoc(one)
+    expect(html.match(/<svg class="rp-pie"/g)).toHaveLength(1)
+    expect(html).not.toContain('Turkum boʻyicha')
   })
   test('the win rate is the app-wide won ÷ (won + lost), with its base', () => {
     const c = FULL_MODEL.cases!

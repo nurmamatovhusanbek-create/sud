@@ -3,7 +3,7 @@ import type { ReportInput } from '../model'
 export const NOW = new Date(2026, 8, 29, 12, 0)
 
 export const mkCase = (n: number, cls: 'win' | 'lose' | 'pending' | 'neutral', result: string, regDate: string, role: 'plaintiff' | 'defendant' = 'plaintiff', courtType: 'economic' | 'civil' | 'administrative' = 'economic') => ({
-  caseNumber: `4-1001-2609/0${n}`, courtType, regDate, result, classification: cls, role, court: 'Toshkent tumanlararo iqtisodiy sud', category: 'Shartnoma', counterparty: `"KONTRAGENT ${n}" MCHJ`,
+  caseNumber: `4-1001-2609/0${n}`, courtType, regDate, result, classification: cls, role, court: 'Toshkent tumanlararo iqtisodiy sud', category: ['Shartnoma', 'Undiruv', 'Soliq'][n % 3], counterparty: `"KONTRAGENT ${n}" MCHJ`,
 })
 
 export const CASES = [
