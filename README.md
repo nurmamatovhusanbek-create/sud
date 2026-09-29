@@ -82,8 +82,8 @@ company/case data and your input:
   via a language switch at the end of the flow; multiple contracts come back as a ZIP.
 
 **Hisobot (Company report)** — the *Hisobot* button in a company's header builds a
-multi-page A4 PDF (own design, follows the app theme) with a signature «verdict wheel» chart
-(outcome arcs plus a win-rate dial): company card and key figures, court activity breakdown, monthly trend, claim amounts, upcoming hearings and bills.
+multi-page A4 PDF (own design, follows the app theme) with the same radial-stack pizza as
+Statistika (every case, four statuses per court type): company card and key figures, court activity breakdown, monthly trend, claim amounts, upcoming hearings and bills.
 It reuses the app's cache and never blocks on a slow source: a source that fails or times
 out is stated in place on the page instead of printing a misleading zero. Sections with no
 data source (subsidiaries, licences, audits, pledges, trademarks…) are intentionally left out.
