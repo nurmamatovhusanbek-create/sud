@@ -45,6 +45,15 @@ describe('court cases block — numbers match Statistika', () => {
     expect(r).toHaveLength(7)
     expect(r[6]).toMatchObject({ label: 'Boshqalar', count: 3 })
   })
+  test('the same wording with opposite outcomes is split, never one bar with one color', () => {
+    const cs = [mkCase(0, 'win', "Da'vo rad etilsin", '01.01.2026'), mkCase(1, 'win', "Da'vo rad etilsin", '01.01.2026'), mkCase(2, 'lose', "Da'vo rad etilsin", '01.01.2026'), mkCase(3, 'neutral', 'Qaytarilgan', '01.01.2026')]
+    const r = buildReportModel({ ...FULL, stats: { ...(FULL.stats as object), cases: cs, summary: { total: 4, win: 2, lose: 1, neutral: 1, pending: 0, asPlaintiff: 1, asDefendant: 3 } } as never }).cases!.results
+    expect(r.map((x) => [x.label, x.count, x.tone])).toEqual([
+      ["Da'vo rad etilsin · yutgan", 2, 'pos'],
+      ["Da'vo rad etilsin · yutqazgan", 1, 'neg'],
+      ['Qaytarilgan', 1, 'neu'],
+    ])
+  })
 })
 
 describe('facts and founders', () => {

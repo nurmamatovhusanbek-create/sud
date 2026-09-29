@@ -50,24 +50,40 @@ describe('nameMatches', () => {
   })
 })
 
-describe('classifyOutcome (Interpretation A)', () => {
-  test('full satisfaction is a WIN for both roles', () => {
-    expect(classifyOutcome('plaintiff', 'Иш тўлиқ қаноатлантирилди')).toBe('win')
-    expect(classifyOutcome('defendant', "Da'vo to'liq qanoatlantirildi")).toBe('win')
+describe('classifyOutcome — judged from the company\'s side of the claim', () => {
+  test('claim satisfied: plaintiff WINS, defendant LOSES', () => {
+    for (const r of ['Иш тўлиқ қаноатлантирилди', "Da'vo to'liq qanoatlantirildi", 'Даъво қисман қаноатлантирилди', 'qisman qanoatlantirildi', "Da'vo to‘liq qanoatlantirilsin"]) {
+      expect(classifyOutcome('plaintiff', r)).toBe('win')
+      expect(classifyOutcome('defendant', r)).toBe('lose')
+    }
   })
 
-  test('partial satisfaction is a WIN', () => {
-    expect(classifyOutcome('plaintiff', 'Даё қисман қаноатлантирилди')).toBe('win')
-    expect(classifyOutcome('defendant', 'qisman qanoatlantirildi')).toBe('win')
+  test('claim rejected (rad etilgan): plaintiff LOSES, defendant WINS', () => {
+    for (const r of ['Даво рад этилди', "Da'vo rad etilsin", "Da'vo rad etildi", 'Rad etilgan', "Da'vo qanoatlantirishdan rad etilsin", "Da'vo qanoatlantirilmasin"]) {
+      expect(classifyOutcome('plaintiff', r)).toBe('lose')
+      expect(classifyOutcome('defendant', r)).toBe('win')
+    }
   })
 
-  test('rejection: plaintiff LOSE, defendant NEUTRAL', () => {
-    expect(classifyOutcome('plaintiff', 'Даво рад этилди')).toBe('lose')
-    expect(classifyOutcome('defendant', 'Даво рад этилди')).toBe('neutral')
+  test('«to\'liq rad etilsin» is a rejection, not a satisfaction', () => {
+    expect(classifyOutcome('plaintiff', "Da'vo to'liq rad etilsin")).toBe('lose')
+    expect(classifyOutcome('defendant', "Da'vo to'liq rad etilsin")).toBe('win')
   })
 
-  test('returned / left-without-review / terminated behave as rejection', () => {
-    for (const r of ['Иш қайтарилган', 'Кўрмасдан қолдирилган', 'Иш юритишдан тугатилган']) {
+  test('partly satisfied, the rest rejected, still counts as satisfied', () => {
+    expect(classifyOutcome('plaintiff', "Da'vo qisman qanoatlantirilsin, qolgan qismi rad etilsin")).toBe('win')
+    expect(classifyOutcome('defendant', "Da'vo qisman qanoatlantirilsin, qolgan qismi rad etilsin")).toBe('lose')
+  })
+
+  test('returned (qaytarilgan) is NEUTRAL for both sides', () => {
+    for (const r of ['Иш қайтарилган', "Da'vo arizasi qaytarilsin", 'Qaytarilgan']) {
+      expect(classifyOutcome('plaintiff', r)).toBe('neutral')
+      expect(classifyOutcome('defendant', r)).toBe('neutral')
+    }
+  })
+
+  test('left-without-review / terminated: plaintiff LOSES, defendant NEUTRAL', () => {
+    for (const r of ['Кўрмасдан қолдирилган', 'Иш юритишдан тугатилган']) {
       expect(classifyOutcome('plaintiff', r)).toBe('lose')
       expect(classifyOutcome('defendant', r)).toBe('neutral')
     }
