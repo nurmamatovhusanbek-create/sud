@@ -960,6 +960,9 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .orders-loader > svg { width: 15px; height: 15px; flex: none; }
 .orders-loader.ok > svg { color: var(--pos-text); }
 .orders-loader.err > svg { color: var(--neg-text); }
+.orders-loader .go { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 11px 0 9px; border-radius: 999px; border: 0; background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; }
+.orders-loader .go svg { width: 13px; height: 13px; }
+.orders-loader.ready > svg { color: var(--accent); }
 .orders-loader.paused > svg { color: var(--warn-text, var(--text-2)); }
 .orders-loader .spinner { width: 14px; height: 14px; flex: none; }
 .orders-loader .x { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--surface-inset); color: var(--text-2); cursor: pointer; flex: none; }

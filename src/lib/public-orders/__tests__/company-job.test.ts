@@ -7,12 +7,13 @@ mock.module('server-only', () => ({}))
 
 // the upstream: every search waits on a gate we open by hand, so pause/resume are tested at exact moments
 const gates: (() => void)[] = []
+let failNext = false
 const searched: string[] = []
 mock.module('../source', () => ({
   searchCase: (cn: string) =>
-    new Promise((resolve) => {
+    new Promise((resolve, reject) => {
       searched.push(cn)
-      gates.push(() => resolve([]))
+      gates.push(() => (failNext ? reject(new Error('worker 502')) : resolve([])))
     }),
   fetchOrderFile: async () => new Uint8Array(),
 }))
@@ -38,7 +39,7 @@ const job = (n: number, extra: Record<string, string> = {}) => ({ caseNumber: `4
 describe('company job queue', () => {
   test('cases still heard in the first instance are left out, decided / appealed ones are queued', async () => {
     const { enqueueCases, cancelCases, caseJobStatus } = await import('../company-job')
-    const out = enqueueCases([
+    const out = await enqueueCases([
       job(1, { result: '', caseStatus: 'Иш юритувда' }),
       job(2, { result: '', caseStatus: 'Апелляцияда' }),
       job(3),
@@ -54,7 +55,7 @@ describe('company job queue', () => {
     const { enqueueCases, pauseCases, resumeCases, caseJobStatus } = await import('../company-job')
     await tick(50)
     searched.length = 0
-    enqueueCases([job(11), job(12), job(13)])
+    await enqueueCases([job(11), job(12), job(13)])
     await tick(30)
     expect(searched.every((c) => c.endsWith('/11'))).toBe(true) // first case is being searched
     pauseCases()
@@ -83,7 +84,7 @@ describe('company job queue', () => {
   test('resuming while the paused case is still being searched just carries on (no second loop)', async () => {
     const { enqueueCases, pauseCases, resumeCases, caseJobStatus } = await import('../company-job')
     searched.length = 0
-    enqueueCases([job(21), job(22)])
+    await enqueueCases([job(21), job(22)])
     await tick(30)
     pauseCases()
     resumeCases()
@@ -97,10 +98,10 @@ describe('company job queue', () => {
   test('cancel drops what is left; the automatic feeder never undoes a pause', async () => {
     const { enqueueCases, pauseCases, cancelCases, caseJobStatus } = await import('../company-job')
     searched.length = 0
-    enqueueCases([job(31), job(32), job(33)])
+    await enqueueCases([job(31), job(32), job(33)])
     await tick(30)
     pauseCases()
-    enqueueCases([job(34)], { keepPaused: true })
+    await enqueueCases([job(34)], { keepPaused: true })
     expect(caseJobStatus().state).toBe('paused')
     expect(caseJobStatus().remaining).toBe(3)
     cancelCases()
@@ -108,5 +109,62 @@ describe('company job queue', () => {
     await finishCurrentCase()
     expect(caseJobStatus().state).not.toBe('running')
     expect(searched.some((c) => c.endsWith('/32'))).toBe(false)
+  })
+
+  test('DETECT then SCRAPE: a held run is «ready» and makes no request until started', async () => {
+    const { enqueueCases, resumeCases, cancelCases, caseJobStatus } = await import('../company-job')
+    await tick(50)
+    searched.length = 0
+    const out = await enqueueCases([job(41), job(42)], { hold: true })
+    expect(out.added).toBe(2)
+    await tick(40)
+    expect(caseJobStatus().state).toBe('ready')
+    expect(searched).toEqual([]) // nothing scraped yet
+    // detecting again (a page refresh) does not double the work
+    expect((await enqueueCases([job(41), job(42), job(43)], { hold: true })).added).toBe(1)
+    expect(caseJobStatus().total).toBe(3)
+    resumeCases()
+    await tick(30)
+    expect(searched.length).toBeGreaterThan(0)
+    expect(caseJobStatus().state).toBe('running')
+    cancelCases()
+    await finishCurrentCase()
+  })
+
+  test('cases already known or waiting out their back-off are not work (no request, not counted)', async () => {
+    const { enqueueCases, resumeCases, caseJobStatus } = await import('../company-job')
+    const { markChecked } = await import('../store')
+    await tick(50)
+    await markChecked({ caseNumber: '4-1001-2601/51', at: new Date().toISOString(), sig: 's', seen: [], misses: 0 }) // checked just now, unchanged
+    await markChecked({ caseNumber: '4-1001-2601/52', at: new Date().toISOString(), sig: 's', seen: ['FIRST', 'APPEAL', 'CASSATION'], misses: 0 })
+    const out = await enqueueCases([job(51), job(52), job(53)], { hold: true })
+    expect(out.added).toBe(1)
+    expect(out.known).toBe(2)
+    expect(caseJobStatus().total).toBe(1)
+    resumeCases()
+    await finishCurrentCase()
+    await finishCurrentCase()
+  })
+
+  test('a failed lookup stays listed and «retry» re-queues exactly it, no refresh needed', async () => {
+    const { enqueueCases, retryFailed, caseJobStatus } = await import('../company-job')
+    await tick(50)
+    failNext = true
+    await enqueueCases([job(61)])
+    await tick(30)
+    await finishCurrentCase() // all 3 instance searches reject
+    await tick(30)
+    let st = caseJobStatus()
+    expect(st.errors).toBe(1)
+    expect(st.failed).toBe(1)
+    failNext = false
+    searched.length = 0
+    const r = await retryFailed()
+    expect(r.added).toBe(1)
+    await tick(30)
+    expect(searched.some((c) => c.endsWith('/61'))).toBe(true)
+    await finishCurrentCase()
+    st = caseJobStatus()
+    expect(st.failed).toBe(0)
   })
 })
