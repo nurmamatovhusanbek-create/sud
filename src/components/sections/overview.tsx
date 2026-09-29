@@ -78,8 +78,8 @@ const fmtSumShort = (tiyins: number): string => formatSum(tiyins).split(',')[0]
 
 /** Decision-row metadata — the prototypeʼs CASE_META (icon/label/band/text). */
 const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band: string; text: string }> = {
-  win: { icon: <Trophy />, label: 'Yutgan', band: 'positive', text: "Daʼvo toʻliq qanoatlantirildi" },
-  lose: { icon: <CircleX />, label: 'Yutqazgan', band: 'negative', text: "Daʼvo qanoatlantirilmadi" },
+  win: { icon: <Trophy />, label: 'Yutgan', band: 'positive', text: "Yutgan" },
+  lose: { icon: <CircleX />, label: 'Yutqazgan', band: 'negative', text: "Yutqazgan" },
   pending: { icon: <Clock />, label: 'Jarayonda', band: 'warning', text: "Koʻrib chiqilmoqda" },
   neutral: { icon: <Minus />, label: 'Neytral', band: 'neutral', text: "Neytral yakunlangan" },
 }
@@ -628,7 +628,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
                   <div className={`lead ${c.classification === 'win' ? 'ink' : ''}`}>{meta.icon}</div>
                   <div className="main-c">
                     <b className="mono">{c.caseNumber}</b>
-                    <div className="sub">{meta.text}</div>
+                    <div className="sub">{c.result?.trim() || meta.text}</div>
                   </div>
                   <span className={`badge ${familyBadgeClass(meta.band)}`}>{meta.label}</span>
                 </div>

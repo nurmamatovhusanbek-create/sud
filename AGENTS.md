@@ -50,7 +50,7 @@ preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
 
 | You want to… | Go to | Why / notes |
 |---|---|---|
-| Change how cases are won/lost/pending, or the pizza breakdown | `src/core/classify.ts`, `src/core/status.ts` | **Pure functions, unit-tested.** Add/adjust a test in `src/core/__tests__/`. Keep them side-effect-free. |
+| Change how cases are won/lost/pending, or the pizza breakdown | `src/core/classify.ts`, `src/core/status.ts` | **Pure functions, unit-tested.** `classifyOutcome` is role-aware (granted: plaintiff win / defendant lose · rad etilgan: plaintiff lose / defendant win · qaytarilgan: neutral for both) and is the ONLY copy — `lib/stats.ts` imports it; never re-inline it. Add/adjust a test in `src/core/__tests__/`. Keep them side-effect-free. |
 | Change money/date formatting or number-to-words | `src/core/billing-format.ts`, `src/core/pretenzia.ts` | Money is in **tiyin** (1 sum = 100 tiyin) for exact integer math. RU *and* UZ number-to-words live here (UZ "ming" drops "bir"). |
 | Change the penalty / demand-letter math | `src/core/pretenzia.ts` (`computeClaim`, `delayDays`, `paymentClause`) | 0.4%/day, capped at 50% of debt, **inclusive** delay-day count, 5-banking-day grace. Golden-tested against real letters — update the test if you change a rule. |
 | Change the API request/response envelope or validation | `src/core/envelope.ts`, `src/core/schemas/`, `src/lib/api-types.ts` | Zod schemas define the shape crossing `/api`. |

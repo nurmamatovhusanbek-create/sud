@@ -59,7 +59,9 @@ renders as a docket ticket linked to its case.
 **Kompaniya (Profile)** — company profile from `orginfo.uz` (address, director, status,
 capital, founders, OKED) plus the `chamber.uz` contractor rating (0–100 score, AAA–D).
 
-**Statistika (Overview)** — win/lose/pending classification, trend chart, and the
+**Statistika (Overview)** — win/lose/neutral/pending classification judged from the company's side
+(claim granted: plaintiff wins, defendant loses; claim rejected: plaintiff loses, defendant wins;
+returned: neutral for both), trend chart, and the
 interactive "pizza" chart (by court type or case category) that breaks the total into
 its four statuses. Plus win-rate by court and side-by-side company comparison.
 

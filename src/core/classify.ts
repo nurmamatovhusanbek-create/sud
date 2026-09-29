@@ -4,12 +4,15 @@
  * Ported VERBATIM (function bodies) from src/lib/stats.ts so the scraper lib
  * and the core share one implementation. No I/O may ever live in this file.
  *
- * Business rules (STATS-TAB-SPEC "Interpretation A"):
- *   - To'liq / Qisman qanoatlantirilgan                    → WIN (either role)
- *   - Rad etilgan / Qaytarilgan / Ko'rmasdan qoldirilgan /
- *     Ish yuritishdan tugatilgan                            → plaintiff: LOSE,
- *                                                              defendant: NEUTRAL
- *   - empty / unknown                                       → PENDING
+ * Business rules — the outcome is judged from the COMPANY'S side of the claim:
+ *   - Da'vo qanoatlantirilgan (to'liq / qisman)  → plaintiff: WIN,  defendant: LOSE
+ *   - Da'vo rad etilgan                          → plaintiff: LOSE, defendant: WIN
+ *   - Da'vo qaytarilgan                          → NEUTRAL for both (nothing was decided)
+ *   - Ko'rmasdan qoldirilgan / ish yuritishdan
+ *     tugatilgan                                 → plaintiff: LOSE, defendant: NEUTRAL
+ *   - empty / unknown                            → PENDING
+ * "To'liq rad etilsin" is a rejection, not a satisfaction: only the word
+ * «qanoatlantir…» (and not «qanoatlantirilmasin») counts as the claim being granted.
  */
 
 export type StatsCourtType = 'economic' | 'civil' | 'administrative'
@@ -58,25 +61,30 @@ export function nameMatches(companyNorm: string, partyNorm: string): boolean {
 export function classifyOutcome(role: PartyRole, result: string): Classification {
   const r = (result || '')
     .toLowerCase()
-    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[\u2018\u2019\u02bb\u02bc]/g, "'")
     .trim()
 
   if (!r || r === '—' || r === '-') return 'pending'
 
-  const full = r.includes('тўлиқ') || r.includes("to'liq") || r.includes('toliq')
-  const partial = r.includes('қисман') || r.includes('qisman')
-  // "Rad etilgan" / "Rad qilingan" — match the key word "rad" alone.
-  const rejected = r.includes('рад') || r.includes('rad ')
-  const returned = r.includes('қайтарилган') || r.includes('qaytarilgan')
-  const leftWithoutReview =
-    r.includes('кўрмасдан') || r.includes("ko'rmasdan") || r.includes('kormasdan')
-  // Terminated without ruling — treated as rejection.
-  const terminated = r.includes('тугатилган') || r.includes('tugatilgan')
+  const has = (...words: string[]) => words.some((w) => r.includes(w))
+  const full = has('тўлиқ', "to'liq", 'toliq')
+  const partial = has('қисман', 'qisman')
+  // "qanoatlantirilmasin/-magan" and "qanoatlantirishdan rad etilsin" say the claim was NOT granted
+  const notGranted = has('қаноатлантирилма', 'qanoatlantirilma', 'қаноатлантиришдан', 'qanoatlantirishdan')
+  // "Rad etilgan" / "Rad qilingan" — match the key word "rad".
+  const rejected = notGranted || has('рад', 'rad ') || r.endsWith('rad')
+  // "to'liq"/"qisman" alone only mean «granted» when nothing rejects the claim ("to'liq rad etilsin")
+  const granted =
+    !notGranted && (has('қаноатлантир', 'qanoatlantir') || ((full || partial) && !rejected))
+  const returned = has('қайтарилган', 'qaytarilgan', 'қайтарилсин', 'qaytarilsin')
+  const leftWithoutReview = has('кўрмасдан', "ko'rmasdan", 'kormasdan')
+  // Terminated without ruling.
+  const terminated = has('тугатилган', 'tugatilgan')
 
-  if (full || partial) return 'win'
-  if (rejected || returned || leftWithoutReview || terminated) {
-    return role === 'plaintiff' ? 'lose' : 'neutral'
-  }
+  if (granted) return role === 'plaintiff' ? 'win' : 'lose'
+  if (returned) return 'neutral' // returned claims are just returned — no winner
+  if (rejected) return role === 'plaintiff' ? 'lose' : 'win'
+  if (leftWithoutReview || terminated) return role === 'plaintiff' ? 'lose' : 'neutral'
   return 'pending'
 }
 

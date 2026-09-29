@@ -354,22 +354,29 @@ function buildCases(stats: CompanyStats, list: CourtCase[] | null, now: Date): C
   }
   const claim = list === null ? null : { total: [...amountOf.values()].reduce((a, b) => a + b, 0), count: amountOf.size }
 
-  // result breakdown: group by the raw outcome text; each group takes its dominant class's tone
-  const groups = new Map<string, { count: number; byClass: Record<string, number> }>()
+  // result breakdown: group by the raw outcome text AND its class. The same wording means
+  // opposite things to the two sides («rad etilsin» wins for a defendant, loses for a plaintiff),
+  // so one bar can never carry both; when a wording splits, each bar says which outcome it is.
+  const groups = new Map<string, { label: string; cls: string; count: number }>()
   for (const c of all) {
     const label = clean(c.result) || (c.classification === 'pending' ? 'Jarayonda' : 'Natija koʻrsatilmagan')
-    const g = groups.get(label) ?? { count: 0, byClass: {} }
+    const key = `${label}\u0000${c.classification}`
+    const g = groups.get(key) ?? { label, cls: c.classification, count: 0 }
     g.count++
-    g.byClass[c.classification] = (g.byClass[c.classification] ?? 0) + 1
-    groups.set(label, g)
+    groups.set(key, g)
   }
-  const sorted = [...groups.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+  const perLabel = new Map<string, number>()
+  for (const g of groups.values()) perLabel.set(g.label, (perLabel.get(g.label) ?? 0) + 1)
+  const CLS_NOTE: Record<string, string> = { win: 'yutgan', lose: 'yutqazgan', neutral: 'neytral', pending: 'jarayonda' }
+  const sorted = [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
   const pct = (n: number) => (total ? Math.round((n / total) * 1000) / 10 : 0)
-  const results: ResultRow[] = sorted.slice(0, RESULTS_SHOWN).map(([label, g]) => {
-    const dominant = Object.entries(g.byClass).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'neutral'
-    return { label, count: g.count, pct: pct(g.count), tone: CLASS_TONE[dominant] ?? 'neu' }
-  })
-  const rest = sorted.slice(RESULTS_SHOWN).reduce((a, [, g]) => a + g.count, 0)
+  const results: ResultRow[] = sorted.slice(0, RESULTS_SHOWN).map((g) => ({
+    label: (perLabel.get(g.label) ?? 0) > 1 ? `${g.label} · ${CLS_NOTE[g.cls] ?? g.cls}` : g.label,
+    count: g.count,
+    pct: pct(g.count),
+    tone: CLASS_TONE[g.cls] ?? 'neu',
+  }))
+  const rest = sorted.slice(RESULTS_SHOWN).reduce((a, g) => a + g.count, 0)
   if (rest > 0) results.push({ label: 'Boshqalar', count: rest, pct: pct(rest), tone: 'neu' })
 
   const byCourtMap = new Map<string, number>()
