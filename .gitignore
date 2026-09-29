@@ -13,3 +13,6 @@ sud-explore/
 sud-explore2/
 sud-explore3/
 sud-explore4/
+
+# local index of the public court orders (rebuildable cache)
+/data/

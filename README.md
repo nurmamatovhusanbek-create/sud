@@ -89,6 +89,11 @@ out is stated in place on the page instead of printing a misleading zero. Sectio
 data source (subsidiaries, licences, audits, pledges, trademarks…) are intentionally left out.
 Page numbers need Chrome/Edge 131+.
 
+**Qarorlar (published court orders)** — Settings › Qarorlar copies the small metadata rows of the public
+court-order library (public.sud.uz) to this machine with a polite background crawl (pausable, resumable).
+A case's drawer then lists its published orders (instance, court, judge, result) instantly and opens the
+PDF on click. The upstream search is too slow to call live, so lookups only ever read the local index.
+
 **Sozlamalar (Settings)** — self-update from GitHub, Cloudflare Worker management, and a
 live health dashboard (per-worker success gauges, sparklines, request timelines).
 
