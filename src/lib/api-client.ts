@@ -312,6 +312,8 @@ async function downloadPost(url: string, body: unknown): Promise<void> {
 export interface PublicOrdersData {
   caseNumber: string
   orders: StoredOrder[]
+  checked: { at: string; found: number; error: string | null } | null
+  downloading: boolean
   coverage: PublicOrdersCoverage
 }
 
@@ -332,7 +334,10 @@ export async function syncPublicOrders(action: 'start' | 'pause', courtTypes?: P
       body: JSON.stringify({ action, courtTypes }),
     })
     const json = await res.json().catch(() => null)
-    if (json?.ok === true && json.data) return { ok: true, data: json.data }
+    if (json?.ok === true && json.data) {
+      window.dispatchEvent(new CustomEvent('sud:orders-job')) // wake the global loader
+      return { ok: true, data: json.data }
+    }
     return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
   } catch {
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
@@ -364,4 +369,30 @@ export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<
     try { win.close() } catch { /* already closed */ }
     throw e
   }
+}
+
+/** Queue cases for the BACKGROUND download of their published orders; returns at once. */
+export async function fetchPublicOrders(cases: { caseNumber: string; courtType: string }[]): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number }>> {
+  try {
+    const res = await fetch('/api/public-orders/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action: 'start', cases }),
+    })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) {
+      window.dispatchEvent(new CustomEvent('sud:orders-job')) // wake the global loader
+      return { ok: true, data: json.data }
+    }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+
+export async function pausePublicOrdersJob(): Promise<void> {
+  try {
+    await fetch('/api/public-orders/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action: 'pause' }) })
+  } catch { /* the loader refreshes anyway */ }
+  window.dispatchEvent(new CustomEvent('sud:orders-job'))
 }

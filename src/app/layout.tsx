@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
+import { OrdersLoader } from "@/components/shell/orders-loader";
 import "./globals.css";
 import "./prototype.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           {children}
         </ThemeProvider>
+        <OrdersLoader />
         <Toaster position="bottom-right" closeButton />
       </body>
     </html>

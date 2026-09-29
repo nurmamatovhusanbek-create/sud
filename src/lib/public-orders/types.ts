@@ -35,8 +35,22 @@ export interface CrawlStatus {
   lastError: string | null
 }
 
+/** The per-case background download (one company's cases, or a single case). */
+export interface CaseJobStatus {
+  state: 'idle' | 'running' | 'paused' | 'error' | 'done'
+  total: number
+  done: number
+  /** published orders found so far — the number the global loader shows */
+  found: number
+  errors: number
+  current: string | null
+  startedAt: string | null
+  lastError: string | null
+}
+
 export interface PublicOrdersStatus {
   crawl: CrawlStatus
+  job: CaseJobStatus
   types: CrawlState['types']
   updatedAt: string
 }

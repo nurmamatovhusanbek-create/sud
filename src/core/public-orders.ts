@@ -176,3 +176,33 @@ export function pdfFileName(name: string, fallback: string): string {
 
 /** The order ids we accept from a client (uuid v4-ish) — nothing else reaches the upstream URL. */
 export const isOrderFileId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
+// ---- published vs unpublished decisions of one case ---------------------------------------
+
+/** A decision the court-case data (jadval) already gives us, per instance — with or without a published PDF. */
+export interface KnownDecision {
+  instance: 'FIRST' | 'APPEAL' | 'CASSATION'
+  date: string
+  text: string
+}
+
+export interface CaseOrdersView {
+  /** every published order, oldest instance first, with the case-data decision of the same instance (if any) */
+  published: { order: StoredOrder; decision: KnownDecision | null }[]
+  /** decisions we know from the case data but the library has NO order for */
+  unpublished: KnownDecision[]
+}
+
+/**
+ * Line up what the case data says (decisions per instance) with what the library published.
+ * A decision is «unpublished» when no published order exists for its instance. Note this is only meaningful
+ * once the case was actually looked up — the caller decides whether to call it «unpublished» or «unchecked».
+ */
+export function splitDecisions(known: KnownDecision[], published: StoredOrder[]): CaseOrdersView {
+  const byInstance = new Map(known.map((d) => [d.instance, d]))
+  const have = new Set(published.map((o) => o.instance))
+  return {
+    published: sortOrders(published).map((order) => ({ order, decision: byInstance.get(order.instance as KnownDecision['instance']) ?? null })),
+    unpublished: known.filter((d) => !have.has(d.instance)),
+  }
+}

@@ -37,3 +37,9 @@ Maps 1:1 onto `core/classify.ts` (granted / rad etilgan / qaytarilgan / ko'rmasd
 - The date filter's exact meaning (publication vs decision date) is **unverified** — the known order (decided 12 May 2026) was not
   inside 11–19 May for its court. It does not matter for a full crawl (every order sits in some day window), only for guessing a window.
 - Index: `data/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `state.json` (progress). Delete the folder to reset.
+
+## Update: per-case download is the default, the full crawl is optional
+The full crawl is disk-heavy (~200 B a row: ~40 MB economic, ~90 MB civil, ~15 MB administrative) and was not wanted on the owner's laptop.
+The default is now `lib/public-orders/company-job.ts`: only the cases the user asks for are looked up (`case_number` + `instance`, ~10 s each,
+3 instances in parallel, one case at a time), in the background, with a «checked» marker per case. The API is called directly from the machine
+(`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).

@@ -33,6 +33,7 @@ import {
 import { PretenziyaFlow } from './pretenzia-view'
 import { DocEditor } from './doc-editor'
 import { useLetterhead } from '@/components/proto/letterhead'
+import { useAppStore } from '@/lib/store/app-store'
 
 const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
@@ -82,8 +83,25 @@ export function DocumentsView() {
   const [activeDoc, setActiveDoc] = useState<string | null>(null)
   const [pretenzia, setPretenzia] = useState(false)
   const [query, setQuery] = useState('')
+  // a case drawer can hand us a petition prefilled from the case data: open that document and use its values
+  const prefill = useAppStore((s) => s.docPrefill)
+  const setDocPrefill = useAppStore((s) => s.setDocPrefill)
+  const [initial, setInitial] = useState<Record<string, string> | null>(null)
 
   const [letterhead, updateLetterhead] = useLetterhead()
+
+  useEffect(() => {
+    if (!prefill) return
+    const d = docById(prefill.docId)
+    if (!d) {
+      setDocPrefill(null)
+      return
+    }
+    setActive(d.tab)
+    setActiveDoc(d.id)
+    setInitial(prefill.values)
+    setDocPrefill(null)
+  }, [prefill, setDocPrefill])
 
   useEffect(() => { document.title = 'Hujjatlar · Sud tizimi' }, [])
 
@@ -117,12 +135,16 @@ export function DocumentsView() {
     const docTab = tabById(doc.tab)!
     return (
       <DocEditor
-        key={doc.id}
+        key={doc.id + (initial ? ':prefilled' : '')}
         tab={docTab}
         doc={doc}
+        initialValues={initial ?? undefined}
         letterhead={letterhead}
         onLetterhead={updateLetterhead}
-        onBack={() => setActiveDoc(null)}
+        onBack={() => {
+          setActiveDoc(null)
+          setInitial(null)
+        }}
         backLabel="Orqaga"
         icon={CAT_ICON[doc.tab]}
       />

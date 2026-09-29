@@ -48,6 +48,8 @@ interface AppState {
   commandOpen: boolean
   /** v18: one-shot court filter for Sud ishlari (mini cards + pizza «Ishlarni koʻrish»). */
   caseCourtFilter: CaseCourtFilter
+  /** Values to prefill a court petition with (set from a case drawer; Hujjatlar consumes and clears it). */
+  docPrefill: { docId: string; values: Record<string, string> } | null
   /** 'add' mode: choosing a company in the palette adds it to the watchlist. */
   commandPurpose: CommandPurpose
   /** Section to land on once a company is chosen in the palette — set when a
@@ -62,6 +64,7 @@ interface AppState {
   setCaseCourtFilter: (f: CaseCourtFilter) => void
   goLauncher: () => void
   setSurface: (s: GlobalSurface) => void
+  setDocPrefill: (p: AppState['docPrefill']) => void
   setCommandOpen: (open: boolean) => void
   setCommandPurpose: (p: CommandPurpose) => void
   setPendingSection: (s: SectionKey | null) => void
@@ -71,6 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   view: 'launcher',
   section: 'overview',
   surface: 'main',
+  docPrefill: null,
   activeCompany: null,
   commandOpen: false,
   commandPurpose: 'search',
@@ -111,6 +115,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCaseCourtFilter: (caseCourtFilter) => set({ caseCourtFilter }),
   goLauncher: () => set({ view: 'launcher', surface: 'main' }),
   setSurface: (surface) => set({ surface }),
+  setDocPrefill: (docPrefill) => set({ docPrefill }),
   // Closing the palette drops any pending section so it can't leak into an
   // unrelated later open (e.g. ⌘K search).
   setCommandOpen: (commandOpen) => set(commandOpen ? { commandOpen } : { commandOpen, pendingSection: null }),
