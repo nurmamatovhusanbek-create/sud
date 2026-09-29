@@ -66,4 +66,23 @@ describe('shard store', () => {
     const seen = new Set(Array.from({ length: 5000 }, (_, i) => shardOf(`4-1001-2619/${i}`)))
     expect(seen.size).toBeGreaterThan(SHARDS * 0.9)
   })
+
+  test('records from an older version (missing fields) are repaired or ignored, never crash the stats', async () => {
+    const { getChecked, cacheStats, resetCheckedCache, dataDir } = await import('../store')
+    await fs.mkdir(dataDir(), { recursive: true })
+    await fs.appendFile(
+      path.join(dataDir(), 'checked.jsonl'),
+      [
+        JSON.stringify({ caseNumber: '4-8-2601/1', at: '2026-05-01T10:00:00.000Z' }), // no seen / misses / sig
+        JSON.stringify({ caseNumber: '4-8-2601/2', checkedAt: 'yesterday' }), // unusable
+        'not json',
+      ].join('\n') + '\n',
+    )
+    resetCheckedCache()
+    const c = await getChecked('4-8-2601/1')
+    expect(c).toMatchObject({ seen: [], misses: 0, sig: '' })
+    expect(await getChecked('4-8-2601/2')).toBeNull()
+    const stats = await cacheStats()
+    expect(stats.cases).toBeGreaterThan(0)
+  })
 })

@@ -15,13 +15,13 @@ import {
   cancelPublicOrdersJob,
   clearPublicOrdersCache,
   getPublicOrdersCache,
-  getPublicOrdersStatus,
   pausePublicOrdersJob,
   resumePublicOrdersJob,
   retryPublicOrdersJob,
 } from '@/lib/api-client'
 import { autoEnabled, checkWatchlistOrders, lastAutoRun, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
 import type { CaseJobStatus, OrdersCacheStats } from '@/lib/public-orders/types'
+import { useOrdersJob } from '@/lib/use-orders-job'
 
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 const p2 = (n: number) => String(n).padStart(2, '0')
@@ -42,40 +42,37 @@ const STATE: Record<CaseJobStatus['state'], { text: string; cls: string }> = {
 }
 
 export function OrdersTab() {
-  const [job, setJob] = useState<CaseJobStatus | null>(null)
+  const { job, reload } = useOrdersJob() // the shared queue store: one poll for the whole app
   const [cache, setCache] = useState<OrdersCacheStats | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [auto, setAuto] = useState(true)
   const [lastAuto, setLastAuto] = useState(0)
   const [confirmClear, setConfirmClear] = useState(false)
   const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
 
-  const load = useCallback(async () => {
-    const [s, c] = await Promise.all([getPublicOrdersStatus(), getPublicOrdersCache()])
-    if (s.ok) {
-      setJob(s.data.job)
-      setError(null)
-    } else setError(s.error)
+  const loadCache = useCallback(async () => {
+    const c = await getPublicOrdersCache()
     if (c.ok) setCache(c.data)
   }, [])
+  const load = useCallback(async () => {
+    await Promise.all([reload(), loadCache()])
+  }, [reload, loadCache])
 
   useEffect(() => {
     setAuto(autoEnabled())
     setLastAuto(lastAutoRun())
   }, [runner.phase])
 
-  // poll while something runs (a paused run still finishing its case counts); every exit path clears the timer
+  // the cache numbers are read on open, whenever the queue changes state, and every 15 s while it works
+  // (not on every 2.5 s status tick — that is what tripped the rate limit)
   const busy = job?.state === 'running' || (job?.state === 'paused' && job.current !== null) || runner.phase === 'collecting'
   useEffect(() => {
-    void load()
-    const wake = () => void load()
-    window.addEventListener('sud:orders-job', wake)
-    const t = busy ? setInterval(() => void load(), 2500) : null
-    return () => {
-      window.removeEventListener('sud:orders-job', wake)
-      if (t) clearInterval(t)
-    }
-  }, [load, busy])
+    void loadCache()
+  }, [loadCache, job?.state])
+  useEffect(() => {
+    if (!busy) return
+    const t = setInterval(() => void loadCache(), 15_000)
+    return () => clearInterval(t)
+  }, [busy, loadCache])
 
   const clear = async () => {
     setConfirmClear(false)
@@ -177,7 +174,6 @@ export function OrdersTab() {
         ) : (
           <p className="faint" style={{ fontSize: 12.5, margin: '2px 0 0' }}>Hozir yuklanayotgan qaror yoʻq.</p>
         )}
-        {error && <p className="faint" style={{ marginTop: 10, fontSize: 12.5 }}>{error}</p>}
       </div>
 
       <div className="p-card rise-c">

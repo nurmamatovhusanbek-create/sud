@@ -49,7 +49,7 @@ export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }
   }, [caseNumber, tick])
   useEffect(() => {
     if (!downloading) return
-    const t = setInterval(() => setTick((n) => n + 1), 3000)
+    const t = setInterval(() => setTick((n) => n + 1), 5000)
     return () => clearInterval(t)
   }, [downloading])
 

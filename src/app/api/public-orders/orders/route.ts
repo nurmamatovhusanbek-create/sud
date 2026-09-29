@@ -25,4 +25,4 @@ export const GET = guard(async (req) => {
     checked: checked ? { at: checked.at, error: checked.error ?? null, seen: checked.seen } : null,
     downloading: caseJobStatus().state === 'running',
   })
-})
+}, { rateLimit: false }) // local cache read, never the upstream

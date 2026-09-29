@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /** GET /api/public-orders/cache — what the local orders cache holds (Settings › Qarorlar). */
-export const GET = guard(async () => jsonOk(await cacheStats()))
+export const GET = guard(async () => jsonOk(await cacheStats()), { rateLimit: false }) // local disk read
 
 /** DELETE /api/public-orders/cache — forget everything (it can all be fetched again). Refused while a download runs. */
 export const DELETE = guard(async () => {
