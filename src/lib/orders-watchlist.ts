@@ -12,8 +12,8 @@
  */
 
 import { toast } from 'sonner'
-import { fetchPublicOrders, getPublicOrdersStatus, getStats } from '@/lib/api-client'
-import { caseSignature } from '@/core/public-orders'
+import { fetchPublicOrders, getPublicOrdersStatus, getStats, pausePublicOrdersJob, resumePublicOrdersJob } from '@/lib/api-client'
+import { orderJobCase } from '@/core/public-orders'
 import { watched } from '@/lib/registry'
 
 // ---- settings (per browser) ---------------------------------------------------------------------
@@ -55,9 +55,11 @@ export interface RunnerState {
   done: number
   total: number
   auto: boolean
+  /** paused by the user: no further company is read until resumed */
+  paused: boolean
 }
 
-let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false }
+let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false, paused: false }
 const listeners = new Set<() => void>()
 function emit() {
   for (const l of listeners) l()
@@ -73,22 +75,43 @@ export const subscribeRunner = (l: () => void): (() => void) => {
 }
 
 let current: AbortController | null = null
+/** Give up the collecting phase (the auto-check does this when the user comes back). What is queued keeps going. */
 export const stopWatchlistCheck = (): void => current?.abort()
+
+/** Pause: stop reading further companies AND hold the server queue exactly where it is. Resume continues in order. */
+export async function pauseWatchlistCheck(): Promise<void> {
+  if (state.phase === 'collecting') set({ paused: true })
+  await pausePublicOrdersJob()
+}
+export async function resumeWatchlistCheck(): Promise<void> {
+  if (state.paused) set({ paused: false })
+  await resumePublicOrdersJob()
+}
 
 // ---- the run ------------------------------------------------------------------------------------------
 
 /** cases → the server's queue payload */
-const payloadOf = (cases: { caseNumber: string; courtType: string; result: string }[]) =>
-  cases.filter((c) => c.caseNumber).map((c) => ({ caseNumber: c.caseNumber, courtType: c.courtType, sig: caseSignature({ result: c.result }) }))
+const payloadOf = (cases: { caseNumber: string; courtType: string; result: string; caseStatus?: string }[]) =>
+  cases.filter((c) => c.caseNumber).map(orderJobCase)
 
+/**
+ * Waits for the queue to finish. A PAUSED queue is not an answer (the user stopped it on purpose and will resume it),
+ * so it resolves to null and nothing is announced — the toasts below are only for a run that really ended.
+ */
 async function waitForJob(signal: AbortSignal): Promise<{ searched: number; found: number; errors: number } | null> {
-  for (let i = 0; i < 400 && !signal.aborted; i++) {
+  for (let i = 0; i < 2400 && !signal.aborted; i++) {
     const r = await getPublicOrdersStatus(signal).catch(() => null)
-    if (r && r.ok && r.data.job.state !== 'running') return r.data.job
+    if (r && r.ok) {
+      const st = r.data.job.state
+      if (st === 'paused') return null
+      if (st !== 'running') return r.data.job
+    }
     await new Promise((res) => setTimeout(res, 1500))
   }
   return null
 }
+
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
 
 export async function checkWatchlistOrders(opts: { auto: boolean; signal?: AbortSignal }): Promise<void> {
   if (current) return // one run at a time
@@ -100,34 +123,43 @@ export async function checkWatchlistOrders(opts: { auto: boolean; signal?: Abort
   const ac = new AbortController()
   current = ac
   opts.signal?.addEventListener('abort', () => ac.abort(), { once: true })
-  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto })
+  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto, paused: false })
 
   let cases = 0
+  let ongoing = 0
   try {
     for (const rec of list) {
+      while (state.paused && !ac.signal.aborted) await sleep(300) // paused: hold before the next company
       if (ac.signal.aborted) break
       const r = await getStats(rec.stir, { signal: ac.signal }).catch(() => null)
       if (r && r.ok) {
         const items = payloadOf(r.data.cases ?? [])
         if (items.length) {
-          const q = await fetchPublicOrders(items)
-          if (q.ok) cases += q.data.queued
+          const q = await fetchPublicOrders(items, { keepPaused: true })
+          if (q.ok) {
+            cases += q.data.queued
+            ongoing += q.data.ongoing
+          }
         }
       }
       set({ done: state.done + 1 })
     }
   } finally {
     current = null
-    set({ phase: 'idle' })
+    set({ phase: 'idle', paused: false })
   }
   if (opts.auto && !ac.signal.aborted) markAutoRun() // an interrupted run does not use up the 6 h allowance
-  if (ac.signal.aborted && opts.auto) return // interrupted by the user coming back: what was queued keeps running
+  // a run the user (or their coming back) cut short says nothing: the queue keeps going and the pill shows it
+  if (ac.signal.aborted) return
 
   // tell the user how it went (auto runs stay silent unless something new arrived)
+  const note = ongoing ? ` · ${ongoing} ta ish hali birinchi instansiyada koʻrilmoqda (qaror yoʻq)` : ''
   const job = cases ? await waitForJob(new AbortController().signal) : null
   if (job) {
-    if (job.found > 0) toast.success(`${job.found} ta yangi qaror yuklandi`)
-    else if (!opts.auto) toast.info(job.searched === 0 ? 'Yangilanish yoʻq — barcha ishlar allaqachon tekshirilgan' : 'Yangi eʼlon qilingan qaror topilmadi')
+    if (job.found > 0) toast.success(`${job.found} ta yangi qaror yuklandi${note}`)
+    else if (!opts.auto) toast.info((job.searched === 0 ? 'Yangilanish yoʻq — barcha ishlar allaqachon tekshirilgan' : 'Yangi eʼlon qilingan qaror topilmadi') + note)
     if (job.errors > 0 && !opts.auto) toast.error(`${job.errors} ta ishni tekshirib boʻlmadi — keyinroq qayta uriniladi`)
-  } else if (!opts.auto && !ac.signal.aborted) toast.info('Kuzatuvdagi kompaniyalarda ish topilmadi')
+  } else if (!cases && !opts.auto) {
+    toast.info(ongoing ? `Tekshiradigan ish yoʻq: ${ongoing} ta ish hali birinchi instansiyada koʻrilmoqda` : 'Kuzatuvdagi kompaniyalarda ish topilmadi')
+  }
 }

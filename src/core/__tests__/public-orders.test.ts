@@ -6,6 +6,7 @@ import {
   classifyPublicResult,
   compactPublication,
   daysBetween,
+  isOngoingFirstInstance,
   isOrderFileId,
   normalizeCaseNumber,
   parseMultipartFile,
@@ -182,5 +183,30 @@ describe('planCheck — published orders are permanent; only a changed case or a
   test('the signature moves with the case and ignores case/space noise', () => {
     expect(caseSignature({ caseStatus: ' Ko‘rilmoqda ', result: '', hearingDate: '02.10.2026' })).toBe(caseSignature({ caseStatus: 'ko‘rilmoqda', result: '', hearingDate: '02.10.2026' }))
     expect(caseSignature({ caseStatus: 'A', result: '', hearingDate: '' })).not.toBe(caseSignature({ caseStatus: 'A', result: 'Apellyatsiya', hearingDate: '' }))
+  })
+})
+
+describe('isOngoingFirstInstance — a case still heard in the first instance has no order to look for', () => {
+  test('no result + «ish yurituvda» / «koʻrib chiqilmoqda» (both scripts) / no status → ongoing', () => {
+    expect(isOngoingFirstInstance({ result: '', caseStatus: 'Иш юритувда' })).toBe(true)
+    expect(isOngoingFirstInstance({ result: '-', caseStatus: 'Ish yurituvda' })).toBe(true)
+    expect(isOngoingFirstInstance({ result: '', caseStatus: "Ko'rib chiqilmoqda" })).toBe(true)
+    expect(isOngoingFirstInstance({ result: '', caseStatus: 'Кўриб чиқилмоқда' })).toBe(true)
+    expect(isOngoingFirstInstance({ result: undefined, caseStatus: '-' })).toBe(true)
+    expect(isOngoingFirstInstance({})).toBe(true)
+  })
+  test('a decided case is never ongoing, whatever the status says', () => {
+    expect(isOngoingFirstInstance({ result: 'Daʼvo qanoatlantirilsin', caseStatus: 'Ish yurituvda' })).toBe(false)
+    expect(isOngoingFirstInstance({ result: 'Да’во рад этилсин', caseStatus: '' })).toBe(false)
+  })
+  test('in appeal / cassation / supervision the first-instance order exists → check', () => {
+    for (const st of ['Апелляцияда', 'Apellyatsiyada', 'Кассацияда', 'Kassatsiyada', 'Назоратда', 'Nazoratda']) {
+      expect(isOngoingFirstInstance({ result: '', caseStatus: st })).toBe(false)
+    }
+  })
+  test('terminated / suspended / unknown wording is still checked (conservative)', () => {
+    for (const st of ['Тугатилган', 'Tugatilgan', "To'xtatilgan", 'Ijro etilmoqda', 'Nomaʼlum holat']) {
+      expect(isOngoingFirstInstance({ result: '', caseStatus: st })).toBe(false)
+    }
   })
 })
