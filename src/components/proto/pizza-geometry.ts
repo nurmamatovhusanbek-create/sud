@@ -77,6 +77,21 @@ export const PIZZA_STATUS_LABEL: Record<PizzaStatus, string> = {
   pending: 'Jarayonda',
 }
 
+/**
+ * Paint shared by the app and the PDF report, so the two charts can never drift.
+ * Density (not hue) tells the status apart: solid · tint · hatch · dashed.
+ */
+export const PIZZA_PAINT = {
+  /** «yutqazgan» tint — a touch stronger on dark surfaces */
+  lostOpacity: (dark: boolean) => (dark ? 0.5 : 0.34),
+  /** «neytral» hatch: pattern box, faint ground and the (strong) stripe */
+  hatch: { size: 4.5, groundOpacity: 0.16, stripeWidth: 2, stripeOpacity: 0.95 },
+  /** «jarayonda»: pale ground + a full-strength dashed outline */
+  pending: { fillOpacity: 0.16, strokeWidth: 1.4, dash: '3.2 2.2' },
+  /** thickness of the clear channel that parts decided from undecided cases */
+  splitGap: 3,
+} as const
+
 /** A band's number is printed only when the band is at least this thick (viewBox units). */
 export const MIN_LABEL_THICKNESS = 11
 
@@ -95,6 +110,12 @@ export interface PizzaWedge {
   index: number
   /** only the non-empty bands, hub → rim */
   bands: PizzaBand[]
+  /**
+   * A clear channel between the DECIDED bands (yutgan + yutqazgan) and the UNDECIDED ones
+   * (neytral + jarayonda), so the part of the pie that has no winner yet reads as its own
+   * zone. null when the slice has only one kind.
+   */
+  split: string | null
   pill: { x: number; y: number; v: number; fill: string }
   aria: string
 }
@@ -163,10 +184,17 @@ export function pizzaModel(items: PizzaItem[]): PizzaModel {
         })
       }
     }
+    const decidedBand = bands.filter((b) => b.status === 'won' || b.status === 'lost').at(-1)
+    const hasUndecided = bands.some((b) => b.status === 'neutral' || b.status === 'pending')
+    const split =
+      decidedBand && hasUndecided
+        ? annSector(cx, cy, decidedBand.rOut - PIZZA_PAINT.splitGap / 2, decidedBand.rOut + PIZZA_PAINT.splitGap / 2, a0, a1)
+        : null
     const pill = polarPt(cx, cy, R + 15, mid)
     wedges.push({
       index: i,
       bands,
+      split,
       pill: { x: +pill[0].toFixed(1), y: +pill[1].toFixed(1), v: tot, fill: it.pill },
       aria:
         `${it.full}, ${tot} ish: ${counts.won} yutgan, ${counts.lost} yutqazgan` +

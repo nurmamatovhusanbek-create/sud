@@ -629,6 +629,7 @@ html, body { height: 100%; }
 .cwon { font-family: var(--font-mono); font-weight: 700; font-size: 9px; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6; paint-order: stroke; text-anchor: middle; }
 .cnum { font-family: var(--font-mono); font-weight: 600; font-size: 8.5px; fill: var(--pie-lost-ink, #454f78); stroke: var(--surface); stroke-opacity: .8; stroke-width: 1.5; paint-order: stroke; text-anchor: middle; }
 .cband { pointer-events: all; }
+.csplit { fill: var(--surface); pointer-events: none; }
 .cband.lost { fill-opacity: var(--pie-lost-op, .34); }
 .pie-hub { fill: var(--surface); stroke: var(--border-subtle); }
 [data-theme='dark'] {
@@ -653,11 +654,11 @@ html, body { height: 100%; }
 .stackbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin: 14px 0 4px; background: var(--surface-inset); }
 .stackbar i { display: block; height: 100%; transition: width .5s var(--ease); }
 /* the four statuses, drawn in one hue (--sw) — same fills as the pizza bands */
-.st { --st-soft: color-mix(in srgb, var(--sw, #3b5bdb) 10%, transparent); }
+.st { --st-soft: color-mix(in srgb, var(--sw, #3b5bdb) 16%, transparent); }
 .st.won { background: var(--sw, #3b5bdb); }
 .st.lost { background: color-mix(in srgb, var(--sw, #3b5bdb) calc(var(--pie-lost-op, .34) * 100%), transparent); }
-.st.neutral { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--sw, #3b5bdb) 75%, transparent) 0 1.4px, var(--st-soft) 1.4px 3.4px); }
-.st.pending { background: color-mix(in srgb, var(--sw, #3b5bdb) 7%, transparent); border: 1.2px dashed var(--sw, #3b5bdb); box-sizing: border-box; }
+.st.neutral { background: repeating-linear-gradient(45deg, var(--sw, #3b5bdb) 0 1.5px, var(--st-soft) 1.5px 3.6px); }
+.st.pending { background: color-mix(in srgb, var(--sw, #3b5bdb) 16%, transparent); border: 1.2px dashed var(--sw, #3b5bdb); box-sizing: border-box; }
 .pie-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 4px; font-size: 11px; color: var(--text-3); }
 .pie-key span { display: inline-flex; align-items: center; gap: 5px; }
 .pie-key i { width: 12px; height: 9px; border-radius: 3px; display: inline-block; }

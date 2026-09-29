@@ -486,6 +486,7 @@ import {
   pizzaTotal,
   winRing as winRingGeom,
   PIZZA_GEOM,
+  PIZZA_PAINT,
   PIZZA_STATUS_LABEL,
   PIZZA_STATUS_ORDER,
   type PizzaItem,
@@ -503,7 +504,13 @@ function bandPaint(status: PizzaStatus, col: string, hatch: string) {
     case 'neutral':
       return { fill: hatch, stroke: 'var(--surface)', strokeWidth: 0.8 }
     default:
-      return { fill: col, fillOpacity: 0.07, stroke: col, strokeWidth: 1, strokeDasharray: '3 2.2' }
+      return {
+        fill: col,
+        fillOpacity: PIZZA_PAINT.pending.fillOpacity,
+        stroke: col,
+        strokeWidth: PIZZA_PAINT.pending.strokeWidth,
+        strokeDasharray: PIZZA_PAINT.pending.dash,
+      }
   }
 }
 
@@ -551,9 +558,9 @@ export function Pizza({
     >
       <defs>
         {items.map((it, i) => (
-          <pattern key={i} id={`${uid}h${i}`} width={4.5} height={4.5} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width={4.5} height={4.5} fill={it.col} fillOpacity={0.1} />
-            <line x1={0} y1={0} x2={0} y2={4.5} stroke={it.col} strokeWidth={1.8} strokeOpacity={0.75} />
+          <pattern key={i} id={`${uid}h${i}`} width={PIZZA_PAINT.hatch.size} height={PIZZA_PAINT.hatch.size} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width={PIZZA_PAINT.hatch.size} height={PIZZA_PAINT.hatch.size} fill={it.col} fillOpacity={PIZZA_PAINT.hatch.groundOpacity} />
+            <line x1={0} y1={0} x2={0} y2={PIZZA_PAINT.hatch.size} stroke={it.col} strokeWidth={PIZZA_PAINT.hatch.stripeWidth} strokeOpacity={PIZZA_PAINT.hatch.stripeOpacity} />
           </pattern>
         ))}
       </defs>
@@ -592,6 +599,7 @@ export function Pizza({
                 {...bandPaint(b.status, it.col, `url(#${uid}h${w.index})`)}
               />
             ))}
+            {w.split && <path className="csplit" d={w.split} />}
             {w.bands.map((b) =>
               b.text ? (
                 <text key={b.status} className={b.status === 'won' ? 'cwon' : 'cnum'} x={b.text.x} y={b.text.y}>

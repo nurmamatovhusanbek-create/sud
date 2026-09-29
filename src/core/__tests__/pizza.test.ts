@@ -68,6 +68,15 @@ describe('pizza geometry (v18 port)', () => {
     }
   })
 
+  it('a clear channel parts decided (yutgan+yutqazgan) from undecided (neytral+jarayonda) cases', () => {
+    const both = pizzaModel([item4('A', 1, 4, 1, 1)]).wedges[0]
+    expect(both.split).toBeTruthy()
+    const onlyDecided = pizzaModel([item4('B', 3, 2, 0, 0)]).wedges[0]
+    const onlyUndecided = pizzaModel([item4('C', 0, 0, 2, 4)]).wedges[0]
+    expect(onlyDecided.split).toBeNull()
+    expect(onlyUndecided.split).toBeNull()
+  })
+
   it('a slice with only in-progress cases is still a full wedge (the old chart drew an empty circle)', () => {
     const w = pizzaModel([item4('A', 0, 0, 0, 6)]).wedges[0]
     expect(w.bands).toHaveLength(1)
