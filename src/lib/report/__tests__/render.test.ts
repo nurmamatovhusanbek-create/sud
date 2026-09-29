@@ -12,6 +12,7 @@ const SPARSE: ReportInput = {
 }
 const NOTHING: ReportInput = { stir: '309922239', generatedAt: NOW, info: null, stats: null, cases: null, hearings: null, bills: null }
 
+const FULL_MODEL = buildReportModel(FULL)
 const doc = (input: ReportInput, dark = false) => buildReportDoc(buildReportModel(input), { dark })
 
 describe.each([['full', FULL], ['sparse', SPARSE], ['nothing', NOTHING]] as const)('%s data', (_n, input) => {
@@ -31,24 +32,45 @@ describe('sections appear only when there is data behind them', () => {
     }
     // match the drawn <svg>, not the class name (the stylesheet always mentions it)
     expect(html).toContain('<svg class="rp-gauge"')
-    expect(html).toContain('<svg class="rp-donut"')
+    expect(html).toContain('<svg class="rp-wheel"')
     expect(html).toContain('<svg class="rp-months"')
   })
   test('sparse: no court/bills/founders/rating sections; the gap is stated', () => {
     const html = doc(SPARSE)
-    expect(html).not.toContain('<svg class="rp-donut"')
+    expect(html).not.toContain('<svg class="rp-wheel"')
     expect(html).not.toContain('<svg class="rp-gauge"')
     expect(html).not.toContain('Taʼsischilar')
     expect(html).not.toContain('Toʻlovlar')
     expect(html).toContain('Reyting mavjud emas')
     expect(html).toContain('Sud ishlari:</b> maʼlumot olinmadi')
-    expect(html).toContain('sud.uz 500')
+    expect(html).not.toContain('sud.uz') // the reader needs to know a section is missing, not which site failed
     expect(html).toContain('Belgilangan majlis yoʻq') // an empty list is an answer, not a failure
   })
   test('nothing: still a valid report that says what failed', () => {
     const html = doc(NOTHING)
     expect(html).toContain('STIR 309922239')
     expect(html.match(/<div class="rp-note">/g)!.length).toBe(3)
+  })
+})
+
+describe('signature chart and sources', () => {
+  test('the document never names where the data came from', () => {
+    const html = doc(FULL)
+    for (const src of ['orginfo', 'chamber.uz', 'sud.uz', 'billing.sud', 'Manba']) expect(html).not.toContain(src)
+  })
+  test('verdict wheel: one arc per non-empty outcome, lit ticks = win rate / 2%', () => {
+    const html = doc(FULL)
+    const svg = html.match(/<svg class="rp-wheel"[\s\S]*?<\/svg>/)![0]
+    const live = ['win', 'lose', 'inProgress', 'neutral'].filter((k) => FULL_MODEL.cases![k as 'win' | 'lose' | 'inProgress' | 'neutral'] > 0).length
+    expect((svg.match(/stroke-linecap="round" stroke-dasharray/g) ?? []).length).toBe(live)
+    const lit = (svg.match(new RegExp(`stroke="${reportTheme(false).tone.pos.fg}" stroke-width="2.2"`, 'g')) ?? []).length
+    expect(lit).toBe(Math.round((FULL_MODEL.cases!.winRate / 100) * 50))
+  })
+  test('outcome colors are distinct and each outcome keeps one color across both themes', () => {
+    for (const dark of [false, true]) {
+      const { tone } = reportTheme(dark)
+      expect(new Set([tone.pos.fg, tone.neg.fg, tone.info.fg, tone.neu.fg]).size).toBe(4)
+    }
   })
 })
 
@@ -69,7 +91,7 @@ describe('document shell', () => {
   test('header and footer sit in thead / tfoot so they repeat on every printed page', () => {
     const html = doc(FULL)
     expect(html).toMatch(/<thead>[\s\S]*Kompaniya hisoboti[\s\S]*<\/thead>/)
-    expect(html).toMatch(/<tfoot>[\s\S]*Manba:[\s\S]*<\/tfoot>/)
+    expect(html).toMatch(/<tfoot>[\s\S]*Hisobot tuzilgan[\s\S]*<\/tfoot>/)
   })
   test('the page margin band is painted in the page colour (it stays white otherwise — a bright strip in dark mode)', () => {
     for (const dark of [false, true]) {
