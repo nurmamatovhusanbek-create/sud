@@ -24,6 +24,7 @@ export interface UpcomingHearingsData {
   tin: string
   count: number
   hearings: UpcomingHearingsPayload['hearings']
+  failed?: UpcomingHearingsPayload['failed']
 }
 
 // ---- Bills stream message union (server contract, typed) --------------------

@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
-import { patchMeta, setWatched, upcomingOf, watched, type CompanyRecord } from '@/lib/registry'
+import { daysUntilIso, futureUpcoming, hearingMetaPatch, patchMeta, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -124,19 +124,11 @@ export function WatchlistView() {
       }
       const applyHearings = (res: Awaited<ReturnType<typeof getUpcomingHearings>>) => {
         if (res.ok) {
-          const h = res.data.hearings[0] as Record<string, unknown> | undefined
-          if (h?.isoDate) {
-            hearingsOk = true
-            patchMeta(stir, {
-              nextHearingIso: h.isoDate as string,
-              nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-              nextHearingCase: (h.caseNumber as string) || undefined,
-              nextHearingTime: (h.hearingTime as string) || undefined,
-              nextHearingJudge: (h.judge as string) || undefined,
-            })
-          } else {
-            hearingsOk = true
-          }
+          hearingsOk = true
+          // the WHOLE upcoming list goes to the registry (not just the first hearing); an empty list is never written
+          // (the server used to answer «no hearings» when a court site did not respond)
+          const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
+          if (hs.some((h) => h?.isoDate)) patchMeta(stir, hearingMetaPatch(hs))
         }
       }
       if (force) {
@@ -185,25 +177,28 @@ export function WatchlistView() {
   /** Per-card refresh: forget the one-shot guard and re-enrich with fresh data. */
   const refreshCompany = (stir: string): Promise<void> => {
     enrichedRef.current.delete(stir)
-    return enrichCompany(stir, true).finally(() => void loadFull()) // the alert / full list follow the fresh data
+    return enrichCompany(stir, true)
   }
 
-  // Every hearing of every watched company: the cached list from the registry at once, refreshed by the background load
-  // below. (Counting one «next hearing» per company undercounted a company with two hearings in the window.)
-  const [fullRows, setFullRows] = useState<HearingRow[] | null>(null)
+  // The registry meta is the ONE source for hearings (enrichment writes the company's whole upcoming list there), so the
+  // alert, the list and the «Barchasi» toggle always agree, and a failed / empty reload can never blank them out.
+  // Only hearings that are still ahead count: a stale «next hearing» that has passed is not upcoming.
+  const rowOf = (w: CompanyRecord, h: UpcomingHearing): HearingRow => ({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })
+  const byDate = (a: HearingRow, b: HearingRow) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || '')
 
+  /** EVERY upcoming hearing of every watched company */
+  const upcomingAll = useMemo(() => items.flatMap((w) => futureUpcoming(w.meta).map((h) => rowOf(w, h))).sort(byDate), [items])
+  /** each company's next hearing only (the collapsed list) */
+  const nextPerCompany = useMemo(
+    () => items.flatMap((w) => { const h = futureUpcoming(w.meta)[0]; return h ? [rowOf(w, h)] : [] }).sort(byDate),
+    [items],
+  )
+
+  /** hearings within the next 7 days — all of them, several per company included */
   const alerts = useMemo(() => {
     const now = Date.now()
-    const within = (iso: string) => {
-      const [y, m, d] = iso.split('-').map(Number)
-      const days = Math.ceil((new Date(y, m - 1, d).getTime() - now) / 86_400_000)
-      return days >= 0 && days <= 7
-    }
-    const source: HearingRow[] =
-      fullRows ??
-      items.flatMap((w) => upcomingOf(w.meta).map((h) => ({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })))
-    return source.filter((h) => h.isoDate && within(h.isoDate)).sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
-  }, [items, fullRows])
+    return upcomingAll.filter((h) => { const d = daysUntilIso(h.isoDate, now); return d !== null && d <= 7 })
+  }, [upcomingAll])
 
   /** the alert line: one entry per company and day («×2» when it has several that day) — the headline counts every hearing */
   const alertSummary = useMemo(() => {
@@ -217,68 +212,26 @@ export function WatchlistView() {
     return [...groups.values()]
   }, [alerts])
 
-  const upcoming = useMemo(
-    () =>
-      items
-        .flatMap((w) =>
-          w.meta?.nextHearingIso
-            ? [
-                {
-                  stir: w.stir,
-                  name: w.name,
-                  isoDate: w.meta.nextHearingIso,
-                  court: w.meta.nextHearingCourt,
-                  caseNumber: w.meta.nextHearingCase,
-                  time: w.meta.nextHearingTime,
-                  judge: w.meta.nextHearingJudge,
-                },
-              ]
-            : [],
-        )
-        .sort((a, b) => a.isoDate.localeCompare(b.isoDate)),
-    [items],
-  )
-
-  // «Yaqinlashayotgan majlislar» shows each company's next hearing; the toggle shows EVERY upcoming hearing of every
-  // watched company. Those hearings are also loaded in the background once the cards are enriched, so the 7-day alert
-  // above always counts all of them (not just one per company) and the toggle is instant.
+  // «Barchasi»: shows every upcoming hearing at once (from the cache) and refreshes them from the courts meanwhile.
+  // A refresh that fails or comes back empty NEVER replaces what is cached — an empty answer can mean «the court site
+  // did not answer», so only a non-empty list is written.
   const [showAll, setShowAll] = useState(false)
   const [loadingAll, setLoadingAll] = useState(false)
 
-  const loadFull = async (): Promise<HearingRow[]> => {
-    const lists = await Promise.all(
+  const refreshHearings = async (): Promise<void> => {
+    await Promise.all(
       watched().map(async (w) => {
         try {
           const res = await getUpcomingHearings(w.stir)
-          if (!res.ok) return [] as HearingRow[]
+          if (!res.ok) return
           const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
-          return hs.map((h) => ({
-            stir: w.stir,
-            name: w.name,
-            isoDate: String(h.isoDate ?? ''),
-            court: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-            caseNumber: (h.caseNumber as string) || undefined,
-            time: (h.hearingTime as string) || undefined,
-            judge: (h.judge as string) || undefined,
-          })) as HearingRow[]
+          if (hs.some((h) => h?.isoDate)) patchMeta(w.stir, hearingMetaPatch(hs))
         } catch {
-          return [] as HearingRow[]
+          /* keep the cache */
         }
       }),
     )
-    const rows = lists
-      .flat()
-      .filter((r) => r.isoDate)
-      .sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
-    setFullRows(rows)
-    return rows
   }
-
-  useEffect(() => {
-    if (!hydrated || items.length === 0) return
-    const t = setTimeout(() => void loadFull(), 1500) // after the cards' own enrichment has started
-    return () => clearTimeout(t)
-  }, [hydrated, items.length])
 
   const toggleAll = async () => {
     if (loadingAll) return
@@ -287,21 +240,16 @@ export function WatchlistView() {
       return
     }
     if (items.length === 0) return
-    if (fullRows) {
-      setShowAll(true)
-      return
-    }
+    setShowAll(true) // instant, from the cache
     setLoadingAll(true)
     try {
-      const rows = await loadFull()
-      setShowAll(true)
-      if (rows.length === 0) toast('Kuzatuvdagi kompaniyalar boʻyicha majlis topilmadi')
+      await refreshHearings()
     } finally {
       setLoadingAll(false)
     }
   }
 
-  const shownRows = showAll && fullRows ? fullRows : upcoming
+  const shownRows = showAll ? upcomingAll : nextPerCompany
 
   const unwatch = (stir: string) => {
     setWatched(stir, undefined, false)

@@ -277,3 +277,11 @@ export function daysUntilIso(iso: string, now = Date.now()): number | null {
   if (!y || !m || !d) return null
   return Math.ceil((new Date(y, m - 1, d).getTime() - now) / 86_400_000) || 0 // (no -0)
 }
+
+/** The cached hearings that are still ahead (today included) — a stale «next hearing» that has passed is not upcoming. */
+export function futureUpcoming(meta: CompanyMeta | undefined, now = Date.now()): UpcomingHearing[] {
+  return upcomingOf(meta).filter((h) => {
+    const d = daysUntilIso(h.iso, now)
+    return d !== null && d >= 0
+  })
+}
