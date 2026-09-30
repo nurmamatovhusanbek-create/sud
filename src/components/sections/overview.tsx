@@ -675,7 +675,7 @@ function OverviewView({
       const d = state.data
       if (d.company?.name) patchCompany({ name: d.company.name })
       const wr = calcWinRate(d.summary.win, d.summary.lose)
-      patchMeta(stir, { cases: d.summary.total, winRate: wr ?? undefined, status: d.company?.status })
+      patchMeta(stir, { cases: d.summary.total, winRate: wr ?? undefined, ...(d.company?.status ? { status: d.company.status } : {}) }) // an unanswered source keeps the known status
       setCasesCount({ cases: d.summary.total })
       onData?.(d)
     }

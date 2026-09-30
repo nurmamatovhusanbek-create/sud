@@ -103,6 +103,10 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
     if (orginfoResult.status === 'rejected') {
       partial.push({ source: 'orginfo', error: orginfoResult.reason instanceof Error ? orginfoResult.reason.message : String(orginfoResult.reason) })
     }
+    // «not found» is also worth saying: the card would otherwise just show dashes
+    if (orginfoResult.status === 'fulfilled' && !orginfoResult.value) {
+      partial.push({ source: 'orginfo', error: 'orginfo.uz saytida kompaniya topilmadi' })
+    }
     if (chamberResult.status === 'rejected') {
       partial.push({ source: 'chamber', error: chamberResult.reason instanceof Error ? chamberResult.reason.message : String(chamberResult.reason) })
     }

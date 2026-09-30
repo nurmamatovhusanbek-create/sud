@@ -78,7 +78,9 @@ export function useResource<T>(
         clearInterval(timer)
         setElapsed(Date.now() - t0)
         if (res.ok) {
-          if (cacheKey) setCached(cacheKey, res.data)
+          // a PARTIAL answer (one source failed) is not cached: replaying it later would show the gaps as if that were all
+          // there is, without the banner that explains them
+          if (cacheKey && !(res.partial && res.partial.length > 0)) setCached(cacheKey, res.data)
           setState(decide(res.data, res.partial ?? [], isEmptyRef.current))
         } else {
           setState({ status: 'error', error: res.error })
