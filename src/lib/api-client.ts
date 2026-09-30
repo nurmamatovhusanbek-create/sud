@@ -356,19 +356,37 @@ export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
 export async function fetchPublicOrders(
   cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],
-  opts: { force?: boolean; keepPaused?: boolean; hold?: boolean } = {},
+  opts: { force?: boolean; keepPaused?: boolean } = {},
 ): Promise<ApiResult<{ job: PublicOrdersStatus['job']; queued: number; ongoing: number; known: number }>> {
   try {
     const res = await fetch('/api/public-orders/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action: 'start', cases, force: opts.force === true, keepPaused: opts.keepPaused === true, hold: opts.hold === true }),
+      body: JSON.stringify({ action: 'start', cases, force: opts.force === true, keepPaused: opts.keepPaused === true }),
     })
     const json = await res.json().catch(() => null)
     if (json?.ok === true && json.data) {
       window.dispatchEvent(new CustomEvent('sud:orders-job')) // wake the global loader
       return { ok: true, data: json.data }
     }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+
+/** DETECT: how many of these cases would really need a look. Free (local records only), queues and starts nothing. */
+export async function planPublicOrders(
+  cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],
+): Promise<ApiResult<{ need: number; ongoing: number; known: number }>> {
+  try {
+    const res = await fetch('/api/public-orders/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action: 'plan', cases }),
+    })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) return { ok: true, data: json.data }
     return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
   } catch {
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }

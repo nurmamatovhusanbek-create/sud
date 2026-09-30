@@ -12,11 +12,11 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
-import { daysUntilIso, futureUpcoming, hearingMetaPatch, patchMeta, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
+import { daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { autoEnabled, checkWatchlistOrders, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
+import { OrdersControl } from '@/components/views/orders-control'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -73,16 +73,11 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
   )
 }
 
-const DETECT_EVERY_MS = 30 * 60_000
-let lastDetect = 0
-
 export function WatchlistView() {
   const openCompany = useAppStore((s) => s.openCompany)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const rv = useRegistryVersion()
-  const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
-  const [autoOrders, setAutoOrders] = useState(true)
   const [hydrated, setHydrated] = useState(false)
   const [tick, setTick] = useState(0)
   const enrichedRef = useRef<Set<string>>(new Set())
@@ -115,6 +110,7 @@ export function WatchlistView() {
           const s = res.data
           patchMeta(stir, {
             cases: s.summary.total,
+            ...orderCasesPatch(s.cases),
             winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
             // a source that did not answer must not erase what an earlier refresh learned (status «Faoliyatda», rating)
             ...(s.company?.status ? { status: s.company.status } : {}),
@@ -148,21 +144,6 @@ export function WatchlistView() {
       throw new Error('enrichment failed: both sources unavailable')
     }
   }).current
-
-  useEffect(() => {
-    if (hydrated) setAutoOrders(autoEnabled())
-  }, [hydrated])
-
-  // DETECT which watched cases need their orders looked up (no scraping): the global pill then offers «Boshlash».
-  // At most once per 30 min, so opening this page over and over does not re-read every company.
-  useEffect(() => {
-    if (!hydrated || items.length === 0 || Date.now() - lastDetect < DETECT_EVERY_MS) return
-    const t = setTimeout(() => {
-      lastDetect = Date.now()
-      void checkWatchlistOrders({ auto: true, detect: true })
-    }, 2500) // after the cards' own enrichment has started
-    return () => clearTimeout(t)
-  }, [hydrated, items.length])
 
   useEffect(() => {
     if (!hydrated) return
@@ -343,32 +324,7 @@ export function WatchlistView() {
         <h2>Kuzatuvdagi kompaniyalar</h2>
         <span className="count">{items.length}</span>
         <div className="sp" />
-        <label
-          className="faint"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}
-          title="Ilova ishlatilmayotganda kuzatuvdagi kompaniyalar qarorlarini oʻzi tekshiradi"
-        >
-          <input
-            type="checkbox"
-            checked={autoOrders}
-            onChange={(e) => {
-              setAutoOrders(e.target.checked)
-              setAutoEnabled(e.target.checked)
-            }}
-          />
-          Boʻsh vaqtda avto
-        </label>
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={items.length === 0}
-          title="Kuzatuvdagi kompaniyalar ishlarining eʼlon qilingan qarorlarini fonda yuklash"
-          onClick={() =>
-            runner.phase !== 'collecting' ? void checkWatchlistOrders({ auto: false }) : runner.paused ? void resumeWatchlistCheck() : void pauseWatchlistCheck()
-          }
-        >
-          {runner.phase !== 'collecting' ? <FileText /> : runner.paused ? <Play /> : <Pause />}
-          <span>{runner.phase !== 'collecting' ? 'Qarorlarni tekshirish' : runner.paused ? 'Davom ettirish' : 'Pauza'}</span>
-        </button>
+        <OrdersControl companies={items.length} registryVersion={rv} />
         <button
           className="btn btn-outline btn-sm"
           onClick={() => {

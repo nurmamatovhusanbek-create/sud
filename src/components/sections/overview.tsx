@@ -59,7 +59,7 @@ import type { CompanyStats } from '@/lib/api-types'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { patchMeta, allRecords } from '@/lib/registry'
+import { patchMeta, allRecords, orderCasesPatch } from '@/lib/registry'
 import { billsTotals, getCachedBills, subscribeBills, billsCacheVersion } from '@/lib/bills-cache'
 import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
@@ -675,7 +675,7 @@ function OverviewView({
       const d = state.data
       if (d.company?.name) patchCompany({ name: d.company.name })
       const wr = calcWinRate(d.summary.win, d.summary.lose)
-      patchMeta(stir, { cases: d.summary.total, winRate: wr ?? undefined, ...(d.company?.status ? { status: d.company.status } : {}) }) // an unanswered source keeps the known status
+      patchMeta(stir, { cases: d.summary.total, ...orderCasesPatch(d.cases), winRate: wr ?? undefined, ...(d.company?.status ? { status: d.company.status } : {}) }) // an unanswered source keeps the known status
       setCasesCount({ cases: d.summary.total })
       onData?.(d)
     }

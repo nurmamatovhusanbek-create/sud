@@ -32,7 +32,6 @@ const size = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 102
 
 const STATE: Record<CaseJobStatus['state'], { text: string; cls: string }> = {
   idle: { text: 'Boʻsh', cls: 'b-neu' },
-  ready: { text: 'Boshlashni kutmoqda', cls: 'b-info' },
   running: { text: 'Ishlamoqda', cls: 'b-info' },
   paused: { text: 'Pauza', cls: 'b-warn' },
   error: { text: 'Xato', cls: 'b-neg' },
@@ -96,7 +95,7 @@ export function OrdersTab() {
               setAutoEnabled(e.target.checked)
             }}
           />
-          Ilova ishlatilmayotganda oʻzi tekshirsin (3 daqiqa boʻsh turgandan keyin, 6 soatda koʻpi bilan bir marta)
+          Ilova ishlatilmayotganda oʻzi tekshirsin (3 daqiqa boʻsh turgandan keyin, 6 soatda koʻpi bilan bir marta). Oʻchiq boʻlsa hech narsa oʻzi boshlanmaydi
         </label>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -143,9 +142,9 @@ export function OrdersTab() {
                   <Pause /><span>Pauza</span>
                 </button>
               )}
-              {(job.state === 'paused' || job.state === 'ready') && (
+              {job.state === 'paused' && (
                 <button className="btn btn-outline" onClick={() => void resumePublicOrdersJob().then(load)}>
-                  <Play /><span>{job.state === 'ready' ? 'Boshlash' : 'Davom ettirish'}</span>
+                  <Play /><span>Davom ettirish</span>
                 </button>
               )}
               {job.state !== 'running' && job.state !== 'paused' && job.failed > 0 && (
@@ -153,7 +152,7 @@ export function OrdersTab() {
                   <RefreshCw /><span>Xatoli ishlarni qayta urinish ({job.failed})</span>
                 </button>
               )}
-              {(job.state === 'running' || job.state === 'paused' || job.state === 'ready') && queued > 0 && (
+              {(job.state === 'running' || job.state === 'paused') && queued > 0 && (
                 <button className="btn btn-outline" onClick={() => void cancelPublicOrdersJob().then(load)}>
                   <X /><span>Qolganini bekor qilish</span>
                 </button>

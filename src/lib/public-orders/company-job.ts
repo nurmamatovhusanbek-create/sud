@@ -11,9 +11,9 @@ import { isOngoingFirstInstance, normalizeCaseNumber, planCheck } from '@/core/p
  * the queue, so the user can keep working. Whether a case actually needs a request is decided by the
  * policy in core/public-orders (planCheck): published orders are permanent and only a changed case or a
  * publication-lag back-off triggers another look — so re-running this over the same cases is cheap.
- * The sequence is: DETECT (which cases really need a look — planCheck, ongoing filter — decided at queue time,
- * no request made) → the run sits «ready» (held) until started, or starts at once for an explicit / idle run →
- * SCRAPE → failed cases stay listed so «retry» needs no refresh. State is in-process (globalThis, survives dev hot reloads); the per-case records on disk survive restarts.
+ * The sequence is: DETECT (planCases: which cases really need a look — planCheck, ongoing filter — no request, no state
+ * change) → SCRAPE (enqueueCases, only from an explicit action or the opt-in idle check) → failed cases stay listed so
+ * «retry» needs no refresh. Nothing is ever started by merely opening a page. State is in-process (globalThis, survives dev hot reloads); the per-case records on disk survive restarts.
  */
 
 interface Holder {
@@ -42,8 +42,8 @@ export const caseJobStatus = (): CaseJobStatus => {
   return { ...h.status, remaining: h.queue.length, failed: h.failed.length }
 }
 
-/** A run is «active» while it works, sits paused, or is held ready with cases in it: new cases join it instead of restarting the counters. */
-const active = (h: Holder) => h.running || h.status.state === 'paused' || h.status.state === 'ready'
+/** A run is «active» while it works or sits paused with cases left: new cases join it instead of restarting the counters. */
+const active = (h: Holder) => h.running || h.status.state === 'paused'
 
 const fresh = (ongoing: number, known: number): CaseJobStatus => ({
   state: 'idle', remaining: 0, failed: 0, total: 0, done: 0, searched: 0, found: 0, errors: 0, ongoing, known, current: null, startedAt: null, lastError: null,
@@ -54,12 +54,20 @@ export interface EnqueueOpts {
   force?: boolean
   /** an automatic feeder must not undo a pause the user pressed while its request was in flight */
   keepPaused?: boolean
-  /** DETECT only: queue what needs a look and leave it «ready» — nothing is scraped until resume */
-  hold?: boolean
 }
 
-export async function enqueueCases(cases: JobCase[], opts: EnqueueOpts = {}): Promise<{ job: CaseJobStatus; added: number; ongoing: number; known: number }> {
-  // DETECT (async, no upstream request): which cases need a look at all?
+/** What a set of cases would cost: `need` really need a look, `known` are already known / backing off, `ongoing` have no decision yet. */
+export interface CasePlan {
+  need: JobCase[]
+  known: number
+  ongoing: number
+}
+
+/**
+ * DETECT — which of these cases really need a look at the library? Reads only the local records, makes no upstream
+ * request and changes no state, so it is free to call as often as the UI likes (the badge on a button, a status line).
+ */
+export async function planCases(cases: JobCase[], opts: { force?: boolean } = {}): Promise<CasePlan> {
   const now = Date.now()
   const need: JobCase[] = []
   const seen = new Set<string>()
@@ -82,6 +90,12 @@ export async function enqueueCases(cases: JobCase[], opts: EnqueueOpts = {}): Pr
     }
     need.push({ ...c, caseNumber: cn })
   }
+  return { need, known, ongoing }
+}
+
+/** SCRAPE — queue what needs a look and start (or continue) the run. Only ever called from an explicit action. */
+export async function enqueueCases(cases: JobCase[], opts: EnqueueOpts = {}): Promise<{ job: CaseJobStatus; added: number; ongoing: number; known: number }> {
+  const { need, known, ongoing } = await planCases(cases, opts)
 
   // everything below is synchronous: the queue is never observed half-updated
   const h = holder()
@@ -100,14 +114,9 @@ export async function enqueueCases(cases: JobCase[], opts: EnqueueOpts = {}): Pr
     h.status.ongoing += ongoing
     h.status.known += known
   }
-  // nothing new — but an explicit start over a run that was only held «ready» (by detection) still starts it
-  if (!added && !(h.status.state === 'ready' && !opts.hold)) return { job: caseJobStatus(), added, ongoing, known }
+  if (!added) return { job: caseJobStatus(), added, ongoing, known }
   h.status.total += added
   h.status.startedAt ??= new Date().toISOString()
-  if (opts.hold && !h.running && h.status.state !== 'paused') {
-    h.status.state = 'ready'
-    return { job: caseJobStatus(), added, ongoing, known }
-  }
   if (opts.keepPaused && h.status.state === 'paused') return { job: caseJobStatus(), added, ongoing, known }
   return { job: resumeCases(), added, ongoing, known }
 }
@@ -139,7 +148,7 @@ export function resumeCases(): CaseJobStatus {
   const h = holder()
   h.paused = false
   if (h.running) h.status.state = 'running' // still finishing the case it was on: just keep going
-  else if (h.queue.length) void loop() // also starts a run that was only held «ready»
+  else if (h.queue.length) void loop()
   else h.status.state = h.status.done ? 'done' : 'idle'
   return caseJobStatus()
 }

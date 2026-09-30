@@ -30,7 +30,8 @@ import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { dateKey, daysUntil } from '@/core/dates'
-import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx, fetchPublicOrders } from '@/lib/api-client'
+import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx, fetchPublicOrders, planPublicOrders } from '@/lib/api-client'
+import { useOrdersJob } from '@/lib/use-orders-job'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
@@ -477,9 +478,6 @@ interface MergedRow {
   courtType: CourtType
 }
 
-/** lists already detected in this page session (`stir:count`) — detection runs once per list, not per render */
-const detectedLists = new Set<string>()
-
 export function CasesSection() {
   const company = useAppStore((s) => s.activeCompany)
   const storeCourtFilter = useAppStore((s) => s.caseCourtFilter)
@@ -610,21 +608,27 @@ export function CasesSection() {
     )
   }, [merged, query, sort])
 
-  // DETECT: once the list is in, let the server work out which of these cases need a look at public.sud.uz (already
-  // known / still-ongoing ones are not work). Nothing is scraped — the global pill offers «Boshlash».
+  // DETECT (free, nothing is scraped or queued): how many of the listed cases would really need a look at public.sud.uz —
+  // shown as a count on the «Qarorlar» button; the button is what starts the work
+  const { job: ordersJob } = useOrdersJob()
+  const [ordersPending, setOrdersPending] = useState<number | null>(null)
+  const ordersJobState = ordersJob?.state
   useEffect(() => {
-    if (!merged.length) return
-    const key = `${stir}:${merged.length}`
-    if (detectedLists.has(key)) return
+    if (!filtered.length) {
+      setOrdersPending(null)
+      return
+    }
+    let stop = false
     const t = setTimeout(() => {
-      detectedLists.add(key)
-      void fetchPublicOrders(
-        merged.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus })),
-        { hold: true, keepPaused: true },
-      )
-    }, 1500) // partial loads (one court type at a time) coalesce into one detection
-    return () => clearTimeout(t)
-  }, [merged, stir])
+      void planPublicOrders(filtered.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus }))).then((r) => {
+        if (!stop) setOrdersPending(r.ok ? r.data.need : null)
+      })
+    }, 800) // partial loads (one court type at a time) coalesce into one call
+    return () => {
+      stop = true
+      clearTimeout(t)
+    }
+  }, [filtered, ordersJobState])
 
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
@@ -717,7 +721,7 @@ export function CasesSection() {
           title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
         >
           <FileText />
-          <span>Qarorlar</span>
+          <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
         </button>
       </div>
 

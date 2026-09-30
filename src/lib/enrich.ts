@@ -9,7 +9,7 @@
 
 import { winRate } from '@/core/rates'
 import { getStats, getUpcomingHearings } from './api-client'
-import { hearingMetaPatch, patchMeta } from './registry'
+import { hearingMetaPatch, orderCasesPatch, patchMeta } from './registry'
 
 export async function enrichCompany(stir: string, force = false): Promise<boolean> {
   let statsOk = false
@@ -21,6 +21,7 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
       const s = res.data
       patchMeta(stir, {
         cases: s.summary.total,
+        ...orderCasesPatch(s.cases),
         winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
         // a source that did not answer must not erase what an earlier refresh learned (status «Faoliyatda», rating)
         ...(s.company?.status ? { status: s.company.status } : {}),

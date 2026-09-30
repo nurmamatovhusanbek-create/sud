@@ -12,9 +12,9 @@
  */
 
 import { toast } from 'sonner'
-import { fetchPublicOrders, getPublicOrdersStatus, getStats, pausePublicOrdersJob, resumePublicOrdersJob } from '@/lib/api-client'
+import { fetchPublicOrders, getStats, pausePublicOrdersJob, planPublicOrders, resumePublicOrdersJob } from '@/lib/api-client'
 import { orderJobCase } from '@/core/public-orders'
-import { watched } from '@/lib/registry'
+import { orderCasesOf, watched } from '@/lib/registry'
 
 // ---- settings (per browser) ---------------------------------------------------------------------
 
@@ -23,9 +23,9 @@ const LAST_KEY = 'sud-orders-auto-last'
 
 export function autoEnabled(): boolean {
   try {
-    return localStorage.getItem(AUTO_KEY) !== '0' // on by default
+    return localStorage.getItem(AUTO_KEY) === '1' // OFF unless the owner switched it on: nothing starts by itself
   } catch {
-    return true
+    return false
   }
 }
 export function setAutoEnabled(on: boolean): void {
@@ -57,11 +57,9 @@ export interface RunnerState {
   auto: boolean
   /** paused by the user: no further company is read until resumed */
   paused: boolean
-  /** DETECT only (which cases need a look, nothing scraped): the pill words it differently */
-  detect: boolean
 }
 
-let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false, paused: false, detect: false }
+let state: RunnerState = { phase: 'idle', done: 0, total: 0, auto: false, paused: false }
 const listeners = new Set<() => void>()
 function emit() {
   for (const l of listeners) l()
@@ -75,6 +73,10 @@ export const subscribeRunner = (l: () => void): (() => void) => {
   listeners.add(l)
   return () => listeners.delete(l)
 }
+
+/** Was the run in progress started by the idle check? (finish messages stay quiet for those) */
+let lastRunAuto = false
+export const runWasAuto = (): boolean => lastRunAuto
 
 let current: AbortController | null = null
 /** Give up the collecting phase (the auto-check does this when the user comes back). What is queued keeps going. */
@@ -96,31 +98,25 @@ export async function resumeWatchlistCheck(): Promise<void> {
 const payloadOf = (cases: { caseNumber: string; courtType: string; result: string; caseStatus?: string }[]) =>
   cases.filter((c) => c.caseNumber).map(orderJobCase)
 
-/**
- * Waits for the queue to finish. A PAUSED queue is not an answer (the user stopped it on purpose and will resume it),
- * so it resolves to null and nothing is announced — the toasts below are only for a run that really ended.
- */
-async function waitForJob(signal: AbortSignal): Promise<{ searched: number; found: number; errors: number } | null> {
-  for (let i = 0; i < 2400 && !signal.aborted; i++) {
-    const r = await getPublicOrdersStatus(signal).catch(() => null)
-    if (r && r.ok) {
-      const st = r.data.job.state
-      if (st === 'paused' || st === 'ready') return null
-      if (st !== 'running') return r.data.job
-    }
-    await new Promise((res) => setTimeout(res, 1500))
-  }
-  return null
-}
-
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
 
 /**
- * `detect` = the first half of the sequence only: read the watched companies' cases and let the server work out which
- * ones really need a look, leaving them «ready» — nothing is scraped until the user presses «Boshlash» on the pill.
- * Without it the run scrapes at once (the button, or the idle auto-check).
+ * DETECT without scraping: how many of the watched companies' cases would really need a look. It works from the cases
+ * each company already has cached in the registry (written whenever its stats are read), so it costs one local call
+ * to the server and never touches the court sites. `null` when there is nothing cached to judge yet.
  */
-export async function checkWatchlistOrders(opts: { auto: boolean; detect?: boolean; signal?: AbortSignal }): Promise<void> {
+export async function planWatchlistOrders(): Promise<{ need: number; known: number; ongoing: number } | null> {
+  const cases = watched().flatMap((w) => orderCasesOf(w.meta))
+  if (!cases.length) return null
+  const r = await planPublicOrders(cases.map(orderJobCase))
+  return r.ok ? r.data : null
+}
+
+/**
+ * The run itself — only ever called from an explicit click or the opt-in idle check: read every watched company's
+ * cases and hand them to the server's queue, which starts scraping what really needs a look.
+ */
+export async function checkWatchlistOrders(opts: { auto: boolean; signal?: AbortSignal }): Promise<void> {
   if (current) return // one run at a time
   const list = watched()
   if (!list.length) {
@@ -129,11 +125,13 @@ export async function checkWatchlistOrders(opts: { auto: boolean; detect?: boole
   }
   const ac = new AbortController()
   current = ac
+  lastRunAuto = opts.auto
   opts.signal?.addEventListener('abort', () => ac.abort(), { once: true })
-  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto, paused: false, detect: opts.detect === true })
+  set({ phase: 'collecting', done: 0, total: list.length, auto: opts.auto, paused: false })
 
   let ongoing = 0
   let known = 0
+  let queued = 0
   try {
     for (const rec of list) {
       while (state.paused && !ac.signal.aborted) await sleep(300) // paused: hold before the next company
@@ -142,8 +140,9 @@ export async function checkWatchlistOrders(opts: { auto: boolean; detect?: boole
       if (r && r.ok) {
         const items = payloadOf(r.data.cases ?? [])
         if (items.length) {
-          const q = await fetchPublicOrders(items, { keepPaused: true, hold: opts.detect === true })
+          const q = await fetchPublicOrders(items, { keepPaused: true })
           if (q.ok) {
+            queued += q.data.queued
             ongoing += q.data.ongoing
             known += q.data.known
           }
@@ -153,26 +152,19 @@ export async function checkWatchlistOrders(opts: { auto: boolean; detect?: boole
     }
   } finally {
     current = null
-    set({ phase: 'idle', paused: false, detect: false })
+    set({ phase: 'idle', paused: false })
   }
-  if (opts.detect) return // detection announces nothing: the pill says what is waiting
   if (opts.auto && !ac.signal.aborted) markAutoRun() // an interrupted run does not use up the 6 h allowance
   // a run the user (or their coming back) cut short says nothing: the queue keeps going and the pill shows it
   if (ac.signal.aborted) return
 
-  // tell the user how it went (auto runs stay silent unless something new arrived)
-  const note = ongoing ? ` · ${ongoing} ta ish hali birinchi instansiyada koʻrilmoqda (qaror yoʻq)` : ''
-  const job = await waitForJob(new AbortController().signal) // null while paused / held: nothing is announced then
-  if (!job) return
-  if (job.found > 0) toast.success(`${job.found} ta yangi qaror yuklandi${note}`)
-  else if (job.searched > 0) {
-    if (!opts.auto) toast.info('Yangi eʼlon qilingan qaror topilmadi' + note)
-  } else if (!opts.auto) {
+  // When something was queued, the global pill follows it and announces the end (orders-loader). Only «there was nothing
+  // to do» has no pill, so say that here — for a manual run only.
+  if (queued === 0 && !opts.auto) {
     toast.info(
       known || ongoing
         ? `Yangi tekshiradigan ish yoʻq${known ? `: ${known} ta ish allaqachon maʼlum` : ''}${ongoing ? `${known ? ', ' : ': '}${ongoing} ta hali birinchi instansiyada koʻrilmoqda` : ''}`
         : 'Kuzatuvdagi kompaniyalarda ish topilmadi',
     )
   }
-  if (job.errors > 0 && !opts.auto) toast.error(`${job.errors} ta ishni tekshirib boʻlmadi — “Qayta urinish” tugmasi bilan yana urinish mumkin`)
 }

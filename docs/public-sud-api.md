@@ -41,8 +41,7 @@ The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
 - A failed search is an error retried after 10 minutes, never a false «no orders».
 - A case still heard in the first instance (no result, status «ish yurituvda» / «koʻrib chiqilmoqda» or none) has no decision, so it is not queued at all (`isOngoingFirstInstance`); one in appeal / cassation / supervision is, because its first-instance order exists. Anything unrecognised is checked (conservative).
 - The queue can be paused (the case in flight finishes, the rest keeps its order), resumed (same counters) or cancelled; Settings › Qarorlar shows and controls it.
-- Who triggers it: the **Kuzatuv** page («Qarorlarni tekshirish»), the same page's «Boʻsh vaqtda avto» switch (runs when the app has been idle
-  3 min or the tab is hidden, at most every 6 h, only while the app is open), Sud ishlari «Qarorlar», or a drawer's «Tekshirish» (forced).
+- Who triggers it: only an explicit action — the **Kuzatuv** page («Qarorlarni tekshirish»), Sud ishlari «Qarorlar», a drawer's «Tekshirish» (forced) — or the opt-in «Boʻsh vaqtda avto» switch (default OFF; runs after 3 min without input, at most every 6 h, only while the app is open). Opening / refreshing / switching pages never starts anything. The number of cases that would need a look is a free local call (`plan`).
 - Storage: `~/.sud-tizimi/public-orders/shards/*.jsonl` (512 shards by FNV hash of the case number) + `checked.jsonl` (one record per case), outside the project on purpose. **It is never deleted by the app**, only appended to (a newer line wins on read); an older in-project `data/public-orders` is copied over once.
 - The API is called directly from the machine (`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
 - The date filter's meaning (publication vs decision date) is **unverified**; nothing depends on it now.
