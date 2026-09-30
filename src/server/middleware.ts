@@ -14,7 +14,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { config } from '@/server/config'
-import { crossSiteReason, hostAllowed, privilegedHeaderOk } from '@/server/security'
+import { bodyTooLarge, crossSiteReason, hostAllowed, privilegedHeaderOk } from '@/server/security'
 
 // ---------- auth ------------------------------------------------------------
 
@@ -133,6 +133,7 @@ export function guard(handler: ApiHandler, opts: GuardOptions = {}): ApiHandler 
     }
     const cross = crossSiteReason(req.method, req.headers)
     if (cross) return forbidden("Boshqa saytdan kelgan oʻzgartiruvchi soʻrov rad etildi", 'cross_site')
+    if (bodyTooLarge(req.headers)) return NextResponse.json({ ok: false, error: 'Soʻrov hajmi juda katta', code: 'too_large' }, { status: 413 })
     if (opts.privileged && !privilegedHeaderOk(req.headers)) {
       return forbidden("Bu amal uchun ilovaning oʻz sahifasidan yuborilgan tasdiq sarlavhasi kerak", 'privileged_header')
     }
@@ -144,7 +145,8 @@ export function guard(handler: ApiHandler, opts: GuardOptions = {}): ApiHandler 
     } catch (e) {
       console.error('[api] unhandled route error:', e)
       return NextResponse.json(
-        { ok: false, error: e instanceof Error ? e.message : 'Ichki xatolik', code: 'internal' },
+        // the real message stays in the server log; in production a client never sees internals (paths, stack hints)
+        { ok: false, error: process.env.NODE_ENV !== 'production' && e instanceof Error ? e.message : 'Ichki xatolik', code: 'internal' },
         { status: 500 },
       )
     }

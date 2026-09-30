@@ -153,7 +153,7 @@ export function ProfileSection() {
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Star /></div>
-            <h3>Chamber reytingi</h3>
+            <h2>Chamber reytingi</h2>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
             {score !== null ? (

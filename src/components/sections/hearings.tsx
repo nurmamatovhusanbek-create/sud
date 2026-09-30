@@ -145,7 +145,7 @@ export function HearingsSection() {
           <div className="ico">
             <CalendarDays />
           </div>
-          <h3>Kelgusi majlislar</h3>
+          <h2>Kelgusi majlislar</h2>
           <div className="sp" />
           <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
           <SortMenu value={sort} onChange={setSort} />

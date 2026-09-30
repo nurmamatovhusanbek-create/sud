@@ -238,7 +238,7 @@ function ComparePanel({ base, onClose }: { base: CompanyStats; onClose: () => vo
     <div className="p-card rise-c cmp-panel">
       <div className="card-h">
         <div className="ico"><Users /></div>
-        <h3>Yonma-yon solishtirish</h3>
+        <h2>Yonma-yon solishtirish</h2>
         <div className="sp" />
         <select className="pie-filter" value={stir} aria-label="Ikkinchi kompaniya" onChange={(e) => load(e.target.value)}>
           <option value="">Kompaniyani tanlang…</option>
@@ -424,7 +424,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><BarChart3 /></div>
-            <h3>Sud ishlari taqsimoti</h3>
+            <h2>Sud ishlari taqsimoti</h2>
             <div className="sp" />
             <select
               className="pie-filter"
@@ -522,7 +522,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Activity /></div>
-          <h3>Oylik faollik</h3>
+          <h2>Oylik faollik</h2>
           <div className="sp" />
           <span className="badge b-neu">{new Date().getFullYear()}</span>
         </div>
@@ -542,7 +542,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Scale /></div>
-            <h3>Sud turi boʻyicha yutuq</h3>
+            <h2>Sud turi boʻyicha yutuq</h2>
           </div>
           <WrRows cases={data.cases} />
           <button className="btn btn-outline btn-sm" style={{ width: '100%', marginTop: 14 }} onClick={onOpenCompare}>
@@ -553,7 +553,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><CalendarDays /></div>
-            <h3>Keyingi majlis</h3>
+            <h2>Keyingi majlis</h2>
           </div>
           {nh && nextHearing ? (
             <>
@@ -588,7 +588,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Receipt /></div>
-            <h3>Soʻnggi toʻlovlar</h3>
+            <h2>Soʻnggi toʻlovlar</h2>
             <div className="sp" />
             <button className="btn btn-ghost btn-xs" onClick={() => setSection('bills')}>
               Barchasi ›
@@ -622,7 +622,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Gavel /></div>
-            <h3>Soʻnggi qarorlar</h3>
+            <h2>Soʻnggi qarorlar</h2>
             <div className="sp" />
             <button className="btn btn-ghost btn-xs" onClick={() => setSection('cases')}>
               Barchasi ›

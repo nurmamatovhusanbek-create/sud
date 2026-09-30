@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { crossSiteReason, hostAllowed, hostnameOf, privilegedHeaderOk } from '../security'
+import { bodyTooLarge, crossSiteReason, hostAllowed, hostnameOf, privilegedHeaderOk } from '../security'
 import { isPublicDnsName, normalizeWorkerUrl } from '@/lib/workers-config'
 
 const H = (o: Record<string, string>) => ({ get: (k: string) => o[k.toLowerCase()] ?? null })
@@ -60,5 +60,13 @@ describe('worker URLs (SSRF guard)', () => {
       'https://127.0.0.1', 'https://192.168.0.10', 'https://169.254.169.254', 'https://[::1]', 'https://localhost', 'https://intranet',
       'https://box.internal', 'https://printer.local', 'https://user:pw@x.example.com', 'https://x.example.com/?a=1', 'http://x.example.com',
     ]) expect(normalizeWorkerUrl(u)).toBeNull()
+  })
+})
+
+describe('request size', () => {
+  test('an oversized declared body is refused, normal / undeclared ones pass', () => {
+    expect(bodyTooLarge(H({ 'content-length': String(9 * 1024 * 1024) }))).toBe(true)
+    expect(bodyTooLarge(H({ 'content-length': '1200' }))).toBe(false)
+    expect(bodyTooLarge(H({}))).toBe(false)
   })
 })

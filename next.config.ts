@@ -38,8 +38,11 @@ const securityHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
-const nextConfig: NextConfig = {
+// Next 16.3+ appends its own block to AGENTS.md on every `next dev` (and dirties the tree the in-app updater checks).
+// This repo maintains AGENTS.md itself; the option is typed only in the newer Next, hence the widening.
+const nextConfig: NextConfig & { agentRules?: boolean } = {
   output: "standalone",
+  agentRules: false,
   // Security headers on all routes; API responses additionally never cache
   // (they carry sensitive scraped data that must not sit in a shared cache).
   async headers() {

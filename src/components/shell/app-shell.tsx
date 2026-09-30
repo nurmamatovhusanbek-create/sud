@@ -40,6 +40,7 @@ import { getHealth } from '@/lib/api-client'
 import { getCached } from '@/lib/cache'
 import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -177,6 +178,17 @@ function BellPopover() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // the registry could not be saved (browser storage full): say so once instead of losing changes silently
+  useEffect(() => {
+    let told = false
+    const onFull = () => {
+      if (told) return
+      told = true
+      toast.warning('Brauzer xotirasi toʻlgan', { description: 'Oxirgi oʻzgarish saqlanmadi. Brauzer sozlamalarida sayt maʼlumotlarini tozalang yoki kuzatuvdagi kompaniyalarni kamaytiring.' })
+    }
+    window.addEventListener('sud:storage-full', onFull)
+    return () => window.removeEventListener('sud:storage-full', onFull)
+  }, [])
   const view = useAppStore((s) => s.view)
   const section = useAppStore((s) => s.section)
   const surface = useAppStore((s) => s.surface)
@@ -279,6 +291,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-frame">
+      <a className="skip-link" href="#main">Asosiy qismga oʻtish</a>
       {sideOpen && <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden />}
       <aside className={cn('side', sideOpen && 'open')} aria-label="Global navigatsiya">
         <button className="brand" onClick={goLauncher} aria-label="Bosh sahifa">
@@ -295,7 +308,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <div className="nav-label">Ish maydoni</div>
-        <nav className="nav">
+        <nav className="nav" aria-label="Ish maydoni">
           {WORKSPACE_NAV.map((n) => (
             <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)}>
               {NAV_ICONS[n.key]}
@@ -306,7 +319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="nav-label">Tizim</div>
-        <nav className="nav">
+        <nav className="nav" aria-label="Tizim">
           <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }}>
             <FileText />
             Hujjatlar
@@ -369,7 +382,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <div className="scroll">
-          <div className="page">{children}</div>
+          <main className="page" id="main">{children}</main>
         </div>
       </div>
     </div>
