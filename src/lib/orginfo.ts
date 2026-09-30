@@ -330,18 +330,27 @@ function pickBestMatch(
  * every caller then read that as «the company does not exist», so a timeout / block / worker outage silently blanked
  * the whole company profile (no address, no director, no status) with nothing to say why. Callers already handle a
  * throw (allSettled → `partial` banner, or a 502 with the message); «not found» stays `null`.
+ *
+ * Route: the worker pool first (the operator's IP stays hidden). If that attempt fails, the retry goes DIRECT from this
+ * machine (ORGINFO_DIRECT_FALLBACK=0 to forbid): a worker that orginfo answers with HTTP 500 (the shared worker sends a
+ * JSON/CORS fingerprint that suits jadval.sud.uz, not this HTML site) must not take the whole company profile down.
+ * The volume is tiny — a successful lookup is cached for 24 h — so this is not the sustained traffic orginfo blocks.
  */
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'uz,ru;q=0.9,en;q=0.8',
+}
+
 async function fetchHtml(url: string, retries = 1): Promise<string> {
-  const proxiedUrl = getCfWorkerUrl(url)
+  const directOk = process.env.ORGINFO_DIRECT_FALLBACK !== '0'
   let reason = 'javob yoʻq'
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const direct = attempt > 0 && directOk // 1st: worker, then: direct
+    const target = direct ? url : getCfWorkerUrl(url)
     try {
-      const res = await fetch(proxiedUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-          Accept: 'text/html',
-          'Accept-Language': 'uz,en;q=0.9',
-        },
+      const res = await fetch(target, {
+        headers: BROWSER_HEADERS,
         signal: AbortSignal.timeout(8000),
         redirect: 'follow' as RequestRedirect,
       })
@@ -349,10 +358,11 @@ async function fetchHtml(url: string, retries = 1): Promise<string> {
       const html = await res.text()
       // an empty / stub body (a block page, a worker error page) is a failed fetch, not an empty directory
       if (html.length < 500) throw new Error('boʻsh javob')
+      if (direct) console.log('[orginfo] served directly (worker attempt failed)')
       return html
     } catch (e) {
       reason = e instanceof Error ? (e.name === 'TimeoutError' ? 'vaqt tugadi' : e.message) : String(e)
-      console.error(`[orginfo] fetch attempt ${attempt + 1} failed: ${reason}`)
+      console.error(`[orginfo] fetch attempt ${attempt + 1} (${direct ? 'direct' : 'worker'}) failed: ${reason}`)
       if (attempt < retries) await new Promise(r => setTimeout(r, 500))
     }
   }

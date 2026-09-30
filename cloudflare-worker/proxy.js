@@ -127,6 +127,21 @@ const sudProxyWorker = {
         headers.set('Referer', 'https://public.sud.uz/')
       }
 
+      // orginfo.uz is a server-rendered HTML site. The JSON/CORS fingerprint above (Accept: application/json,
+      // Origin: my.sud.uz, Sec-Fetch-Mode: cors) makes it answer HTTP 500, so it gets what a browser sends when you
+      // open a page: a navigation request with HTML Accept and no Origin/Referer.
+      if (target.hostname === 'orginfo.uz') {
+        headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        headers.set('Accept-Language', 'uz,ru;q=0.9,en;q=0.8')
+        headers.set('Sec-Fetch-Dest', 'document')
+        headers.set('Sec-Fetch-Mode', 'navigate')
+        headers.set('Sec-Fetch-Site', 'none')
+        headers.set('Sec-Fetch-User', '?1')
+        headers.set('Upgrade-Insecure-Requests', '1')
+        headers.delete('Origin')
+        headers.delete('Referer')
+      }
+
       const response = await fetch(targetUrl, {
         method: request.method,
         headers,

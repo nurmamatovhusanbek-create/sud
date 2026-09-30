@@ -7,17 +7,20 @@
  * filter. Cards render registry-cached meta; unknown values stay neutral.
  */
 
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
-import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming } from '@/lib/registry'
+import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming, patchMeta } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
-import { searchCompanies } from '@/lib/api-client'
+import { getCompanyInfo, searchCompanies } from '@/lib/api-client'
 import { enrichCompany } from '@/lib/enrich'
 import { toast } from 'sonner'
 import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
 import type { CompanyRecord } from '@/lib/registry'
+
+/** companies whose status the home already tried to read this page session (one light attempt each) */
+const statusTried = new Set<string>()
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -103,8 +106,30 @@ export function Launcher() {
   const modeLabel =
     detected.mode === 'stir' ? 'STIR' : detected.mode === 'invoice' ? 'Kvitansiya' : detected.mode === 'caseNumber' ? 'Ish raqami' : detected.mode === 'pinfl' ? 'PINFL' : query ? 'Nom' : ''
 
+  // A company is active or liquidated — a missing status only means we have not managed to READ it yet (orginfo did
+  // not answer). Read it in the background with the light company-info call (no court scraping), once per session and
+  // company, one at a time, so the count fills itself in as soon as the source answers.
+  useEffect(() => {
+    if (!hydrated) return
+    const missing = companies.filter((c) => !c.meta?.status && !statusTried.has(c.stir)).map((c) => c.stir)
+    if (missing.length === 0) return
+    let stopped = false
+    void (async () => {
+      for (const stir of missing) {
+        if (stopped) return
+        statusTried.add(stir)
+        const r = await getCompanyInfo(stir).catch(() => null)
+        const st = r && r.ok ? r.data.company?.status : ''
+        if (st) patchMeta(stir, { status: st })
+      }
+    })()
+    return () => {
+      stopped = true
+    }
+  }, [hydrated, companies])
+
   // «faol» is only what a source SAID is active; a company whose status was never read (orginfo did not answer) is
-  // «nomaʼlum», not inactive — say so instead of showing a bare 0
+  // «oʻqilmagan», not inactive — say so instead of showing a bare 0
   const statusCounts = useMemo(() => {
     let active = 0
     let unknown = 0
@@ -280,7 +305,7 @@ export function Launcher() {
           foot={
             <>
               <span className={`p-dot ${statusCounts.active > 0 ? 'd-pos' : 'd-warn'}`} />
-              {statusCounts.active} faol kompaniya{statusCounts.unknown > 0 ? ` · ${statusCounts.unknown} tasining holati nomaʼlum` : ''}
+              {statusCounts.active} faol kompaniya{statusCounts.unknown > 0 ? ` · ${statusCounts.unknown} tasining holati oʻqilmagan` : ''}
             </>
           }
         >
