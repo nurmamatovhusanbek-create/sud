@@ -77,20 +77,13 @@ export function HearingsSection() {
     if (loaded) setCounts({ hearings: hearingsCount })
   }, [loaded, hearingsCount, setCounts])
 
-  // Cache the nearest hearing into the registry meta (feeds home + bell)
+  // Cache the upcoming hearings into the registry meta (feeds home + bell + the Kuzatuv alert)
   useEffect(() => {
     if (!company || !loaded) return
-    const h = hearings[0]
-    if (h?.isoDate) {
+    if (hearings.some((h) => h?.isoDate)) {
       void (async () => {
-        const { patchMeta } = await import('@/lib/registry')
-        patchMeta(company.stir, {
-          nextHearingIso: h.isoDate as string,
-          nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-          nextHearingCase: (h.caseNumber as string) || undefined,
-          nextHearingTime: (h.hearingTime as string) || undefined,
-          nextHearingJudge: (h.judge as string) || undefined,
-        })
+        const { patchMeta, hearingMetaPatch } = await import('@/lib/registry')
+        patchMeta(company.stir, hearingMetaPatch(hearings))
       })()
     }
   }, [loaded, company, hearings])

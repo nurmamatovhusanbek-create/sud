@@ -20,6 +20,15 @@ export interface CompanyRecord {
   meta?: CompanyMeta
 }
 
+/** One upcoming hearing as cached in the registry (compact). */
+export interface UpcomingHearing {
+  iso: string
+  court?: string
+  caseNumber?: string
+  time?: string
+  judge?: string
+}
+
 /** Display meta cached from previous visits — feeds home cards / KPIs / badges. */
 export interface CompanyMeta {
   status?: string
@@ -33,6 +42,9 @@ export interface CompanyMeta {
   nextHearingCase?: string
   nextHearingTime?: string
   nextHearingJudge?: string
+  /** EVERY upcoming hearing (nearest first, capped) — `nextHearing*` alone is one per company and undercounts when a
+   *  company has several hearings in the window (alerts, bell, home KPI). */
+  upcoming?: UpcomingHearing[]
   /** Billing aggregates (tiyins) written by the Bills stream — feeds the
    *  overview KPIs and the home "Umumiy qarzdorlik" card. */
   billCount?: number
@@ -222,4 +234,46 @@ export function removeRecord(stir: string): void {
 /** Is this company watched? */
 export function isWatched(stir: string): boolean {
   return !!getRecord(stir)?.watched
+}
+
+const MAX_UPCOMING = 30
+
+/** The registry patch for a company's upcoming-hearing list (nearest first). One place, used wherever hearings are read. */
+export function hearingMetaPatch(hearings: Record<string, unknown>[]): Partial<CompanyMeta> {
+  const upcoming: UpcomingHearing[] = hearings
+    .filter((h) => typeof h?.isoDate === 'string' && h.isoDate)
+    .map((h) => ({
+      iso: h.isoDate as string,
+      court: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
+      caseNumber: (h.caseNumber as string) || undefined,
+      time: (h.hearingTime as string) || undefined,
+      judge: (h.judge as string) || undefined,
+    }))
+    .sort((a, b) => a.iso.localeCompare(b.iso) || (a.time || '').localeCompare(b.time || ''))
+    .slice(0, MAX_UPCOMING)
+  const first = upcoming[0]
+  return {
+    upcoming,
+    nextHearingIso: first?.iso,
+    nextHearingCourt: first?.court,
+    nextHearingCase: first?.caseNumber,
+    nextHearingTime: first?.time,
+    nextHearingJudge: first?.judge,
+  }
+}
+
+/** All the cached upcoming hearings of a company; older cache entries only have the single `nextHearing*`. */
+export function upcomingOf(meta: CompanyMeta | undefined): UpcomingHearing[] {
+  if (!meta) return []
+  if (meta.upcoming) return meta.upcoming
+  return meta.nextHearingIso
+    ? [{ iso: meta.nextHearingIso, court: meta.nextHearingCourt, caseNumber: meta.nextHearingCase, time: meta.nextHearingTime, judge: meta.nextHearingJudge }]
+    : []
+}
+
+/** Whole days from today (local) to an ISO date; negative = past. */
+export function daysUntilIso(iso: string, now = Date.now()): number | null {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return Math.ceil((new Date(y, m - 1, d).getTime() - now) / 86_400_000) || 0 // (no -0)
 }

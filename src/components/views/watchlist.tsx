@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
-import { patchMeta, setWatched, watched, type CompanyRecord } from '@/lib/registry'
+import { patchMeta, setWatched, upcomingOf, watched, type CompanyRecord } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -185,31 +185,37 @@ export function WatchlistView() {
   /** Per-card refresh: forget the one-shot guard and re-enrich with fresh data. */
   const refreshCompany = (stir: string): Promise<void> => {
     enrichedRef.current.delete(stir)
-    return enrichCompany(stir, true)
+    return enrichCompany(stir, true).finally(() => void loadFull()) // the alert / full list follow the fresh data
   }
 
+  // Every hearing of every watched company: the cached list from the registry at once, refreshed by the background load
+  // below. (Counting one «next hearing» per company undercounted a company with two hearings in the window.)
+  const [fullRows, setFullRows] = useState<HearingRow[] | null>(null)
+
   const alerts = useMemo(() => {
-    const out: HearingRow[] = []
     const now = Date.now()
-    for (const w of items) {
-      const iso = w.meta?.nextHearingIso
-      if (!iso) continue
+    const within = (iso: string) => {
       const [y, m, d] = iso.split('-').map(Number)
       const days = Math.ceil((new Date(y, m - 1, d).getTime() - now) / 86_400_000)
-      if (days >= 0 && days <= 7) {
-        out.push({
-          stir: w.stir,
-          name: w.name,
-          isoDate: iso,
-          court: w.meta?.nextHearingCourt,
-          caseNumber: w.meta?.nextHearingCase,
-          time: w.meta?.nextHearingTime,
-          judge: w.meta?.nextHearingJudge,
-        })
-      }
+      return days >= 0 && days <= 7
     }
-    return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate))
-  }, [items])
+    const source: HearingRow[] =
+      fullRows ??
+      items.flatMap((w) => upcomingOf(w.meta).map((h) => ({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })))
+    return source.filter((h) => h.isoDate && within(h.isoDate)).sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
+  }, [items, fullRows])
+
+  /** the alert line: one entry per company and day («×2» when it has several that day) — the headline counts every hearing */
+  const alertSummary = useMemo(() => {
+    const groups = new Map<string, { row: HearingRow; n: number }>()
+    for (const a of alerts) {
+      const k = `${a.stir}|${a.isoDate}`
+      const g = groups.get(k)
+      if (g) g.n++
+      else groups.set(k, { row: a, n: 1 })
+    }
+    return [...groups.values()]
+  }, [alerts])
 
   const upcoming = useMemo(
     () =>
@@ -233,49 +239,69 @@ export function WatchlistView() {
     [items],
   )
 
-  // Click «Yaqinlashayotgan majlislar» to load EVERY upcoming hearing for EVERY
-  // watched company (not just each company's cached next one). Toggles closed.
-  const [allRows, setAllRows] = useState<HearingRow[] | null>(null)
+  // «Yaqinlashayotgan majlislar» shows each company's next hearing; the toggle shows EVERY upcoming hearing of every
+  // watched company. Those hearings are also loaded in the background once the cards are enriched, so the 7-day alert
+  // above always counts all of them (not just one per company) and the toggle is instant.
+  const [showAll, setShowAll] = useState(false)
   const [loadingAll, setLoadingAll] = useState(false)
+
+  const loadFull = async (): Promise<HearingRow[]> => {
+    const lists = await Promise.all(
+      watched().map(async (w) => {
+        try {
+          const res = await getUpcomingHearings(w.stir)
+          if (!res.ok) return [] as HearingRow[]
+          const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
+          return hs.map((h) => ({
+            stir: w.stir,
+            name: w.name,
+            isoDate: String(h.isoDate ?? ''),
+            court: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
+            caseNumber: (h.caseNumber as string) || undefined,
+            time: (h.hearingTime as string) || undefined,
+            judge: (h.judge as string) || undefined,
+          })) as HearingRow[]
+        } catch {
+          return [] as HearingRow[]
+        }
+      }),
+    )
+    const rows = lists
+      .flat()
+      .filter((r) => r.isoDate)
+      .sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
+    setFullRows(rows)
+    return rows
+  }
+
+  useEffect(() => {
+    if (!hydrated || items.length === 0) return
+    const t = setTimeout(() => void loadFull(), 1500) // after the cards' own enrichment has started
+    return () => clearTimeout(t)
+  }, [hydrated, items.length])
 
   const toggleAll = async () => {
     if (loadingAll) return
-    if (allRows) { setAllRows(null); return }
+    if (showAll) {
+      setShowAll(false)
+      return
+    }
     if (items.length === 0) return
+    if (fullRows) {
+      setShowAll(true)
+      return
+    }
     setLoadingAll(true)
     try {
-      const lists = await Promise.all(
-        items.map(async (w) => {
-          try {
-            const res = await getUpcomingHearings(w.stir)
-            if (!res.ok) return [] as HearingRow[]
-            const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
-            return hs.map((h) => ({
-              stir: w.stir,
-              name: w.name,
-              isoDate: String(h.isoDate ?? ''),
-              court: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-              caseNumber: (h.caseNumber as string) || undefined,
-              time: (h.hearingTime as string) || undefined,
-              judge: (h.judge as string) || undefined,
-            })) as HearingRow[]
-          } catch {
-            return [] as HearingRow[]
-          }
-        }),
-      )
-      const rows = lists
-        .flat()
-        .filter((r) => r.isoDate)
-        .sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
-      setAllRows(rows)
+      const rows = await loadFull()
+      setShowAll(true)
       if (rows.length === 0) toast('Kuzatuvdagi kompaniyalar boʻyicha majlis topilmadi')
     } finally {
       setLoadingAll(false)
     }
   }
 
-  const shownRows = allRows ?? upcoming
+  const shownRows = showAll && fullRows ? fullRows : upcoming
 
   const unwatch = (stir: string) => {
     setWatched(stir, undefined, false)
@@ -303,10 +329,10 @@ export function WatchlistView() {
           <div className="at">
             <b>{alerts.length} ta majlis 7 kun ichida</b>
             <p>
-              {alerts
-                .map((a) => {
+              {alertSummary
+                .map(({ row: a, n }) => {
                   const p = isoParts(a.isoDate)
-                  return `${(a.name || a.stir).slice(0, 16)} · ${p.d} ${p.m}`
+                  return `${(a.name || a.stir).slice(0, 16)} · ${p.d} ${p.m}${n > 1 ? ` ×${n}` : ''}`
                 })
                 .join(' · ')}
             </p>
@@ -328,7 +354,7 @@ export function WatchlistView() {
         <span className="faint sh-hint">
           {loadingAll ? (
             <><span className="spinner" style={{ width: 13, height: 13 }} />Yuklanmoqda…</>
-          ) : allRows ? (
+          ) : showAll ? (
             <>Yaqinlarini koʻrsatish<ChevronDown style={{ transform: 'rotate(180deg)' }} /></>
           ) : (
             <>Barcha majlislar<ChevronDown /></>

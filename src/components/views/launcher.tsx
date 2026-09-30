@@ -11,7 +11,7 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
-import { recents, removeRecent, removeRecord, allRecords } from '@/lib/registry'
+import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { searchCompanies } from '@/lib/api-client'
 import { enrichCompany } from '@/lib/enrich'
@@ -104,13 +104,15 @@ export function Launcher() {
     detected.mode === 'stir' ? 'STIR' : detected.mode === 'invoice' ? 'Kvitansiya' : detected.mode === 'caseNumber' ? 'Ish raqami' : detected.mode === 'pinfl' ? 'PINFL' : query ? 'Nom' : ''
 
   const totCases = companies.reduce((a, c) => a + (c.meta?.cases ?? 0), 0)
-  const nearHearings = companies.filter((c) => c.meta?.nextHearingIso).length
+  // every upcoming hearing of every listed company (a company can have several), not one per company
+  const upcomingIsos = useMemo(
+    () => companies.flatMap((c) => upcomingOf(c.meta).map((h) => h.iso)).filter((iso) => (daysUntilIso(iso) ?? -1) >= 0).sort(),
+    [companies],
+  )
+  const nearHearings = upcomingIsos.length
 
   // Nearest known hearing across listed companies (prototype: "Eng yaqini — 16 Sen")
-  const nearest = useMemo(() => {
-    const isos = companies.map((c) => c.meta?.nextHearingIso).filter((v): v is string => !!v).sort()
-    return isos[0]
-  }, [companies])
+  const nearest = upcomingIsos[0]
 
   // Prototype KPI 4: total overdue debt across companies with known billing
   const overdueTotal = companies.reduce((a, c) => a + (c.meta?.overdueTotal ?? 0), 0)
