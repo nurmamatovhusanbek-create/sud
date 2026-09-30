@@ -14,6 +14,7 @@ import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
+import { patchMeta } from '@/lib/registry'
 import { ratingBandFamily } from '@/core/status'
 import type { CompanyInfoData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
@@ -43,7 +44,11 @@ export function ProfileSection() {
     if (state.status === 'success' || state.status === 'partial') {
       const c = state.data.company
       if (c?.shortName || c?.officialName) patchCompany({ name: c.shortName || c.officialName })
-      if (c?.status) patchCompany({ status: c.status })
+      if (c?.status) {
+        patchCompany({ status: c.status })
+        // also remember it in the registry: the home «faol kompaniya» count and the Faol filter read it from there
+        if (company) patchMeta(company.stir, { status: c.status })
+      }
       if (state.data.rating?.category) {
         patchCompany({
           rating: {
