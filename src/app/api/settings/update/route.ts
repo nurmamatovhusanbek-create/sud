@@ -43,6 +43,9 @@ import { join } from 'path'
 import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const execFileAsync = promisify(execFile)
 
 /**
@@ -154,4 +157,5 @@ async function POST_impl() {
   }
 }
 
-export const POST = guard(POST_impl)
+// git pull + restart: the most dangerous door in the app — privileged (server/security.ts)
+export const POST = guard(POST_impl, { privileged: true })

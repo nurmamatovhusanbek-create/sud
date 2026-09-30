@@ -49,6 +49,9 @@ const fresh = (ongoing: number, known: number): CaseJobStatus => ({
   state: 'idle', remaining: 0, failed: 0, total: 0, done: 0, searched: 0, found: 0, errors: 0, ongoing, known, current: null, startedAt: null, lastError: null,
 })
 
+/** Hard cap on what the queue may hold — a forged or runaway request cannot make the app scrape without end. */
+export const MAX_QUEUE = 5000
+
 export interface EnqueueOpts {
   /** ask about the case even if it is known / ongoing (a drawer's «Tekshirish») */
   force?: boolean
@@ -103,6 +106,7 @@ export async function enqueueCases(cases: JobCase[], opts: EnqueueOpts = {}): Pr
   let added = 0
   for (const c of need) {
     if (h.queued.has(c.caseNumber)) continue
+    if (h.queue.length >= MAX_QUEUE) break
     h.queued.add(c.caseNumber)
     h.queue.push({ ...c, force: opts.force })
     added++

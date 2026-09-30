@@ -21,6 +21,9 @@ import {
   getWorkerUrls,
 } from '@/lib/workers-config'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const PROBE_TARGET =
   'https://jadvalapi.sud.uz/online-monitoring/ECONOMIC/findByTin/302678824'
 
@@ -149,4 +152,4 @@ function finish(
   return NextResponse.json(result, { status: 200 })
 }
 
-export const POST = guard(POST_impl)
+export const POST = guard(POST_impl, { privileged: true }) // it makes the server fetch a given URL

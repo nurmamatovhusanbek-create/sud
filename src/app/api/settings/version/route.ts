@@ -20,6 +20,9 @@ import { APP_VERSION } from '@/lib/version'
 import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // v208: the real repo (the old sud-billing-lookup mirror is stale — the
 // update check kept comparing against a v168 commit from a dead URL).
 const GITHUB_REPO = 'nurmamatovhusanbek-create/sud'

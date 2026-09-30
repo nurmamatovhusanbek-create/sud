@@ -10,6 +10,9 @@ import fs from 'fs'
 import path from 'path'
 import { guard } from '@/server/middleware'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 async function GET_impl() {
   try {
     const workerPath = path.resolve(process.cwd(), 'cloudflare-worker', 'proxy.js')

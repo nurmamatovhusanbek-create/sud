@@ -1,6 +1,7 @@
 /**
  * API middleware chain — P4 of the rebuild blueprint (§5.4):
- *   auth → rate-limit → coalesce → handler
+ *   host check → cross-site check → (privileged header) → auth → rate-limit → coalesce → handler
+ *  - host / cross-site / privileged: server/security.ts (DNS rebinding, CSRF, dangerous routes)
  *
  *  - auth: requires the shared bearer token when APP_API_TOKEN is configured.
  *    Open in dev (no token) so the sandbox preview works.
@@ -13,6 +14,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { config } from '@/server/config'
+import { crossSiteReason, hostAllowed, privilegedHeaderOk } from '@/server/security'
 
 // ---------- auth ------------------------------------------------------------
 
@@ -95,14 +97,47 @@ export interface GuardOptions {
   rateLimit?: boolean
   /** Overridable auth check for internal tooling. */
   auth?: boolean
+  /**
+   * Dangerous doors (git pull + restart, worker list, Tor): additionally need the `x-sud-action: 1` header (which a
+   * cross-site page cannot send) and get a much smaller request budget.
+   */
+  privileged?: boolean
 }
 
-/** Wrap a route handler with the P4 middleware chain. */
+function forbidden(error: string, code: string): NextResponse {
+  return NextResponse.json({ ok: false, error, code }, { status: 403 })
+}
+
+// privileged routes: at most this many calls per window per client (a click, not a loop)
+const PRIVILEGED_MAX = 10
+const privBuckets = new Map<string, Bucket>()
+function privilegedLimited(req: Request): boolean {
+  const key = clientIp(req)
+  const now = Date.now()
+  const b = privBuckets.get(key)
+  if (!b || now > b.resetAt) {
+    privBuckets.set(key, { count: 1, resetAt: now + config.rateLimit.windowMs })
+    return false
+  }
+  b.count++
+  return b.count > PRIVILEGED_MAX
+}
+
+/** Wrap a route handler with the middleware chain. */
 export function guard(handler: ApiHandler, opts: GuardOptions = {}): ApiHandler {
   const useAuth = opts.auth !== false
   const useRl = opts.rateLimit !== false
   return async (req: NextRequest) => {
+    if (!hostAllowed(req.headers.get('host'), config.security.allowedHosts)) {
+      return forbidden("Notoʻgʻri Host sarlavhasi — ilova faqat localhost orqali ochiladi (APP_ALLOWED_HOSTS bilan kengaytiriladi)", 'bad_host')
+    }
+    const cross = crossSiteReason(req.method, req.headers)
+    if (cross) return forbidden("Boshqa saytdan kelgan oʻzgartiruvchi soʻrov rad etildi", 'cross_site')
+    if (opts.privileged && !privilegedHeaderOk(req.headers)) {
+      return forbidden("Bu amal uchun ilovaning oʻz sahifasidan yuborilgan tasdiq sarlavhasi kerak", 'privileged_header')
+    }
     if (useAuth && !authorized(req)) return unauthorizedResponse()
+    if (opts.privileged && privilegedLimited(req)) return rateLimitResponse()
     if (useRl && rateLimited(req)) return rateLimitResponse()
     try {
       return await handler(req)
