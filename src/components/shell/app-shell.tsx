@@ -34,7 +34,7 @@ import {
 } from 'lucide-react'
 import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { watched } from '@/lib/registry'
+import { daysUntilIso, upcomingOf, watched } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getHealth } from '@/lib/api-client'
 import { getCached } from '@/lib/cache'
@@ -60,30 +60,18 @@ interface Notif {
   judge?: string
 }
 
-/** Watched companies' hearings within the 7-day alert window. */
+/** Watched companies' hearings within the 7-day alert window — EVERY hearing, not one per company. */
 function computeAlerts(): Notif[] {
   const out: Notif[] = []
   const now = Date.now()
   for (const w of watched()) {
-    const iso = w.meta?.nextHearingIso
-    if (!iso) continue
-    const [y, m, d] = iso.split('-').map(Number)
-    if (!y || !m || !d) continue
-    const t = new Date(y, m - 1, d).getTime()
-    const days = Math.ceil((t - now) / 86_400_000)
-    if (days >= 0 && days <= 7) {
-      out.push({
-        stir: w.stir,
-        name: w.name,
-        isoDate: iso,
-        court: w.meta?.nextHearingCourt,
-        caseNumber: w.meta?.nextHearingCase,
-        time: w.meta?.nextHearingTime,
-        judge: w.meta?.nextHearingJudge,
-      })
+    for (const h of upcomingOf(w.meta)) {
+      const days = daysUntilIso(h.iso, now)
+      if (days === null || days < 0 || days > 7) continue
+      out.push({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })
     }
   }
-  return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate))
+  return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
 }
 
 const noopSubscribe = () => () => {}

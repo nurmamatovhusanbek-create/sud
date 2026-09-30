@@ -9,7 +9,7 @@
 
 import { winRate } from '@/core/rates'
 import { getStats, getUpcomingHearings } from './api-client'
-import { patchMeta } from './registry'
+import { hearingMetaPatch, patchMeta } from './registry'
 
 export async function enrichCompany(stir: string, force = false): Promise<boolean> {
   let statsOk = false
@@ -31,16 +31,8 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
   const applyHearings = (res: Awaited<ReturnType<typeof getUpcomingHearings>>) => {
     if (res.ok) {
       hearingsOk = true
-      const h = res.data.hearings[0] as Record<string, unknown> | undefined
-      if (h?.isoDate) {
-        patchMeta(stir, {
-          nextHearingIso: h.isoDate as string,
-          nextHearingCourt: (h.courtName as string) || (h.courtTypeLabel as string) || undefined,
-          nextHearingCase: (h.caseNumber as string) || undefined,
-          nextHearingTime: (h.hearingTime as string) || undefined,
-          nextHearingJudge: (h.judge as string) || undefined,
-        })
-      }
+      const hs = (res.data.hearings as unknown as Record<string, unknown>[]) || []
+      if (hs.some((h) => h?.isoDate)) patchMeta(stir, hearingMetaPatch(hs))
     }
   }
 
