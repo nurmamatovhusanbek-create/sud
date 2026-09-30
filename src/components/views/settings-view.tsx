@@ -219,7 +219,7 @@ function UpdatesTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><GitBranch /></div>
-          <h3>Joriy versiya</h3>
+          <h2>Joriy versiya</h2>
           <div className="sp" />
           {info && !info.updateAvailable && <span className="badge b-pos"><Check />Eng soʻnggi</span>}
           {info?.updateAvailable && <span className="badge b-warn">Yangilanish bor</span>}
@@ -232,7 +232,7 @@ function UpdatesTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Download /></div>
-          <h3>GitHubʼdagi soʻnggi</h3>
+          <h2>GitHubʼdagi soʻnggi</h2>
         </div>
         {kv('SHA', <span className="mono">{info?.remote?.sha?.slice(0, 7) || '-'}</span>)}
         {kv('Commit', <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: '60%' }}>{info?.remote?.message || '-'}</span>)}
@@ -342,7 +342,7 @@ function TorCard() {
     <div className="p-card rise-c" style={{ marginBottom: 16 }}>
       <div className="card-h">
         <div className="ico"><Shield /></div>
-        <h3>Tor</h3>
+        <h2>Tor</h2>
         <div className="sp" />
         <span className="p-dot" style={{ background: color }} />
         <span className="faint" style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
@@ -537,7 +537,7 @@ function WorkersTab() {
       <div className="p-card rise-c" style={{ marginTop: 16 }}>
         <div className="card-h">
           <div className="ico"><Plus /></div>
-          <h3>Yangi worker qoʻshish</h3>
+          <h2>Yangi worker qoʻshish</h2>
         </div>
         <div className="p-row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <label className="field" style={{ height: 40, flex: 1, minWidth: 220 }}>
@@ -720,7 +720,7 @@ function HealthTab() {
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Activity /></div>
-            <h3>Umumiy holat</h3>
+            <h2>Umumiy holat</h2>
             <div className="sp" />
             <span className={`badge ${rate >= 80 ? 'b-pos' : 'b-warn'}`}>{rate >= 80 ? "Sogʻlom" : 'Beqaror'}</span>
           </div>
@@ -757,7 +757,7 @@ function HealthTab() {
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Zap /></div>
-            <h3>Soʻrov hajmi</h3>
+            <h2>Soʻrov hajmi</h2>
             <div className="sp" />
             <span className="faint" style={{ fontSize: 12 }}>workerlar boʻyicha</span>
           </div>

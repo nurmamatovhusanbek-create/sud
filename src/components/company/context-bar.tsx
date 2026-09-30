@@ -69,7 +69,7 @@ export function ContextBar() {
         {company.name ? initials(company.name) : grp(company.stir).slice(0, 2)}
       </div>
       <div className="ctx-name">
-        <div className="nm">{company.name || `STIR ${grp(company.stir)}`}</div>
+        <h1 className="nm">{company.name || `STIR ${grp(company.stir)}`}</h1>
         <div className="sub">
           {company.status && (
             <>

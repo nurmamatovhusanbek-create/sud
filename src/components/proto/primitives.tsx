@@ -553,7 +553,7 @@ export function Pizza({
       width={size}
       height={size}
       viewBox="0 0 340 340"
-      role="img"
+      role="group" /* its wedges are buttons: an «img» may not contain interactive children */
       aria-label="Ishlar taqsimoti, holatlar boʻyicha"
     >
       <defs>

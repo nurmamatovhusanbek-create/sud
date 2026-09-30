@@ -33,6 +33,12 @@ Since it can now work in the background (queued scraping, `git pull` + restart, 
 - The orginfo direct fallback (`ORGINFO_DIRECT_FALLBACK`) sends a few requests from the operator's IP when a worker attempt fails; set `0` to forbid.
 - LAN use needs: `SUD_HOST=<ip>`, `APP_API_TOKEN`, `APP_ALLOWED_HOSTS=<name>` — and is not recommended.
 
+## Dependencies
+
+- `bun run audit` (= `bun audit`) lists known vulnerabilities. Keep `dependencies` to what the code imports (18 packages): an unused package is pure attack surface (an audit found `next-auth` with a critical advisory, never imported).
+- Keep `next` on the latest patched 16.x (`bun update next eslint-config-next`); the audit of 2026-09 found critical Next.js advisories (RCE on Windows hosts, image-optimizer RCE) below 16.2.5. `next.config.ts` sets `agentRules: false` so `next dev` does not append its own block to AGENTS.md.
+- Removing a dependency: grep imports first (`from '<pkg>`), then `bun remove`.
+
 ## Checklist before merging
 
-`bun run typecheck` · `bun run lint` · `bun test src/core src/lib src/server` · `bun run map:check`.
+`bun run typecheck` · `bun run lint` · `bun test src/core src/lib src/server` · `bun run map:check` · `bun run audit` (after dependency changes).

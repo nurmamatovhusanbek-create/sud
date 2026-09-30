@@ -65,10 +65,44 @@ export function getCached<T>(key: string, ttl = DEFAULT_TTL): T | null {
  */
 export function setCached<T>(key: string, data: T): void {
   if (typeof window === 'undefined') return
+  const value = JSON.stringify({ data, ts: Date.now() })
   try {
-    localStorage.setItem(PREFIX + key, JSON.stringify({ data, ts: Date.now() }))
+    localStorage.setItem(PREFIX + key, value)
   } catch {
-    // Quota exceeded / private mode — silently ignore.
+    // Quota exceeded: this cache is only a 5-minute convenience, so make room by dropping the OLDEST entries and try
+    // once more — never let it crowd out the registry (the watchlist), which shares the same quota.
+    try {
+      evictCaches(0.5)
+      localStorage.setItem(PREFIX + key, value)
+    } catch {
+      /* still no room / private mode — skip caching */
+    }
+  }
+}
+
+/**
+ * Free localStorage space by removing cached API responses (oldest first). `fraction` 1 = all of them. Returns how
+ * many entries were removed. Only touches this module's own keys.
+ */
+export function evictCaches(fraction = 1): number {
+  if (typeof window === 'undefined') return 0
+  try {
+    const entries: { key: string; ts: number }[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith(PREFIX)) continue
+      let ts = 0
+      try {
+        ts = (JSON.parse(localStorage.getItem(k) || '{}') as { ts?: number }).ts ?? 0
+      } catch { /* unreadable: oldest */ }
+      entries.push({ key: k, ts })
+    }
+    entries.sort((a, b) => a.ts - b.ts)
+    const n = Math.ceil(entries.length * Math.min(1, Math.max(0, fraction)))
+    for (const e of entries.slice(0, n)) localStorage.removeItem(e.key)
+    return n
+  } catch {
+    return 0
   }
 }
 

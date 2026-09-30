@@ -6,6 +6,9 @@
  * Legacy migration: the three old keys are read ONCE, merged, and written
  * into the new store; the old keys are left untouched for rollback.
  */
+
+import { evictCaches } from './cache'
+
 export interface CompanyRecord {
   stir: string
   name?: string
@@ -74,17 +77,40 @@ function readStore(): Record<string, CompanyRecord> {
   }
 }
 
-function writeStore(store: Record<string, CompanyRecord>): void {
+/**
+ * Persist the registry. It is the ONLY copy of the watchlist (no server database), so a full localStorage must never
+ * silently drop it: on a quota error make room in this order — (1) the 5-minute response caches (re-fetchable),
+ * (2) the compact case lists of companies that are NOT watched (re-derivable) — and only then give up, loudly
+ * (`sud:storage-full`, shown as a toast by the shell) instead of losing changes without a word.
+ */
+export function writeStore(store: Record<string, CompanyRecord>): void {
   if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(REGISTRY_KEY, JSON.stringify(store))
-    // v204 (P-E): broadcast on EVERY write — setWatched/unwatch previously
-    // mutated silently, so the watchlist grid and home KPIs didn't react
-    // until an unrelated patchMeta (or a remount) bumped the version.
-    window.dispatchEvent(new CustomEvent('sud:registry-changed'))
-  } catch {
-    // quota / private mode — best-effort
+  const attempt = (): boolean => {
+    try {
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(store))
+      return true
+    } catch {
+      return false
+    }
   }
+  let ok = attempt()
+  if (!ok) {
+    evictCaches(1)
+    ok = attempt()
+  }
+  if (!ok) {
+    for (const rec of Object.values(store)) if (!rec.watched && rec.meta?.orderCases) delete rec.meta.orderCases
+    ok = attempt()
+  }
+  if (!ok) {
+    console.warn('[registry] localStorage is full — the latest change could not be saved')
+    window.dispatchEvent(new CustomEvent('sud:storage-full'))
+    return
+  }
+  // v204 (P-E): broadcast on EVERY write — setWatched/unwatch previously
+  // mutated silently, so the watchlist grid and home KPIs didn't react
+  // until an unrelated patchMeta (or a remount) bumped the version.
+  window.dispatchEvent(new CustomEvent('sud:registry-changed'))
 }
 
 /** Read the three legacy keys once; merge into a registry map (in memory only). */

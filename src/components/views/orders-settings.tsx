@@ -79,7 +79,7 @@ export function OrdersTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><RefreshCw /></div>
-          <h3>Kuzatuvdagi kompaniyalar qarorlari</h3>
+          <h2>Kuzatuvdagi kompaniyalar qarorlari</h2>
         </div>
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
           Kuzatuvdagi kompaniyalarning ishlari boʻyicha public.sud.uz da eʼlon qilingan qarorlar orqa fonda yuklanadi. Eʼlon qilingan qaror oʻzgarmaydi, shuning uchun
@@ -121,7 +121,7 @@ export function OrdersTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><ListChecks /></div>
-          <h3>Navbat</h3>
+          <h2>Navbat</h2>
           <div className="sp" />
           <span className={`badge ${st.cls}`}>{st.text}</span>
         </div>
@@ -167,7 +167,7 @@ export function OrdersTab() {
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Database /></div>
-          <h3>Mahalliy kesh</h3>
+          <h2>Mahalliy kesh</h2>
         </div>
         {cache ? (
           <>

@@ -80,7 +80,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route | lib/__tests__/billing-search.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
-| `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/report/generate.ts |  |
+| `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts |  |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
@@ -106,7 +106,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
-| `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +8 | lib/__tests__/registry-hearings.test.ts |
+| `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +8 | lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
 | `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/fonts.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/generate.ts` | components/company/context-bar.tsx |  |
@@ -262,6 +262,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
+| `sud:storage-full` | components/shell/app-shell.tsx, lib/registry.ts |
 
 ## Custom window events
 
@@ -273,6 +274,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/command-palette.tsx |
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
+| `sud:storage-full` | components/shell/app-shell.tsx, lib/registry.ts |
 
 ## Server-side global holders (`globalThis.__x`, survive dev hot reloads)
 

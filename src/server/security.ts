@@ -69,3 +69,12 @@ export const PRIVILEGED_VALUE = '1'
 export function privilegedHeaderOk(headers: { get(name: string): string | null }): boolean {
   return headers.get(PRIVILEGED_HEADER) === PRIVILEGED_VALUE
 }
+
+/** Largest request body any route accepts (the biggest legitimate payload is a few hundred KB of JSON). */
+export const MAX_BODY_BYTES = 8 * 1024 * 1024
+
+/** True when the declared body size is over the limit (a chunked body has no declared size; JSON parse limits cover that). */
+export function bodyTooLarge(headers: { get(name: string): string | null }, max = MAX_BODY_BYTES): boolean {
+  const n = Number(headers.get('content-length'))
+  return Number.isFinite(n) && n > max
+}
