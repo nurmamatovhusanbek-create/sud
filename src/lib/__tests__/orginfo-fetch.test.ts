@@ -51,4 +51,28 @@ describe('orginfo fetching — a failed fetch is an error, never «company not f
     const c = await getCompanyByTin('222222222')
     expect(c).toMatchObject({ tin: '222222222', status: 'Faoliyatda', director: 'Ali Valiyev', officialName: 'TEST MCHJ' })
   })
+
+  test('the worker answers HTTP 500 → the retry goes direct and the profile still loads', async () => {
+    const page = big(`<html><body><a href="/uz/organization/abc123def456/">X</a><div>STIR</div><div>333333333</div><div>Faollik holati</div><div>Faoliyatda</div></body></html>`)
+    let calls = 0
+    stub(async () => (++calls === 1 ? new Response('boom', { status: 500 }) : new Response(page, { status: 200 })))
+    const c = await getCompanyByTin('333333333')
+    expect(c?.status).toBe('Faoliyatda')
+    expect(calls).toBeGreaterThanOrEqual(2)
+  })
+
+  test('ORGINFO_DIRECT_FALLBACK=0 keeps every attempt on the workers (no direct request at all)', async () => {
+    process.env.ORGINFO_DIRECT_FALLBACK = '0'
+    try {
+      const urls: string[] = []
+      stub(async (u) => {
+        urls.push(u)
+        return new Response('boom', { status: 500 })
+      })
+      await expect(getCompanyByTin('444444444')).rejects.toThrow(/HTTP 500/)
+      expect(urls.length).toBe(2) // both attempts, none of them skipped or rerouted
+    } finally {
+      delete process.env.ORGINFO_DIRECT_FALLBACK
+    }
+  })
 })
