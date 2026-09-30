@@ -1,10 +1,10 @@
 'use client'
 
 /**
- * Idle auto-check: while the app sits unused (no pointer/keyboard input for a few minutes, or the tab is hidden)
- * it quietly checks the published orders of the Kuzatuv companies, at most once every 6 hours. The moment the
- * user comes back, the collecting phase stops (it must never compete with interactive requests); whatever was
- * already queued keeps running in the server's background lane. Turn it off from the Kuzatuv page.
+ * Idle auto-check — OFF unless the owner switches it on (Kuzatuv / Settings › Qarorlar). While the app sits unused
+ * (no pointer/keyboard input for 3 minutes) it quietly checks the published orders of the Kuzatuv companies, at most
+ * once every 6 hours. The moment the user comes back, the collecting phase stops (it must never compete with
+ * interactive requests); whatever was already queued keeps running in the server's background lane.
  * Mounted once in the root layout. Renders nothing.
  */
 
@@ -29,7 +29,7 @@ export function OrdersAutoCheck() {
     const tick = () => {
       if (ac && !ac.signal.aborted) return // a run is in progress
       if (!autoEnabled()) return
-      const idle = document.visibilityState === 'hidden' || Date.now() - lastActive >= IDLE_MS
+      const idle = Date.now() - lastActive >= IDLE_MS // a hidden tab is NOT idle by itself: switching tabs must not start anything
       if (!idle || Date.now() - lastAutoRun() < EVERY_MS) return
       ac = new AbortController()
       const mine = ac

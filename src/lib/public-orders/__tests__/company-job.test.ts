@@ -111,37 +111,33 @@ describe('company job queue', () => {
     expect(searched.some((c) => c.endsWith('/32'))).toBe(false)
   })
 
-  test('DETECT then SCRAPE: a held run is «ready» and makes no request until started', async () => {
-    const { enqueueCases, resumeCases, cancelCases, caseJobStatus } = await import('../company-job')
+  test('DETECT (plan) is free: it counts what needs a look, changes nothing and makes no request', async () => {
+    const { planCases, caseJobStatus } = await import('../company-job')
     await tick(50)
     searched.length = 0
-    const out = await enqueueCases([job(41), job(42)], { hold: true })
-    expect(out.added).toBe(2)
-    await tick(40)
-    expect(caseJobStatus().state).toBe('ready')
-    expect(searched).toEqual([]) // nothing scraped yet
-    // detecting again (a page refresh) does not double the work
-    expect((await enqueueCases([job(41), job(42), job(43)], { hold: true })).added).toBe(1)
-    expect(caseJobStatus().total).toBe(3)
-    resumeCases()
+    const before = JSON.stringify(caseJobStatus())
+    const p = await planCases([job(41), job(42), job(43, { result: '', caseStatus: 'Иш юритувда' })])
+    expect(p.need.map((c) => c.caseNumber)).toEqual(['4-1001-2601/41', '4-1001-2601/42'])
+    expect(p.ongoing).toBe(1)
     await tick(30)
-    expect(searched.length).toBeGreaterThan(0)
-    expect(caseJobStatus().state).toBe('running')
-    cancelCases()
-    await finishCurrentCase()
+    expect(searched).toEqual([]) // nothing scraped
+    expect(JSON.stringify(caseJobStatus())).toBe(before) // and no state moved: nothing «ready», nothing queued
   })
 
   test('cases already known or waiting out their back-off are not work (no request, not counted)', async () => {
-    const { enqueueCases, resumeCases, caseJobStatus } = await import('../company-job')
+    const { enqueueCases, planCases, caseJobStatus } = await import('../company-job')
     const { markChecked } = await import('../store')
     await tick(50)
     await markChecked({ caseNumber: '4-1001-2601/51', at: new Date().toISOString(), sig: 's', seen: [], misses: 0 }) // checked just now, unchanged
     await markChecked({ caseNumber: '4-1001-2601/52', at: new Date().toISOString(), sig: 's', seen: ['FIRST', 'APPEAL', 'CASSATION'], misses: 0 })
-    const out = await enqueueCases([job(51), job(52), job(53)], { hold: true })
+    const cases = [job(51), job(52), job(53)]
+    const p = await planCases(cases)
+    expect(p.need).toHaveLength(1)
+    expect(p.known).toBe(2)
+    const out = await enqueueCases(cases)
     expect(out.added).toBe(1)
     expect(out.known).toBe(2)
     expect(caseJobStatus().total).toBe(1)
-    resumeCases()
     await finishCurrentCase()
     await finishCurrentCase()
   })

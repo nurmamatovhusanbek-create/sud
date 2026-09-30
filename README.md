@@ -94,12 +94,13 @@ Page numbers need Chrome/Edge 131+.
 case of the watched companies on public.sud.uz **in the background** and keeps them in a small local cache; the Sud ishlari
 *Qarorlar* button and a drawer's *Tekshirish* do the same for one list or case. A published order never changes, so it is
 fetched once and never asked about again; a case is looked at again only when its status changes (e.g. appealed) or after a
-short publication-lag back-off. Cases still heard in the first instance have no decision yet and are left out. Opening a company's case list or the
-Kuzatuv page first *detects* which cases need a look (nothing is scraped), and the pill at
-the bottom of every screen offers «Boshlash», then shows «N qaror yuklanmoqda» while it works (failed cases get a
-«Qayta urinish» button, no refresh needed; the pill can be dismissed); its button really *pauses* (the queue keeps its
-order and «Davom ettirish» continues from the same case). Settings › Qarorlar is the control panel: the idle auto-check
-switch, run now, the queue (pause / resume / cancel) and the local cache (numbers, clear). A case
+short publication-lag back-off. Cases still heard in the first instance have no decision yet and are left out. Nothing starts by itself: opening,
+refreshing or switching pages never scrapes. The number of cases that would really need a look is shown on the
+«Qarorlar» button and in Kuzatuv («N ta ish tekshirilishi kerak»); the work starts when you press it (or, if you switch
+«Boʻsh vaqtda avto» on, when the app has been idle for 3 minutes). A small pill at the bottom shows «N qaror
+yuklanmoqda» only while it works (✕ hides it for that run; pause really pauses and continues from the same case);
+the end is one toast, with «Qayta urinish» for cases that failed. A paused queue is continued from Kuzatuv or
+Settings › Qarorlar, which is also the control panel. A case
 drawer shows *Eʼlon qilingan qarorlar* (instance, court, judge, result, PDF on click) and *Eʼlon qilinmagan qarorlar*
 (decisions the court data gives us that have no published order). There is no full-library copy. What was fetched is
 kept in `~/.sud-tizimi/public-orders` (outside the project, so re-cloning the app never loses it) and is never deleted,

@@ -45,6 +45,10 @@ export interface CompanyMeta {
   /** EVERY upcoming hearing (nearest first, capped) — `nextHearing*` alone is one per company and undercounts when a
    *  company has several hearings in the window (alerts, bell, home KPI). */
   upcoming?: UpcomingHearing[]
+  /** The company's cases in the compact shape the orders check needs (n = case number, t = court type, r = result,
+   *  s = status). Written whenever the stats are read, so «what needs its orders looked up» can be worked out from
+   *  here at any time WITHOUT scraping the company again. */
+  orderCases?: { n: string; t: string; r?: string; s?: string }[]
   /** Billing aggregates (tiyins) written by the Bills stream — feeds the
    *  overview KPIs and the home "Umumiy qarzdorlik" card. */
   billCount?: number
@@ -284,4 +288,22 @@ export function futureUpcoming(meta: CompanyMeta | undefined, now = Date.now()):
     const d = daysUntilIso(h.iso, now)
     return d !== null && d >= 0
   })
+}
+
+const MAX_ORDER_CASES = 400
+
+/** The registry patch for a company's cases (see CompanyMeta.orderCases). */
+export function orderCasesPatch(cases: { caseNumber: string; courtType: string; result?: string; caseStatus?: string }[] | undefined): Partial<CompanyMeta> {
+  if (!cases) return {}
+  return {
+    orderCases: cases
+      .filter((c) => c.caseNumber)
+      .slice(0, MAX_ORDER_CASES)
+      .map((c) => ({ n: c.caseNumber, t: c.courtType, ...(c.result ? { r: c.result } : {}), ...(c.caseStatus ? { s: c.caseStatus } : {}) })),
+  }
+}
+
+/** Cached cases back in the shape the orders API takes. */
+export function orderCasesOf(meta: CompanyMeta | undefined): { caseNumber: string; courtType: string; result: string; caseStatus: string }[] {
+  return (meta?.orderCases ?? []).map((c) => ({ caseNumber: c.n, courtType: c.t, result: c.r ?? '', caseStatus: c.s ?? '' }))
 }

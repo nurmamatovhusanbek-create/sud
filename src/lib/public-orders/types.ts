@@ -1,6 +1,6 @@
 /** The background download of published orders, as the UI sees it. */
 export interface CaseJobStatus {
-  state: 'idle' | 'ready' | 'running' | 'paused' | 'error' | 'done'
+  state: 'idle' | 'running' | 'paused' | 'error' | 'done'
   /** cases still waiting in the queue (a paused run resumes with exactly these, in this order) */
   remaining: number
   /** cases whose lookup failed in this run — «Qayta urinish» re-queues them */
