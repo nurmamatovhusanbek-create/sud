@@ -190,6 +190,8 @@ export interface UpcomingHearingsPayload {
   tin: string
   count: number
   hearings: UpcomingHearing[]
+  /** court types whose search failed (the list is then incomplete) */
+  failed?: CourtType[]
 }
 
 export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPayload>({
@@ -197,15 +199,19 @@ export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPaylo
   cachePolicy: { key: (tin) => `upcoming:${tin}`, ttlMs: () => config.cache.ttl.upcomingMs },
   run: async (tin) => {
     const courtTypes: CourtType[] = ['economic', 'civil', 'administrative']
+    // A failed search must NOT read as «no hearings»: the client would overwrite what it knows with an empty list.
+    const failed: CourtType[] = []
     const results = await Promise.allSettled(
       courtTypes.map(async (ct) => {
         try {
           return await searchCourtCases(ct, 'tin', tin)
         } catch {
+          failed.push(ct)
           return []
         }
       }),
     )
+    if (failed.length === courtTypes.length) throw new Error('Sud saytlari javob bermadi — majlislarni olib boʻlmadi')
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const todayStr = today.toISOString().slice(0, 10)
@@ -227,6 +233,6 @@ export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPaylo
       const db = (b as { hearingTime?: string }).hearingTime || '00:00'
       return (a.isoDate + da).localeCompare(b.isoDate + db)
     })
-    return { tin, count: allHearings.length, hearings: allHearings }
+    return { tin, count: allHearings.length, hearings: allHearings, ...(failed.length ? { failed } : {}) }
   },
 })

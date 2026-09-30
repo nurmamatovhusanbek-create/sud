@@ -25,7 +25,7 @@ export const GET = guard(async (req) => {
 
   try {
     const data = await coalesce(`upcoming:${tin}`, () => upcomingHearingsSource.run(tin))
-    return jsonOk({ tin, count: data.count, hearings: data.hearings })
+    return jsonOk({ tin, count: data.count, hearings: data.hearings, ...(data.failed ? { failed: data.failed } : {}) })
   } catch (e) {
     return jsonFail(e instanceof Error ? e.message : "Majlislarni olib boʻlmadi", 'upstream_error', 502)
   }

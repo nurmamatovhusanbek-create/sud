@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { daysUntilIso, hearingMetaPatch, upcomingOf } from '../registry'
+import { daysUntilIso, futureUpcoming, hearingMetaPatch, upcomingOf } from '../registry'
 
 describe('upcoming hearings in the registry meta', () => {
   test('keeps EVERY hearing, nearest first (a company with two hearings on one day counts twice)', () => {
@@ -28,5 +28,12 @@ describe('upcoming hearings in the registry meta', () => {
     expect(daysUntilIso('2026-10-02', noon)).toBe(2)
     expect(daysUntilIso('2026-09-29', noon)).toBeLessThan(0)
     expect(daysUntilIso('nope', noon)).toBeNull()
+  })
+
+  test('futureUpcoming drops hearings that have passed (a stale «next hearing» is not upcoming), keeps today', () => {
+    const noon = new Date(2026, 8, 30, 12, 0).getTime()
+    const meta = hearingMetaPatch([{ isoDate: '2026-09-29' }, { isoDate: '2026-09-30' }, { isoDate: '2026-10-02' }])
+    expect(futureUpcoming(meta, noon).map((h) => h.iso)).toEqual(['2026-09-30', '2026-10-02'])
+    expect(futureUpcoming({ nextHearingIso: '2026-09-29' }, noon)).toEqual([])
   })
 })
