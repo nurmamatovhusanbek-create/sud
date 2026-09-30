@@ -1,5 +1,14 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { getCompanyByTin } from '../orginfo'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
+
+// mock.module is process-wide in bun: this is a superset of the mock billing-search.test.ts installs for the same module
+mock.module('@/lib/cf-worker-pool', () => ({
+  getCfWorkerUrls: () => ['https://w1.example/'],
+  createWorkerPool: () => ({ nextProxyUrl: (u: string) => u }),
+  OriginHealthPool: class {
+    recordSuccess() {}
+    recordFailure() {}
+  },
+}))
 
 const realFetch = globalThis.fetch
 afterEach(() => {
@@ -10,6 +19,8 @@ const stub = (impl: (url: string) => Promise<Response>) => {
   globalThis.fetch = ((url: string | URL | Request) => impl(String(url))) as typeof fetch
 }
 const big = (body: string) => body + ' '.repeat(600) // real pages are large; a tiny body is a stub
+
+const { getCompanyByTin } = await import('../orginfo')
 
 describe('orginfo fetching — a failed fetch is an error, never «company not found»', () => {
   test('HTTP failure / timeout / stub body all THROW with the reason', async () => {

@@ -18,6 +18,7 @@ mock.module('server-only', () => ({}))
 const WORKERS = ['https://w1.example/', 'https://w2.example/', 'https://w3.example/']
 mock.module('@/lib/cf-worker-pool', () => ({
   getCfWorkerUrls: () => WORKERS,
+  createWorkerPool: () => ({ nextProxyUrl: (u: string) => u }), // (orginfo builds one at import; the mock is process-wide)
   OriginHealthPool: class {
     recordSuccess() {}
     recordFailure() {}
