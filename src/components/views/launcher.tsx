@@ -11,7 +11,7 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
-import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso } from '@/lib/registry'
+import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { searchCompanies } from '@/lib/api-client'
 import { enrichCompany } from '@/lib/enrich'
@@ -70,7 +70,7 @@ function CompanyCard({ rec, onRefresh, onDelete }: {
           )}
         </div>
       </div>
-      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
+      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={futureUpcoming(meta)[0]?.iso /* a hearing that has passed is not «keyingi» */} />
     </div>
   )
 }
@@ -103,6 +103,18 @@ export function Launcher() {
   const modeLabel =
     detected.mode === 'stir' ? 'STIR' : detected.mode === 'invoice' ? 'Kvitansiya' : detected.mode === 'caseNumber' ? 'Ish raqami' : detected.mode === 'pinfl' ? 'PINFL' : query ? 'Nom' : ''
 
+  // «faol» is only what a source SAID is active; a company whose status was never read (orginfo did not answer) is
+  // «nomaʼlum», not inactive — say so instead of showing a bare 0
+  const statusCounts = useMemo(() => {
+    let active = 0
+    let unknown = 0
+    for (const c of companies) {
+      const st = c.meta?.status
+      if (isKnownActive(st)) active++
+      else if (!st || !st.trim()) unknown++
+    }
+    return { active, unknown }
+  }, [companies])
   const totCases = companies.reduce((a, c) => a + (c.meta?.cases ?? 0), 0)
   // every upcoming hearing of every listed company (a company can have several), not one per company
   const upcomingIsos = useMemo(
@@ -267,8 +279,8 @@ export function Launcher() {
           icon={<Gavel />}
           foot={
             <>
-              <span className="p-dot d-pos" />
-              {companies.filter((c) => isKnownActive(c.meta?.status)).length} faol kompaniya
+              <span className={`p-dot ${statusCounts.active > 0 ? 'd-pos' : 'd-warn'}`} />
+              {statusCounts.active} faol kompaniya{statusCounts.unknown > 0 ? ` · ${statusCounts.unknown} tasining holati nomaʼlum` : ''}
             </>
           }
         >
