@@ -22,9 +22,9 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
       patchMeta(stir, {
         cases: s.summary.total,
         winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
-        status: s.company?.status,
-        rating: s.rating?.category ?? null,
-        score: s.rating?.score ?? null,
+        // a source that did not answer must not erase what an earlier refresh learned (status «Faoliyatda», rating)
+        ...(s.company?.status ? { status: s.company.status } : {}),
+        ...(s.rating ? { rating: s.rating.category, score: s.rating.score } : {}),
       })
     }
   }

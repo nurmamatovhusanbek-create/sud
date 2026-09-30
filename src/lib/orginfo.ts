@@ -325,8 +325,15 @@ function pickBestMatch(
 
 // ---- HTML fetching ----
 
+/**
+ * Fetch one orginfo.uz page. A page that could not be fetched THROWS (with the reason) — it used to return '' and
+ * every caller then read that as «the company does not exist», so a timeout / block / worker outage silently blanked
+ * the whole company profile (no address, no director, no status) with nothing to say why. Callers already handle a
+ * throw (allSettled → `partial` banner, or a 502 with the message); «not found» stays `null`.
+ */
 async function fetchHtml(url: string, retries = 1): Promise<string> {
   const proxiedUrl = getCfWorkerUrl(url)
+  let reason = 'javob yoʻq'
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(proxiedUrl, {
@@ -335,17 +342,21 @@ async function fetchHtml(url: string, retries = 1): Promise<string> {
           Accept: 'text/html',
           'Accept-Language': 'uz,en;q=0.9',
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(8000),
         redirect: 'follow' as RequestRedirect,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return await res.text()
+      const html = await res.text()
+      // an empty / stub body (a block page, a worker error page) is a failed fetch, not an empty directory
+      if (html.length < 500) throw new Error('boʻsh javob')
+      return html
     } catch (e) {
-      console.error(`[orginfo] fetch attempt ${attempt + 1} failed: ${e instanceof Error ? e.message : e}`)
+      reason = e instanceof Error ? (e.name === 'TimeoutError' ? 'vaqt tugadi' : e.message) : String(e)
+      console.error(`[orginfo] fetch attempt ${attempt + 1} failed: ${reason}`)
       if (attempt < retries) await new Promise(r => setTimeout(r, 500))
     }
   }
-  return ''
+  throw new Error(`orginfo.uz javob bermadi (${reason})`)
 }
 
 // ---- HTML parsing ----
