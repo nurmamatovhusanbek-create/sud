@@ -21,7 +21,7 @@ const hasData = (dir: string): boolean => fs.existsSync(path.join(dir, 'checked.
 export function migrateLegacy(from: string, to: string): boolean {
   try {
     if (path.resolve(from) === path.resolve(to) || !hasData(from) || hasData(to)) return false
-    fs.mkdirSync(to, { recursive: true })
+    fs.mkdirSync(to, { recursive: true, mode: 0o700 })
     fs.cpSync(from, to, { recursive: true, force: false, errorOnExist: false })
     return true
   } catch {

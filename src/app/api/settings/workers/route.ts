@@ -19,6 +19,9 @@ import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
 import { pruneAllPools } from '@/lib/health-registry'
 import { guard } from '@/server/middleware'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // GET — list all workers (merge workers.json + fallback/env)
 async function GET_impl() {
   const source = getWorkerSource()
@@ -98,7 +101,7 @@ async function POST_impl(request: Request) {
 }
 
 // DELETE — remove a worker
-export async function DELETE(request: Request) {
+async function DELETE_impl(request: Request) {
   const { searchParams } = new URL(request.url)
   const urlFromQuery = searchParams.get('url')
 
@@ -141,4 +144,6 @@ export async function DELETE(request: Request) {
 }
 
 export const GET = guard(GET_impl)
-export const POST = guard(POST_impl)
+// changing the worker list redirects every scrape through a chosen host: privileged (see server/security.ts)
+export const POST = guard(POST_impl, { privileged: true })
+export const DELETE = guard(DELETE_impl, { privileged: true })

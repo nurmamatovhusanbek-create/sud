@@ -28,7 +28,7 @@ import {
 import { ArcGauge, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
 import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
-import { getTorStatus } from '@/lib/api-client'
+import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { OrdersTab } from '@/components/views/orders-settings'
 
@@ -134,7 +134,7 @@ async function pollForRestart(onTick: (elapsedMs: number) => void): Promise<bool
     await new Promise((r) => setTimeout(r, intervalMs))
     onTick(Date.now() - start)
     try {
-      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { cache: 'no-store', headers: authHeaders() })
       if (res.ok) return true
     } catch {
       // still restarting — keep polling
@@ -156,7 +156,7 @@ function UpdatesTab() {
   const load = useCallback(async () => {
     setChecking(true)
     try {
-      const res = await fetch(`/api/settings/version?_=${Date.now()}`)
+      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { headers: authHeaders() })
       setInfo(await res.json())
     } catch {
       setInfo(null)
@@ -173,7 +173,7 @@ function UpdatesTab() {
     setUpdateState('pulling')
     let res: Response
     try {
-      res = await fetch('/api/settings/update', { method: 'POST' })
+      res = await fetch('/api/settings/update', { method: 'POST', headers: privilegedHeaders() })
     } catch {
       setUpdateState('idle')
       toast.error('Tarmoq xatosi — serverga ulanib boʻlmadi')
@@ -369,7 +369,7 @@ function WorkersTab() {
   const fetchWorkers = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/settings/workers')
+      const res = await fetch('/api/settings/workers', { headers: authHeaders() })
       const json = await res.json()
       // An error body (401 with APP_API_TOKEN set, 429, 500…) has no `workers`;
       // treating it as data crashed the whole Settings page on `.workers.length`.
@@ -391,7 +391,7 @@ function WorkersTab() {
     try {
       const res = await fetch('/api/settings/workers/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: privilegedHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ url, timeoutMs: 10000 }),
       })
       const result: TestResult = await res.json()
@@ -434,7 +434,7 @@ function WorkersTab() {
     try {
       const res = await fetch('/api/settings/workers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: privilegedHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ url: newUrl.trim() }),
       })
       const result = await res.json()
@@ -460,7 +460,7 @@ function WorkersTab() {
 
   const removeWorker = async (url: string) => {
     try {
-      await fetch(`/api/settings/workers?url=${encodeURIComponent(url)}`, { method: 'DELETE' })
+      await fetch(`/api/settings/workers?url=${encodeURIComponent(url)}`, { method: 'DELETE', headers: privilegedHeaders() })
       toast(`${url} oʻchirildi`)
       await fetchWorkers()
     } catch {
@@ -587,7 +587,7 @@ function HealthTab() {
   const load = useCallback(async () => {
     setLoading(true) // v208: "Qayta urinish" now shows the skeleton while retrying
     try {
-      const res = await fetch('/api/settings/health')
+      const res = await fetch('/api/settings/health', { headers: authHeaders() })
       const json = (await res.json()) as HealthData & { ok?: boolean }
       if (json && (json.ok || json.workers)) setData(json)
     } catch {

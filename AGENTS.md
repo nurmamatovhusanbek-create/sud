@@ -1,125 +1,64 @@
-# AGENTS.md — guide for the next agent (or developer)
+# AGENTS.md — start here
 
-You're about to change **Sud tizimi**. This file tells you *where* things live and,
-more importantly, *why* they're built the way they are — so you can pick up a request,
-land it in the right place, and not re-break things that were hard to get right.
+**Sud tizimi**: a private, localhost, single-operator Next.js app that looks up Uzbek companies, court cases, bills,
+published court orders and fills legal documents. This file is the *rules*; the *map* is `docs/`.
 
-Read the [`README.md`](./README.md) for the product picture. This file is the map for
-making changes.
+## 0. Work fast: read the map, not the code
 
----
+1. Open **`docs/MAP.md`** (≈10 KB): layers, feature → files → tests, «one concept in several places», state/pools, change recipes.
+2. `grep` **`docs/MAP.generated.md`** for the file you will change → who imports it (blast radius), tests that cover it, routes, env vars, storage keys, events.
+3. Open only the files those name (use `Read` with `offset`/`limit`; don't read whole big files: `sections/cases.tsx`, `settings-view.tsx`, `court-case.ts`, `billing.ts` are large).
+4. Area-specific *why*: `docs/design-notes.md` (pizza, report, drawer, documents, scraping…), `docs/orders.md` (published orders), `docs/SECURITY.md`, `docs/public-sud-api.md`.
+5. After moving/adding files, routes, env vars, storage keys or events: **`bun run map`** and commit `docs/MAP.generated.md`.
 
-## 0. First principles (don't fight these)
+## 1. First principles (don't fight these)
 
-- **Localhost-first, single operator.** This is a private power tool, not a public app.
-  It handles sensitive scraped legal/financial data. Bias toward "useful and dense for
-  one expert" over "friendly for the public".
-- **The client is 100% same-origin.** All data comes through `/api/*` (same host).
-  Fonts are self-hosted by `next/font`. There are **no external scripts, no CDNs, no
-  third-party trackers**. Keep it that way — the tight CSP in `next.config.ts` depends
-  on it, and it's the app's main security control.
-- **No server database.** Server state is in-memory only (caches + worker health).
-  Anything that must persist across page loads lives in the **browser** (`localStorage`
-  registry, keyed by STIR). Don't add a DB unless the owner asks.
-- **Types are enforced.** `ignoreBuildErrors` is `false`. If `bun run typecheck` is red,
-  the build is broken — fix the file, don't suppress.
-- **Uzbek is the UI language.** Use native Uzbek phrasing and the correct typography:
-  `oʻ`/`gʻ` use the tutuq belgisi `ʼ`/`ʻ` (not straight apostrophes), guillemets `«»`
-  for quotes, no em dash. Money and dates use the app's own formatters, not `toLocaleString`.
+- **Localhost-first, single operator.** Private power tool with sensitive scraped data: dense and useful for one expert over friendly for the public.
+- **Same-origin client.** All data via `/api/*`; fonts self-hosted; **no external scripts/CDNs/trackers**. The tight CSP in `next.config.ts` depends on it — bring an external asset same-origin, never loosen the CSP.
+- **Perimeter (background jobs exist now).** Listens on `127.0.0.1` only; every API route is `guard()`-wrapped (Host check → cross-site check → token → rate limit); dangerous doors (`settings/update`, worker list, Tor) are `privileged` (header `x-sud-action`). **Nothing starts by itself:** loading, refreshing or switching pages/tabs never queues or scrapes; work starts from a click or an opt-in setting. Details/threat model: `docs/SECURITY.md`. A test fails if a route forgets `guard()`.
+- **No server database.** Server state is in-memory + one deliberate on-disk cache (published orders, `~/.sud-tizimi`, **never deleted by the app**). What must persist across loads lives in the browser (`localStorage` registry keyed by STIR). Don't add a DB unless the owner asks.
+- **Types are enforced** (`ignoreBuildErrors: false`). Red `bun run typecheck` = broken build; fix the file, don't suppress.
+- **Uzbek UI.** Native phrasing; `oʻ`/`gʻ` use `ʻ`/`ʼ` (not straight apostrophes), guillemets `«»`, no em dash. Money/dates via the app's formatters, not `toLocaleString`.
+- **Two owner UI rules:** no «choosing glow» / inset glow (crisp focus only); «less info is useful info» — compact cards, match existing tile sizes.
+- **Tokens, not hex.** Colors are CSS variables (`globals.css`); theme via `data-theme` (`next-themes`, default light).
 
-## 1. Always verify before you finish
+## 2. Always verify before you finish
 
 ```bash
-bun run typecheck      # must be clean — types are enforced at build time
-bun run lint           # must be 0 problems
-bun test src/core src/lib   # pure-core math/logic (pretenzia, classify, status, pizza) + scraper error handling (network mocked)
+bun run typecheck                        # must be clean
+bun run lint                             # must be 0 problems
+bun test src/core src/lib src/server     # pure logic, scrapers (network mocked), security, route guards
+bun run map:check                        # docs/MAP.generated.md is current (else: bun run map)
 ```
+Never pipe these through `| tail` inside an `&&` chain before committing — `tail` hides the exit code.
 
-**Live scraping does not work in a sandbox** (the sud.uz / orginfo endpoints are
-blocked, and the Cloudflare workers aren't configured). To verify UI or flows that need
-data, **seed `localStorage`** via Playwright `page.addInitScript`, **mock the API** with
-`page.route(...).fulfill()`, or render a component against fixture data — don't conclude
-a feature is broken just because a live fetch failed here. The document editor needs no live data: run `next dev`, open Hujjatlar, and drive it with Playwright (fill `[data-fk]` inputs, click `.dprev .slot`, capture the download and compare its text to the preview). Playwright + Chromium are
-preinstalled (`/opt/pw-browsers/...`); never run `playwright install`.
+**Live scraping does not work in a sandbox** (sud.uz / orginfo / public.sud.uz are blocked, workers not configured). Verify UI/flows by seeding
+`localStorage` (`page.addInitScript`), mocking `/api/*` (`page.route(...).fulfill()`), or pointing a service at a local mock
+(`PUBLIC_ORDERS_API=http://localhost:PORT`). A failed live fetch here proves nothing. Playwright + Chromium are preinstalled
+(`/opt/pw-browsers/...`); never run `playwright install`. Document editor: run `next dev`, open Hujjatlar, fill `[data-fk]`, click `.dprev .slot`, compare the download with the preview.
+Sandbox dev server: `bun run dev:once`; free the port with `fuser -k 3000/tcp` (never `pkill -f`).
 
----
+## 3. Where things are (one line each — the full table is `docs/MAP.md` §2)
 
-## 2. Where to make a change — grouped by concern
+| Concern | Start at |
+|---|---|
+| Won/lost/pending, win rate, pizza | `core/classify`, `core/rates`, `core/status`, `proto/pizza-geometry` |
+| Money, dates, number-to-words, penalty math | `core/billing-format`, `core/dates`, `core/pretenzia` |
+| API envelope / validation | `core/envelope`, `core/schemas`, `lib/api-types` |
+| Client state, watchlist registry, enrichment | `lib/store/app-store`, `lib/registry`, `lib/enrich` |
+| Shell, nav, ⌘K | `shell/app-shell`, `shell/command-palette` |
+| Company report PDF («Hisobot») | `lib/report/*` (model tested; render only draws) |
+| Slide-over drawer | `proto/drawer` + `.drawer*/.dw-*` in `prototype.css` |
+| `.docx` forms, live preview, templates | `lib/documents/*`, `views/doc-editor`, `proto/doc-preview`, `scripts/doc-templates` |
+| Talabnoma (demand letters) | `lib/pretenzia/*`, `views/pretenzia-view` |
+| Scrapers, worker routing | `lib/{billing,court-case,orginfo,chamber,stats}`, `lib/net/worker-fetch`, `cf-worker-pool` |
+| Published court orders | `lib/public-orders/*`, `core/public-orders` → `docs/orders.md` |
+| API routes, middleware, security | `app/api/**`, `server/{middleware,security,config}` → `docs/SECURITY.md` |
+| Petition prefill from a case | `lib/documents/from-case`, `core/translit` |
 
-### 🧩 CODE — domain logic & data layer
+Both document APIs need their templates traced into the standalone build (`outputFileTracingIncludes` in `next.config.ts`) — add new templates there too.
 
-| You want to… | Go to | Why / notes |
-|---|---|---|
-| Change how cases are won/lost/pending, or the pizza breakdown | `src/core/classify.ts`, `src/core/status.ts` | **Pure functions, unit-tested.** `classifyOutcome` is role-aware (granted: plaintiff win / defendant lose · rad etilgan: plaintiff lose / defendant win · qaytarilgan: neutral for both) and is the ONLY copy — `lib/stats.ts` imports it; never re-inline it. Add/adjust a test in `src/core/__tests__/`. Keep them side-effect-free. |
-| Change the **win rate** | `src/core/rates.ts` (`winRate`, `winRateText`) | The ONE definition: **won ÷ (won + lost)**, `null` (shown «–») when nothing is decided. Neutral and in-progress cases are not in the base. KPI cards, the pie detail, the per-court bars, the watchlist meta and the PDF report all call it — never inline `win / total` again. Always print the base («N ta hal qilingan ishdan»). |
-| Change the Statistika pie («radial stack») | `src/components/proto/pizza-geometry.ts` (pure model) · `Pizza` / `PizzaDetail` / `PizzaKey` in `proto/primitives.tsx` · `.cband` / `.cnum` / `.st` / `.pie-key` in `prototype.css` | One circle = 100% of cases; a wedge's radius is that slice's own 100%, stacked hub→rim: yutgan · yutqazgan · neytral · jarayonda. **Every case is drawn** (bands sum to the pill total — tested). Status = fill density in the slice's hue (solid · tint · hatch · dashed), never a new hue. Counts are tiny mono numbers printed only where the band is ≥ `MIN_LABEL_THICKNESS`. A clear channel (`wedge.split`) parts the decided bands from the undecided ones (neytral + jarayonda) so they read as their own zone. Paint constants live in `PIZZA_PAINT` and are shared with the PDF — change them once. **Report typography stays light** (max weight 700, body/values 500): heavier text ate the space between figures. The win rate is a number beside the chart, not a radius. |
-| Change money/date formatting or number-to-words | `src/core/billing-format.ts`, `src/core/pretenzia.ts` | Money is in **tiyin** (1 sum = 100 tiyin) for exact integer math. RU *and* UZ number-to-words live here (UZ "ming" drops "bir"). |
-| Change the penalty / demand-letter math | `src/core/pretenzia.ts` (`computeClaim`, `delayDays`, `paymentClause`) | 0.4%/day, capped at 50% of debt, **inclusive** delay-day count, 5-banking-day grace. Golden-tested against real letters — update the test if you change a rule. |
-| Change the API request/response envelope or validation | `src/core/envelope.ts`, `src/core/schemas/`, `src/lib/api-types.ts` | Zod schemas define the shape crossing `/api`. |
-| Change client-side state (which section/surface is shown) | `src/lib/store/app-store.ts` (Zustand) | `WORKSPACE_NAV` and `SectionKey` live here. |
-| Change the watchlist / recently-viewed registry | `src/lib/registry.ts`, `src/lib/use-registry.ts`, `src/lib/enrich.ts` | localStorage `sud-registry-v1`. Writes dispatch `sud:registry-changed`; `useRegistryVersion` re-renders on it. `enrichCompany(stir, force)` refreshes stats+hearings. |
-
-### 🎨 UI — components & design system
-
-| You want to… | Go to | Why / notes |
-|---|---|---|
-| Touch the shell / navigation / ⌘K | `src/components/shell/app-shell.tsx`, `command-palette.tsx` | Nav is `WORKSPACE_NAV` + the "Tizim" group (Hujjatlar, Sozlamalar). |
-| Edit a data section | `src/components/sections/` (`bills`, `cases`, `hearings`, `profile`, `overview`) | |
-| Edit a full-surface view | `src/components/views/` (`launcher`, `watchlist`, `documents-view`, `doc-editor`, `pretenzia-view`, `settings-view`) | The launcher is the home surface. |
-| Change a slide-over panel (case detail, receipt, worker) | `src/components/proto/drawer.tsx` + the `.drawer*` / `.dw-*` block in `prototype.css`; callers: `openCaseDetail` (`sections/cases.tsx`), `openReceipt` (`sections/bills.tsx`), `openWorker` (`views/settings-view.tsx`) | One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title block, accent section labels with a rule, zebra rows, accent-soft key figure). Open it with `openProtoDrawer(title, content, sub, { eyebrow, badges, footer })` and build the body from `DwSection` / `DwKv` / `DwFig` so every panel matches. `DwKv` **drops rows with no value** — never render a «-» row. New panels get the look for free; don't hand-style a one-off. |
-| Change colors, spacing, tokens, dark mode | `src/app/globals.css` + `src/app/prototype.css` | **Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components. |
-| Lay out a responsive card grid | reuse the `.kpis` / `.ccards` breakpoints | **Grid gotcha (learned the hard way):** `repeat(N, 1fr)` = `minmax(auto, 1fr)`, so non-wrapping content (company names, STIRs) forces horizontal overflow off-screen. Use `minmax(0, 1fr)` **and** `min-width: 0` on the items. |
-| Change the **company report** («Hisobot», PDF) | `src/lib/report/` — `model.ts` (pure: raw data → report model, tested) · `render.ts` (model → HTML sections) · `doc.ts` (page shell, `@page`, theme) · `fonts.ts` · `generate.ts` (`openCompanyReport`, called from `company/context-bar.tsx`) | Split on purpose: put logic in `model.ts` and cover it in `report/__tests__/`; `render.ts` only draws. A failed source is recorded in `model.notes` and shown **in place** — never print a zero for missing data. Sections with no data source are omitted, not faked. **The report never names its data sources** (owner's call): no footer credit, no `orginfo`/`sud.uz` in failure notes. **Colors:** outcomes have one hue each (teal won · vermilion lost · indigo in progress · slate neutral), validated for color-blind separation in light and dark with the dataviz validator; the navy `ramp` is only for magnitude/shares. Don't reuse an outcome hue for something else. The signature chart is the SAME pizza as Statistika: `pizza()` in `render.ts` draws `pizzaModel()` from `components/proto/pizza-geometry.ts` (one geometry, two paints — never fork the maths for print).. `generate.ts` opens the print window **first** (synchronously in the click, or popup blockers reject it), then gathers data with a per-source timeout. |
-| Add a "themed PDF" export | `src/lib/print.ts` | `buildPrintDoc(title, body, dark)` renders an app-themed sheet that adapts to the active theme; uses `print-color-adjust: exact` so brand colors survive "Save as PDF". |
-
-**Two UI rules the owner has stated explicitly — honor them:**
-- **No "choosing glow" / no inner (inset) glow.** Don't add hover background-glows on
-  clickable sections or `inset` accent shadows on focus. Plain, crisp focus states only.
-- **"Less info is useful info."** Prefer compact cards. When adding a card, match the
-  existing tile sizes (doc tiles / KPI cards), don't invent a bigger one.
-
-### 📄 DOCUMENTS — the `.docx` engine
-
-The app fills Word templates server-side and streams them back.
-
-| You want to… | Go to | Why / notes |
-|---|---|---|
-| Add/edit a form-driven document (visa, IIO, court) | `src/lib/documents/registry.ts` | Declares each document (id, template, fields) and each category (label, shared field groups). The editor, its live preview and the download all pick a new document up automatically — every field in `fields` must have a `{{key}}` in the template (and vice versa), or the form and the page disagree. Give fields a `placeholder`: it is what an empty spot shows on the page. |
-| Change how templates are filled | `src/lib/documents/fill.shared.ts` (the substitution) · `fill.server.ts` (download: reads template, swaps letterhead, zips) | Trivial `{{key}}` string replace inside `word/document.xml` via JSZip. **The substitution is isomorphic on purpose:** the server download and the browser live preview both call `fillXml`/`markXml` from `fill.shared.ts`, so the preview can never drift from the file. Change fill behaviour there, never in only one side. |
-| Change the document editor (form ↔ live page) | `src/components/views/doc-editor.tsx` (form, sections, doc switcher, downloads) + `src/components/proto/doc-preview.tsx` (live render) + `.dedit*` / `.dprev*` in `prototype.css` | Split view: fields left, the REAL .docx template rendered right (via `docx-preview`), filled as you type. Click a value on the page → its field focuses; focus a field → its spots highlight. Combined categories (visa, iio) share one form and get a doc switcher + «Barchasi»; court docs get one doc with sectioned fields (`sectionsFor` in the registry). |
-| Change how the preview is drawn | `doc-preview.tsx` | Pipeline per change (debounced): template zip → `markXml` wraps each value in private-use sentinels (U+E000–E002) → letterhead swap → `docx-preview` renders **off-screen** → sentinels become `<span class="slot" data-k>` → DOM swapped in (no flicker, scroll kept). Empty spots show the field's example text (`placeholder`) in italics; the real download still leaves them blank. Slot tints are fixed light colors because the paper is always white, even in dark mode. |
-| Serve a template to the preview | `src/app/api/documents/template/route.ts` (`GET ?id=`) | Guarded like every route; id is validated against the registry (path-traversal ids 404). Returns the raw, unfilled template only. |
-| Work on the **Talabnoma** (akt-sverka → demand letters) flow | `src/lib/pretenzia/` (`parse.ts` client xlsx reader · `render.ts` values · `fill.server.ts`) + `src/components/views/pretenzia-view.tsx` + API `src/app/api/pretenzia/generate/route.ts` | `parse.ts` reads the xlsx client-side and finds debtor contracts; `render.ts` builds RU/UZ values; `fill.server.ts` picks the template by language (`pretenzia.docx` / `talabnoma-uz.docx`), fills, and returns one `.docx` or a ZIP. |
-| Build or repair a `.docx` template | `scripts/doc-templates/` (`build-*.mjs`, `verify-templates.mjs`) → outputs to `src/lib/documents/templates/` | **Placeholders get split across XML runs by Word.** The build scripts do "span surgery": collapse run-fragmented `{{key}}` back into a single run so the fill step can replace it. Run `verify-templates.mjs` after building — it checks every placeholder is present and reachable. Don't hand-edit the binary `.docx`. |
-| Add a letterhead/header image picker | `src/components/proto/letterhead.tsx` | Shared `useLetterhead()` hook + `LetterheadRow`; swaps `word/media/image1.png` (blank transparent PNG / uploaded / keep template's). Reused by both the visa docs and Talabnoma. |
-
-Both document APIs need their templates traced into the standalone build —
-see `outputFileTracingIncludes` in `next.config.ts`. If you add a template a route
-reads at runtime, add it there too or production won't find it.
-
-### 🌐 SCRAPING — sources, network, workers
-
-| You want to… | Go to | Why / notes |
-|---|---|---|
-| Fix/extend a scraper | `src/lib/billing.ts`, `court-case.ts`, `orginfo.ts`, `chamber.ts`, `jadval2`, `stats.ts` (+ `src/sources/`) | These were ported carefully; match upstream shapes and keep them typed. `court-case` party STIRs aren't returned by the API — they're resolved by name against `orginfo` (see the `PartyRow` pattern in `cases.tsx`). |
-| Change proxying / worker health / Tor | `src/lib/cf-worker-pool.ts`, `health-registry.ts`, `workers-config.ts`, `tor.ts` | Requests go through health-tracked Cloudflare Workers so the operator IP is never exposed. Workers are the owner's own (`CF_WORKER_URLS`); never wire in third-party fallbacks. **orginfo.uz exception:** the shared worker sends a JSON/CORS fingerprint (Origin `my.sud.uz`, `Accept: application/json`) that suits jadval.sud.uz but makes orginfo's HTML site answer HTTP 500, so `proxy.js` gives `orginfo.uz` a navigation-style header set, and `orginfo.ts` retries a failed worker attempt DIRECT from the machine (`ORGINFO_DIRECT_FALLBACK=0` forbids it; low volume, results cached 24 h). A fetch that fails THROWS (never `''` = «not found») so the profile can say why it is empty; `scripts/probe-orginfo.mjs` shows worker vs direct status. |
-| Add/adjust an API route | `src/app/api/**/route.ts` | Every route must call `guard()` (bearer auth → per-IP rate-limit → coalesce) and set `runtime='nodejs'` + `dynamic='force-dynamic'`. Copy an existing route as the template. |
-| Work on the **public court-order library** (published orders per case) | `src/core/public-orders.ts` (pure: row compaction, labels, multipart parser, `splitDecisions`, **`planCheck` policy**, **`isOngoingFirstInstance`**, `orderJobCase`) · `src/lib/public-orders/` (`source.ts` API · `engine.ts` `lookupCase` · `company-job.ts` background queue with pause/resume/cancel · `store.ts` shard files + per-case «checked» records + `cacheStats`; `data-dir.ts` = where it lives) · `src/app/api/public-orders/*` (`fetch` start/pause/resume/cancel · `status` · `orders` · `file` · `cache`) · `src/lib/orders-watchlist.ts` (Kuzatuv run, pause/resume, auto toggle) · `components/shell/orders-auto-check.tsx` (idle watcher) · `components/shell/orders-loader.tsx` (global pill) · `components/views/orders-settings.tsx` (Settings › Qarorlar: control panel) · `components/proto/case-orders.tsx` (drawer cards) · `docs/public-sud-api.md` | Orders are fetched **only for cases the owner cares about** (Kuzatuv companies manually or when idle; a Sud ishlari list; a drawer's «Tekshirish»); there is deliberately no full-library crawl (owner's call, laptop/disk) — Settings › Qarorlar is the *control panel* (auto switch, run now, queue pause/resume/cancel, cache numbers), not a library copy. **A published order is permanent** (instance never matters, only the case status changes on appeal): an instance with a stored order is never asked again, a case is re-checked only on a signature change (`orderJobCase` → `caseSignature` of status + result, built the SAME way by every caller or two screens ping-pong «changed») or the back-off (3 d, 14 d, 45 d), a failed search is retried after 10 min and never recorded as «none». **A case still heard in the first instance (no result, «ish yurituvda»/«koʻrib chiqilmoqda») has no decision, so `enqueueCases` leaves it out** (unless forced by hand); one in appeal/cassation is checked because its first-instance order exists. **Nothing starts by itself, and nothing nags**: opening, refreshing or switching pages/tabs never scrapes and never queues (an earlier version detected on load and left a «ready» queue + pill that came back). The sequence is DETECT → SCRAPE, and DETECT is free: `planCases` / `POST /fetch {action:'plan'}` works out from local records how many cases really need a look (ongoing filter + `planCheck`; known/backing-off ones are not work) and changes NOTHING — the count is shown on the «Qarorlar» button (case list) and as «N ta ish tekshirilishi kerak» in Kuzatuv, computed from `meta.orderCases` (each company's compact case list, written whenever its stats are read; `orderCasesPatch`/`orderCasesOf` in `registry.ts`) so it needs no scraping of the companies. SCRAPE (`enqueueCases`) only runs from a click or the OPT-IN idle check (`sud-orders-auto`, **default off**, a hidden browser tab is not idle). Failed cases stay in `failed`, so «Qayta urinish» (a button on the error toast) re-queues them without a refresh. **The global pill (`orders-loader.tsx`) exists only while something is really being scraped**, ✕ hides it for that run (sessionStorage, survives a refresh); a paused, failed or finished run leaves NO pill — the end is one toast, a paused queue is continued from Kuzatuv (`orders-control.tsx`) or Settings › Qarorlar. All consumers share ONE status poll (`use-orders-job.ts`). **Pause really pauses**: the state flips at once, the case in flight finishes, the rest stays queued IN ORDER and `resume` continues with the same counters (never a restart); the Kuzatuv feeder sends `keepPaused` so it cannot undo a pause; a paused run announces nothing (no «yangi qaror yoʻq» toast). The upstream **search is slow** (≈10 s per `case_number`+`instance`, a minute+ without), so it only runs in the BACKGROUND, one case at a time, 3 instances in parallel; results go to `~/.sud-tizimi/public-orders/` (`PUBLIC_ORDERS_DIR` overrides; an old `<project>/data/public-orders` is copied over once). **The cache is NEVER deleted by the app** (owner's rule: rebuilding costs ~10 s per case) — no clear button, no DELETE route; it lives OUTSIDE the project so re-cloning / `git clean` cannot wipe it, and writes only append (a newer line for a re-fetched order/case wins on read). Don't add a delete path. The auto-check is client-driven (runs only while the app is open and idle). **Called directly from this machine**; `PUBLIC_ORDERS_VIA_WORKERS=1` routes via workers. PDFs are anonymised and rows carry no parties/STIR. |
-| Prefill a court petition from a scraped case | `src/lib/documents/from-case.ts` (`caseToDocValues`) · `core/translit.ts` (Cyrillic → Latin) · the drawer's «Hujjat tayyorlash» buttons in `sections/cases.tsx` · `docPrefill` in `store/app-store.ts` · `DocEditor initialValues` | The forms need court, judge, case number, claimant, subject and next hearing — all already in the case detail, so **no library or PDF is needed**. Only real fields of the target document are emitted (tested against the registry); what only the user knows (representative, address, reason, phone) stays empty. |
-
-### 🔒 SECURITY
-
-`next.config.ts` owns the headers: a tight **CSP** (only relaxed in dev for HMR:
-`unsafe-eval`, `ws:`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
-`Permissions-Policy`, COOP, `X-Robots-Tag: noindex`, and `Cache-Control: no-store` on
-`/api/*`. If you add an external origin (script, image, font, fetch), the CSP will
-block it — the correct move is almost always to **bring it same-origin** (self-host it),
-not to loosen the CSP. (The live preview relies on `img-src data:`/`blob:` and inline styles — `docx-preview` embeds images as data URLs and injects a `<style>`; don't tighten those without re-testing the editor.) `guard()` on every API route is the second layer. `APP_API_TOKEN`
-is required in production.
-
----
-
-## 3. Conventions & gotchas that will bite you
+## 4. Gotchas that will bite you
 
 - **Lint — React Compiler advisory rules are intentionally off** (`eslint.config.mjs`:
   `set-state-in-effect`, `refs`, `use-memo`, `exhaustive-deps`, `purity`,
@@ -194,7 +133,7 @@ is required in production.
 
 ---
 
-## 4. Git workflow
+## 5. Git workflow
 
 - Develop on the branch the owner names for the task (currently
   `claude/gifted-volta-d1wpww` on `nurmamatovhusanbek-create/sud`). Create it from the

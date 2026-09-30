@@ -79,6 +79,12 @@ export const config = {
     apiToken: requiredIn('production', 'APP_API_TOKEN'),
   },
 
+  /** Request-origin security (server/security.ts). */
+  security: {
+    /** Extra hostnames the app may be reached by (LAN / reverse proxy). Loopback is always allowed. */
+    allowedHosts: list('APP_ALLOWED_HOSTS'),
+  },
+
   /** Per-IP rate limit for expensive scrape endpoints (blueprint §5.4). */
   rateLimit: {
     windowMs: int('RATE_LIMIT_WINDOW_MS', 60_000, { min: 1_000 }),

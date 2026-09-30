@@ -42,6 +42,19 @@ let _cachedMtime = 0
  * Normalize a worker URL: trim, ensure https://, ensure trailing /.
  * Returns null if the URL is invalid.
  */
+/**
+ * A worker is a public https host with a DNS name. IP literals, `localhost` and single-label / internal names are
+ * refused: the worker test route fetches this URL from the server, so accepting them would let a forged «add worker»
+ * turn the app into a request forwarder to the operator's own network (SSRF).
+ */
+export function isPublicDnsName(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/\.$/, '')
+  if (!h.includes('.')) return false // localhost, intranet single-label names
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(':') || h.startsWith('[')) return false // IPv4 / IPv6 literals
+  if (/\.(local|internal|lan|localdomain|home|corp|intranet)$/.test(h)) return false
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h)
+}
+
 export function normalizeWorkerUrl(url: string): string | null {
   let u = url.trim()
   if (!u) return null
@@ -50,6 +63,8 @@ export function normalizeWorkerUrl(url: string): string | null {
   try {
     const parsed = new URL(u)
     if (parsed.pathname !== '/' && parsed.pathname !== '') return null
+    if (parsed.username || parsed.password || parsed.search) return null
+    if (!isPublicDnsName(parsed.hostname)) return null
     // Ensure trailing slash
     u = parsed.origin + '/'
   } catch {

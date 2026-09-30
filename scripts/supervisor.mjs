@@ -48,6 +48,15 @@ let portStreak = 0     // consecutive quick exits caused by port 3000 being busy
 
 const PORT = process.env.PORT || '3000'
 
+// The app has no login: it listens on THIS machine only. SUD_HOST=0.0.0.0 (LAN) is refused unless APP_API_TOKEN is set,
+// and then the other hostnames must also be listed in APP_ALLOWED_HOSTS (see docs/SECURITY.md).
+const HOST = process.env.SUD_HOST || '127.0.0.1'
+const LOOPBACK = ['127.0.0.1', 'localhost', '::1']
+if (!LOOPBACK.includes(HOST) && !process.env.APP_API_TOKEN) {
+  console.error(`[supervisor] SUD_HOST=${HOST} would expose the app to the network with NO login. Set APP_API_TOKEN (and APP_ALLOWED_HOSTS) first, or unset SUD_HOST.`)
+  process.exit(1)
+}
+
 function portHelp() {
   console.error(
     `\n[supervisor] Port ${PORT} band — avvalgi «bun run dev» toʻliq yopilmagan boʻlishi mumkin.\n` +
@@ -112,8 +121,8 @@ async function cycle(doInstall = true) {
     if (mode === 'start') await runStep('bun run build', bunCmd, ['run', 'build'])
   }
 
-  const args = mode === 'dev' ? ['x', 'next', 'dev', '-p', PORT] : ['.next/standalone/server.js']
-  const env = { ...process.env, SUD_SUPERVISED: '1', ...(mode === 'start' ? { NODE_ENV: 'production' } : {}) }
+  const args = mode === 'dev' ? ['x', 'next', 'dev', '-p', PORT, '-H', HOST] : ['.next/standalone/server.js']
+  const env = { ...process.env, SUD_SUPERVISED: '1', HOSTNAME: HOST, ...(mode === 'start' ? { NODE_ENV: 'production' } : {}) }
   console.log(`[supervisor] starting: ${bunCmd} ${args.join(' ')}`)
   sinceLastStart = Date.now()
   // detached on Unix → the child leads its own process group so killTree can

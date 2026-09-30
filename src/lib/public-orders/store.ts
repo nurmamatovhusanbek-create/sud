@@ -47,8 +47,8 @@ export function appendOrders(orders: StoredOrder[]): Promise<void> {
       lines.push(JSON.stringify(o))
       byShard.set(n, lines)
     }
-    await fs.mkdir(path.join(dataDir(), 'shards'), { recursive: true })
-    for (const [n, lines] of byShard) await fs.appendFile(shardFile(n), lines.join('\n') + '\n', 'utf8')
+    await fs.mkdir(path.join(dataDir(), 'shards'), { recursive: true, mode: 0o700 })
+    for (const [n, lines] of byShard) await fs.appendFile(shardFile(n), lines.join('\n') + '\n', { encoding: 'utf8', mode: 0o600 })
   })
 }
 
@@ -123,8 +123,8 @@ export async function markChecked(c: CaseCheck): Promise<void> {
   const rec = { ...c, caseNumber: normalizeCaseNumber(c.caseNumber) }
   m.set(rec.caseNumber, rec)
   await serial(async () => {
-    await fs.mkdir(dataDir(), { recursive: true })
-    await fs.appendFile(checkedFile(), JSON.stringify(rec) + '\n', 'utf8')
+    await fs.mkdir(dataDir(), { recursive: true, mode: 0o700 })
+    await fs.appendFile(checkedFile(), JSON.stringify(rec) + '\n', { encoding: 'utf8', mode: 0o600 }) // private to this user
   })
 }
 

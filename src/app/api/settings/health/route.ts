@@ -20,6 +20,9 @@ import { guard } from '@/server/middleware'
 import { snapshotMetrics } from '@/infra/metrics'
 import { configSummary } from '@/server/config'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 async function GET_impl() {
   const pools = getAllHealthPools()
   const poolsData = pools.map(({ label, pool }) => pool.snapshot())

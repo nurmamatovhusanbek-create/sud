@@ -23,8 +23,13 @@ import type {
 /** Operator may set NEXT_PUBLIC_APP_API_TOKEN for an authed deployment. */
 const TOKEN = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_APP_API_TOKEN || '') : ''
 
-function authHeaders(): HeadersInit {
+export function authHeaders(): HeadersInit {
   return TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
+}
+
+/** Headers for the dangerous doors (update, worker list, Tor): the token plus the confirmation header a cross-site page cannot send. */
+export function privilegedHeaders(extra: Record<string, string> = {}): HeadersInit {
+  return { ...authHeaders(), 'x-sud-action': '1', ...extra }
 }
 
 async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<T>> {

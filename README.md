@@ -240,3 +240,9 @@ scripts/            supervisor.mjs (dev/start) · doc-templates/ (build & verify
 ## License
 
 Proprietary — internal tool. All rights reserved.
+
+## For developers and agents
+
+Start at [`AGENTS.md`](./AGENTS.md) (rules) and [`docs/MAP.md`](./docs/MAP.md) (where everything lives, what else to touch, change
+recipes). Security model: [`docs/SECURITY.md`](./docs/SECURITY.md). The app listens on `127.0.0.1` only and never starts background
+work by itself.

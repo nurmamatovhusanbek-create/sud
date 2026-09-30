@@ -56,4 +56,4 @@ async function POST_impl() {
 }
 
 export const GET = guard(GET_impl)
-export const POST = guard(POST_impl)
+export const POST = guard(POST_impl, { privileged: true }) // starts a local process
