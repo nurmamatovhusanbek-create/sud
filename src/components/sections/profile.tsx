@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react'
 import { Building2, CalendarDays, Factory, Mail, Phone, Receipt, Gavel, User, Wallet, Star } from 'lucide-react'
-import { EmptyBlock, ArcGauge, SkRows, initials } from '@/components/proto/primitives'
+import { EmptyBlock, Dial, SkRows, initials } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
@@ -157,9 +157,9 @@ export function ProfileSection() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
             {score !== null ? (
-              <ArcGauge pct={score} size={160} band={ratingBand} label="Ishonch balli (0–100)" id="profile-score" />
+              <Dial pct={score} size={200} band={ratingBand} label="Ishonch balli" id="profile-score" />
             ) : (
-              <ArcGauge pct={0} size={160} band="neu" label="Ball mavjud emas" />
+              <Dial pct={null} size={200} label="Ball mavjud emas" />
             )}
             {rating?.category ? (
               <span

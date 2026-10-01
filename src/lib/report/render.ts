@@ -31,6 +31,7 @@ import {
   type PizzaItem,
   type PizzaStatus,
 } from '@/components/proto/pizza-geometry'
+import { clampPct, dialAngle, dialGeom, tickLook } from '@/components/proto/dial-geometry'
 import { fmtInt, shortSum, type ReportModel, type Tone } from './model'
 
 // ---- theme -------------------------------------------------------------------
@@ -80,16 +81,29 @@ export function reportTheme(dark: boolean): ReportTheme {
 
 // ---- SVG ---------------------------------------------------------------------
 
-/** Half-circle score gauge, drawn for the dark rail; the arc is `score`% of the half turn. */
+/**
+ * The rating dial, drawn static on the dark rail. Same geometry as the app's Dial
+ * (components/proto/dial-geometry.ts): 51 hairline ticks over 270°, numerals 0 · 50 · 100,
+ * lit up to the score, a needle with a pointer at the score.
+ */
 function gauge(score: number | null, tone: Tone, t: ReportTheme): string {
-  const r = 54
-  const len = Math.PI * r
-  const arc = `M12 66 A${r} ${r} 0 0 1 120 66`
-  const filled = score === null ? 0 : (len * score) / 100
-  return `<svg class="rp-gauge" viewBox="0 0 132 76" role="img" aria-label="Reyting ${score ?? ''}">
-    <path d="${arc}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="9" stroke-linecap="round"/>
-    ${filled > 0 ? `<path d="${arc}" fill="none" stroke="${t.rail.tone[tone]}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${filled.toFixed(2)} ${len.toFixed(2)}"/>` : ''}
-    <text x="66" y="62" text-anchor="middle" class="rp-gauge-n" fill="#fff">${score === null ? '–' : Math.round(score)}</text>
+  const S = 150
+  const g = dialGeom(S)
+  const col = t.rail.tone[tone]
+  const v = score === null ? 0 : clampPct(score)
+  const ticks = g.ticks
+    .map((k) => {
+      const { lit, width } = tickLook(k, score === null ? -1 : v)
+      return `<line x1="${k.x1.toFixed(2)}" y1="${k.y1.toFixed(2)}" x2="${k.x2.toFixed(2)}" y2="${k.y2.toFixed(2)}" stroke="${lit ? col : 'rgba(255,255,255,.2)'}" stroke-width="${width.toFixed(2)}" stroke-linecap="round"/>`
+    })
+    .join('')
+  const labels = g.labels.map((l) => `<text x="${l.x.toFixed(1)}" y="${l.y.toFixed(1)}" text-anchor="middle" class="rp-dial-l">${l.v}</text>`).join('')
+  const needle =
+    score === null
+      ? ''
+      : `<g transform="rotate(${dialAngle(v).toFixed(2)} ${g.cx} ${g.cy})"><line x1="${g.needle.x1}" y1="${g.needle.y1.toFixed(2)}" x2="${g.needle.x2}" y2="${g.needle.y2.toFixed(2)}" stroke="${col}" stroke-width="3" stroke-linecap="round"/><path d="${g.needle.tri}" fill="${col}"/></g>`
+  return `<svg class="rp-gauge" viewBox="0 0 ${S} ${S}" role="img" aria-label="Reyting ${score ?? ''}">${ticks}${labels}${needle}
+    <text x="${S / 2}" y="${S / 2 + 11}" text-anchor="middle" class="rp-gauge-n" fill="#fff">${score === null ? '–' : Math.round(v)}</text>
   </svg>`
 }
 
@@ -403,9 +417,10 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-sub .sep { opacity: .5; }
   .rp-sub i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
   .rp-rate { break-inside: avoid; margin: 7mm 0 0; }
-  .rp-gauge { display: block; width: 38mm; height: auto; margin: 0 auto; }
-  .rp-gauge-n { font: 700 24px ${fontStack}; }
-  .rp-rate-c { margin-top: 1mm; text-align: center; font-size: 6.4pt; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .rp-gauge { display: block; width: 44mm; height: auto; margin: 0 auto; }
+  .rp-gauge-n { font: 600 40px ${monoStack}; letter-spacing: -.04em; }
+  .rp-dial-l { font: 400 8.5px ${monoStack}; fill: rgba(255,255,255,.5); }
+  .rp-rate-c { margin-top: -4mm; text-align: center; font-size: 6.4pt; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.55); }
   .rp-rate-none { padding: 3mm 0; text-align: center; font-size: 7pt; color: rgba(255,255,255,.55); border: 1px dashed rgba(255,255,255,.25); border-radius: 2mm; }
   .rp-rg { break-inside: avoid; margin-top: 7mm; padding-top: 2.6mm; border-top: .5pt solid rgba(255,255,255,.18); }
   .rp-rg h3 { margin-bottom: 2.4mm; font-size: 5.9pt; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,.5); }

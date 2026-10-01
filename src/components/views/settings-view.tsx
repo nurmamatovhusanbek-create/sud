@@ -25,7 +25,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { ArcGauge, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
+import { Dial, HEALTH_ZONES, WORKER_ZONES, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
 import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
 import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
@@ -725,7 +725,7 @@ function HealthTab() {
             <span className={`badge ${rate >= 80 ? 'b-pos' : 'b-warn'}`}>{rate >= 80 ? "Sogʻlom" : 'Beqaror'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 2px' }}>
-            <ArcGauge pct={rate} size={220} band={rate >= 80 ? 'pos' : 'warn'} label={`Muvaffaqiyat darajasi · ${spanLabel}`} id="health-overall" />
+            <Dial pct={rate} size={240} zones={HEALTH_ZONES} unit="%" label="Muvaffaqiyat" id="health-overall" />
           </div>
           <div className="health-grid" style={{ marginTop: 8 }}>
             <div>
@@ -793,7 +793,7 @@ function HealthTab() {
               </div>
               <div className="p-row" style={{ gap: 14, marginTop: 12 }}>
                 <div style={{ flex: '0 0 auto' }}>
-                  <ArcGauge pct={r} size={110} band={r >= 90 ? 'pos' : r >= 60 ? 'warn' : 'neg'} id={`health-${w.workerUrl}`} />
+                  <Dial pct={r} size={92} zones={WORKER_ZONES} unit="%" id={`health-${w.workerUrl}`} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div className="p-row" style={{ justifyContent: 'space-between' }}>

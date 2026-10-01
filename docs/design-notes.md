@@ -187,3 +187,9 @@ Every route must call `guard()` (bearer auth → per-IP rate-limit → coalesce)
 
 The forms need court, judge, case number, claimant, subject and next hearing — all already in the case detail, so **no library or PDF is needed**. Only real fields of the target document are emitted (tested against the registry); what only the user knows (representative, address, reason, phone) stays empty.
 
+### Change the **gauge** (rating, worker health, overall health) — the Dial
+
+**Where:** geometry `src/components/proto/dial-geometry.ts` (pure, tested in `core/__tests__/dial.test.ts`) · app paint `Dial` in `proto/primitives.tsx` (+ `.dial*` in `prototype.css`) · PDF paint `gauge()` in `lib/report/render.ts`. Call sites: `sections/profile` (rating, `band`), `views/settings-view` (overall `HEALTH_ZONES`, per worker `WORKER_ZONES`).
+
+One instrument scale everywhere («Sirkul · Asbob», picked by the owner from four concepts): 270° of 51 hairline ticks (26 when < 130 px), a longer tick every 20 points, numerals 0 · 50 · 100, ticks lit up to the value, a needle (long tick + pointer) at the value. `zones` (`[upTo, band][]`) colour the limits: workers < 60 dead · 60–89 slow · ≥ 90 healthy, overall ≥ 80 healthy; keep them equal to the badges/dots next to the gauge. The rating has no zones (the score → AAA…D mapping is unknown), only its band. **Motion:** the needle sweeps once on mount and glides from the old value to a new one (rAF, 1300 / 800 ms, nothing loops, reduced-motion = final state); keyed dials (`id`) remember their value across remounts. **Never** fork the maths: change `dialGeom`, both paints follow. The old 22-dash `ArcGauge` and the segmented `Ring` are gone.
+
