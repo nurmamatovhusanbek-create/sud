@@ -153,6 +153,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `case-orders.tsx` | components/sections/cases.tsx |  |
+| `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render.ts | core/__tests__/dial.test.ts |
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |
 | `letterhead.tsx` | components/views/doc-editor.tsx, components/views/documents-view.tsx, components/views/pretenzia-view.tsx |  |

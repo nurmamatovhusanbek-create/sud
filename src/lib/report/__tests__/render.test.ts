@@ -134,6 +134,16 @@ describe('document shell', () => {
       expect(html).toContain(`@bottom-left { content: ""; width: 66mm; background: ${t.rail.bg}; }`)
     }
   })
+  test('the rating dial is the app\'s Dial geometry: 51 ticks, lit up to the score, the needle at the score', () => {
+    const svg = doc(FULL).match(/<svg class="rp-gauge"[\s\S]*?<\/svg>/)![0]
+    const score = FULL_MODEL.rating!.score!
+    const lines = [...svg.matchAll(/<line [^>]*stroke="([^"]+)"/g)].map((m) => m[1])
+    expect(lines).toHaveLength(51 + 1) // ticks + the needle
+    const lit = lines.slice(0, 51).filter((c) => !c.startsWith('rgba')).length
+    expect(lit).toBe(Math.floor(score / 2) + 1) // ticks 0, 2, … ≤ score
+    expect(svg).toContain(`>${Math.round(score)}</text>`)
+    expect(svg).toContain('rotate(')
+  })
   test('typography stays light: nothing heavier than 700', () => {
     const css = doc(FULL).match(/<style>([\s\S]*?)<\/style>/)![1]
     expect(css).not.toMatch(/font(-weight)?:[^;}]*\b[89]00\b/)

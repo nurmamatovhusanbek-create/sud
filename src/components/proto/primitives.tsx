@@ -2,7 +2,7 @@
 
 /**
  * Prototype primitives — the Sud Signal signature visuals ported 1:1 from
- * sud-prototype.html: segmented ring gauge, arc gauge, bar chart with hover
+ * sud-prototype.html: hairline dial gauge, bar chart with hover
  * tooltip, sparkline, count-up numbers, KPI card, segmented control.
  * All colors flow through the semantic tokens (color = signal only).
  */
@@ -11,6 +11,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
+import { bandFor, clampPct, dialAngle, dialGeom, tickLook, type DialZones } from './dial-geometry'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -117,90 +118,87 @@ export function CountUp({ value, suffix = '', className, id }: { value: number; 
   )
 }
 
-/** Segmented ring gauge (28 dashes) with count-up center — prototype ring(). */
-export function Ring({ pct, size, band = 'neu' }: { pct: number; size: number; band?: Band }) {
-  const mounted = useMounted()
-  const r = (size - 9) / 2
-  const c = 2 * Math.PI * r
-  const N = 28
-  const gap = 3.2
-  const dash = c / N - gap
-  const active = Math.round((N * Math.min(100, Math.max(0, pct))) / 100)
-  const col = BAND_VAR[band]
-  return (
-    <div style={{ position: 'relative', width: size, height: size, flex: `0 0 ${size}px` }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-          {Array.from({ length: N }, (_, i) => (
-            <circle
-              key={i}
-              className={mounted ? 'gseg gseg-shown' : 'gseg'}
-              style={mounted ? { transitionDelay: `${i * 20}ms` } : undefined}
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              fill="none"
-              stroke={i < active ? col : 'var(--border-default)'}
-              strokeWidth={4.5}
-              strokeLinecap="round"
-              strokeDasharray={`${dash} ${c - dash}`}
-              strokeDashoffset={-(i / N) * c}
-            />
-          ))}
-        </g>
-      </svg>
-      <div
-        className="mono"
-        style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: size * 0.22 }}
-      >
-        <CountUp value={pct} suffix="%" />
-      </div>
-    </div>
-  )
-}
+/**
+ * Dial — the hairline instrument gauge (geometry: proto/dial-geometry.ts, shared with the PDF report).
+ * The needle sweeps to the value once on mount and glides from the old value to a new one; ticks light
+ * as it passes. Nothing loops. `zones` paint the limits (e.g. workers: 60 / 90); without them the
+ * dial uses `band`. `pct = null` draws an empty dial with «–».
+ */
+/** worker success rate: < 60 dead · 60–89 slow · ≥ 90 healthy (the badges and dots use the same limits) */
+export const WORKER_ZONES: DialZones = [[60, 'neg'], [90, 'warn'], [100, 'pos']]
+/** overall success rate: ≥ 80 healthy */
+export const HEALTH_ZONES: DialZones = [[80, 'warn'], [100, 'pos']]
 
-/** Semi-circular dash gauge — prototype arcGauge(). */
-export function ArcGauge({ pct, size, band = 'neu', label, id }: { pct: number; size: number; band?: Band; label?: string; id?: string }) {
-  const mounted = useMounted()
-  const N = 22
-  const cx = size / 2
-  const cy = size * 0.56
-  const R = size * 0.4
-  const inr = R - size * 0.11
-  const col = BAND_VAR[band]
-  const active = Math.round((N * Math.min(100, Math.max(0, pct))) / 100)
-  const segs = Array.from({ length: N }, (_, i) => {
-    const a = Math.PI * (1 - i / (N - 1))
-    return {
-      x1: cx + inr * Math.cos(a),
-      y1: cy - inr * Math.sin(a),
-      x2: cx + R * Math.cos(a),
-      y2: cy - R * Math.sin(a),
+const dialSeen = new Map<string, number>() // keyed dials remember where they were, so a remount doesn't replay from 0
+
+export function Dial({
+  pct,
+  size,
+  band = 'neu',
+  zones = null,
+  label,
+  unit = '',
+  id,
+}: {
+  pct: number | null
+  size: number
+  band?: Band
+  zones?: DialZones | null
+  label?: string
+  unit?: string
+  id?: string
+}) {
+  const target = pct === null ? 0 : clampPct(pct)
+  const geom = useMemo(() => dialGeom(size, zones), [size, zones])
+  const start = id != null && dialSeen.has(id) ? (dialSeen.get(id) as number) : 0
+  const [shown, setShown] = useState(start)
+  const fromRef = useRef(start)
+  useEffect(() => {
+    if (id != null) dialSeen.set(id, target)
+    const from = fromRef.current
+    if (from === target) return
+    if (REDUCED) { fromRef.current = target; setShown(target); return }
+    const dur = from === 0 ? 1300 : 800
+    const t0 = performance.now()
+    let raf = 0
+    const step = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur)
+      const v = from + (target - from) * (1 - Math.pow(1 - p, 4))
+      fromRef.current = v
+      setShown(v)
+      if (p < 1) raf = requestAnimationFrame(step)
+      else fromRef.current = target
     }
-  })
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [target, id])
+
+  const col = BAND_VAR[(bandFor(target, zones, band) as Band)]
+  const num = size * (geom.small ? 0.22 : 0.27)
   return (
-    <div className="gauge-wrap" style={{ width: size }}>
-      <svg width={size} height={size * 0.66} viewBox={`0 0 ${size} ${size * 0.66}`}>
-        {segs.map((s, i) => (
-          <line
-            key={i}
-            className={mounted ? 'gseg gseg-shown' : 'gseg'}
-            style={mounted ? { transitionDelay: `${i * 20}ms` } : undefined}
-            x1={s.x1.toFixed(1)}
-            y1={s.y1.toFixed(1)}
-            x2={s.x2.toFixed(1)}
-            y2={s.y2.toFixed(1)}
-            stroke={i < active ? col : 'var(--border-default)'}
-            strokeWidth={size * 0.05}
-            strokeLinecap="round"
-          />
+    <div className="dial" style={{ width: size, height: size }} role="img" aria-label={pct === null ? (label ?? 'Maʼlumot yoʻq') : `${label ? `${label}: ` : ''}${Math.round(target)}${unit}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        {geom.ticks.map((t) => {
+          const { lit, width } = tickLook(t, shown)
+          const stroke = pct !== null && lit ? col : t.zone ? `color-mix(in srgb, ${BAND_VAR[t.zone]} 38%, var(--border-subtle))` : 'var(--border-default)'
+          return <line key={t.v} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={stroke} strokeWidth={width} strokeLinecap="round" />
+        })}
+        {geom.labels.map((l) => (
+          <text key={l.v} x={l.x} y={l.y} textAnchor="middle" fontSize={9} fontFamily="var(--font-mono)" fill="var(--text-3)">{l.v}</text>
         ))}
+        {pct !== null && shown > 0.4 ? (
+          <g transform={`rotate(${dialAngle(shown)} ${geom.cx} ${geom.cy})`}>
+            <line x1={geom.needle.x1} y1={geom.needle.y1} x2={geom.needle.x2} y2={geom.needle.y2} stroke={col} strokeWidth={3} strokeLinecap="round" />
+            <path d={geom.needle.tri} fill={col} />
+          </g>
+        ) : null}
       </svg>
-      <div style={{ textAlign: 'center', marginTop: -size * 0.2 }}>
-        <div className="mono" style={{ fontSize: size * 0.17, fontWeight: 700, letterSpacing: '-.02em' }}>
-          <CountUp value={pct} suffix="%" id={id} />
+      <div className="dial-ov" aria-hidden>
+        <div className="dial-n">
+          <span className="mono" style={{ fontSize: num }}>{pct === null ? '–' : Math.round(shown)}</span>
+          {unit && pct !== null ? <span className="mono dial-u" style={{ fontSize: num * 0.45 }}>{unit}</span> : null}
         </div>
-        {label ? <div className="faint" style={{ fontSize: 11, marginTop: 2 }}>{label}</div> : null}
+        {label && !geom.small ? <div className="faint" style={{ fontSize: size > 150 ? 11.5 : 10, marginTop: size > 150 ? 6 : 1 }}>{label}</div> : null}
       </div>
     </div>
   )
