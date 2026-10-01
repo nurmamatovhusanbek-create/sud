@@ -27,7 +27,7 @@ describe.each([['full', FULL], ['sparse', SPARSE], ['nothing', NOTHING]] as cons
 describe('sections appear only when there is data behind them', () => {
   test('full: every section is present, charts are drawn', () => {
     const html = doc(FULL)
-    for (const t of ['Umumiy maʼlumot', 'Faoliyat kodlari', 'Taʼsischilar', 'Toʻlovlar', 'Sud ishlari', 'Natijalar', 'Oylik faollik', 'Soʻnggi ishlar', 'Yaqin majlislar']) {
+    for (const t of ['Asosiy maʼlumot', 'Faoliyat kodlari', 'Taʼsischilar', 'Aloqa', 'Toʻlovlar', 'Taqsimot', 'Natijalar', 'Oylik faollik', 'Soʻnggi ishlar', 'Yaqin majlislar']) {
       expect(html).toContain(t)
     }
     // match the drawn <svg>, not the class name (the stylesheet always mentions it)
@@ -100,7 +100,7 @@ describe('safety', () => {
     const html = buildReportDoc(evil)
     expect(html).not.toContain('<img src=x')
     expect(html).not.toContain('<script>alert')
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt; &amp; &quot;Co&quot;')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt; &amp; “Co”') // paired quotes become typographic ones, the rest is escaped
   })
 })
 
@@ -108,15 +108,35 @@ describe('document shell', () => {
   test('the title (the proposed PDF file name) carries the STIR and the date', () => {
     expect(doc(FULL)).toContain('<title>Kompaniya hisoboti 302121267 29.09.2026</title>')
   })
-  test('header and footer sit in thead / tfoot so they repeat on every printed page', () => {
+  test('the brand line repeats on every page (thead); the pinned footer is fixed in print and carries the disclaimer', () => {
     const html = doc(FULL)
-    expect(html).toMatch(/<thead>[\s\S]*Kompaniya hisoboti[\s\S]*<\/thead>/)
-    expect(html).toMatch(/<tfoot>[\s\S]*Hisobot tuzilgan[\s\S]*<\/tfoot>/)
+    expect(html).toMatch(/<thead>[\s\S]*Sud tizimi · Hisobot[\s\S]*<\/thead>/)
+    expect(html).toMatch(/<div class="rp-pin rp-pin-r">Hisobot tuzilgan/)
+    expect(html).toMatch(/@media print \{[^}]*\.rp-bg, \.rp-pin \{ position: fixed; \}/)
+    expect(html).toContain('<tfoot>') // reserves the room the pinned footer sits in
   })
-  test('the page margin band is painted in the page colour (it stays white otherwise — a bright strip in dark mode)', () => {
+  test('two columns: the rail (identity, rating, facts, founders) beside the analysis, both cells of one row', () => {
+    const html = doc(FULL)
+    const row = html.match(/<tbody><tr>([\s\S]*)<\/tr><\/tbody>/)![1]
+    const [rail, main] = row.split('<td class="r rp-main">')
+    expect(rail).toContain('PROCAB')
+    expect(rail).toContain('<svg class="rp-gauge"')
+    expect(rail).toContain('Taʼsischilar')
+    expect(main).toContain('<svg class="rp-pie"')
+    expect(main).toContain('Soʻnggi ishlar')
+    expect(main).not.toContain('Taʼsischilar')
+  })
+  test('the page band under the rail keeps the rail colour, and the paper is the page colour (it stays white otherwise — a bright strip in dark mode)', () => {
     for (const dark of [false, true]) {
-      expect(doc(FULL, dark)).toContain(`background: ${reportTheme(dark).bg}; @bottom-right`)
+      const t = reportTheme(dark)
+      const html = doc(FULL, dark)
+      expect(html).toContain(`@page { size: A4; margin: 0 0 9mm; background: ${t.surface};`)
+      expect(html).toContain(`@bottom-left { content: ""; width: 66mm; background: ${t.rail.bg}; }`)
     }
+  })
+  test('typography stays light: nothing heavier than 700', () => {
+    const css = doc(FULL).match(/<style>([\s\S]*?)<\/style>/)![1]
+    expect(css).not.toMatch(/font(-weight)?:[^;}]*\b[89]00\b/)
   })
   test('dark and light use different palettes', () => {
     expect(doc(FULL, true)).toContain('data-theme="dark"')
@@ -125,7 +145,7 @@ describe('document shell', () => {
   })
   test('the win rate is not coloured (a good/bad threshold would be an editorial judgement)', () => {
     const html = doc(FULL)
-    const tile = html.match(/Yutuq darajasi<\/div><div class="v"([^>]*)>/)!
+    const tile = html.match(/<div class="v"([^>]*)>\d+%<\/div><i class="tick"/)!
     expect(tile[1]).toBe('')
   })
   test('the app\'s fonts are used first, with a system fallback', () => {
