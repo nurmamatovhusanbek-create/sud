@@ -44,6 +44,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
+| `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
 | `dates.ts` | components/sections/cases.tsx, lib/report/doc.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/dates.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
@@ -152,6 +153,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `brand-mark.tsx` | components/proto/drawer.tsx, components/shell/app-shell.tsx |  |
 | `case-orders.tsx` | components/sections/cases.tsx |  |
 | `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render.ts | core/__tests__/dial.test.ts |
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
