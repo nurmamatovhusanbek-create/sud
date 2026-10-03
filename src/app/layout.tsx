@@ -24,7 +24,16 @@ export const metadata: Metadata = {
   title: "Sud tizimi",
   description:
     "Sud tizimi · by Nurmamatov — sud ishlari, toʻlovlar, majlislar va kompaniya statistikasi.",
-  icons: { icon: "/logo.svg" },
+  // The ?v= suffix busts the browser's favicon cache (it keeps the old tab icon for days otherwise):
+  // bump it whenever core/brand-mark.ts changes. The PNGs are the tile version, for browsers without
+  // SVG favicons and for iOS (public/favicon-32.png, public/apple-touch-icon.png).
+  icons: {
+    icon: [
+      { url: "/logo.svg?v=hukm", type: "image/svg+xml" },
+      { url: "/favicon-32.png?v=hukm", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png?v=hukm",
+  },
 };
 
 export default function RootLayout({
