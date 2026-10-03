@@ -20,7 +20,7 @@
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRating } from './chamber'
-import { classifyOutcome, partyRole } from '@/core/classify'
+import { assignRoles, classifyOutcome } from '@/core/classify'
 
 // ---- Types (returned to API + consumed by client) --------------------
 
@@ -244,6 +244,8 @@ async function fetchCompanyStatsInternal(
   // Process court case results
   const errors: CourtTypeError[] = []
   const allCases: CaseWithClassification[] = []
+  // collected first, classified after: the company's side is learned from the WHOLE list (core/classify assignRoles)
+  const pooled: { raw: CourtCase; courtType: StatsCourtType }[] = []
 
   courtResults.forEach((res, i) => {
     const ct = courtTypes[i]
@@ -271,14 +273,21 @@ async function fetchCompanyStatsInternal(
         else if (cn.startsWith('2-') || cn.startsWith('3-')) actualCourtType = 'civil'
         else if (cn.startsWith('4-')) actualCourtType = 'economic'
 
-        const cwc = classifyCase(raw, actualCourtType, companyNames, tin)
-        if (cwc) allCases.push(cwc)
+        pooled.push({ raw, courtType: actualCourtType })
       }
     } else {
       const msg = res.reason instanceof Error ? res.reason.message : String(res.reason)
       console.warn(`[stats] ${ct} search failed: ${msg}`)
       errors.push({ courtType: ct, error: msg })
     }
+  })
+
+  // which side is the company on, in every case (TIN → the name found in most cases → the known names)
+  const { roles, method } = assignRoles(pooled.map((x) => x.raw), { names: companyNames, tin })
+  if (pooled.length >= 5 && method === 'none') console.warn(`[stats] ${tin}: could not tell the company's side in ${pooled.length} cases (party names did not match)`)
+  pooled.forEach((x, i) => {
+    const cwc = classifyCase(x.raw, x.courtType, roles[i])
+    if (cwc) allCases.push(cwc)
   })
 
   // 3. Deduplicate by case number (a case might appear in both jadval.sud.uz
@@ -326,26 +335,23 @@ async function fetchCompanyStatsInternal(
 /**
  * Turn a raw CourtCase from searchCourtCases into a classified CaseWithClassification.
  *
- * Determines the company's role (plaintiff or defendant) by name-matching the
- * company name (from orginfo) against the case's plaintiff and defendant fields.
- * If orginfo failed and we don't have a company name, fall back to matching the
- * TIN itself as a substring in those fields (sometimes the TIN appears in the
- * party string).
+ * `side` is the company's role in this case, decided for the whole list by
+ * core/classify assignRoles (TIN, then the name that appears in most cases,
+ * then the known names); null = could not be told.
  */
 function classifyCase(
   raw: CourtCase,
   courtType: StatsCourtType,
-  companyNames: readonly string[],
-  tin: string,
+  side: PartyRole | null,
 ): CaseWithClassification | null {
   if (!raw || !raw.caseNumber || raw.caseNumber === '—' || raw.caseNumber === '-') return null
 
   const plaintiffRaw = raw.plaintiff || ''
   const defendantRaw = raw.defendant || ''
 
-  // TIN-guaranteed membership (we searched by TIN), so when neither side can be told apart we keep the old
-  // default (plaintiff) for the win/lose maths; the list filter treats such a case as «unknown» instead (core/classify partyRole)
-  const role: PartyRole = partyRole({ names: companyNames, tin }, plaintiffRaw, defendantRaw) ?? 'plaintiff'
+  // We searched by TIN, so the company IS a party; when its side cannot be told the old default (plaintiff) keeps
+  // the win/lose maths running (the Sud ishlari filter shows such a case as «Noaniq» instead of guessing)
+  const role: PartyRole = side ?? 'plaintiff'
 
   const classification = classifyOutcome(role, raw.result)
   const counterparty = role === 'plaintiff' ? defendantRaw : plaintiffRaw

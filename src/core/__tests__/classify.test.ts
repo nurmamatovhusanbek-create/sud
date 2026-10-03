@@ -9,6 +9,7 @@ import {
   distinctiveName,
   samePartyName,
   partyRole,
+  assignRoles,
 } from '../classify'
 
 describe('normalizeName', () => {
@@ -144,7 +145,7 @@ describe('summarize', () => {
   })
 })
 
-describe('which side is the company on (partyRole)', () => {
+describe('which side is the company on', () => {
   const procab = { names: ['PROCAB', '"PROCAB" MAS\'ULIYATI CHEKLANGAN JAMIYAT'], tin: '302121267' }
 
   test('distinctiveName drops legal-form words, quotes and script differences', () => {
@@ -157,22 +158,80 @@ describe('which side is the company on (partyRole)', () => {
     expect(samePartyName('PROCAB MChJ', '"KONTRAGENT 1" MChJ')).toBe(false)
     expect(samePartyName('PROCAB MChJ', '"PROCAB" Mas\'uliyati cheklangan jamiyati')).toBe(true)
   })
-  test('the company as defendant against another MChJ is a defendant (it used to come out as plaintiff)', () => {
-    expect(partyRole(procab, '"KONTRAGENT 1" MCHJ', '"PROCAB" MCHJ')).toBe('defendant')
-    expect(partyRole(procab, '"PROCAB" MCHJ', '"KONTRAGENT 1" MCHJ')).toBe('plaintiff')
-  })
-  test('works across Latin / Cyrillic, and with the short name only', () => {
-    expect(partyRole({ names: ['Artikul Aziya Kabel'], tin: '1' }, 'Бошка МЧЖ', '«Артикул Азия Кабел» МЧЖ')).toBe('defendant')
-    expect(partyRole({ names: ['PROCAB'], tin: '1' }, 'X MChJ', 'Procab Group MChJ')).toBe('defendant')
-  })
-  test('a TIN inside the party string wins over the name', () => {
-    expect(partyRole(procab, 'ABC MCHJ (STIR 302121267)', '"PROCAB" MCHJ')).toBe('plaintiff')
-  })
-  test('cannot tell → null (never guessed); no names → null', () => {
-    expect(partyRole(procab, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
-    expect(partyRole({ names: [undefined, ''], tin: '' }, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
+  test('the same company in another script / spelling is the same party (c = k, q = k, x = h, no vowels)', () => {
+    expect(samePartyName('PROCAB MChJ', '«ПРОКАБ» МЧЖ')).toBe(true)
+    expect(samePartyName('Xolding Qurilish MChJ', '«Холдинг Курилиш» МЧЖ')).toBe(true)
+    expect(samePartyName('PROCAB MChJ', '«ПРОМАБ» МЧЖ')).toBe(false)
   })
   test('a tiny distinctive name does not match everything', () => {
     expect(samePartyName('A MChJ', 'ABC MChJ')).toBe(false)
+  })
+
+  test('single case: names and TIN (nothing to learn from)', () => {
+    expect(partyRole(procab, '"KONTRAGENT 1" MCHJ', '"PROCAB" MCHJ')).toBe('defendant')
+    expect(partyRole(procab, '"PROCAB" MCHJ', '"KONTRAGENT 1" MCHJ')).toBe('plaintiff')
+    expect(partyRole(procab, 'ABC MCHJ (STIR 302121267)', '"PROCAB" MCHJ')).toBe('plaintiff') // TIN wins over the name
+    expect(partyRole(procab, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
+    expect(partyRole({ names: [undefined, ''], tin: '' }, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
+  })
+
+  // the field report: 100 cases, the registers know the company in Latin, the courts write it in Cyrillic
+  describe('learning the company from the list (100 cases, Cyrillic parties, a Latin company name)', () => {
+    const cases = Array.from({ length: 100 }, (_, i) => {
+      const me = i % 5 === 4 ? '«ПРОКАБ ГРУПП» МЧЖ' : i % 2 ? 'ПРОКАБ МЧЖ' : '«ПРОКАБ» Масъулияти чекланган жамияти' // spellings drift
+      const other = i % 10 === 3 ? 'Давлат солиқ қўмитаси' : `«КОНТРАГЕНТ ${i}» МЧЖ` // one counterparty recurs in 10 cases
+      const asPlaintiff = i < 60
+      return asPlaintiff ? { plaintiff: me, defendant: other } : { plaintiff: other, defendant: me }
+    })
+    test('every case gets its side: 60 plaintiff, 40 defendant, none unknown', () => {
+      const r = assignRoles(cases, { names: ['PROCAB'], tin: '302121267' })
+      expect(r.method).toBe('learned')
+      expect(r.roles.filter((x) => x === 'plaintiff')).toHaveLength(60)
+      expect(r.roles.filter((x) => x === 'defendant')).toHaveLength(40)
+      expect(r.roles.filter((x) => x === null)).toHaveLength(0)
+    })
+    test('it does not need the company name at all', () => {
+      const r = assignRoles(cases, { names: [], tin: '' })
+      expect(r.method).toBe('learned')
+      expect(r.roles.filter((x) => x === 'plaintiff')).toHaveLength(60)
+      expect(r.roles.filter((x) => x === 'defendant')).toHaveLength(40)
+    })
+    test('the old way (name matching only) would have found almost nothing', () => {
+      const old = cases.map((c) => (nameMatches(normalizeName('PROCAB'), normalizeName(c.plaintiff)) ? 'plaintiff' : nameMatches(normalizeName('PROCAB'), normalizeName(c.defendant)) ? 'defendant' : null))
+      expect(old.filter((x) => x === null).length).toBeGreaterThan(90)
+    })
+    test('a recurring counterparty is not mistaken for the company (the known name breaks a tie)', () => {
+      // «Soliq» appears in every case, like the company itself: only the known name can tell which one is us
+      const tied = cases.map((c, i) => (i < 60 ? { plaintiff: c.plaintiff, defendant: 'Давлат солиқ қўмитаси' } : { plaintiff: 'Давлат солиқ қўмитаси', defendant: c.defendant }))
+      const r = assignRoles(tied, { names: ['PROCAB'], tin: '' })
+      expect(r.method).toBe('learned')
+      expect(r.roles.filter((x) => x === 'plaintiff')).toHaveLength(60)
+      expect(r.roles.filter((x) => x === 'defendant')).toHaveLength(40)
+    })
+    test('an unresolvable tie is unknown, never a guess', () => {
+      const tied = cases.map((c, i) => (i < 60 ? { plaintiff: c.plaintiff, defendant: 'Давлат солиқ қўмитаси' } : { plaintiff: 'Давлат солиқ қўмитаси', defendant: c.defendant }))
+      const r = assignRoles(tied, { names: ['Boshqa nom'], tin: '' })
+      expect(r.roles.every((x) => x === null)).toBe(true)
+    })
+  })
+
+  test('against another MChJ the company is the defendant (it used to come out as plaintiff)', () => {
+    const list = [
+      { plaintiff: '"KONTRAGENT 1" MCHJ', defendant: '"PROCAB" MCHJ' },
+      { plaintiff: '"KONTRAGENT 2" MCHJ', defendant: '"PROCAB" MCHJ' },
+      { plaintiff: '"PROCAB" MCHJ', defendant: '"KONTRAGENT 3" MCHJ' },
+    ]
+    expect(assignRoles(list, procab).roles).toEqual(['defendant', 'defendant', 'plaintiff'])
+  })
+  test('missing parties ("-", empty) are unknown, not an error', () => {
+    const r = assignRoles([{ plaintiff: '-', defendant: '' }, { plaintiff: null, defendant: undefined }, { plaintiff: '"PROCAB" MCHJ', defendant: 'X Y' }], procab)
+    expect(r.roles).toEqual([null, null, 'plaintiff'])
+  })
+  test('the company against itself (both sides) is unknown', () => {
+    expect(assignRoles([{ plaintiff: 'PROCAB MChJ', defendant: '«ПРОКАБ» МЧЖ' }], procab).roles).toEqual([null])
+  })
+  test('an empty list and a list with no names are fine', () => {
+    expect(assignRoles([], procab)).toEqual({ roles: [], method: 'none', keys: [] })
+    expect(assignRoles([{ plaintiff: 'A MChJ', defendant: 'B MChJ' }], { names: [], tin: '' }).roles).toEqual([null])
   })
 })

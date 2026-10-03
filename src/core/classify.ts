@@ -61,11 +61,16 @@ export function nameMatches(companyNorm: string, partyNorm: string): boolean {
 
 // ---- which side is the company? ---------------------------------------------------------------
 //
-// nameMatches() above is deliberately loose and has a known quirk: normalizeName() expands «MChJ» into
-// three words, so any two MChJs «share ≥ 2 words» and match. Deciding a SIDE with it picks the plaintiff
-// whenever the plaintiff is any MChJ — wrong for every case the company defends against another MChJ.
-// partyRole() therefore compares only the DISTINCTIVE part of the name (legal-form words removed,
-// Cyrillic transliterated) and trusts a TIN found in the party string over any name.
+// Why this is not name matching alone:
+//  - nameMatches() above is deliberately loose and has a known quirk: normalizeName() expands «MChJ» into
+//    three words, so any two MChJs «share ≥ 2 words» and match → every case against another MChJ was a «plaintiff».
+//  - The courts answer in Cyrillic («ПРОКАБ» МЧЖ), the registers in Latin (PROCAB MChJ), and the spelling
+//    differs beyond script (c/k, q/k, x/h): the same company simply does not match itself (out of 100 cases
+//    0 plaintiff, 3 defendant, the rest «unknown»).
+// So the sides are decided from the DATA first. Every case in the list was found by the company's TIN, so the
+// company is a party of (nearly) every case: its spelling is the one name that appears in almost all of them.
+// assignRoles() LEARNS that name from the list (script- and spelling-insensitive), uses the known company names
+// only as a tie-break / fallback, and trusts a TIN inside the party text over everything.
 
 const LEGAL_FORM = /^(mchj|aj|ooo|oao|ao|xk|uk|fx|yatt|ok|mas\w*uliyat\w*|cheklangan|jamiyat\w*|ak?t?s\w*(?:dor|ioner)\w*|xususiy|korxona\w*|qoshma|kooperativ\w*)$/
 
@@ -79,29 +84,145 @@ export function distinctiveName(s: string): string {
     .join(' ')
 }
 
-/** Same company? Whole-word match of the distinctive names: equal, or all words of the shorter inside the longer. */
+/** One word reduced to a spelling-proof skeleton (no vowels, no doubled letters, look-alike consonants folded): «procab» = «prokab» = «прокап». */
+function skeleton(w: string): string {
+  // c/q→k, x→h, w→v; voiced = voiceless (b/p, d/t, g/k, v/f, z/s): final devoicing is written both ways («прокаб» / «прокап»)
+  const f = w.replace(/[cq]/g, 'k').replace(/x/g, 'h').replace(/w/g, 'v').replace(/b/g, 'p').replace(/d/g, 't').replace(/g/g, 'k').replace(/v/g, 'f').replace(/z/g, 's')
+  const k = f.replace(/[aeiouy]/g, '').replace(/(.)\1+/g, '$1')
+  return k || f
+}
+
+/** The words of a party name as skeletons (legal-form words dropped). */
+export function partyTokens(s: string): string[] {
+  const d = distinctiveName(s)
+  return d ? d.split(' ').map(skeleton) : []
+}
+
+/** Is a shared-words match specific enough to mean the same company? («a», «os» would match anything) */
+const specific = (t: string[]): boolean => t.length > 1 || (t.length === 1 && t[0].length >= 3)
+
+/** Same company: all words of the shorter name are among the words of the longer. */
+function sameTokens(a: string[], b: string[]): boolean {
+  if (!a.length || !b.length) return false
+  const [sh, lg] = a.length <= b.length ? [a, b] : [b, a]
+  return specific(sh) && sh.every((w) => lg.includes(w))
+}
+
+/** Same company, by name only (script- and spelling-insensitive). */
 export function samePartyName(a: string, b: string): boolean {
-  const x = distinctiveName(a).split(' ').filter(Boolean)
-  const y = distinctiveName(b).split(' ').filter(Boolean)
-  if (!x.length || !y.length) return false
-  const [short, long] = x.length <= y.length ? [x, y] : [y, x]
-  if (short.length === 1 && short[0].length < 4) return false // «a», «os»… would match anything
-  return short.every((w) => long.includes(w))
+  return sameTokens(partyTokens(a), partyTokens(b))
+}
+
+/** a party field may list several parties */
+const PARTS = /[;\n]+|,(?=\s*["«“”A-ZА-ЯЎҚҒҲa-zа-яўқғҳ0-9])/
+
+export interface PartyPair {
+  plaintiff?: string | null
+  defendant?: string | null
+}
+
+export type RoleMethod = 'tin' | 'learned' | 'name' | 'none'
+
+export interface RoleResult {
+  /** per input case; `null` = cannot tell (never guessed) */
+  roles: (PartyRole | null)[]
+  /** how the company's name was found: learned from the list, from the known names, or nothing matched */
+  method: RoleMethod
+  /** the company's spelling(s) used (skeleton words), for tests and debugging */
+  keys: string[][]
+}
+
+const clean = (v: string | null | undefined): string => {
+  const s = (v ?? '').trim()
+  return s === '-' || s === '—' ? '' : s
 }
 
 /**
- * Which side the company is on in one case: the TIN inside a party string wins, then the distinctive
- * name (any of `names`: short, official, registered…). `null` = cannot tell (shown under neither side).
+ * Which side the company is on in EACH case of a list. `company.names` are the names we know it by (any
+ * script); `company.tin` its 9-digit id. Order of trust: a TIN in the party text → the name that appears in
+ * most of the cases (learned) → the known names → unknown.
  */
+export function assignRoles(cases: readonly PartyPair[], company: { names?: readonly (string | undefined)[]; tin?: string }): RoleResult {
+  // a 9-digit TIN, as a whole number inside the party text (a shorter «tin» would match any digit)
+  const tinRe = /^\d{9}$/.test((company.tin || '').trim()) ? new RegExp(`(?<!\\d)${(company.tin || '').trim()}(?!\\d)`) : null
+  const rows = cases.map((c) => {
+    const p = clean(c.plaintiff)
+    const d = clean(c.defendant)
+    return { p, d, pParts: p.split(PARTS).map(partyTokens).filter((t) => t.length), dParts: d.split(PARTS).map(partyTokens).filter((t) => t.length), pAll: partyTokens(p), dAll: partyTokens(d) }
+  })
+  const N = rows.length
+
+  // candidate names = every party part, scored by how many cases contain it (once per case, on either side)
+  const present = (r: (typeof rows)[number], key: string[]): 'p' | 'd' | 'both' | null => {
+    const inP = r.pParts.some((t) => sameTokens(t, key)) || sameTokens(r.pAll, key)
+    const inD = r.dParts.some((t) => sameTokens(t, key)) || sameTokens(r.dAll, key)
+    return inP && inD ? 'both' : inP ? 'p' : inD ? 'd' : null
+  }
+  const cand = new Map<string, { key: string[]; cover: number; exact: number }>()
+  for (const r of rows) {
+    const seen = new Set<string>()
+    for (const t of [...r.pParts, ...r.dParts]) {
+      if (!specific(t)) continue
+      const id = t.join(' ')
+      if (seen.has(id)) continue
+      seen.add(id)
+      const c = cand.get(id) ?? { key: t, cover: 0, exact: 0 }
+      c.exact++
+      cand.set(id, c)
+    }
+  }
+  const hints = (company.names ?? []).map((n) => partyTokens(n ?? '')).filter(specific)
+  const hinted = (key: string[]) => hints.some((h) => sameTokens(h, key))
+  // the company is in most cases, so its spelling(s) are among the most frequent exact names: only those (plus the
+  // ones that look like a known name) are scored against the whole list, which keeps this O(cases × 50)
+  const scored = [...cand.values()].sort((a, b) => b.exact - a.exact).slice(0, 40)
+  for (const c of cand.values()) if (!scored.includes(c) && hinted(c.key) && scored.length < 50) scored.push(c)
+  for (const c of scored) for (const r of rows) if (present(r, c.key)) c.cover++
+
+  let keys: string[][] = []
+  let method: RoleMethod = 'none'
+  const ranked = scored.sort((a, b) => b.cover - a.cover)
+  const top = ranked[0]
+  // learned: one name in most of the cases (≥ 60 % and ≥ 2); on a tie between unrelated names the known names decide
+  if (top && top.cover >= Math.max(2, Math.ceil(N * 0.6))) {
+    const tied = ranked.filter((c) => c.cover === top.cover)
+    const shortest = tied.reduce((m, c) => (c.key.length < m.key.length ? c : m), tied[0])
+    // spellings of ONE name («PROCAB», «PROCAB GROUP») are the same company; unrelated names on a tie: the known names decide
+    const pick = tied.every((c) => sameTokens(c.key, shortest.key)) ? tied : tied.filter((c) => hinted(c.key))
+    if (pick.length >= 1 && (pick.length === 1 || pick.every((c) => sameTokens(c.key, pick[0].key)))) {
+      keys = pick.map((c) => c.key)
+      // other spellings of the same company seen in fewer cases («PROCAB GROUP» next to «PROCAB»)
+      for (const c of ranked) if (c.cover < top.cover && keys.some((k) => sameTokens(k, c.key)) && !keys.includes(c.key)) keys.push(c.key)
+      method = 'learned'
+    }
+  }
+  if (!keys.length && hints.length && N) {
+    keys = hints
+    method = 'name'
+  }
+
+  const roles = rows.map((r): PartyRole | null => {
+    if (tinRe) {
+      const inP = tinRe.test(r.p)
+      const inD = tinRe.test(r.d)
+      if (inP !== inD) return inP ? 'plaintiff' : 'defendant'
+    }
+    let inP = false
+    let inD = false
+    for (const k of keys) {
+      const w = present(r, k)
+      if (w === 'p' || w === 'both') inP = true
+      if (w === 'd' || w === 'both') inD = true
+    }
+    return inP && !inD ? 'plaintiff' : inD && !inP ? 'defendant' : null // both sides (the company against itself) or neither: not guessed
+  })
+  if (method === 'none' && roles.some((x) => x)) method = 'tin'
+  return { roles, method, keys }
+}
+
+/** one case on its own (the learning needs a list, so this only has the known names and the TIN) */
 export function partyRole(company: { names: readonly (string | undefined)[]; tin?: string }, plaintiff: string, defendant: string): PartyRole | null {
-  const tin = (company.tin || '').trim()
-  if (tin && plaintiff.includes(tin)) return 'plaintiff'
-  if (tin && defendant.includes(tin)) return 'defendant'
-  const names = company.names.filter((n): n is string => !!n && n.trim().length > 0)
-  const is = (party: string) => names.some((n) => samePartyName(n, party))
-  if (is(plaintiff)) return 'plaintiff'
-  if (is(defendant)) return 'defendant'
-  return null
+  return assignRoles([{ plaintiff, defendant }], company).roles[0]
 }
 
 /** Classify an Uzbek (Cyrillic or Latin) case outcome from the company's role. */
