@@ -9,7 +9,7 @@
  * codes) and the analysis on the right (key figures, the pizza, results, months,
  * latest cases, hearings, payments). No cards: hairlines, big numerals and white space.
  * Both columns are cells of one table row, so each flows (and breaks) across pages on
- * its own; the table's thead repeats the brand line on every page, the rail colour is a
+ * its own; the table's thead only reserves the top margin on every page, the rail colour and the logo watermark are a
  * fixed strip, and the pinned footer repeats too.
  *
  * Outcomes have ONE color each everywhere on the page (teal won · vermilion lost ·
@@ -360,9 +360,9 @@ export function renderReportBody(m: ReportModel, t: ReportTheme): { rail: string
   return { rail: renderRail(m, t), main: renderMain(m, t) }
 }
 
-/** Running header (thead, repeats on every printed page): the brand line over the rail. */
-export function renderReportHeader(): string {
-  return `<div class="rp-brand"><span class="rp-mk">${brandMarkSvg('dark')}</span>Sud tizimi · Hisobot</div>`
+/** The watermark: the logo in the report's own paint (light on paper, dark on the dark page). */
+export function renderReportWatermark(t: ReportTheme): string {
+  return `<div class="rp-wm" aria-hidden="true">${brandMarkSvg(t.dark ? 'dark' : 'light')}</div>`
 }
 
 /** Pinned bottom line (repeats on every page): the company key on the rail, the disclaimer beside it. No source names. */
@@ -399,18 +399,18 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-pin { position: absolute; bottom: 4mm; font-size: 6.4pt; line-height: 1.3; }
   .rp-pin-l { left: 11mm; width: 46mm; display: flex; justify-content: space-between; color: rgba(255,255,255,.5); }
   .rp-pin-r { left: calc(${RAIL_W} + 14mm); right: 15mm; color: var(--t3); }
-  @media print { .rp-bg, .rp-pin { position: fixed; } .rp-bg { bottom: -9mm; } .rp-sheet { margin: 0; } }
-  @media screen { .rp-sheet { background: var(--bg); box-shadow: 0 8px 40px rgba(20,24,52,.18); margin: 24px auto; min-height: 297mm; } body { padding-bottom: 24px; } html { background: ${t.dark ? t.bg : '#e9ebf5'}; } }
+  /* the logo as a quiet watermark behind the analysis column: low opacity, never over the rail */
+  .rp-wm { position: absolute; z-index: -1; right: -24mm; bottom: -6mm; width: 124mm; opacity: ${t.dark ? 0.07 : 0.065}; pointer-events: none; }
+  .rp-wm svg { display: block; width: 100%; height: auto; }
+  @media print { .rp-bg, .rp-pin, .rp-wm { position: fixed; } .rp-bg { bottom: -9mm; } .rp-sheet { margin: 0; } }
+  @media screen { .rp-sheet { overflow: hidden; background: var(--bg); box-shadow: 0 8px 40px rgba(20,24,52,.18); margin: 24px auto; min-height: 297mm; } body { padding-bottom: 24px; } html { background: ${t.dark ? t.bg : '#e9ebf5'}; } }
 
   table.rp { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.rp col.l { width: ${RAIL_W}; }
   td.l { padding: 0 9mm 0 11mm; color: #fff; vertical-align: top; }
   td.r { padding: 0 15mm 0 14mm; vertical-align: top; }
-  thead td { height: 19mm; vertical-align: bottom; padding-bottom: 5mm; }
+  thead td { height: 15mm; }
   tfoot td { height: 14mm; }
-  .rp-brand { display: flex; align-items: center; gap: 2mm; font-size: 5.8pt; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,.55); }
-
-  .rp-mk svg { display: block; width: 11px; height: 11px; }
 
   /* rail */
   .rp-rail h1 { margin: 0 0 2.4mm; font-size: 14pt; line-height: 1.2; font-weight: 700; letter-spacing: -.015em; overflow-wrap: anywhere; }

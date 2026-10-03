@@ -108,11 +108,15 @@ describe('document shell', () => {
   test('the title (the proposed PDF file name) carries the STIR and the date', () => {
     expect(doc(FULL)).toContain('<title>Kompaniya hisoboti 302121267 29.09.2026</title>')
   })
-  test('the brand line repeats on every page (thead); the pinned footer is fixed in print and carries the disclaimer', () => {
+  test('no brand line at the top; the logo is a fixed, faint watermark; the pinned footer carries the disclaimer', () => {
     const html = doc(FULL)
-    expect(html).toMatch(/<thead>[\s\S]*Sud tizimi · Hisobot[\s\S]*<\/thead>/)
+    expect(html).not.toContain('Sud tizimi · Hisobot')
+    const wm = html.match(/<div class="rp-wm"[\s\S]*?<\/svg><\/div>/)![0]
+    expect(wm.match(/<path /g)).toHaveLength(4)
+    expect(html).toMatch(/\.rp-wm \{[^}]*opacity: 0\.0\d+/) // faint enough not to compete with the text
+    expect(html).toMatch(/@media print \{[^}]*\.rp-wm \{ position: fixed; \}/)
     expect(html).toMatch(/<div class="rp-pin rp-pin-r">Hisobot tuzilgan/)
-    expect(html).toMatch(/@media print \{[^}]*\.rp-bg, \.rp-pin \{ position: fixed; \}/)
+    expect(html).toMatch(/@media print \{[^}]*\.rp-bg, \.rp-pin, \.rp-wm \{ position: fixed; \}/)
     expect(html).toContain('<tfoot>') // reserves the room the pinned footer sits in
   })
   test('two columns: the rail (identity, rating, facts, founders) beside the analysis, both cells of one row', () => {
