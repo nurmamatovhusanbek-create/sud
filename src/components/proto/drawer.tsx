@@ -18,7 +18,8 @@
 
 import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
-import { ShieldCheck, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import { BrandMark } from './brand-mark'
 
 export interface DrawerOpts {
   /** small uppercase label in the masthead, e.g. «Ish tafsiloti» */
@@ -87,7 +88,7 @@ export function ProtoDrawer() {
       <div className={`drawer-scrim ${open ? 'open' : ''}`} onClick={hide} />
       <aside className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-modal="true" aria-hidden={!open}>
         <div className="drawer-mast">
-          <span className="logo" aria-hidden><ShieldCheck /></span>
+          <span className="logo" aria-hidden><BrandMark /></span>
           <span className="eb">{eyebrow || 'Sud tizimi'}</span>
           <button ref={closeRef} className="x" onClick={hide} aria-label="Yopish">
             <X />

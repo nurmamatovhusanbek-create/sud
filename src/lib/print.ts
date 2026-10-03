@@ -14,6 +14,8 @@
  * (.pr-next-date/.pr-next-meta), .pr-text, table.pr-table.
  */
 
+import { brandMarkSvg } from '@/core/brand-mark'
+
 export interface Palette {
   bg: string; surface: string; inset: string
   t1: string; t2: string; t3: string
@@ -50,7 +52,8 @@ function printCss(p: Palette): string {
 
   /* masthead */
   .pr-brand { display: flex; align-items: center; gap: 10px; background: var(--pa); color: var(--pat); padding: 13px 22px; }
-  .pr-logo { width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.16); display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+  .pr-logo { width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.16); display: grid; place-items: center; }
+  .pr-logo svg { width: 17px; height: 17px; }
   .pr-brand b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
   .pr-brand .by { margin-left: auto; font-size: 10.5px; opacity: .8; letter-spacing: .04em; }
 
@@ -124,7 +127,7 @@ export function buildPrintDoc(title: string, bodyHtml: string, dark = isDarkThem
   const p = palette(dark)
   return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${printCss(p)}</style></head><body>
 <div class="pr-sheet">
-  <div class="pr-brand"><span class="pr-logo">S</span><b>Sud tizimi</b><span class="by">by Nurmamatov</span></div>
+  <div class="pr-brand"><span class="pr-logo">${brandMarkSvg('tile')}</span><b>Sud tizimi</b><span class="by">by Nurmamatov</span></div>
   <div class="pr-inner">${bodyHtml}</div>
   <div class="pr-foot"><span>sud.uz maʼlumotlari asosida tayyorlangan</span><span>${stamp()}</span></div>
 </div>

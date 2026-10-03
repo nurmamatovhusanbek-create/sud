@@ -375,7 +375,7 @@ html, body { height: 100%; }
 .drawer.open { transform: none; visibility: visible; transition: transform .32s var(--ease-emph), visibility 0s; }
 .drawer-mast { display: flex; align-items: center; gap: 10px; padding: 11px 14px 11px 20px; background: linear-gradient(180deg, #1c2657 0%, #171f47 100%); color: #cfd6f4; flex: 0 0 auto; }
 .drawer-mast .logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #3b5bdb, #6d84ec); display: grid; place-items: center; color: #fff; flex: none; }
-.drawer-mast .logo svg { width: 14px; height: 14px; }
+.drawer-mast .logo svg { width: 15px; height: 15px; }
 .drawer-mast .eb { flex: 1; min-width: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .drawer-mast .x { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #cfd6f4; background: rgba(255, 255, 255, .08); transition: background .15s, color .15s; flex: none; }
 .drawer-mast .x:hover { background: rgba(255, 255, 255, .16); color: #fff; }
@@ -595,7 +595,7 @@ html, body { height: 100%; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 20px; background: none; border: 0; text-align: left; cursor: pointer; width: 100%; }
 .brand .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #3b5bdb, #6d84ec);
   display: grid; place-items: center; color: #fff; box-shadow: 0 6px 16px -6px rgba(59, 91, 219, .9); transition: transform .5s var(--ease-emph); flex: none; }
-.brand .logo svg { width: 19px; height: 19px; }
+.brand .logo svg { width: 21px; height: 21px; }
 .brand:hover .logo { transform: rotate(-8deg) scale(1.05); }
 .brand b { color: #fff; font-weight: 800; font-size: 16px; letter-spacing: -.01em; line-height: 1.05; display: block; }
 .brand span { display: block; font-size: 11px; color: #8b96cf; font-weight: 500; }

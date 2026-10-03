@@ -41,6 +41,7 @@ import { getCached } from '@/lib/cache'
 import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { BrandMark } from '@/components/proto/brand-mark'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -296,10 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className={cn('side', sideOpen && 'open')} aria-label="Global navigatsiya">
         <button className="brand" onClick={goLauncher} aria-label="Bosh sahifa">
           <span className="logo" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3 4 7v5c0 4.5 3.2 7.9 8 9 4.8-1.1 8-4.5 8-9V7z" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
+            <BrandMark />
           </span>
           <span>
             <b>Sud tizimi</b>

@@ -31,6 +31,7 @@ import {
   type PizzaItem,
   type PizzaStatus,
 } from '@/components/proto/pizza-geometry'
+import { brandMarkSvg } from '@/core/brand-mark'
 import { clampPct, dialAngle, dialGeom, tickLook } from '@/components/proto/dial-geometry'
 import { fmtInt, shortSum, type ReportModel, type Tone } from './model'
 
@@ -181,8 +182,6 @@ function monthly(points: { label: string; count: number }[], t: ReportTheme): st
   return `<svg class="rp-months" viewBox="0 0 600 100" role="img" aria-label="Oylik faollik">
     <line x1="0" y1="78" x2="600" y2="78" stroke="${t.border}" stroke-width="1"/>${bars}</svg>`
 }
-
-const LOGO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 4.5 3.2 7.9 8 9 4.8-1.1 8-4.5 8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>`
 
 // ---- HTML pieces -------------------------------------------------------------
 
@@ -363,7 +362,7 @@ export function renderReportBody(m: ReportModel, t: ReportTheme): { rail: string
 
 /** Running header (thead, repeats on every printed page): the brand line over the rail. */
 export function renderReportHeader(): string {
-  return `<div class="rp-brand">Sud tizimi · Hisobot</div>`
+  return `<div class="rp-brand"><span class="rp-mk">${brandMarkSvg('dark')}</span>Sud tizimi · Hisobot</div>`
 }
 
 /** Pinned bottom line (repeats on every page): the company key on the rail, the disclaimer beside it. No source names. */
@@ -409,7 +408,9 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   td.r { padding: 0 15mm 0 14mm; vertical-align: top; }
   thead td { height: 19mm; vertical-align: bottom; padding-bottom: 5mm; }
   tfoot td { height: 14mm; }
-  .rp-brand { font-size: 5.8pt; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,.55); }
+  .rp-brand { display: flex; align-items: center; gap: 2mm; font-size: 5.8pt; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,.55); }
+
+  .rp-mk svg { display: block; width: 11px; height: 11px; }
 
   /* rail */
   .rp-rail h1 { margin: 0 0 2.4mm; font-size: 14pt; line-height: 1.2; font-weight: 700; letter-spacing: -.015em; overflow-wrap: anywhere; }

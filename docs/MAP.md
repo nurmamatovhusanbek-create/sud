@@ -36,6 +36,7 @@ core/                 PURE functions (no I/O, no React): classify · rates · st
 | **Shell / navigation / ⌘K** | `shell/app-shell`, `shell/command-palette` | `store/app-store` (`WORKSPACE_NAV`, `SectionKey`, `GlobalSurface`) | – | – | – |
 | **Launcher (home)** | `views/launcher` | `registry`, `enrich` | `stats`, `upcoming-hearings`, `company-info` | – | `lib/__tests__/registry-hearings` |
 | **Company header + report («Hisobot» PDF)** | `company/context-bar` | `report/generate` → `report/{model,render,doc,fonts}` | `stats`, `company-info` | `core/{rates,status,trend,dates}` | `report/__tests__`, `core/__tests__` |
+| **Logo / brand mark** | `proto/brand-mark`, `shell/app-shell`, `proto/drawer` | – | – | `core/brand-mark` (also `lib/print`, `report/render`, `public/logo.svg`) | `core/__tests__/brand-mark` |
 | **Gauges (rating, worker/overall health)** | `proto/primitives` (`Dial`, `WORKER_ZONES`, `HEALTH_ZONES`), `sections/profile`, `views/settings-view` | – | – | `proto/dial-geometry` (also used by `report/render`) | `core/__tests__/dial`, `report/__tests__` |
 | **Overview / Statistika (pizza)** | `sections/overview`, `proto/primitives` (Pizza…), `proto/pizza-geometry` | – | `stats` | `lib/stats`, `core/classify`, `core/rates` | `core/__tests__/{classify,rates,pizza}` |
 | **Sud ishlari (cases list + drawer)** | `sections/cases`, `proto/drawer`, `proto/case-orders` | `api-client` | `court-cases`, `court-cases/export` | `lib/court-case*`, `sources` | – |
