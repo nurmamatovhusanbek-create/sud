@@ -45,7 +45,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
-| `classify.ts` | core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
+| `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
 | `dates.ts` | components/sections/cases.tsx, lib/report/doc.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/dates.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
@@ -54,7 +54,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
-| `translit.ts` | lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts |
+| `translit.ts` | core/classify.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
 
 ### Server middleware / config / security

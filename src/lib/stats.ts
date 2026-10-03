@@ -20,7 +20,7 @@
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRating } from './chamber'
-import { classifyOutcome, nameMatches, normalizeName } from '@/core/classify'
+import { classifyOutcome, partyRole } from '@/core/classify'
 
 // ---- Types (returned to API + consumed by client) --------------------
 
@@ -195,7 +195,8 @@ async function fetchCompanyStatsInternal(
 
   // Process orginfo result (non-blocking — fallback to chamber.uz, then TIN)
   let company: CompanyStatsCompany
-  let companyNameNorm = ''
+  // every name we know the company by (orginfo short + official, chamber): the role is decided on the distinctive part
+  const companyNames: string[] = []
   let chamberName = ''
   // v204 (P-E): keep the rating that getCompanyRating already fetched — it
   // used to be fetched and thrown away outside the stats payload.
@@ -218,7 +219,7 @@ async function fetchCompanyStatsInternal(
       officialName: info.officialName || '',
       shortName: info.shortName || '',
     }
-    companyNameNorm = normalizeName(name)
+    companyNames.push(info.shortName, info.officialName, chamberName, name)
   } else {
     if (orginfoResult.status === 'rejected') {
       console.warn(`[stats] orginfo lookup failed: ${orginfoResult.reason instanceof Error ? orginfoResult.reason.message : orginfoResult.reason}`)
@@ -234,7 +235,7 @@ async function fetchCompanyStatsInternal(
           ? chamberResult.value.regionNameUz || ''
           : '',
       }
-      companyNameNorm = normalizeName(chamberName)
+      companyNames.push(chamberName)
     } else {
       company = { name: `STIR ${tin}`, tin }
     }
@@ -270,7 +271,7 @@ async function fetchCompanyStatsInternal(
         else if (cn.startsWith('2-') || cn.startsWith('3-')) actualCourtType = 'civil'
         else if (cn.startsWith('4-')) actualCourtType = 'economic'
 
-        const cwc = classifyCase(raw, actualCourtType, companyNameNorm, tin)
+        const cwc = classifyCase(raw, actualCourtType, companyNames, tin)
         if (cwc) allCases.push(cwc)
       }
     } else {
@@ -334,7 +335,7 @@ async function fetchCompanyStatsInternal(
 function classifyCase(
   raw: CourtCase,
   courtType: StatsCourtType,
-  companyNameNorm: string,
+  companyNames: readonly string[],
   tin: string,
 ): CaseWithClassification | null {
   if (!raw || !raw.caseNumber || raw.caseNumber === '—' || raw.caseNumber === '-') return null
@@ -342,19 +343,9 @@ function classifyCase(
   const plaintiffRaw = raw.plaintiff || ''
   const defendantRaw = raw.defendant || ''
 
-  let role: PartyRole
-  if (companyNameNorm && nameMatches(companyNameNorm, normalizeName(plaintiffRaw))) {
-    role = 'plaintiff'
-  } else if (companyNameNorm && nameMatches(companyNameNorm, normalizeName(defendantRaw))) {
-    role = 'defendant'
-  } else if (plaintiffRaw.includes(tin)) {
-    role = 'plaintiff'
-  } else if (defendantRaw.includes(tin)) {
-    role = 'defendant'
-  } else {
-    // TIN-guaranteed match — default to plaintiff when we can't determine role
-    role = 'plaintiff'
-  }
+  // TIN-guaranteed membership (we searched by TIN), so when neither side can be told apart we keep the old
+  // default (plaintiff) for the win/lose maths; the list filter treats such a case as «unknown» instead (core/classify partyRole)
+  const role: PartyRole = partyRole({ names: companyNames, tin }, plaintiffRaw, defendantRaw) ?? 'plaintiff'
 
   const classification = classifyOutcome(role, raw.result)
   const counterparty = role === 'plaintiff' ? defendantRaw : plaintiffRaw
