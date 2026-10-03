@@ -15,6 +15,8 @@
  * «qanoatlantir…» (and not «qanoatlantirilmasin») counts as the claim being granted.
  */
 
+import { uzCyrToLat } from './translit'
+
 export type StatsCourtType = 'economic' | 'civil' | 'administrative'
 export type Classification = 'win' | 'lose' | 'neutral' | 'pending'
 export type PartyRole = 'plaintiff' | 'defendant'
@@ -55,6 +57,51 @@ export function nameMatches(companyNorm: string, partyNorm: string): boolean {
     }
   }
   return matchCount >= Math.min(2, cWords.length)
+}
+
+// ---- which side is the company? ---------------------------------------------------------------
+//
+// nameMatches() above is deliberately loose and has a known quirk: normalizeName() expands «MChJ» into
+// three words, so any two MChJs «share ≥ 2 words» and match. Deciding a SIDE with it picks the plaintiff
+// whenever the plaintiff is any MChJ — wrong for every case the company defends against another MChJ.
+// partyRole() therefore compares only the DISTINCTIVE part of the name (legal-form words removed,
+// Cyrillic transliterated) and trusts a TIN found in the party string over any name.
+
+const LEGAL_FORM = /^(mchj|aj|ooo|oao|ao|xk|uk|fx|yatt|ok|mas\w*uliyat\w*|cheklangan|jamiyat\w*|ak?t?s\w*(?:dor|ioner)\w*|xususiy|korxona\w*|qoshma|kooperativ\w*)$/
+
+/** The part of a party name that tells companies apart: lowercase Latin, no quotes, no legal-form words. */
+export function distinctiveName(s: string): string {
+  return uzCyrToLat(s || '')
+    .toLowerCase()
+    .replace(/["«»“”„'’‘`ʻʼ]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !LEGAL_FORM.test(w))
+    .join(' ')
+}
+
+/** Same company? Whole-word match of the distinctive names: equal, or all words of the shorter inside the longer. */
+export function samePartyName(a: string, b: string): boolean {
+  const x = distinctiveName(a).split(' ').filter(Boolean)
+  const y = distinctiveName(b).split(' ').filter(Boolean)
+  if (!x.length || !y.length) return false
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x]
+  if (short.length === 1 && short[0].length < 4) return false // «a», «os»… would match anything
+  return short.every((w) => long.includes(w))
+}
+
+/**
+ * Which side the company is on in one case: the TIN inside a party string wins, then the distinctive
+ * name (any of `names`: short, official, registered…). `null` = cannot tell (shown under neither side).
+ */
+export function partyRole(company: { names: readonly (string | undefined)[]; tin?: string }, plaintiff: string, defendant: string): PartyRole | null {
+  const tin = (company.tin || '').trim()
+  if (tin && plaintiff.includes(tin)) return 'plaintiff'
+  if (tin && defendant.includes(tin)) return 'defendant'
+  const names = company.names.filter((n): n is string => !!n && n.trim().length > 0)
+  const is = (party: string) => names.some((n) => samePartyName(n, party))
+  if (is(plaintiff)) return 'plaintiff'
+  if (is(defendant)) return 'defendant'
+  return null
 }
 
 /** Classify an Uzbek (Cyrillic or Latin) case outcome from the company's role. */

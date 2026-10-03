@@ -23,6 +23,7 @@ import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSo
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
+import { partyRole, type PartyRole } from '@/core/classify'
 import { isOngoingFirstInstance, orderJobCase, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValues, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
@@ -484,6 +485,7 @@ export function CasesSection() {
   const setStoreCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const [courtFilter, setCourtFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | PartyRole>('all')
   const [sort, setSort] = useState<SortKey>('new')
   const [exporting, setExporting] = useState(false)
   const [printing, setPrinting] = useState(false)
@@ -595,18 +597,44 @@ export function CasesSection() {
     [views],
   )
 
-  const filtered = useMemo(() => {
+  // which side the company is on in each case (TIN in the party string, else the distinctive name; null = cannot tell)
+  const companyName = company?.name
+  const roleOf = useCallback(
+    (c: CourtCase): PartyRole | null => partyRole({ names: [companyName], tin: stir }, c.plaintiff || '', c.defendant || ''),
+    [companyName, stir],
+  )
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q
-      ? merged.filter(({ c }) => Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q)))
-      : merged
+    return q ? merged.filter(({ c }) => Object.values(c).some((v) => typeof v === 'string' && v.toLowerCase().includes(q))) : merged
+  }, [merged, query])
+  // chip counts follow the court type + search, so a chip never promises a list that comes back empty
+  const roleCounts = useMemo(() => {
+    const n = { plaintiff: 0, defendant: 0 }
+    for (const { c } of searched) {
+      const r = roleOf(c)
+      if (r) n[r]++
+    }
+    return n
+  }, [searched, roleOf])
+
+  const roleOptions = useMemo(
+    () => [
+      { key: 'all', label: 'Ikkala tomon' },
+      { key: 'plaintiff', label: `Daʼvogar · ${roleCounts.plaintiff}` },
+      { key: 'defendant', label: `Javobgar · ${roleCounts.defendant}` },
+    ],
+    [roleCounts],
+  )
+
+  const filtered = useMemo(() => {
+    const list = roleFilter === 'all' ? searched : searched.filter(({ c }) => roleOf(c) === roleFilter)
     return applySort(
       list,
       sort,
       ({ c }) => parseSortDate(c.hearingDate || c.dateFiled),
       ({ c }) => c.caseNumber || '',
     )
-  }, [merged, query, sort])
+  }, [searched, roleFilter, roleOf, sort])
 
   // DETECT (free, nothing is scraped or queued): how many of the listed cases would really need a look at public.sud.uz —
   // shown as a count on the «Qarorlar» button; the button is what starts the work
@@ -633,7 +661,7 @@ export function CasesSection() {
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
-  }, [query, courtFilter, sort, stir])
+  }, [query, courtFilter, roleFilter, sort, stir])
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -696,6 +724,9 @@ export function CasesSection() {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
         </div>
         <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+        {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
+          <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole)} />
+        ) : null}
         <SortMenu value={sort} onChange={setSort} />
         <div style={{ flex: 1 }} />
         <button
@@ -740,7 +771,7 @@ export function CasesSection() {
       ) : merged.length === 0 ? (
         <EmptyBlock icon={<Gavel />} title="Ish topilmadi" hint="Tanlangan sud turlarida bu STIR boʻyicha ish topilmadi." />
       ) : filtered.length === 0 ? (
-        <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz bilan qidirib koʻring." />
+        <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint={roleFilter === 'all' ? 'Boshqa soʻz bilan qidirib koʻring.' : `Kompaniya ${roleFilter === 'plaintiff' ? 'daʼvogar' : 'javobgar'} boʻlgan ish topilmadi. «Ikkala tomon» ni tanlang.`} />
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />

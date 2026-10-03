@@ -6,6 +6,9 @@ import {
   remapCourtTypeByCaseNumber,
   dedupCases,
   summarize,
+  distinctiveName,
+  samePartyName,
+  partyRole,
 } from '../classify'
 
 describe('normalizeName', () => {
@@ -138,5 +141,38 @@ describe('summarize', () => {
     expect(summarize(cases)).toEqual({
       total: 5, win: 2, lose: 1, neutral: 1, pending: 1, asPlaintiff: 3, asDefendant: 2,
     })
+  })
+})
+
+describe('which side is the company on (partyRole)', () => {
+  const procab = { names: ['PROCAB', '"PROCAB" MAS\'ULIYATI CHEKLANGAN JAMIYAT'], tin: '302121267' }
+
+  test('distinctiveName drops legal-form words, quotes and script differences', () => {
+    expect(distinctiveName('"PROCAB" MAS\'ULIYATI CHEKLANGAN JAMIYAT')).toBe('procab')
+    expect(distinctiveName('«Артикул Азия Кабел» МЧЖ')).toBe('artikul aziya kabel')
+    expect(distinctiveName('"KONTRAGENT 1" MCHJ')).toBe('kontragent 1')
+  })
+  test('two different MChJs are NOT the same party (the fuzzy nameMatches quirk would say yes)', () => {
+    expect(nameMatches(normalizeName('PROCAB MChJ'), normalizeName('"KONTRAGENT 1" MChJ'))).toBe(true) // the quirk, kept as is
+    expect(samePartyName('PROCAB MChJ', '"KONTRAGENT 1" MChJ')).toBe(false)
+    expect(samePartyName('PROCAB MChJ', '"PROCAB" Mas\'uliyati cheklangan jamiyati')).toBe(true)
+  })
+  test('the company as defendant against another MChJ is a defendant (it used to come out as plaintiff)', () => {
+    expect(partyRole(procab, '"KONTRAGENT 1" MCHJ', '"PROCAB" MCHJ')).toBe('defendant')
+    expect(partyRole(procab, '"PROCAB" MCHJ', '"KONTRAGENT 1" MCHJ')).toBe('plaintiff')
+  })
+  test('works across Latin / Cyrillic, and with the short name only', () => {
+    expect(partyRole({ names: ['Artikul Aziya Kabel'], tin: '1' }, 'Бошка МЧЖ', '«Артикул Азия Кабел» МЧЖ')).toBe('defendant')
+    expect(partyRole({ names: ['PROCAB'], tin: '1' }, 'X MChJ', 'Procab Group MChJ')).toBe('defendant')
+  })
+  test('a TIN inside the party string wins over the name', () => {
+    expect(partyRole(procab, 'ABC MCHJ (STIR 302121267)', '"PROCAB" MCHJ')).toBe('plaintiff')
+  })
+  test('cannot tell → null (never guessed); no names → null', () => {
+    expect(partyRole(procab, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
+    expect(partyRole({ names: [undefined, ''], tin: '' }, 'ABC MCHJ', 'XYZ MCHJ')).toBeNull()
+  })
+  test('a tiny distinctive name does not match everything', () => {
+    expect(samePartyName('A MChJ', 'ABC MChJ')).toBe(false)
   })
 })
