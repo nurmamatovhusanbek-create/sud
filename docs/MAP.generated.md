@@ -43,6 +43,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
@@ -82,17 +83,19 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route | lib/__tests__/billing-search.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
-| `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
+| `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/health-store.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
+| `data-age.ts` | components/company/context-bar.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route |  |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts |  |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
 | `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts | lib/documents/__tests__/from-case.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
-| `enrich.ts` | components/views/launcher.tsx |  |
+| `enrich.ts` | components/views/launcher.tsx, lib/hard-refresh.ts |  |
+| `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 | `health-registry.ts` | api/settings/health/route, api/settings/workers/route, lib/cf-worker-pool.ts |  |
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
@@ -116,8 +119,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `report/generate.ts` | components/company/context-bar.tsx |  |
 | `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts |
 | `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts |
-| `snapshot-store.ts` | api/company-info/route, api/court-cases/route, api/stats/route | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts |
-| `stats.ts` | api/stats/export/route, api/stats/route, components/proto/pizza-geometry.ts, lib/api-types.ts, sources/index.ts | core/__tests__/pizza.test.ts |
+| `snapshot-store.ts` | api/company-info/route, api/court-cases/route, lib/stats-snapshot.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
+| `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
+| `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 |  |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
 | `tor.ts` | api/tor-status/route |  |
@@ -268,8 +272,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-saved-companies` | lib/registry.ts |
 | `sud-watchlist` | lib/registry.ts |
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
+| `sud:company-refreshed` | lib/hard-refresh.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
-| `sud:force-section` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, +3 |
+| `sud:force-section` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
@@ -280,8 +285,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | Event | Used in |
 |---|---|
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
+| `sud:company-refreshed` | lib/hard-refresh.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
-| `sud:force-section` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
+| `sud:force-section` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/command-palette.tsx |
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |

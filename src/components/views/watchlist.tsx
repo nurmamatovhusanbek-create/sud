@@ -105,7 +105,8 @@ export function WatchlistView() {
     let hearingsOk = false
     try {
       const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
-        if (res.ok) {
+        // a PARTIAL answer (a court site failed) counts too few cases: writing them would lower what a complete one learned
+        if (res.ok && !(res.partial && res.partial.length > 0) && res.data.errors.length === 0) {
           statsOk = true
           const s = res.data
           patchMeta(stir, {

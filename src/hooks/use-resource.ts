@@ -34,15 +34,31 @@ export interface UseResourceOptions<T> {
   isEmpty?: (data: T) => boolean
   /** Auto-fetch when enabled becomes true. */
   enabled?: boolean
+  /**
+   * Keep the answer in the browser's 5 min cache (default). Off for the daily-snapshot resources (stats, company info,
+   * court lists): the server already keeps those for 24 h and says how old they are, a second copy here would only
+   * hide a hard refresh done elsewhere and eat localStorage.
+   */
+  persist?: boolean
+}
+
+/** What the server said about the answer (`meta` of the envelope). */
+export interface ResourceMeta {
+  /** when the sites answered for this data (ms) */
+  fetchedAt?: number
+  /** past its day and the sites failed: the old data is shown */
+  stale?: boolean
 }
 
 export function useResource<T>(
-  fetcher: (signal: AbortSignal) => Promise<ApiResult<T>>,
+  /** `force` is true only for refetch(): a hard refresh the server must not answer from a snapshot. */
+  fetcher: (signal: AbortSignal, force: boolean) => Promise<ApiResult<T>>,
   opts: UseResourceOptions<T> = {},
 ) {
-  const { cacheKey, ttl, isEmpty, enabled = true } = opts
+  const { cacheKey, ttl, isEmpty, enabled = true, persist = true } = opts
   const [state, setState] = useState<ResourceState<T>>({ status: 'idle' })
   const [elapsed, setElapsed] = useState<number | null>(null)
+  const [meta, setMeta] = useState<ResourceMeta | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Sync "latest" refs inside effects (react-hooks/refs forbids render-time writes).
   const fetcherRef = useRef(fetcher)
@@ -58,7 +74,7 @@ export function useResource<T>(
       const ac = new AbortController()
       abortRef.current = ac
 
-      if (cacheKey && !force) {
+      if (cacheKey && persist && !force) {
         const hit = getCached<T>(cacheKey, ttl)
         if (hit !== null) {
           setState(decide(hit, [], isEmptyRef.current))
@@ -70,7 +86,7 @@ export function useResource<T>(
       const t0 = Date.now()
       const timer = setInterval(() => setElapsed(Date.now() - t0), 500)
       try {
-        const res = await fetcherRef.current(ac.signal)
+        const res = await fetcherRef.current(ac.signal, force)
         // Superseded/unmounted while the response was in flight. This used to
         // `return` with the interval still running: every 500ms it re-rendered
         // the owning component (e.g. the whole cases list) forever.
@@ -80,7 +96,8 @@ export function useResource<T>(
         if (res.ok) {
           // a PARTIAL answer (one source failed) is not cached: replaying it later would show the gaps as if that were all
           // there is, without the banner that explains them
-          if (cacheKey && !(res.partial && res.partial.length > 0)) setCached(cacheKey, res.data)
+          if (cacheKey && persist && !(res.partial && res.partial.length > 0)) setCached(cacheKey, res.data)
+          setMeta(res.meta?.fetchedAt ? { fetchedAt: res.meta.fetchedAt, ...(res.meta.stale ? { stale: true } : {}) } : null)
           setState(decide(res.data, res.partial ?? [], isEmptyRef.current))
         } else {
           setState({ status: 'error', error: res.error })
@@ -95,7 +112,7 @@ export function useResource<T>(
       }
     },
      
-    [cacheKey, ttl],
+    [cacheKey, ttl, persist],
   )
 
   useEffect(() => {
@@ -109,13 +126,20 @@ export function useResource<T>(
     return run(true)
   }, [cacheKey, run])
 
+  /** Read again WITHOUT forcing: after something else already refreshed the data (the header's hard refresh). */
+  const reload = useCallback(() => {
+    if (cacheKey) clearCached(cacheKey)
+    return run(false)
+  }, [cacheKey, run])
+
   const clear = useCallback(() => {
     abortRef.current?.abort()
     setState({ status: 'idle' })
     setElapsed(null)
+    setMeta(null)
   }, [])
 
-  return { state, elapsed, refetch, clear, loading: state.status === 'loading' }
+  return { state, elapsed, meta, refetch, reload, clear, loading: state.status === 'loading' }
 }
 
 function decide<T>(data: T, partial: SourceError[], isEmpty?: (d: T) => boolean): ResourceState<T> {

@@ -64,6 +64,7 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 | **Win rate / outcome** | `core/rates.ts` (`winRate`), `core/classify.ts` (`classifyOutcome`) — imported by stats, overview, watchlist, enrich, report, pizza | Never re-inline. |
 | **Order job case shape + signature** | `core/public-orders.ts` `orderJobCase` / `caseSignature` — used by `orders-watchlist.ts` and `sections/cases.tsx` | ONE shape or screens ping-pong «changed». |
 | **Ongoing-first-instance rule** | `core/public-orders.ts` `isOngoingFirstInstance` — used by `company-job.ts` (`planCases`) and `sections/cases.tsx` (drawer note) | – |
+| **Hard refresh + data age** | button/R key: `company/context-bar` + `app/page.tsx` → `lib/hard-refresh` (`hardRefreshWithToast` → `lib/enrich` `enrichCompanyDetailed(force)`); age label: sections call `lib/data-age` `reportAge` with `meta.fetchedAt` (via `hooks/use-resource` `meta`), header shows the oldest (`core/age`) | The event `sud:company-refreshed` makes the active section `reload()` (read, NOT force: the scrape already happened). `sud:force-section` = a section-level retry (forces). Snapshot resources use `persist:false` (no browser copy). A PARTIAL stats answer must never be written to registry meta or counted as a refresh. |
 | **Hearing date `dd.mm.yyyy` ordering** | `sections/cases.tsx` (`hearingKey`, `pickUpcoming`), `core/dates.ts`, `sources/index.ts` (upcoming iso) | Never compare as strings. |
 | **Court-type names** | `lib/court-case-types.ts` (`CourtType`), `lib/stats.ts` (`COURT_TYPE_MAP`, `StatsCourtType`), `core/public-orders.ts` (`PUBLIC_COURT_OF` → ECONOMIC/CIVIL/ADMINISTRATIVE) | lowercase in the app, UPPERCASE for the public library. |
 | **Money / Uzbek formatting** | `core/billing-format.ts` (tiyin math, words), `core/dates.ts`; UI `sections/bills-helpers.ts` | Not `toLocaleString`. |
@@ -76,7 +77,7 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 
 | Store | Lifetime | Key / holder | Who writes |
 |---|---|---|---|
-| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sb-cache-v168:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource |
+| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sb-cache-v169:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource |
 | Browser `sessionStorage` | tab session | `sud-orders-pill-hidden` (run id whose pill was hidden) | orders-loader |
 | Zustand `app-store` | page | active company, section, surface, `docPrefill` | components |
 | Server memory (`globalThis`) | process | `__publicOrdersJob` (queue), health pools (`__sudHealthPools`, live cooldowns only), `__sudHealthStore` (request history, mirrored to disk), metrics | company-job / cf-worker-pool / health-store |

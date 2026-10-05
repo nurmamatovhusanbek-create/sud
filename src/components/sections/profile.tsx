@@ -12,6 +12,8 @@ import { EmptyBlock, Dial, SkRows, initials } from '@/components/proto/primitive
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { useResource } from '@/hooks/use-resource'
+import { reportAge } from '@/lib/data-age'
+import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta } from '@/lib/registry'
@@ -24,20 +26,31 @@ export function ProfileSection() {
   const company = useAppStore((s) => s.activeCompany)
   const patchCompany = useAppStore((s) => s.patchCompany)
   const setSection = useAppStore((s) => s.setSection)
-  const { state, elapsed, refetch } = useResource<CompanyInfoData>(
-    (signal) => getCompanyInfo(company?.stir || '', { signal }),
+  const { state, elapsed, meta, refetch, reload } = useResource<CompanyInfoData>(
+    (signal, force) => getCompanyInfo(company?.stir || '', { signal, force }),
     {
       cacheKey: company ? `company-info:${company.stir}` : undefined,
+      persist: false,
       enabled: !!company,
     },
   )
+  const stirNow = company?.stir || ''
+  useEffect(() => {
+    const ok = state.status === 'success' || state.status === 'partial'
+    reportAge(stirNow, 'info', ok ? meta?.fetchedAt : undefined, meta?.stale)
+  }, [state.status, meta, stirNow])
 
   // v208: Yangilash previously did NOTHING on this section (no listener).
   useEffect(() => {
     const handler = () => void refetch()
+    const refreshed = () => void reload()
     window.addEventListener('sud:force-section', handler)
-    return () => window.removeEventListener('sud:force-section', handler)
-  }, [refetch])
+    window.addEventListener(COMPANY_REFRESHED, refreshed)
+    return () => {
+      window.removeEventListener('sud:force-section', handler)
+      window.removeEventListener(COMPANY_REFRESHED, refreshed)
+    }
+  }, [refetch, reload])
 
   // Hydrate identity into the active company (context bar fills instantly)
   useEffect(() => {

@@ -231,3 +231,14 @@ fails serves the expired one flagged `stale` (meta `stale`); a forced stats scra
 the «fresh» answer would be the old one. The STIR is the file name, so exactly 9 digits. Files and parts unrefreshed
 for 7 days are deleted (hourly sweep, mtime). Responses carry `meta.fetchedAt` / `meta.cached` / `meta.stale`.
 Tests: `lib/__tests__/snapshot-store`, `lib/__tests__/snapshot-routes`.
+
+### Hard refresh and the age label
+
+The header's circle button and the R key run `hardRefreshWithToast`: forced stats (which refills the server's court-list /
+orginfo memory and, when complete, retires the older info / court / bills snapshots), then the live hearings, then the event
+`sud:company-refreshed`, on which the active section re-reads (`reload()`: no second scrape). The toast says how it went:
+«Yangilandi» · «…lekin majlislarni olib boʻlmadi» · «Yangilab boʻlmadi … eski maʼlumot qoldi» (an incomplete stats answer is a
+failed refresh: nothing is stored and the registry meta keeps its numbers). Stats, company info and court lists use
+`useResource({ persist:false })`: the server's snapshot is the only copy, so there is nothing in the browser to hide a refresh
+done elsewhere. Sections report `meta.fetchedAt` to `lib/data-age`; the header shows «Yangilandi 3 soat oldin» (the OLDEST part;
+the tooltip lists each; «· eskirgan» when the sites failed and a past-day snapshot is shown).

@@ -279,6 +279,8 @@ html, body { height: 100%; }
 .ctx-name .nm { font-size: clamp(18px, 2vw, 22px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .ctx-name .sub { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-top: 3px; flex-wrap: wrap; }
 .ctx-name .sub .mono { color: var(--text-2); }
+.ctx-name .sub .data-age { white-space: nowrap; cursor: default; }
+.ctx-name .sub .data-age[data-stale] { color: var(--status-warning-text); }
 .copy { color: var(--text-3); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; }
 .copy:hover { background: var(--surface-hover); color: var(--text-1); }
 .copy svg { width: 13px; height: 13px; }

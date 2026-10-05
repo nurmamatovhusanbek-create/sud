@@ -11,12 +11,25 @@ import { winRate } from '@/core/rates'
 import { getStats, getUpcomingHearings } from './api-client'
 import { hearingMetaPatch, orderCasesPatch, patchMeta } from './registry'
 
+export interface EnrichResult {
+  /** the stats came back COMPLETE (every court answered) */
+  stats: boolean
+  hearings: boolean
+}
+
 export async function enrichCompany(stir: string, force = false): Promise<boolean> {
+  const r = await enrichCompanyDetailed(stir, force)
+  return r.stats || r.hearings
+}
+
+export async function enrichCompanyDetailed(stir: string, force = false): Promise<EnrichResult> {
   let statsOk = false
   let hearingsOk = false
 
   const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
-    if (res.ok) {
+    // a PARTIAL answer (a court site failed) counts too few cases: writing them would replace what an earlier,
+    // complete refresh learned with a lower number
+    if (res.ok && !(res.partial && res.partial.length > 0) && res.data.errors.length === 0) {
       statsOk = true
       const s = res.data
       patchMeta(stir, {
@@ -38,14 +51,18 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
   }
 
   try {
-    const [stats, hearings] = await Promise.allSettled([
-      getStats(stir, { force }),
-      getUpcomingHearings(stir),
-    ])
-    if (stats.status === 'fulfilled') applyStats(stats.value)
-    if (hearings.status === 'fulfilled') applyHearings(hearings.value)
+    if (force) {
+      // one after the other: the forced stats scrape refills the server's court lists, and the hearings read then
+      // uses them instead of scraping the same sites a second time
+      applyStats(await getStats(stir, { force: true }).catch(() => ({ ok: false }) as Awaited<ReturnType<typeof getStats>>))
+      applyHearings(await getUpcomingHearings(stir).catch(() => ({ ok: false }) as Awaited<ReturnType<typeof getUpcomingHearings>>))
+    } else {
+      const [stats, hearings] = await Promise.allSettled([getStats(stir), getUpcomingHearings(stir)])
+      if (stats.status === 'fulfilled') applyStats(stats.value)
+      if (hearings.status === 'fulfilled') applyHearings(hearings.value)
+    }
   } catch {
     /* best-effort */
   }
-  return statsOk || hearingsOk
+  return { stats: statsOk, hearings: hearingsOk }
 }

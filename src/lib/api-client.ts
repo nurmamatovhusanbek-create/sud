@@ -73,8 +73,9 @@ export function getCompanyInfo(tin: string, opts?: { force?: boolean; signal?: A
   return request<CompanyInfoData>(`/api/company-info?tin=${tin}${opts?.force ? '&force=1' : ''}`, opts?.signal)
 }
 
-export function searchCases(params: { courtType: string; mode: string; value: string }, signal?: AbortSignal) {
+export function searchCases(params: { courtType: string; mode: string; value: string }, signal?: AbortSignal, force?: boolean) {
   const q = new URLSearchParams({ courtType: params.courtType, mode: params.mode, value: params.value })
+  if (force) q.set('force', '1')
   return request<{ cases: CourtCase[] }>(`/api/court-cases?${q}`, signal)
 }
 

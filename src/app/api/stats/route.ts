@@ -4,8 +4,7 @@ import { statsSource } from '@/sources'
 import { StirQuery } from '@/core/schemas'
 import { logger } from '@/infra/logger'
 import { config } from '@/server/config'
-import { dropSnapshot, viaSnapshot } from '@/lib/snapshot-store'
-import type { CompanyStats } from '@/lib/stats'
+import { servedStats } from '@/lib/stats-snapshot'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -35,23 +34,7 @@ export const GET = guard(async (req) => {
 
   const t0 = Date.now()
   try {
-    const served = await coalesce(`stats:${tin}:${force ? 'f' : 'c'}`, () =>
-      viaSnapshot<CompanyStats>(
-        tin,
-        'stats',
-        {
-          force,
-          // complete only: every court answered and the company was found (else the name is the «STIR …» placeholder)
-          storable: (d) => d.errors.length === 0 && !d.company.name.startsWith('STIR '),
-        },
-        async () => {
-          const d = await statsSource.run(tin, { force })
-          // the forced scrape just refilled the court caches: the court lists of an older day must not outlive it
-          if (force) dropSnapshot(tin, 'court:')
-          return d
-        },
-      ),
-    )
+    const served = await coalesce(`stats:${tin}:${force ? 'f' : 'c'}`, () => servedStats(tin, force, () => statsSource.run(tin, { force })))
     const data = served.data
     log.info('stats built', { tin, elapsedMs: Date.now() - t0, cases: data.cases.length, fromSnapshot: served.fromSnapshot })
     return jsonOk(data, {

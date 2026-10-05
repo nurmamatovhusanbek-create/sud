@@ -30,6 +30,8 @@ import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
+import { reportAge } from '@/lib/data-age'
+import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { dateKey, daysUntil } from '@/core/dates'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx, fetchPublicOrders, planPublicOrders } from '@/lib/api-client'
 import { useOrdersJob } from '@/lib/use-orders-job'
@@ -535,16 +537,16 @@ export function CasesSection() {
   // Only the SELECTED court types fetch (matches the old per-court mounting);
   // results merge into a single list for filtering, pagination and export.
   const econ = useResource<{ cases: CourtCase[] }>(
-    (signal) => searchCases({ courtType: 'economic', mode: 'tin', value: stir }, signal),
-    { cacheKey: `court:economic:tin:${stir}`, enabled: !!company && courts.includes('economic') },
+    (signal, force) => searchCases({ courtType: 'economic', mode: 'tin', value: stir }, signal, force),
+    { cacheKey: `court:economic:tin:${stir}`, persist: false, enabled: !!company && courts.includes('economic') },
   )
   const civ = useResource<{ cases: CourtCase[] }>(
-    (signal) => searchCases({ courtType: 'civil', mode: 'tin', value: stir }, signal),
-    { cacheKey: `court:civil:tin:${stir}`, enabled: !!company && courts.includes('civil') },
+    (signal, force) => searchCases({ courtType: 'civil', mode: 'tin', value: stir }, signal, force),
+    { cacheKey: `court:civil:tin:${stir}`, persist: false, enabled: !!company && courts.includes('civil') },
   )
   const adm = useResource<{ cases: CourtCase[] }>(
-    (signal) => searchCases({ courtType: 'administrative', mode: 'tin', value: stir }, signal),
-    { cacheKey: `court:administrative:tin:${stir}`, enabled: !!company && courts.includes('administrative') },
+    (signal, force) => searchCases({ courtType: 'administrative', mode: 'tin', value: stir }, signal, force),
+    { cacheKey: `court:administrative:tin:${stir}`, persist: false, enabled: !!company && courts.includes('administrative') },
   )
 
   const views = useMemo(
@@ -570,11 +572,37 @@ export function CasesSection() {
     if (courts.includes('administrative')) adm.refetch()
   }, [econ.refetch, civ.refetch, adm.refetch, courts.join(',')])
 
+  // the header's hard refresh already scraped (through the stats): read the lists again, without forcing a second scrape
+  const reloadAll = useCallback(() => {
+    if (courts.includes('economic')) econ.reload()
+    if (courts.includes('civil')) civ.reload()
+    if (courts.includes('administrative')) adm.reload()
+  }, [econ.reload, civ.reload, adm.reload, courts.join(',')])
+
   useEffect(() => {
     const handler = () => refetchAll()
     window.addEventListener('sud:force-section', handler)
-    return () => window.removeEventListener('sud:force-section', handler)
-  }, [refetchAll])
+    window.addEventListener(COMPANY_REFRESHED, reloadAll)
+    return () => {
+      window.removeEventListener('sud:force-section', handler)
+      window.removeEventListener(COMPANY_REFRESHED, reloadAll)
+    }
+  }, [refetchAll, reloadAll])
+
+  // the header shows how old the dossier is: the oldest of the court lists on screen
+  useEffect(() => {
+    const done = (r: { state: { status: string }; meta: { fetchedAt?: number; stale?: boolean } | null }, on: boolean) =>
+      on && (r.state.status === 'success' || r.state.status === 'partial' || r.state.status === 'empty') ? r.meta : null
+    const parts: [string, boolean, typeof econ][] = [
+      ['court:economic', courts.includes('economic'), econ],
+      ['court:civil', courts.includes('civil'), civ],
+      ['court:administrative', courts.includes('administrative'), adm],
+    ]
+    for (const [name, on, r] of parts) {
+      const m = done(r, on)
+      reportAge(stir, name, m?.fetchedAt, m?.stale)
+    }
+  }, [econ.state.status, econ.meta, civ.state.status, civ.meta, adm.state.status, adm.meta, courts.join(','), stir])
 
   const anyLoading = views.some((v) => v.view.status === 'idle' || v.view.status === 'loading')
   const allError = views.length > 0 && views.every((v) => v.view.status === 'error')

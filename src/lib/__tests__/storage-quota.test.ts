@@ -35,7 +35,7 @@ describe('registry vs a full localStorage', () => {
   test('response caches are sacrificed first — the watchlist is saved', async () => {
     const { writeStore } = await import('../registry')
     // fill the quota with cached API responses
-    for (let i = 0; i < 5; i++) ls.setItem(`sb-cache-v168:stats:${i}`, JSON.stringify({ data: 'x'.repeat(900), ts: i }))
+    for (let i = 0; i < 5; i++) ls.setItem(`sb-cache-v169:stats:${i}`, JSON.stringify({ data: 'x'.repeat(900), ts: i }))
     writeStore({ '111111111': { stir: '111111111', name: 'A', watched: true, meta: { status: 'Faoliyatda' } } })
     expect(JSON.parse(ls.getItem('sud-registry-v1')!)['111111111'].name).toBe('A')
     expect(events).toContain('sud:registry-changed')
@@ -71,10 +71,10 @@ describe('registry vs a full localStorage', () => {
 describe('response cache', () => {
   test('a write that does not fit evicts the OLDEST entries and succeeds', async () => {
     const { setCached, getCached } = await import('../cache')
-    for (let i = 0; i < 5; i++) ls.setItem(`sb-cache-v168:k${i}`, JSON.stringify({ data: 'y'.repeat(1000), ts: 100 + i }))
+    for (let i = 0; i < 5; i++) ls.setItem(`sb-cache-v169:k${i}`, JSON.stringify({ data: 'y'.repeat(1000), ts: 100 + i }))
     setCached('fresh', { big: 'z'.repeat(1500) })
     expect(getCached('fresh')).not.toBeNull()
-    expect(ls.getItem('sb-cache-v168:k0')).toBeNull() // oldest went first
-    expect(ls.getItem('sb-cache-v168:k4')).not.toBeNull()
+    expect(ls.getItem('sb-cache-v169:k0')).toBeNull() // oldest went first
+    expect(ls.getItem('sb-cache-v169:k4')).not.toBeNull()
   })
 })

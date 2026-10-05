@@ -67,6 +67,8 @@ import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
+import { reportAge } from '@/lib/data-age'
+import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -664,10 +666,16 @@ function OverviewView({
   const patchCompany = useAppStore((s) => s.patchCompany)
   const setCasesCount = useTabCounts((s) => s.set)
   // v208: force=true (Yangilash) skips the server-side stats/court caches too.
-  const { state, elapsed, refetch } = useResource<CompanyStats>(
-    (signal) => getStats(stir, { signal, force }),
-    { cacheKey: `stats:${stir}`, isEmpty: (d) => d.cases.length === 0 && Object.keys(d.company || {}).length === 0 },
+  const { state, elapsed, meta, refetch } = useResource<CompanyStats>(
+    (signal, f) => getStats(stir, { signal, force: force || f }),
+    { cacheKey: `stats:${stir}`, persist: false, isEmpty: (d) => d.cases.length === 0 && Object.keys(d.company || {}).length === 0 },
   )
+
+  // the header shows how old the dossier is
+  useEffect(() => {
+    const ok = state.status === 'success' || state.status === 'partial'
+    reportAge(stir, 'stats', ok ? meta?.fetchedAt : undefined, meta?.stale)
+  }, [state.status, meta, stir])
 
   // Hydrate identity + cached meta once stats land
   useEffect(() => {
@@ -712,23 +720,30 @@ function OverviewView({
 
 export function OverviewSection() {
   const company = useAppStore((s) => s.activeCompany)
-  const [forceKey, setForceKey] = useState(0)
+  const [reloadKey, setReloadKey] = useState(0)
+  /** the last reload was a forced one (a section-level retry); a company switch or the header's refresh is not */
+  const [forced, setForced] = useState(false)
   const [comparing, setComparing] = useState(false)
   const [baseStats, setBaseStats] = useState<CompanyStats | null>(null)
 
   useEffect(() => {
-    const handler = () => {
-      // v208: Yangilash must bypass BOTH caches — drop the client-side
-      // localStorage entries, then remount with force=1 so the server also
-      // re-scrapes instead of replaying its 60s/10min memoized results.
-      if (company) {
-        clearCached(`stats:${company.stir}`)
-        clearCached(`upcoming:${company.stir}`)
-      }
-      setForceKey((k) => k + 1)
+    // a section-level retry (partial banner): the server must re-scrape, not replay its snapshot
+    const force = () => {
+      if (company) clearCached(`upcoming:${company.stir}`)
+      setForced(true)
+      setReloadKey((k) => k + 1)
     }
-    window.addEventListener('sud:force-section', handler)
-    return () => window.removeEventListener('sud:force-section', handler)
+    // the header's hard refresh already scraped everything: just read it again
+    const refreshed = () => {
+      setForced(false)
+      setReloadKey((k) => k + 1)
+    }
+    window.addEventListener('sud:force-section', force)
+    window.addEventListener(COMPANY_REFRESHED, refreshed)
+    return () => {
+      window.removeEventListener('sud:force-section', force)
+      window.removeEventListener(COMPANY_REFRESHED, refreshed)
+    }
   }, [company])
 
   if (!company) return null
@@ -737,9 +752,9 @@ export function OverviewSection() {
     <div className={`stat-view${comparing ? ' comparing' : ''}`}>
       {comparing && baseStats && <ComparePanel base={baseStats} onClose={() => setComparing(false)} />}
       <OverviewView
-        key={`${company.stir}-${forceKey}`}
+        key={`${company.stir}-${reloadKey}`}
         stir={company.stir}
-        force={forceKey > 0}
+        force={forced}
         onOpenCompare={() => setComparing(true)}
         onData={setBaseStats}
       />

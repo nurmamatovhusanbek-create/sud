@@ -15,8 +15,10 @@
  * on their next visit. When bumping the version, update PREFIX below.
  */
 
-const CACHE_VERSION = 'v168'
+const CACHE_VERSION = 'v169'
 const PREFIX = `sb-cache-${CACHE_VERSION}:`
+// v169: stats, company info and court lists are no longer kept here (the server keeps them for a day); the bump sweeps
+// the old copies out of localStorage.
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
 
 /**

@@ -14,6 +14,7 @@ import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
+import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getUpcomingHearings, exportHearingsXlsx } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
@@ -65,7 +66,11 @@ export function HearingsSection() {
   useEffect(() => {
     const handler = () => void refetch()
     window.addEventListener('sud:force-section', handler)
-    return () => window.removeEventListener('sud:force-section', handler)
+    window.addEventListener(COMPANY_REFRESHED, handler)
+    return () => {
+      window.removeEventListener('sud:force-section', handler)
+      window.removeEventListener(COMPANY_REFRESHED, handler)
+    }
   }, [refetch])
 
   const view = state as ResourceState<UpcomingHearingsData>

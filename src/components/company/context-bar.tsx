@@ -6,7 +6,7 @@
  * badge, refresh / export circle buttons, the watch pill button).
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Copy, Download, FileText, RefreshCw, Star } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/lib/store/app-store'
@@ -15,8 +15,20 @@ import { isWatched, setWatched } from '@/lib/registry'
 import { openCompanyReport } from '@/lib/report/generate'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { toast } from 'sonner'
+import { ageLabel } from '@/core/age'
+import { useDataAge } from '@/lib/data-age'
+import { hardRefreshWithToast, useRefreshing } from '@/lib/hard-refresh'
 import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 import { bandFromFamily } from '@/components/proto/primitives'
+
+const PART_LABEL: Record<string, string> = {
+  stats: 'Statistika',
+  info: 'Profil',
+  bills: 'Toʻlovlar',
+  'court:economic': 'Iqtisodiy sud',
+  'court:civil': 'Fuqarolik sud',
+  'court:administrative': 'Maʼmuriy sud',
+}
 
 const statusLabel = (s?: string) => {
   if (!s) return ''
@@ -32,6 +44,14 @@ export function ContextBar() {
   const [copied, setCopied] = useState(false)
   const rv = useRegistryVersion()
   const watching = company ? (rv >= 0 ? isWatched(company.stir) : false) : false
+  const refreshing = useRefreshing(company?.stir)
+  const age = useDataAge(company?.stir)
+  // the label ages while the page stays open
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
 
   if (!company) return null
 
@@ -57,10 +77,7 @@ export function ContextBar() {
     })
   }
 
-  const refresh = () => {
-    toast('Ma’lumot yangilanmoqda…')
-    window.dispatchEvent(new CustomEvent('sud:force-section'))
-  }
+  const refresh = () => void hardRefreshWithToast(company.stir)
   const exportx = () => window.dispatchEvent(new CustomEvent('sud:export-active'))
 
   return (
@@ -82,6 +99,18 @@ export function ContextBar() {
           <button className="copy" data-copy onClick={() => void copyStir()} aria-label="STIRni nusxalash">
             <Copy style={{ opacity: copied ? 1 : undefined }} />
           </button>
+          {age.oldest !== null && !refreshing && (
+            <>
+              <span>·</span>
+              <span
+                className="data-age"
+                data-stale={age.stale || undefined}
+                title={Object.entries(age.parts).map(([k, t]) => `${PART_LABEL[k] ?? k}: ${ageLabel(t, now)}`).join('\n')}
+              >
+                Yangilandi {ageLabel(age.oldest, now)}{age.stale ? ' · eskirgan' : ''}
+              </span>
+            </>
+          )}
         </div>
       </div>
       <div className="ctx-actions">
@@ -93,11 +122,11 @@ export function ContextBar() {
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="circ" data-act="refresh" onClick={refresh} aria-label="Yangilash (R)">
-                <RefreshCw />
+              <button className="circ" data-act="refresh" onClick={refresh} disabled={refreshing} aria-busy={refreshing} aria-label="Toʻliq yangilash (R)">
+                <RefreshCw className={refreshing ? 'spin' : undefined} />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Yangilash (R)</TooltipContent>
+            <TooltipContent>Toʻliq yangilash (R): saytlardan yangidan oladi</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>

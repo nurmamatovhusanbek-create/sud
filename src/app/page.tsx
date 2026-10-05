@@ -30,6 +30,7 @@ import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-sto
 import { exportStatsXlsx, getStats } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { keepIdentityWarm } from '@/lib/identity'
+import { hardRefreshWithToast } from '@/lib/hard-refresh'
 
 /** Workspace: the v18 sidebar IS the nav — this mounts the active section. */
 function CompanyWorkspace() {
@@ -65,7 +66,8 @@ function CompanyWorkspace() {
         }
       }
       if (e.key.toLowerCase() === 'r') {
-        window.dispatchEvent(new CustomEvent('sud:force-section'))
+        const stir = useAppStore.getState().activeCompany?.stir
+        if (stir) void hardRefreshWithToast(stir)
       }
       if (e.key.toLowerCase() === 'e') {
         window.dispatchEvent(new CustomEvent('sud:export-active'))
