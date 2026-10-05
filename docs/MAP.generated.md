@@ -62,7 +62,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `config.ts` | api/settings/health/route, api/stats/route, infra/logger.ts, lib/billing.ts, server/middleware.ts, sources/index.ts, sources/types.ts |  |
+| `config.ts` | api/settings/health/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, server/middleware.ts, sources/index.ts, +1 |  |
 | `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +4 |  |
 | `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +18 |  |
 | `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
@@ -86,7 +86,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/health-store.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
-| `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/upcoming-appeal.test.ts |
+| `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route |  |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts |  |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
@@ -116,7 +116,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `report/generate.ts` | components/company/context-bar.tsx |  |
 | `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts |
 | `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts |
-| `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, sources/index.ts | core/__tests__/pizza.test.ts |
+| `snapshot-store.ts` | api/company-info/route, api/court-cases/route, api/stats/route | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts |
+| `stats.ts` | api/stats/export/route, api/stats/route, components/proto/pizza-geometry.ts, lib/api-types.ts, sources/index.ts | core/__tests__/pizza.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 |  |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
 | `tor.ts` | api/tor-status/route |  |
@@ -234,6 +235,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `PUBLIC_ORDERS_VIA_WORKERS` | lib/public-orders/source.ts |
 | `RATE_LIMIT_MAX` | server/config.ts |
 | `RATE_LIMIT_WINDOW_MS` | server/config.ts |
+| `SNAPSHOT_DIR` | lib/snapshot-store.ts, server/config.ts |
+| `SNAPSHOT_KEEP_MS` | server/config.ts |
+| `SNAPSHOT_TTL_MS` | server/config.ts |
 | `SUD_SUPERVISED` | app/api/settings/update/route.ts |
 | `TOR_ENABLED` | server/config.ts |
 | `TOR_SOCKS_PORT` | server/config.ts |
@@ -289,5 +293,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|
 | `__publicOrdersJob` | lib/public-orders/company-job.ts |
 | `__resetHealthStoreForTests` | lib/health-store.ts |
+| `__resetSnapshotsForTests` | lib/snapshot-store.ts |
 | `__sudHealthPools` | lib/health-registry.ts |
 | `__sudHealthStore` | lib/health-store.ts |
+| `__sudSnapshots` | lib/snapshot-store.ts |

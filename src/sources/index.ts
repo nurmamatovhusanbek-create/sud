@@ -27,6 +27,7 @@ export const statsSource = defineSource<string, CompanyStats>({
     if (ctx?.force) {
       const { clearCourtCaseCache } = await import('@/lib/court-case')
       clearCourtCaseCache(tin)
+      forgetCompany(tin)
     }
     // v206: force also bypasses the 60s statsCache inside getCompanyStats.
     return getCompanyStats(tin, { force: ctx?.force })
@@ -36,7 +37,7 @@ export const statsSource = defineSource<string, CompanyStats>({
 
 // ---- company info (orginfo.uz + chamber.uz) ---------------------------------
 
-import { getCompanyByTin } from '@/lib/orginfo'
+import { forgetCompany, getCompanyByTin } from '@/lib/orginfo'
 import { getCompanyRating } from '@/lib/chamber'
 
 export interface CompanyInfoMapped {
@@ -93,7 +94,8 @@ const CompanyInfoPayloadSchema = z.object({
 export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
   name: 'company-info',
   cachePolicy: { key: (tin) => `company-info:${tin}`, ttlMs: () => config.cache.ttl.companyMs },
-  run: async (tin) => {
+  run: async (tin, ctx) => {
+    if (ctx?.force) forgetCompany(tin)
     const partial: { source: string; error: string }[] = []
     const [orginfoResult, chamberResult] = await Promise.allSettled([
       getCompanyByTin(tin),
@@ -159,7 +161,7 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
 
 // ---- court cases -------------------------------------------------------------
 
-import { searchCourtCases, getCaseDetails, type FullCaseData } from '@/lib/court-case'
+import { searchCourtCases, searchCourtCasesDetailed, clearCourtCaseCache, getCaseDetails, type FullCaseData } from '@/lib/court-case'
 
 export interface CourtSearchParams {
   courtType: CourtType
@@ -175,6 +177,22 @@ export const courtCasesSource = defineSource<CourtSearchParams, Awaited<ReturnTy
   },
   run: (p) => searchCourtCases(p.courtType, p.mode, p.value),
   schema: CourtCasesResponseSchema.shape.cases as unknown as z.ZodType<Awaited<ReturnType<typeof searchCourtCases>>>,
+})
+
+/**
+ * The same search, but it says whether it is COMPLETE: a source that failed on every proxy reads as «no cases», and an
+ * incomplete list must not be kept for a day. `force` drops the 10 min memory of that list first (hard refresh).
+ */
+export const courtListSource = defineSource<CourtSearchParams, { cases: Awaited<ReturnType<typeof searchCourtCases>>; incomplete: boolean }>({
+  name: 'court-cases',
+  run: (p, ctx) => {
+    if (ctx?.force && p.mode === 'tin') clearCourtCaseCache(p.value)
+    return searchCourtCasesDetailed(p.courtType, p.mode, p.value)
+  },
+  schema: z.object({
+    cases: CourtCasesResponseSchema.shape.cases,
+    incomplete: z.boolean(),
+  }) as unknown as z.ZodType<{ cases: Awaited<ReturnType<typeof searchCourtCases>>; incomplete: boolean }>,
 })
 
 export const caseDetailSource = defineSource<{ courtType: CourtType; caseNumber: string }, FullCaseData>({

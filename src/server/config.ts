@@ -125,6 +125,18 @@ export const config = {
     },
   },
 
+  /**
+   * Daily snapshots of a company's scraped data (stats, company info, court lists, bills), kept on disk so a refresh
+   * or a restart does not scrape again. Upcoming hearings are NOT part of it (they stay live, 5 min cache).
+   * `ttlMs`: how long a snapshot is served without scraping. `keepMs`: how long an unrefreshed one may linger
+   * (served as «stale» only when the sites fail) before the janitor deletes it.
+   */
+  snapshot: {
+    dir: str('SNAPSHOT_DIR'), // default ~/.sud-tizimi/snapshots
+    ttlMs: int('SNAPSHOT_TTL_MS', 24 * 60 * 60_000, { min: 0 }),
+    keepMs: int('SNAPSHOT_KEEP_MS', 7 * 24 * 60 * 60_000, { min: 0 }),
+  },
+
   /** Captcha/VLM solver (blueprint §3.7 — this key was committed in .z-ai-config). */
   vlm: {
     apiKey: requiredIn('production', 'VLM_API_KEY'),

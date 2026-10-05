@@ -24,6 +24,11 @@ interface TinCacheEntry {
   ts: number
 }
 const tinCache = new Map<string, TinCacheEntry>()
+
+/** A hard refresh must not be answered from the 24 h memory above. */
+export function forgetCompany(tin: string): void {
+  tinCache.delete(tin)
+}
 const TIN_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 
 // ---- CF Worker proxy helper (same pattern as jadval2.ts / chamber.ts) ----

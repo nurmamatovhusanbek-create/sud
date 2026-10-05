@@ -216,3 +216,18 @@ or later across the top level and all reviews (else the latest past one); the ro
 judge and `hearingStage`. When jadval.sud.uz and jadvalapi both answer, the row that still knows a hearing ahead wins.
 The upcoming filter now compares the local calendar day (`toISOString` shifted «today» by the UTC offset).
 Test: `lib/__tests__/upcoming-appeal.test.ts`.
+
+## Daily snapshots (`lib/snapshot-store`)
+
+A company used to be scraped again whenever the 5 min browser cache or the 60 s / 10 min server memory had lapsed, and
+every server restart emptied the server ones. Now `stats`, `company-info` and the court lists (`mode=tin`) go through
+`viaSnapshot` in their routes: a part younger than 24 h is read from `~/.sud-tizimi/snapshots/<STIR>.json` and no site is
+touched; older (or missing) is scraped and replaces it; `force=1` (the hard refresh) scrapes regardless. Upcoming hearings
+are deliberately not a part: they stay live (5 min).
+Rules: only COMPLETE answers are stored (`storable`: stats without court errors and with a found company, info without
+`partial`, a court list that is not `incomplete`); a failed refresh keeps the old snapshot; a plain open whose re-scrape
+fails serves the expired one flagged `stale` (meta `stale`); a forced stats scrape drops that company's `court:` parts
+(the lists must not be older than the stats beside them); `force` also drops orginfo's 24 h memory (`forgetCompany`), or
+the «fresh» answer would be the old one. The STIR is the file name, so exactly 9 digits. Files and parts unrefreshed
+for 7 days are deleted (hourly sweep, mtime). Responses carry `meta.fetchedAt` / `meta.cached` / `meta.stale`.
+Tests: `lib/__tests__/snapshot-store`, `lib/__tests__/snapshot-routes`.

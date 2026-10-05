@@ -9,7 +9,7 @@ import type { BillSummary, EnrichedBill } from '@/core/billing-format'
 import type { CompanyInfoPayload, UpcomingHearingsPayload } from '@/sources'
 
 export type ApiResult<T> =
-  | { ok: true; data: T; partial?: SourceError[]; meta?: { elapsedMs?: number; cached?: boolean } }
+  | { ok: true; data: T; partial?: SourceError[]; meta?: { elapsedMs?: number; cached?: boolean; fetchedAt?: number; stale?: boolean } }
   | { ok: false; error: string; code?: string; status?: number }
 
 export type { CompanyStats, CourtCase, FullCaseData, BillSummary, EnrichedBill }

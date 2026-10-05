@@ -1,6 +1,7 @@
 import { guard, coalesce } from '@/server/middleware'
 import { jsonOk, jsonFail } from '@/server/envelope'
 import { companyInfoSource } from '@/sources'
+import { viaSnapshot } from '@/lib/snapshot-store'
 import { StirQuery } from '@/core/schemas'
 import { logger } from '@/infra/logger'
 
@@ -30,13 +31,14 @@ export const GET = guard(async (req) => {
 
   const t0 = Date.now()
   try {
-    const data = await coalesce(`company-info:${tin}:${force ? 'f' : 'c'}`, () =>
-      companyInfoSource.run(tin, { force }),
+    const served = await coalesce(`company-info:${tin}:${force ? 'f' : 'c'}`, () =>
+      viaSnapshot(tin, 'info', { force, storable: (d) => d.partial.length === 0 }, () => companyInfoSource.run(tin, { force })),
     )
-    log.info('company info built', { tin, elapsedMs: Date.now() - t0 })
+    const data = served.data
+    log.info('company info built', { tin, elapsedMs: Date.now() - t0, fromSnapshot: served.fromSnapshot })
     return jsonOk({ company: data.company, rating: data.rating }, {
       partial: data.partial,
-      meta: { elapsedMs: Date.now() - t0 },
+      meta: { elapsedMs: Date.now() - t0, cached: served.fromSnapshot, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}) },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'

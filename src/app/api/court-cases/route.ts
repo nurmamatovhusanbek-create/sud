@@ -1,6 +1,7 @@
 import { guard, coalesce } from '@/server/middleware'
 import { jsonOk, jsonFail } from '@/server/envelope'
-import { courtCasesSource, caseDetailSource } from '@/sources'
+import { courtCasesSource, courtListSource, caseDetailSource } from '@/sources'
+import { viaSnapshot, type SnapshotPart } from '@/lib/snapshot-store'
 import { StirQuery, PinflQuery, CourtTypeQuery } from '@/core/schemas'
 import { logger } from '@/infra/logger'
 
@@ -10,6 +11,7 @@ export const maxDuration = 30
 
 const log = logger('api:court-cases')
 
+const SNAPSHOT_COURTS = new Set(['economic', 'civil', 'administrative'])
 const CASE_NUMBER_RE = /^\d+-[\d-]+\/\d+$/
 
 /**
@@ -67,6 +69,21 @@ export const GET = guard(async (req) => {
   }
 
   try {
+    // a company's court list (economic / civil / administrative) is kept for a day; `force=1` is the hard refresh
+    if (mode === 'tin' && SNAPSHOT_COURTS.has(ct.data)) {
+      const force = url.searchParams.get('force') === '1'
+      const served = await coalesce(`court-snap:${ct.data}:${value}:${force ? 'f' : 'c'}`, () =>
+        viaSnapshot(
+          value,
+          `court:${ct.data}` as SnapshotPart,
+          { force, storable: (r) => !r.incomplete },
+          () => courtListSource.run({ courtType: ct.data, mode, value }, { force }),
+        ),
+      )
+      return jsonOk({ cases: served.data.cases }, {
+        meta: { cached: served.fromSnapshot, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}) },
+      })
+    }
     const cases = await coalesce(`court:${ct.data}:${mode}:${value}`, () =>
       courtCasesSource.run({ courtType: ct.data, mode, value }),
     )

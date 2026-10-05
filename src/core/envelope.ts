@@ -26,6 +26,10 @@ export interface EnvelopeMeta {
   via?: string
   /** True when the result was served from cache rather than a live scrape. */
   cached?: boolean
+  /** When the sites answered for this data (ms epoch). Present on the daily-snapshot routes. */
+  fetchedAt?: number
+  /** The snapshot was past its day and the sites failed, so the old data is shown. */
+  stale?: boolean
 }
 
 export type Envelope<T> =

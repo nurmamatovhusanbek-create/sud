@@ -4,6 +4,8 @@ import { statsSource } from '@/sources'
 import { StirQuery } from '@/core/schemas'
 import { logger } from '@/infra/logger'
 import { config } from '@/server/config'
+import { dropSnapshot, viaSnapshot } from '@/lib/snapshot-store'
+import type { CompanyStats } from '@/lib/stats'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -33,13 +35,28 @@ export const GET = guard(async (req) => {
 
   const t0 = Date.now()
   try {
-    const data = await coalesce(`stats:${tin}:${force ? 'f' : 'c'}`, () =>
-      statsSource.run(tin, { force }),
+    const served = await coalesce(`stats:${tin}:${force ? 'f' : 'c'}`, () =>
+      viaSnapshot<CompanyStats>(
+        tin,
+        'stats',
+        {
+          force,
+          // complete only: every court answered and the company was found (else the name is the «STIR …» placeholder)
+          storable: (d) => d.errors.length === 0 && !d.company.name.startsWith('STIR '),
+        },
+        async () => {
+          const d = await statsSource.run(tin, { force })
+          // the forced scrape just refilled the court caches: the court lists of an older day must not outlive it
+          if (force) dropSnapshot(tin, 'court:')
+          return d
+        },
+      ),
     )
-    log.info('stats built', { tin, elapsedMs: Date.now() - t0, cases: data.cases.length })
+    const data = served.data
+    log.info('stats built', { tin, elapsedMs: Date.now() - t0, cases: data.cases.length, fromSnapshot: served.fromSnapshot })
     return jsonOk(data, {
       partial: data.errors.map((e) => ({ source: `court:${e.courtType}`, error: e.error })),
-      meta: { elapsedMs: Date.now() - t0 },
+      meta: { elapsedMs: Date.now() - t0, cached: served.fromSnapshot, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}) },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Statistikani olib bo\'lmadi'
