@@ -205,3 +205,14 @@ One instrument scale everywhere («Sirkul · Asbob», picked by the owner from f
 
 **Bug fixed:** the history lived only in the pool's memory (a 500-record ring per origin × worker): every server restart (the dev supervisor restarts on crash and HMR rebuilds re-created the pool) emptied it, and a busy worker pushed older requests out, so the long spans could never reach back. **Now:** `OriginHealthPool.pushHistory` also calls `recordRequest` (`lib/health-store.ts`): per worker × origin it keeps COUNTS per hour (ok · fail · summed ms) for 35 days, rolled up into per-day counts after that and kept (≈ 40 bytes a day, so «Barcha» is all time), plus the last 300 raw records for the drawer and the bars. One JSON file `~/.sud-tizimi/worker-health.json` (0600, atomic write, `WORKER_HEALTH_FILE` overrides; flushed 15 s after a change and on `exit`; damaged/garbage rows are skipped; a worker removed in Settings drops its history, nothing else is ever deleted). `/api/settings/health` now lists every CONFIGURED worker (also unused ones) with `buckets` as `[start, width, ok, fail, ms]` tuples; the page computes every figure for the chosen span from them with `spanTotals` (`lib/health-span.ts`, pure) and falls back to the raw records for an older server. The registry (`health-registry`) is on `globalThis` so a route bundle never sees an empty copy. Span edges are accurate to a bucket (an hour up to 35 days, a day beyond). Tests: `lib/__tests__/health-store.test.ts`.
 
+
+## Hearings of a case in appeal (`core/hearing-pick`)
+
+jadvalapi rows hold the **first-instance** hearing at the top level and one nested `reviews[]` entry per appeal /
+cassation, each with its own `hearing_date`, `hearing_time`, `responsible` and `court`. Reading only the top level
+meant a case that went to appeal kept its old date and an appeal hearing set for today never reached «upcoming
+hearings» (case 4-1001-2621/42935, defendant TIN 309922239). `pickHearing` takes the earliest hearing that is today
+or later across the top level and all reviews (else the latest past one); the row then carries that hearing's court,
+judge and `hearingStage`. When jadval.sud.uz and jadvalapi both answer, the row that still knows a hearing ahead wins.
+The upcoming filter now compares the local calendar day (`toISOString` shifted «today» by the UTC offset).
+Test: `lib/__tests__/upcoming-appeal.test.ts`.

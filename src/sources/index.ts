@@ -9,6 +9,7 @@
 import { z } from 'zod'
 import { config } from '@/server/config'
 import { defineSource } from './types'
+import { dateKey, daysUntil } from '@/core/dates'
 import {
   CompanyStatsSchema,
   CompanyInfoResponseSchema,
@@ -216,19 +217,15 @@ export const upcomingHearingsSource = defineSource<string, UpcomingHearingsPaylo
       }),
     )
     if (failed.length === courtTypes.length) throw new Error('Sud saytlari javob bermadi — majlislarni olib boʻlmadi')
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().slice(0, 10)
     const allHearings: UpcomingHearing[] = []
     for (const result of results) {
       if (result.status !== 'fulfilled') continue
       const ct = courtTypes[results.indexOf(result)]
       for (const c of result.value) {
-        if (!c.hearingDate || c.hearingDate === '—' || c.hearingDate === '-' || c.hearingDate === 'null') continue
-        const m = c.hearingDate.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
-        if (!m) continue
-        const isoDate = `${m[3]}-${m[2]}-${m[1]}`
-        if (isoDate < todayStr) continue
+        // «today» is the local calendar day (toISOString would shift it by the UTC offset)
+        const left = daysUntil(c.hearingDate)
+        if (left === null || left < 0) continue
+        const isoDate = dateKey(c.hearingDate)
         allHearings.push({ ...c, courtType: ct, isoDate, courtTypeLabel: ct.charAt(0).toUpperCase() + ct.slice(1) })
       }
     }

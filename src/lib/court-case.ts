@@ -95,6 +95,8 @@ import { fetchViaWorkers } from './net/worker-fetch'
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
 import type { CourtType, SearchMode, CourtCase, FullCaseData, InstanceData } from './court-case-types'
+import { pickHearing } from '@/core/hearing-pick'
+import { daysUntil } from '@/core/dates'
 
 // ---- Status enums for UI ----
 export { CASE_STATUSES, HEARING_STATUSES, COURT_TYPE_LABELS } from './court-case-types'
@@ -448,14 +450,19 @@ async function searchCourtCasesInternal(
   const results = await Promise.all(promises)
   // Merge and deduplicate by case number
   const merged: CourtCase[] = []
-  const seen = new Set<string>()
+  const at = new Map<string, number>()
   let incomplete = false
   for (const { items, failed } of results) {
     if (failed) incomplete = true
     for (const item of items) {
-      if (item.caseNumber && !seen.has(item.caseNumber)) {
-        seen.add(item.caseNumber)
+      if (!item.caseNumber) continue
+      const i = at.get(item.caseNumber)
+      if (i === undefined) {
+        at.set(item.caseNumber, merged.length)
         merged.push(item)
+      } else if (!isAhead(merged[i].hearingDate) && isAhead(item.hearingDate)) {
+        // the two APIs disagree: keep the row that knows the hearing still ahead
+        merged[i] = { ...merged[i], hearingDate: item.hearingDate, hearingTime: item.hearingTime, judge: item.judge || merged[i].judge, hearingStage: item.hearingStage }
       }
     }
   }
@@ -555,6 +562,8 @@ function getApiConfig(courtType: CourtType, mode: SearchMode, value: string): Ap
 
 // ---- Mappers ----
 
+const isAhead = (d: string): boolean => (daysUntil(d) ?? -1) >= 0
+
 function mapJadvalApiCase(raw: any): CourtCase {
   return {
     caseNumber: raw.casenumber || raw.caseNumber || '-',
@@ -567,9 +576,7 @@ function mapJadvalApiCase(raw: any): CourtCase {
     plaintiff: raw.claiment || raw.claimant || raw.plaintiff || '-',
     defendant: raw.defendant || '-',
     claimAmount: raw.claim_amount || raw.amount || '-',
-    hearingDate: raw.hearing_date || '',
-    hearingTime: raw.hearing_time || '',
-    judge: raw.responsible || '',
+    ...hearingFields(raw),
   }
 }
 
@@ -584,9 +591,27 @@ function mapJadvalCase(raw: any): CourtCase {
     plaintiff: raw.claimant || raw.claiment || raw.plaintiff || '-',
     defendant: raw.defendant || '-',
     claimAmount: raw.claim_amount || raw.amount || '-',
-    hearingDate: raw.hearing_date || '',
-    hearingTime: raw.hearing_time || '',
-    judge: raw.responsible || '',
+    ...hearingFields(raw),
+  }
+}
+
+/**
+ * The hearing a list row shows: the next one wherever it sits, including the
+ * nested `reviews[]` (appeal, cassation). A case in appeal keeps its old first-instance
+ * date at the top level, so reading only that hid an appeal hearing set for today
+ * (`core/hearing-pick`). The appeal court differs from the first one, so a review
+ * hearing also brings its own court and judge.
+ */
+function hearingFields(raw: any): Pick<CourtCase, 'hearingDate' | 'hearingTime' | 'judge' | 'hearingStage'> & { courtName?: string } {
+  const h = pickHearing(raw)
+  if (!h) return { hearingDate: '', hearingTime: '', judge: raw.responsible || '' }
+  const review = h.stage !== 'first'
+  return {
+    hearingDate: h.date,
+    hearingTime: h.time,
+    judge: (review ? h.judge : '') || raw.responsible || '',
+    hearingStage: h.stage,
+    ...(review && h.court ? { courtName: h.court } : {}),
   }
 }
 

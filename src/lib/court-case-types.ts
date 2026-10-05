@@ -23,6 +23,8 @@ export interface CourtCase {
   hearingDate: string
   hearingTime: string
   judge: string
+  /** which instance the shown hearing belongs to (absent on older cached rows) */
+  hearingStage?: 'first' | 'appeal' | 'cassation'
 }
 
 export interface CaseDetail {

@@ -46,8 +46,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
-| `dates.ts` | components/sections/cases.tsx, lib/report/doc.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/dates.test.ts |
+| `dates.ts` | components/sections/cases.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, lib/report/model.ts, lib/report/render.ts, sources/index.ts | core/__tests__/dates.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
+| `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, lib/orders-watchlist.ts, +4 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
@@ -70,7 +71,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `index.ts` | api/company-info/route, api/court-cases/route, api/stats/route, api/upcoming-hearings/route, lib/api-types.ts |  |
+| `index.ts` | api/company-info/route, api/court-cases/route, api/stats/route, api/upcoming-hearings/route, lib/api-types.ts | lib/__tests__/upcoming-appeal.test.ts |
 | `types.ts` | sources/index.ts |  |
 
 ### Libraries (`src/lib`)
@@ -85,7 +86,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/health-store.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
-| `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts |  |
+| `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/upcoming-appeal.test.ts |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route |  |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts |  |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
