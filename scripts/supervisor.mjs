@@ -121,13 +121,22 @@ async function cycle(doInstall = true) {
     if (mode === 'start') await runStep('bun run build', bunCmd, ['run', 'build'])
   }
 
-  const args = mode === 'dev' ? ['x', 'next', 'dev', '-p', PORT, '-H', HOST] : ['.next/standalone/server.js']
+  // Next's dev server is built for Node. Under Bun's runtime its hot-reload WebSocket fails («Error handling upgrade request
+  // … upgrade requires a Request object», repeated by every open tab after an update restart). This supervisor already runs
+  // on Node, so start Next with THAT Node; fall back to `bun x next` only if the Next binary is not on disk yet.
+  const nextBin = join(process.cwd(), 'node_modules', 'next', 'dist', 'bin', 'next')
+  let cmd = bunCmd
+  let args = mode === 'dev' ? ['x', 'next', 'dev', '-p', PORT, '-H', HOST] : ['.next/standalone/server.js']
+  if (mode === 'dev' && existsSync(nextBin)) {
+    cmd = process.execPath
+    args = [nextBin, 'dev', '-p', PORT, '-H', HOST]
+  }
   const env = { ...process.env, SUD_SUPERVISED: '1', HOSTNAME: HOST, ...(mode === 'start' ? { NODE_ENV: 'production' } : {}) }
-  console.log(`[supervisor] starting: ${bunCmd} ${args.join(' ')}`)
+  console.log(`[supervisor] starting: ${cmd === process.execPath ? 'node' : cmd} ${args.map((a) => (a === nextBin ? 'next' : a)).join(' ')}`)
   sinceLastStart = Date.now()
   // detached on Unix → the child leads its own process group so killTree can
   // signal the whole tree; harmless on Windows (taskkill /T handles the tree).
-  const child = spawn(bunCmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env, detached: !isWin })
+  const child = spawn(cmd, args, { stdio: ['inherit', 'pipe', 'pipe'], env, detached: !isWin })
   pipe(child)
   // Watch the child's output for a port-in-use failure so we can react to it
   // instead of blindly respawning into the same wall.

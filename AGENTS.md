@@ -129,7 +129,10 @@ Both document APIs need their templates traced into the standalone build (`outpu
   `@page { background }` set or the margin band stays white in dark mode; `@bottom-right` page counters are
   Chrome/Edge 131+ only. In e2e tests block `window.close` in the popup (it closes itself after printing).
 - **`bun run dev` runs under a supervisor** (`scripts/supervisor.mjs`) that restarts on
-  crash; `dev:once` / `start:once` run the raw server if you need clean logs.
+  crash; `dev:once` / `start:once` run the raw server if you need clean logs. The supervisor starts
+  `next dev` with the **same Node that runs it** (`process.execPath`), not `bun x next`: under Bun's
+  runtime on Windows Next's HMR WebSocket fails with «Error handling upgrade request … upgrade requires
+  a Request object» (spammed by every open tab after an update restart). `bun` still does install/build.
 
 ---
 
