@@ -31,6 +31,8 @@ export const GET = guard(async (req) => {
   if (detail) {
     const ct = CourtTypeQuery.safeParse(courtTypeRaw)
     if (!ct.success) return jsonFail("courtType notoʻgʻri", 'bad_request', 400)
+    // the number becomes part of an upstream URL path: only the case-number shape gets there
+    if (!CASE_NUMBER_RE.test(detail)) return jsonFail('Ish raqami formati: X-XXXX-XXXX/XXXXX', 'bad_request', 400)
     try {
       const data = await coalesce(`case-detail:${ct.data}:${detail}`, () =>
         caseDetailSource.run({ courtType: ct.data, caseNumber: detail }),

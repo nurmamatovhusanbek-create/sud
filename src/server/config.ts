@@ -83,6 +83,12 @@ export const config = {
   security: {
     /** Extra hostnames the app may be reached by (LAN / reverse proxy). Loopback is always allowed. */
     allowedHosts: list('APP_ALLOWED_HOSTS'),
+    /**
+     * Believe `X-Forwarded-For` / `X-Real-IP` for the rate-limit key. Off: the app is reached directly on loopback and
+     * those headers are whatever the caller typed (a rotating value would give every request a fresh budget). Turn it on
+     * only behind a reverse proxy that overwrites them.
+     */
+    trustProxy: bool('APP_TRUST_PROXY', false),
   },
 
   /** Per-IP rate limit for expensive scrape endpoints (blueprint §5.4). */

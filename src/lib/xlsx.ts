@@ -130,14 +130,24 @@ ${strings.map((str) => `<si><t xml:space="preserve">${esc(str)}</t></si>`).join(
 }
 
 /** Standard download response for a built workbook (matches the old headers). */
+/**
+ * A download name from request data (a STIR in the body) must not carry a quote or a line break into the header:
+ * ASCII letters, digits, `.` `_` `-` only; everything else becomes `_`.
+ */
+export function safeDownloadName(name: string): string {
+  const clean = name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^\.+/, '').slice(0, 100)
+  return clean || 'export.xlsx'
+}
+
 export function xlsxResponse(buf: Buffer, filename: string) {
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${safeDownloadName(filename)}"`,
       'Content-Length': String(buf.byteLength),
-      'Access-Control-Allow-Origin': '*',
+      // no Access-Control-Allow-Origin: this is private scraped data, readable by this origin only
+      'Cache-Control': 'no-store',
     },
   })
 }

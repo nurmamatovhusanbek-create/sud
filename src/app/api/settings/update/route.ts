@@ -48,6 +48,12 @@ export const runtime = 'nodejs'
 
 const execFileAsync = promisify(execFile)
 
+// git must never wait for a credential prompt (the request would hang until the timeout), and the pull must never open an editor
+const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_EDITOR: 'true' }
+
+// one update at a time: two clicks (or a forged double fire) must not run two stash/pull/pop sequences on one working tree
+const g = globalThis as unknown as { __sudUpdating?: boolean }
+
 /**
  * Ask the supervisor to restart the server by dropping the sentinel file it
  * polls for. The supervisor kills the whole server process tree and respawns
@@ -65,6 +71,18 @@ function requestRestart(newSha: string) {
 }
 
 async function POST_impl() {
+  if (g.__sudUpdating) {
+    return NextResponse.json({ ok: false, error: 'busy', detail: 'Yangilash allaqachon davom etmoqda' }, { status: 409 })
+  }
+  g.__sudUpdating = true
+  try {
+    return await runUpdate()
+  } finally {
+    g.__sudUpdating = false
+  }
+}
+
+async function runUpdate() {
   // Exiting only works if something is actually watching this process to
   // bring a new one back up — without it this would just kill the app.
   if (!process.env.SUD_SUPERVISED) {
@@ -102,7 +120,7 @@ async function POST_impl() {
   let stashed = false
   if (clean === false) {
     try {
-      await execFileAsync('git', ['stash', 'push', '-m', 'auto-stash before update'], { timeout: 10000 })
+      await execFileAsync('git', ['stash', 'push', '-m', 'auto-stash before update'], { timeout: 10000, env: GIT_ENV })
       stashed = true
       console.log('[update] Auto-stashed local changes before git pull')
     } catch {
@@ -111,23 +129,29 @@ async function POST_impl() {
     }
   }
 
-  // Run git pull
+  /** Give the operator's local changes back. Runs on EVERY path: a failed pull used to leave them hidden in the stash. */
+  const restoreStash = async (): Promise<boolean> => {
+    if (!stashed) return true
+    try {
+      await execFileAsync('git', ['stash', 'pop'], { timeout: 10000, env: GIT_ENV })
+      console.log('[update] Auto-popped stash')
+      return true
+    } catch {
+      console.log('[update] Stash pop failed — changes remain in the stash (git stash list)')
+      return false
+    }
+  }
+
+  // Run git pull — FAST-FORWARD ONLY: a pull that would need a merge (local commits on main, a rewritten remote) must stop
+  // here, not leave conflict markers in files the server is about to rebuild from.
   try {
-    const { stdout, stderr } = await execFileAsync('git', ['pull', 'origin', 'main'], {
+    const { stdout, stderr } = await execFileAsync('git', ['pull', '--ff-only', 'origin', 'main'], {
       timeout: 60000,
       maxBuffer: 1024 * 1024,
+      env: GIT_ENV,
     })
 
-    // v165: Pop stash if we stashed earlier
-    if (stashed) {
-      try {
-        await execFileAsync('git', ['stash', 'pop'], { timeout: 10000 })
-        console.log('[update] Auto-popped stash after git pull')
-      } catch {
-        console.log('[update] Stash pop failed — changes remain in stash')
-      }
-    }
-
+    const restored = await restoreStash()
     const newSha = getLocalGitSha()
     const output = (stdout + (stderr ? '\n' + stderr : '')).trim()
     const changed = !!newSha && newSha !== currentSha
@@ -142,8 +166,10 @@ async function POST_impl() {
       newSha,
       oldSha: currentSha,
       stashed,
+      ...(stashed && !restored ? { stashRestored: false } : {}),
     })
   } catch (e: any) {
+    await restoreStash()
     return NextResponse.json(
       {
         ok: false,
@@ -151,6 +177,7 @@ async function POST_impl() {
         detail: e.message || 'git pull failed',
         stderr: e.stderr || '',
         stdout: e.stdout || '',
+        stashed,
       },
       { status: 500 },
     )

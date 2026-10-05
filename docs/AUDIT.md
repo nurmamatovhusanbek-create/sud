@@ -2,6 +2,26 @@
 
 Newest first. Each finding: **status** · what · where. «Deferred» items are real but were left on purpose (reason given).
 
+## 2026-10-05 — security pass after background jobs, snapshots and the hard refresh
+
+### Fixed
+- **Cross-site GET started real work** · the CSRF check skipped every GET, but `/api/bills`, `/api/stats`, `/api/court-cases`… scrape on GET (bills spends a captcha). A page in another tab (or another localhost port) could fire them with `<img>` / `fetch(no-cors)`. Now every method must be same-origin / `none`; verified in a real browser (8 forged requests from `localhost:4000` and `127.0.0.1:4000` refused, none scraped, normal use refused 0). `security.ts` `crossSiteReason`.
+- **Rate limit key was caller-controlled** · `X-Forwarded-For` was believed on a loopback app, so a rotating header gave every request a fresh budget (and grew the bucket map). Ignored unless `APP_TRUST_PROXY=1`; spent buckets are swept.
+- **Token compared with `===`** · now constant-time (`safeEqual`).
+- **No trace of refused / privileged calls** · new event log + Settings › Xavfsizlik + `[security]` log lines.
+- **Update route**: a failed pull after the auto-stash left the operator's local changes hidden in the stash (pop only ran on success); a diverged `main` was merged by plain `git pull`; two clicks ran two stash/pull/pop sequences; git could wait on a credential prompt. Now `--ff-only`, single-flight, `GIT_TERMINAL_PROMPT=0`, stash restored on every path. Tested against real throw-away repos.
+- **Worker SSRF by DNS** · a worker URL was only checked by NAME; `127.0.0.1.nip.io` or an A record to `10.x` / cloud metadata passed. Now the resolved addresses must all be public (add and test); the test fetch no longer follows redirects.
+- **`court-cases?detail=` unvalidated** · spliced into upstream URL paths and a curl argument (curl also expands `{}` / `[1-9999]` in URLs: a request multiplier). Shape-checked in the route and the lib; curl runs with `--globoff`.
+- **Spreadsheet exports** · sent `Access-Control-Allow-Origin: *` on private data and put request values into the download filename unsanitized. CORS header removed, names restricted to `[A-Za-z0-9._-]`.
+- **Dependencies** · `bun.lock` was stale (listed ~50 removed packages: 94 advisories). Regenerated; `postcss` / `nanoid` / `baseline-browser-mapping` overridden to patched versions; `bun audit --prod` = 0. Verified in a clean copy with a frozen-lockfile install (typecheck, lint, 445 tests). Extra `Permissions-Policy` locks and `Origin-Agent-Cluster`.
+
+### Checked and fine
+No TLS verification bypass anywhere · no `innerHTML` / `dangerouslySetInnerHTML` / `eval` (print windows escape scraped text) · `child_process` only `spawn`/`execFile` without a shell, constant git arguments · spreadsheet cells are typed strings (no formula injection) · snapshot file names are 9-digit STIR only · no secrets in the last 50 commits (pattern scan) · every route is `guard()`-wrapped (test).
+
+### Deferred
+- Remaining `bun audit` entries are eslint/babel build tooling (ReDoS on trusted files).
+- Showing the incoming commits before «Yangilash» applies them (the update still trusts whatever is on `origin/main`, by design); `workers.json` tracked in git (removing it from the index would delete the operator's copy on their next pull).
+
 ## 2026-09-30 — full audit (security, reliability, dependencies, UI/a11y)
 
 ### Fixed

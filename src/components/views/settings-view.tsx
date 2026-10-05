@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Server,
   Shield,
+  ShieldCheck,
   Trash2,
   X,
   Zap,
@@ -32,6 +33,7 @@ import { APP_VERSION } from '@/lib/version'
 import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { OrdersTab } from '@/components/views/orders-settings'
+import { SecurityTab } from '@/components/views/security-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -114,6 +116,7 @@ const REASON_LABELS: Record<string, string> = {
   wrong_shape: "Notoʻgʻri format",
   network_error: 'Tarmoq xatosi',
   not_https: 'HTTPS emas',
+  private_host: 'Manzil ichki tarmoqqa ishora qiladi',
 }
 
 // ---- Updates tab ------------------------------------------------------------------
@@ -122,7 +125,8 @@ const UPDATE_ERROR_LABELS: Record<string, string> = {
   dirty_tree: "Ish daraxtida oʻzgarishlar bor va ularni vaqtincha yashirib boʻlmadi",
   wrong_branch: "Server 'main' branchida emas — avtomatik yangilash faqat 'main'da ishlaydi",
   git_unavailable: 'Git topilmadi — bu muhitda mavjud emas',
-  pull_failed: "git pull amalga oshmadi",
+  pull_failed: "git pull amalga oshmadi (faqat oldinga siljitish mumkin: mahalliy commitlar boʻlsa toʻxtaydi)",
+  busy: 'Yangilash allaqachon davom etmoqda',
   not_supervised: "Server nazoratchisiz ishga tushirilgan — avtomatik qayta ishga tushirib boʻlmaydi",
 }
 
@@ -451,6 +455,8 @@ function WorkersTab() {
           invalid_url: "URL notoʻgʻri. HTTPS boʻlishi kerak",
           duplicate: 'Bu worker allaqachon mavjud',
           missing_url: 'URL kiriting',
+          private_host: 'Bu nom ichki tarmoq manziliga ishora qiladi — qoʻshilmaydi',
+          unresolved_host: 'Bu nom topilmadi (DNS) — URLni tekshiring',
         }
         toast.error(msgs[result.error] || 'Xato yuz berdi')
       }
@@ -813,7 +819,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health' | 'orders'
+type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -847,12 +853,17 @@ export function SettingsView() {
           <Library />
           Qarorlar
         </button>
+        <button className={`set-tab ${tab === 'security' ? 'on' : ''}`} onClick={() => setTab('security')}>
+          <ShieldCheck />
+          Xavfsizlik
+        </button>
       </div>
 
       {tab === 'updates' && <UpdatesTab />}
       {tab === 'workers' && <WorkersTab />}
       {tab === 'health' && <HealthTab />}
       {tab === 'orders' && <OrdersTab />}
+      {tab === 'security' && <SecurityTab />}
     </div>
   )
 }

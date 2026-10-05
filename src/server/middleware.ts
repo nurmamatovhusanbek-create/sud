@@ -14,7 +14,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { config } from '@/server/config'
-import { bodyTooLarge, crossSiteReason, hostAllowed, privilegedHeaderOk } from '@/server/security'
+import { bodyTooLarge, crossSiteReason, hostAllowed, hostnameOf, privilegedHeaderOk, safeEqual } from '@/server/security'
+import { recordSecurityEvent } from '@/server/audit'
 
 // ---------- auth ------------------------------------------------------------
 
@@ -23,7 +24,8 @@ export function authorized(req: Request): boolean {
   if (!token) return true // dev/open mode
   const header = req.headers.get('authorization') || ''
   const alt = req.headers.get('x-app-token') || ''
-  return header === `Bearer ${token}` || alt === token
+  // constant-time: `===` would tell a timing attacker how much of a guess was right
+  return safeEqual(header, `Bearer ${token}`) || safeEqual(alt, token)
 }
 
 export function unauthorizedResponse(): NextResponse {
@@ -42,10 +44,21 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>()
 
+/**
+ * The rate-limit key. `X-Forwarded-For` is a header the CALLER writes: believed only behind a proxy that overwrites it
+ * (APP_TRUST_PROXY), otherwise one budget for the whole machine, which is what a single-operator loopback app wants.
+ */
 function clientIp(req: Request): string {
+  if (!config.security.trustProxy) return 'local'
   const fwd = req.headers.get('x-forwarded-for')
-  if (fwd) return fwd.split(',')[0].trim()
-  return req.headers.get('x-real-ip') || 'local'
+  if (fwd) return fwd.split(',')[0].trim().slice(0, 64)
+  return req.headers.get('x-real-ip')?.slice(0, 64) || 'local'
+}
+
+/** Drop spent windows once the map grows (a trusted-proxy deployment sees many keys). */
+function sweep(map: Map<string, Bucket>, now: number): void {
+  if (map.size < 256) return
+  for (const [k, b] of map) if (now > b.resetAt) map.delete(k)
 }
 
 export function rateLimited(req: Request): boolean {
@@ -53,11 +66,18 @@ export function rateLimited(req: Request): boolean {
   const now = Date.now()
   const b = buckets.get(key)
   if (!b || now > b.resetAt) {
+    sweep(buckets, now)
     buckets.set(key, { count: 1, resetAt: now + config.rateLimit.windowMs })
     return false
   }
   b.count++
   return b.count > config.rateLimit.max
+}
+
+/** Tests only: forget every spent budget (bun runs all test files in one process; a test that exhausts the budget must not starve the next file). */
+export function __resetRateLimitsForTests(): void {
+  buckets.clear()
+  privBuckets.clear()
 }
 
 export function rateLimitResponse(): NextResponse {
@@ -116,6 +136,7 @@ function privilegedLimited(req: Request): boolean {
   const now = Date.now()
   const b = privBuckets.get(key)
   if (!b || now > b.resetAt) {
+    sweep(privBuckets, now)
     privBuckets.set(key, { count: 1, resetAt: now + config.rateLimit.windowMs })
     return false
   }
@@ -128,18 +149,24 @@ export function guard(handler: ApiHandler, opts: GuardOptions = {}): ApiHandler 
   const useAuth = opts.auth !== false
   const useRl = opts.rateLimit !== false
   return async (req: NextRequest) => {
+    const refuse = (kind: Parameters<typeof recordSecurityEvent>[0], detail: string | undefined, res: NextResponse) => {
+      recordSecurityEvent(kind, req.method, req.url, detail)
+      return res
+    }
     if (!hostAllowed(req.headers.get('host'), config.security.allowedHosts)) {
-      return forbidden("Notoʻgʻri Host sarlavhasi — ilova faqat localhost orqali ochiladi (APP_ALLOWED_HOSTS bilan kengaytiriladi)", 'bad_host')
+      return refuse('bad_host', hostnameOf(req.headers.get('host')) || 'no Host', forbidden("Notoʻgʻri Host sarlavhasi — ilova faqat localhost orqali ochiladi (APP_ALLOWED_HOSTS bilan kengaytiriladi)", 'bad_host'))
     }
     const cross = crossSiteReason(req.method, req.headers)
-    if (cross) return forbidden("Boshqa saytdan kelgan oʻzgartiruvchi soʻrov rad etildi", 'cross_site')
-    if (bodyTooLarge(req.headers)) return NextResponse.json({ ok: false, error: 'Soʻrov hajmi juda katta', code: 'too_large' }, { status: 413 })
+    if (cross) return refuse('cross_site', cross, forbidden("Boshqa saytdan kelgan soʻrov rad etildi", 'cross_site'))
+    if (bodyTooLarge(req.headers)) return refuse('too_large', req.headers.get('content-length') ?? undefined, NextResponse.json({ ok: false, error: 'Soʻrov hajmi juda katta', code: 'too_large' }, { status: 413 }))
     if (opts.privileged && !privilegedHeaderOk(req.headers)) {
-      return forbidden("Bu amal uchun ilovaning oʻz sahifasidan yuborilgan tasdiq sarlavhasi kerak", 'privileged_header')
+      return refuse('privileged_header', undefined, forbidden("Bu amal uchun ilovaning oʻz sahifasidan yuborilgan tasdiq sarlavhasi kerak", 'privileged_header'))
     }
-    if (useAuth && !authorized(req)) return unauthorizedResponse()
-    if (opts.privileged && privilegedLimited(req)) return rateLimitResponse()
-    if (useRl && rateLimited(req)) return rateLimitResponse()
+    if (useAuth && !authorized(req)) return refuse('unauthorized', undefined, unauthorizedResponse())
+    if (opts.privileged && privilegedLimited(req)) return refuse('rate_limited', 'privileged', rateLimitResponse())
+    if (useRl && rateLimited(req)) return refuse('rate_limited', undefined, rateLimitResponse())
+    // a dangerous door was opened: leave a trace the operator can see (Settings › Xavfsizlik)
+    if (opts.privileged) recordSecurityEvent('privileged_call', req.method, req.url)
     try {
       return await handler(req)
     } catch (e) {

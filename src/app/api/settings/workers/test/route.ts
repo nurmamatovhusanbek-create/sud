@@ -15,6 +15,7 @@
 
 import { NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
+import { checkPublicHost } from '@/lib/net/public-host'
 import {
   normalizeWorkerUrl,
   updateWorkerTestResult,
@@ -37,6 +38,7 @@ type Reason =
   | 'html_response'
   | 'non_json'
   | 'wrong_shape'
+  | 'private_host'
 
 async function POST_impl(request: Request) {
   let body: { url?: string; timeoutMs?: number }
@@ -52,6 +54,10 @@ async function POST_impl(request: Request) {
   const norm = normalizeWorkerUrl((body.url || '').trim())
   if (!norm) return finish(body.url || '', { ok: false, reason: 'not_https' })
 
+  // «test worker» fetches from THIS machine: never to an address inside it (a name can point at 127.0.0.1 / 10.x)
+  const host = await checkPublicHost(new URL(norm).hostname)
+  if (!host.ok) return finish(norm, { ok: false, reason: host.reason === 'private' ? 'private_host' : 'network_error', detail: host.reason === 'private' ? `manzil ichki tarmoqqa ishora qiladi (${host.detail})` : host.detail })
+
   const timeoutMs = Math.min(Math.max(body.timeoutMs ?? 10000, 2000), 20000)
   const started = Date.now()
 
@@ -65,6 +71,7 @@ async function POST_impl(request: Request) {
         Referer: 'https://my.sud.uz/',
       },
       signal: AbortSignal.timeout(timeoutMs),
+      redirect: 'manual', // a worker that answers 3xx must not steer this machine to another address
     })
     const responseMs = Date.now() - started
 

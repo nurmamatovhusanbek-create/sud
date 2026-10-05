@@ -135,6 +135,8 @@ function curlFetch(url: string, altIp?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       '--silent', '--show-error',
+      // curl expands {a,b} and [1-9] in a URL into many requests: the URL here must be taken literally
+      '--globoff',
       // v207: real full-history searches on jadval.sud.uz measured at 6.6-21s;
       // 15s truncated some good responses (exit 28). 25s covers observed nodes.
       '--max-time', '25',
@@ -562,6 +564,9 @@ function getApiConfig(courtType: CourtType, mode: SearchMode, value: string): Ap
 
 // ---- Mappers ----
 
+/** `4-1001-2605/14720` and kin: digits and dashes, a slash, digits. */
+const CASE_NUMBER_RE = /^\d+-[\d-]+\/\d+$/
+
 const isAhead = (d: string): boolean => (daysUntil(d) ?? -1) >= 0
 
 function mapJadvalApiCase(raw: any): CourtCase {
@@ -623,6 +628,8 @@ export async function getCaseDetails(
   courtType: CourtType,
   caseNumber: string,
 ): Promise<FullCaseData> {
+  // defence in depth (the route checks too): the number is spliced into upstream URL paths
+  if (!CASE_NUMBER_RE.test(caseNumber)) throw new Error('Ish raqami formati: X-XXXX-XXXX/XXXXX')
   const encodedNumber = caseNumber.replace('/', '@')
   const courtTypeUpper = courtType.toUpperCase()
 

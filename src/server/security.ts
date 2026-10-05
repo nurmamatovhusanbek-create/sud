@@ -8,9 +8,11 @@
  * machines on the LAN if the server listens on every interface. These pure functions are the fix for (1) and (2);
  * (3) is the loopback bind in scripts/supervisor.mjs and package.json.
  *
- * Pure and dependency-free so it is unit-tested (src/server/__tests__/security.test.ts). Wired into `guard()` in
+ * Pure (apart from `safeEqual`'s node:crypto) so it is unit-tested (src/server/__tests__/security.test.ts). Wired into `guard()` in
  * middleware.ts — every /api route goes through it.
  */
+
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1']
 
@@ -32,18 +34,22 @@ export function hostAllowed(hostHeader: string | null | undefined, extra: string
   return LOOPBACK_HOSTS.includes(name) || extra.map((e) => e.trim().toLowerCase()).includes(name)
 }
 
-const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
-
 /**
- * CSRF guard for state-changing requests: a browser tells us where the request came from (`Sec-Fetch-Site`, `Origin`),
- * and it must be this same site. Requests with neither header (curl, scripts) are not browser-driven, so they cannot be
- * cross-site request forgeries; the token (when configured) is what protects those.
+ * CSRF / cross-site guard: a browser tells us where the request came from (`Sec-Fetch-Site`, `Origin`), and it must be
+ * this same origin. This covers EVERY method, GET included: several GET routes start real work (a stats or bills read
+ * scrapes the court / billing sites, a bills read spends a captcha), so a page open in another tab firing
+ * `<img src="http://localhost:3000/api/bills?inn=…">` would burn the operator's worker quota and IP reputation even
+ * though it can never read the answer. `same-site` (another port on localhost, a sibling subdomain) is NOT us.
+ * `none` is the operator typing the URL or following a bookmark. Requests with neither header (curl, scripts) are not
+ * browser-driven, so they cannot be cross-site forgeries; the token (when configured) is what protects those.
  * Returns the reason a request is refused, or null when it is fine.
  */
 export function crossSiteReason(method: string, headers: { get(name: string): string | null }): string | null {
-  if (SAFE_METHODS.includes(method.toUpperCase())) return null
+  const m = method.toUpperCase()
+  if (m === 'OPTIONS') return null // a preflight carries nothing; the app never answers one with a grant
   const site = headers.get('sec-fetch-site')
   if (site && site !== 'same-origin' && site !== 'none') return `Sec-Fetch-Site: ${site}`
+  // `Origin` is sent on every state-changing request, and on cross-origin CORS-mode reads (older browsers lack Sec-Fetch-*)
   const origin = headers.get('origin')
   if (origin) {
     let originHost = ''
@@ -77,4 +83,14 @@ export const MAX_BODY_BYTES = 8 * 1024 * 1024
 export function bodyTooLarge(headers: { get(name: string): string | null }, max = MAX_BODY_BYTES): boolean {
   const n = Number(headers.get('content-length'))
   return Number.isFinite(n) && n > max
+}
+
+/**
+ * Constant-time string comparison for secrets (the API token): `===` returns at the first differing byte, which leaks
+ * how much of a guess was right to anything that can time many requests. Hashing first makes the lengths equal.
+ */
+export function safeEqual(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest()
+  const hb = createHash('sha256').update(b).digest()
+  return timingSafeEqual(ha, hb)
 }

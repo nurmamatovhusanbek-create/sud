@@ -6,6 +6,7 @@
  */
 
 import type { StoredOrder } from '@/core/public-orders'
+import type { SecuritySnapshot } from '@/core/security-events'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
@@ -76,6 +77,14 @@ export async function dropCompanySnapshot(tin: string): Promise<void> {
   } catch {
     /* offline / server down: nothing to forget yet */
   }
+}
+
+export interface SecurityStatus extends SecuritySnapshot {
+  posture: { tokenRequired: boolean; extraHosts: number; trustProxy: boolean; supervised: boolean; production: boolean }
+}
+
+export function getSecurityStatus(signal?: AbortSignal) {
+  return request<SecurityStatus>('/api/settings/security', signal)
 }
 
 export function getCompanyInfo(tin: string, opts?: { force?: boolean; signal?: AbortSignal }) {

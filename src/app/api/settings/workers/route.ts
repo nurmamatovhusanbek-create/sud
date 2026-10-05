@@ -18,6 +18,7 @@ import {
 import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
 import { pruneAllPools } from '@/lib/health-registry'
 import { guard } from '@/server/middleware'
+import { checkPublicHost } from '@/lib/net/public-host'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -82,6 +83,15 @@ async function POST_impl(request: Request) {
   if (!normalized) {
     return NextResponse.json(
       { ok: false, error: 'invalid_url', detail: 'URL must be https:// and have no path' },
+      { status: 400 },
+    )
+  }
+
+  // the NAME looks public; where it points must be public too (a domain can resolve to 127.0.0.1 / 10.x / cloud metadata)
+  const host = await checkPublicHost(new URL(normalized).hostname)
+  if (!host.ok) {
+    return NextResponse.json(
+      { ok: false, error: host.reason === 'private' ? 'private_host' : 'unresolved_host', detail: host.detail },
       { status: 400 },
     )
   }
