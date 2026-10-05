@@ -16,6 +16,8 @@ import { openProtoDrawer, closeProtoDrawer, DwKv, DwFig, type DwRow } from '@/co
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
+import { reportAge } from '@/lib/data-age'
+import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { setCachedBills, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
 import { exportBillsXlsx, getBillDetail } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
@@ -235,12 +237,27 @@ export function BillsSection() {
   }, [stir])
 
   useEffect(() => {
-    const handler = () => {
+    // a section-level retry: scrape billing.sud.uz now, not the daily snapshot
+    const force = () => {
+      if (stir) stream.start(stir, { force: true })
+    }
+    // the header's hard refresh retired the snapshot (when the stats came back complete): read again
+    const refreshed = () => {
       if (stir) stream.start(stir)
     }
-    window.addEventListener('sud:force-section', handler)
-    return () => window.removeEventListener('sud:force-section', handler)
+    window.addEventListener('sud:force-section', force)
+    window.addEventListener(COMPANY_REFRESHED, refreshed)
+    return () => {
+      window.removeEventListener('sud:force-section', force)
+      window.removeEventListener(COMPANY_REFRESHED, refreshed)
+    }
   }, [stir])
+
+  // the header shows how old the dossier is
+  useEffect(() => {
+    if (!stir) return
+    reportAge(stir, 'bills', stream.status === 'done' && stream.fetchedAt ? stream.fetchedAt : undefined, stream.stale)
+  }, [stir, stream.status, stream.fetchedAt, stream.stale])
 
   const items = stream.items
   useEffect(() => {

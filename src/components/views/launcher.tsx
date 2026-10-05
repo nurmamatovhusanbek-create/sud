@@ -13,7 +13,7 @@ import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
 import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming, patchMeta } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
-import { getCompanyInfo, searchCompanies } from '@/lib/api-client'
+import { dropCompanySnapshot, getCompanyInfo, searchCompanies } from '@/lib/api-client'
 import { enrichCompany } from '@/lib/enrich'
 import { toast } from 'sonner'
 import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
@@ -227,6 +227,7 @@ export function Launcher() {
   // Delete removes a single searched (non-watched) company from the list.
   const deleteOne = (stir: string) => {
     removeRecord(stir)
+    void dropCompanySnapshot(stir)
     toast.success('Roʻyxatdan oʻchirildi')
   }
 
@@ -238,7 +239,10 @@ export function Launcher() {
       toast('Tozalash uchun qidirilgan kompaniya yoʻq')
       return
     }
-    searched.forEach((c) => removeRecord(c.stir))
+    searched.forEach((c) => {
+      removeRecord(c.stir)
+      void dropCompanySnapshot(c.stir)
+    })
     toast.success(`${searched.length} ta qidirilgan kompaniya tozalandi`)
   }
 

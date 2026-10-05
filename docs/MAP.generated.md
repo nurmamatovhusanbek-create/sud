@@ -29,6 +29,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/settings/workers/code` | GET | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
 | `/api/settings/workers` | GET, POST (privileged), DELETE (privileged) | GET/POST/DELETE /api/settings/workers | `settings/workers/route.ts` |
 | `/api/settings/workers/test` | POST (privileged) | POST /api/settings/workers/test Body: { url: string, timeoutMs?: number } | `settings/workers/test/route.ts` |
+| `/api/snapshot` | DELETE | DELETE /api/snapshot?tin=302678824 | `snapshot/route.ts` |
 | `/api/stats/export` | POST, GET | POST /api/stats/export | `stats/export/route.ts` |
 | `/api/stats` | GET | GET /api/stats?tin=302678824&force=1 | `stats/route.ts` |
 | `/api/tor-status` | GET, POST (privileged) | GET /api/tor-status | `tor-status/route.ts` |
@@ -53,7 +54,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, lib/orders-watchlist.ts, +4 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
-| `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
+| `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts |
@@ -63,9 +64,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `config.ts` | api/settings/health/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, server/middleware.ts, sources/index.ts, +1 |  |
-| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +4 |  |
-| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +18 |  |
+| `config.ts` | api/bills/route, api/settings/health/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, server/middleware.ts, +2 |  |
+| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +5 |  |
+| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +19 |  |
 | `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
@@ -81,21 +82,22 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +17 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
-| `billing.ts` | api/bills/route | lib/__tests__/billing-search.test.ts |
+| `billing.ts` | api/bills/route, lib/bills-snapshot.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
+| `bills-snapshot.ts` | api/bills/route | lib/__tests__/bills-snapshot.test.ts |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/health-store.test.ts |
+| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
-| `data-age.ts` | components/company/context-bar.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
+| `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route |  |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts |  |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
 | `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts | lib/documents/__tests__/from-case.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/views/launcher.tsx, lib/hard-refresh.ts |  |
-| `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
+| `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 | `health-registry.ts` | api/settings/health/route, api/settings/workers/route, lib/cf-worker-pool.ts |  |
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
@@ -119,7 +121,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `report/generate.ts` | components/company/context-bar.tsx |  |
 | `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts |
 | `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts |
-| `snapshot-store.ts` | api/company-info/route, api/court-cases/route, lib/stats-snapshot.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
+| `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 |  |

@@ -242,3 +242,13 @@ failed refresh: nothing is stored and the registry meta keeps its numbers). Stat
 `useResource({ persist:false })`: the server's snapshot is the only copy, so there is nothing in the browser to hide a refresh
 done elsewhere. Sections report `meta.fetchedAt` to `lib/data-age`; the header shows «Yangilandi 3 soat oldin» (the OLDEST part;
 the tooltip lists each; «· eskirgan» when the sites failed and a past-day snapshot is shown).
+
+### Bills in the snapshot
+
+`/api/bills?inn=` replays a fresh stored list as the SAME NDJSON stream (meta · bills · done; `meta.cached`, `meta.fetchedAt`,
+`done.fetchedAt`), so there is no captcha and no scrape inside the day; `&force=1` always scrapes. A live scrape is stored
+(`lib/bills-snapshot`, the final list after the retry round) only when no bill is left with a TRANSIENT error (a definitive
+HTTP 4xx/5xx for one receipt is a stable fact and does not block it). If the live scrape fails before anything was sent and an
+older snapshot exists, that is replayed with `stale:true`. A forced, complete stats scrape retires the bills snapshot, so the
+header's hard refresh makes the next Bills open (or the open one, immediately) scrape. Removing a company in the app calls
+`DELETE /api/snapshot?tin=` and its file goes. Tests: `lib/__tests__/bills-snapshot`, `snapshot-routes`.

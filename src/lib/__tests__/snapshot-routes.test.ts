@@ -13,7 +13,9 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'sud-snap-route-'))
 process.env.SNAPSHOT_DIR = DIR
 
 mock.module('server-only', () => ({}))
-const WORKERS = ['https://w1.example/', 'https://w2.example/']
+const WORKERS = ['https://snap-w1.example/', 'https://snap-w2.example/'] // own URLs (the scheduler keeps per-worker state for the whole test process)
+// bun's mock.module is process-wide: keep the real module to put back when this file is done
+const realPool = { ...(await import('@/lib/cf-worker-pool')) }
 mock.module('@/lib/cf-worker-pool', () => ({
   getCfWorkerUrls: () => WORKERS,
   createWorkerPool: () => ({ nextProxyUrl: (u: string) => u }),
@@ -48,7 +50,10 @@ beforeEach(() => {
 afterEach(() => {
   globalThis.fetch = realFetch
 })
-afterAll(() => fs.rmSync(DIR, { recursive: true, force: true }))
+afterAll(() => {
+  mock.module('@/lib/cf-worker-pool', () => realPool)
+  fs.rmSync(DIR, { recursive: true, force: true })
+})
 
 const { GET } = await import('@/app/api/court-cases/route')
 const { clearCourtCaseCache } = await import('../court-case')
@@ -98,5 +103,20 @@ describe('court list snapshot', () => {
     const b = await get()
     expect(b.meta?.cached).toBe(false)
     expect(b.data.cases).toHaveLength(1)
+  })
+})
+
+describe('DELETE /api/snapshot (the company was removed from the app)', () => {
+  test('forgets the whole file; a bad STIR is refused', async () => {
+    const { DELETE } = await import('@/app/api/snapshot/route')
+    const { writeSnapshot, readSnapshot } = await import('../snapshot-store')
+    writeSnapshot(TIN, 'stats', 's')
+    writeSnapshot(TIN, 'bills', 'b')
+    const del = (tin: string) => DELETE(new NextRequest(`http://localhost:3000/api/snapshot?tin=${tin}`, { method: 'DELETE', headers: { host: 'localhost:3000' } }))
+    expect((await del(TIN)).status).toBe(200)
+    expect(readSnapshot(TIN, 'stats')).toBeNull()
+    expect(readSnapshot(TIN, 'bills')).toBeNull()
+    expect(fs.existsSync(path.join(DIR, `${TIN}.json`))).toBe(false)
+    expect((await del('../../x')).status).toBe(400)
   })
 })

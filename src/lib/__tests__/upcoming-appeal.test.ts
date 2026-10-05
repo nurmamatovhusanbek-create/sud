@@ -9,7 +9,9 @@
 import { afterAll, describe, expect, mock, test } from 'bun:test'
 
 mock.module('server-only', () => ({}))
-const WORKERS = ['https://w1.example/', 'https://w2.example/']
+const WORKERS = ['https://appeal-w1.example/', 'https://appeal-w2.example/'] // own URLs (the scheduler keeps per-worker state for the whole test process)
+// bun's mock.module is process-wide: keep the real module to put back when this file is done
+const realPool = { ...(await import('@/lib/cf-worker-pool')) }
 mock.module('@/lib/cf-worker-pool', () => ({
   getCfWorkerUrls: () => WORKERS,
   createWorkerPool: () => ({ nextProxyUrl: (u: string) => u }),
@@ -44,6 +46,7 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   return new Response('[]', { status: 404 })
 }) as typeof fetch
 afterAll(() => {
+  mock.module('@/lib/cf-worker-pool', () => realPool)
   globalThis.fetch = realFetch
 })
 

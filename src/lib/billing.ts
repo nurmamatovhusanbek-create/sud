@@ -693,6 +693,10 @@ export async function getBillStatus(
  * An optional `onProgress` callback is invoked after each bill is enriched,
  * which lets the API route stream partial results to the client.
  */
+/** Errors the origin answers definitively for one invoice (retrying never helps); anything else is a hiccup worth another try. */
+const PERMANENT_ERROR_PATTERNS = ['PERMANENT:', 'HTTP 5', 'HTTP 4', 'invalid']
+export const isTransientBillError = (msg: string): boolean => !PERMANENT_ERROR_PATTERNS.some((p) => msg.includes(p))
+
 export async function getFullBillData(
   inn: string,
   onProgress?: (loaded: number, total: number, bill: EnrichedBill) => void,
@@ -746,7 +750,6 @@ export async function getFullBillData(
   // Bills that got HTTP 500/404 from the origin (not proxy errors) are permanent —
   // the origin returns a definitive error for that invoice, retrying won't help.
   // Only retry bills that failed due to timeouts or 521 (origin temporarily down).
-  const PERMANENT_ERROR_PATTERNS = ['PERMANENT:', 'HTTP 5', 'HTTP 4', 'invalid']
   for (let retryRound = 0; retryRound < 1; retryRound++) {
     const failedBills = bills.filter((b) => b.error)
     if (failedBills.length === 0) break

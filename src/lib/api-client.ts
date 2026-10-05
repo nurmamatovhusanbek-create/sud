@@ -69,6 +69,15 @@ export function getStats(tin: string, opts?: { force?: boolean; signal?: AbortSi
   return request<CompanyStats>(`/api/stats?tin=${tin}${opts?.force ? '&force=1' : ''}`, opts?.signal)
 }
 
+/** The operator removed the company: forget its daily snapshot too. Best-effort (a failure just leaves a file the janitor sweeps). */
+export async function dropCompanySnapshot(tin: string): Promise<void> {
+  try {
+    await fetch(`/api/snapshot?tin=${tin}`, { method: 'DELETE', headers: authHeaders() })
+  } catch {
+    /* offline / server down: nothing to forget yet */
+  }
+}
+
 export function getCompanyInfo(tin: string, opts?: { force?: boolean; signal?: AbortSignal }) {
   return request<CompanyInfoData>(`/api/company-info?tin=${tin}${opts?.force ? '&force=1' : ''}`, opts?.signal)
 }
@@ -112,15 +121,16 @@ export function getWorkers(signal?: AbortSignal) {
 
 export interface StreamHandlers {
   onPhase?: (phase: string, detail?: string) => void
-  onMeta?: (total: number) => void
+  onMeta?: (total: number, info?: { cached?: boolean; fetchedAt?: number; stale?: boolean }) => void
   onBill?: (bill: EnrichedBill, index: number) => void
-  onDone?: () => void
+  onDone?: (info?: { fetchedAt?: number }) => void
   onError?: (error: string) => void
 }
 
-export async function streamBills(stir: string, handlers: StreamHandlers, signal?: AbortSignal): Promise<void> {
+/** `force`: the hard refresh: scrape billing.sud.uz now instead of replaying the daily snapshot. */
+export async function streamBills(stir: string, handlers: StreamHandlers, signal?: AbortSignal, force = false): Promise<void> {
   try {
-    const res = await fetch(`/api/bills?inn=${stir}`, { signal, headers: authHeaders() })
+    const res = await fetch(`/api/bills?inn=${stir}${force ? '&force=1' : ''}`, { signal, headers: authHeaders() })
     if (!res.ok || !res.body) {
       let msg = `Server xatosi (${res.status})`
       try {
@@ -148,10 +158,10 @@ export async function streamBills(stir: string, handlers: StreamHandlers, signal
           continue
         }
         switch (msg.type) {
-          case 'meta': handlers.onMeta?.(msg.total); break
+          case 'meta': handlers.onMeta?.(msg.total, { cached: msg.cached, fetchedAt: msg.fetchedAt, stale: msg.stale }); break
           case 'phase': handlers.onPhase?.(msg.phase, msg.detail); break
           case 'bill': handlers.onBill?.(msg.bill, msg.index); break
-          case 'done': handlers.onDone?.(); break
+          case 'done': handlers.onDone?.({ fetchedAt: msg.fetchedAt }); break
           case 'error': handlers.onError?.(msg.error); break
         }
       }

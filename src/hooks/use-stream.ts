@@ -21,7 +21,12 @@ export interface UseStreamResult {
   items: EnrichedBill[]
   total: number | null
   error: string | null
-  start: (stir: string) => void
+  /** when the sites answered for this list (ms): a replayed snapshot's own time, or the live scrape's end */
+  fetchedAt: number | null
+  /** past its day and the sites failed: an older list is shown */
+  stale: boolean
+  /** `force`: scrape now, ignore the daily snapshot */
+  start: (stir: string, opts?: { force?: boolean }) => void
   stop: () => void
 }
 
@@ -39,6 +44,8 @@ export function useStream(): UseStreamResult {
   const [items, setItems] = useState<EnrichedBill[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null)
+  const [stale, setStale] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const stop = useCallback(() => {
@@ -47,7 +54,7 @@ export function useStream(): UseStreamResult {
   }, [])
 
   const start = useCallback(
-    (stir: string) => {
+    (stir: string, opts?: { force?: boolean }) => {
       abortRef.current?.abort()
       const ac = new AbortController()
       abortRef.current = ac
@@ -57,6 +64,8 @@ export function useStream(): UseStreamResult {
       setItems([])
       setTotal(null)
       setError(null)
+      setFetchedAt(null)
+      setStale(false)
       void streamBills(
         stir,
         {
@@ -64,17 +73,23 @@ export function useStream(): UseStreamResult {
             setPhase(p)
             setPhaseDetail(d ?? null)
           },
-          onMeta: (t) => setTotal(t),
+          onMeta: (t, info) => {
+            setTotal(t)
+            if (info?.fetchedAt) setFetchedAt(info.fetchedAt)
+            setStale(!!info?.stale)
+          },
           onBill: (bill) => setItems((prev) => [...prev, bill]),
           onError: (msg) => {
             setError(msg)
             setStatus('error')
           },
-          onDone: () => {
+          onDone: (info) => {
+            if (info?.fetchedAt) setFetchedAt(info.fetchedAt)
             setStatus((s) => (s === 'error' ? s : 'done'))
           },
         },
         ac.signal,
+        opts?.force === true,
       ).then(() => {
         setStatus((s) => (s === 'streaming' ? 'done' : s))
       })
@@ -84,5 +99,5 @@ export function useStream(): UseStreamResult {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  return { status, phase, phaseDetail, items, total, error, start, stop }
+  return { status, phase, phaseDetail, items, total, error, fetchedAt, stale, start, stop }
 }

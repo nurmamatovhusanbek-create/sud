@@ -30,10 +30,10 @@ export interface UpcomingHearingsData {
 // ---- Bills stream message union (server contract, typed) --------------------
 
 export type BillStreamMessage =
-  | { type: 'meta'; inn: string; total: number }
+  | { type: 'meta'; inn: string; total: number; /** replayed from the daily snapshot */ cached?: boolean; /** when the sites answered (ms) */ fetchedAt?: number; /** past its day and the sites failed */ stale?: boolean }
   | { type: 'phase'; phase: string; detail?: string }
   | { type: 'bill'; index: number; bill: EnrichedBill }
-  | { type: 'done'; inn: string }
+  | { type: 'done'; inn: string; fetchedAt?: number }
   | { type: 'error'; error: string }
 
 // ---- Bill detail (single invoice) --------------------------------------------
