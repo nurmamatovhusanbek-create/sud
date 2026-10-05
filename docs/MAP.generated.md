@@ -23,7 +23,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
-| `/api/settings/health` | GET | GET /api/settings/health | `settings/health/route.ts` |
+| `/api/settings/health` | GET | GET /api/settings/health (history now saved on disk: lib/health-store) | `settings/health/route.ts` |
 | `/api/settings/update` | POST (privileged) | POST /api/settings/update | `settings/update/route.ts` |
 | `/api/settings/version` | GET | GET /api/settings/version | `settings/version/route.ts` |
 | `/api/settings/workers/code` | GET | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
@@ -82,7 +82,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing.ts` | api/bills/route | lib/__tests__/billing-search.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts |  |
+| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/health-store.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts |  |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts |  |
@@ -93,6 +93,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/views/launcher.tsx |  |
 | `health-registry.ts` | api/settings/health/route, api/settings/workers/route, lib/cf-worker-pool.ts |  |
+| `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
+| `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
 | `identity.ts` | app/page.tsx |  |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orders-watchlist.ts` | components/shell/orders-auto-check.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
@@ -239,6 +241,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `VLM_TOKEN` | server/config.ts |
 | `WORKER_DEAD_COOLDOWN_MS` | server/config.ts |
 | `WORKER_DEAD_THRESHOLD` | server/config.ts |
+| `WORKER_HEALTH_FILE` | lib/health-store.ts |
 
 ## Browser storage keys (localStorage / sessionStorage)
 
@@ -284,3 +287,6 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | Holder | Defined/used in |
 |---|---|
 | `__publicOrdersJob` | lib/public-orders/company-job.ts |
+| `__resetHealthStoreForTests` | lib/health-store.ts |
+| `__sudHealthPools` | lib/health-registry.ts |
+| `__sudHealthStore` | lib/health-store.ts |

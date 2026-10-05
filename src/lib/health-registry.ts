@@ -11,13 +11,16 @@
  */
 
 import type { OriginHealthPool } from './cf-worker-pool'
+import { pruneStore } from './health-store'
 
 interface RegisteredPool {
   label: string
   pool: OriginHealthPool
 }
 
-const _pools: RegisteredPool[] = []
+// on globalThis: a route bundle or an HMR rebuild must not get its own (empty) registry
+const g = globalThis as unknown as { __sudHealthPools?: RegisteredPool[] }
+const _pools: RegisteredPool[] = (g.__sudHealthPools ??= [])
 
 /**
  * Register a health pool. Idempotent on label — re-registering with the
@@ -47,4 +50,5 @@ export function pruneAllPools(validWorkerUrls: string[]): void {
   for (const { pool } of _pools) {
     pool.pruneWorkers(validWorkerUrls)
   }
+  pruneStore(validWorkerUrls) // the saved history of a removed worker goes with it
 }

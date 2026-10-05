@@ -13,6 +13,7 @@
 import { getWorkerUrls, getWorkerSource } from './workers-config'
 import { registerHealthPool } from './health-registry'
 import { DEFAULT_WORKERS } from './worker-defaults'
+import { recordRequest } from './health-store'
 
 // v204 (P-A): the 4 default workers now live in worker-defaults.ts — the
 // single home for hardcoded worker URLs — so cf-worker-pool, workers-config
@@ -160,8 +161,9 @@ export class OriginHealthPool {
   }
 
   /** v167: Push a request record to the history ring buffer. */
-  private pushHistory(s: WorkerHealthState, origin: string, ok: boolean, ms: number): void {
+  private pushHistory(s: WorkerHealthState, workerUrl: string, origin: string, ok: boolean, ms: number): void {
     s.history.push({ ts: Date.now(), ok, ms, origin })
+    recordRequest(origin, workerUrl, ok, ms) // saved to disk: the pool's own copy is only the live window
     // Trim to max size (ring buffer)
     if (s.history.length > OriginHealthPool.MAX_HISTORY) {
       s.history.shift()
@@ -204,7 +206,7 @@ export class OriginHealthPool {
     s.totalSuccesses++
     s.lastResponseTimeMs = responseMs
     s.lastUsedAt = Date.now()
-    this.pushHistory(s, originKey, true, responseMs) // v167
+    this.pushHistory(s, workerUrl, originKey, true, responseMs) // v167
   }
 
   /** Call on a transport-level failure (timeout, 5xx/521, parse error).
@@ -223,7 +225,7 @@ export class OriginHealthPool {
     s.totalFailures++
     s.lastResponseTimeMs = responseMs
     s.lastUsedAt = Date.now()
-    this.pushHistory(s, originKey, false, responseMs) // v167
+    this.pushHistory(s, workerUrl, originKey, false, responseMs) // v167
     if (s.failures >= OriginHealthPool.DEAD_THRESHOLD && s.deadUntil === 0) {
       s.deadUntil = Date.now() + OriginHealthPool.DEAD_COOLDOWN_MS
       console.log(`[${this.poolLabel}] ${s.label} marked DEAD for ${originKey} for ${OriginHealthPool.DEAD_COOLDOWN_MS / 1000}s (${s.failures} consecutive failures)`)

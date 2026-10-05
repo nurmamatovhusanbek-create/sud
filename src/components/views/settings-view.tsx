@@ -25,6 +25,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import { recordTotals, spanTotals } from '@/lib/health-span'
 import { Dial, HEALTH_ZONES, WORKER_ZONES, BarChart, Spark, SkRows, EmptyBlock } from '@/components/proto/primitives'
 import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
@@ -53,6 +54,8 @@ interface WorkerHealth {
   status: 'alive' | 'dead'
   origins: string[]
   history: RequestRecord[]
+  /** [start, width, ok, fail, summed ms] per hour / day, saved on the server across restarts */
+  buckets?: [number, number, number, number, number][]
 }
 
 interface HealthData {
@@ -607,33 +610,26 @@ function HealthTab() {
     return () => clearInterval(t)
   }, [auto, load])
 
-  // v208: derive everything from the span-filtered history (was: server
-  // summary only — the pills could not change anything by design).
+  // Every number follows the selected span. The server keeps per-hour (recent) and per-day (older) counts on disk, so
+  // 7 kun / 30 kun / Barcha reach back past the last restart and past the last few hundred requests; the raw
+  // `history` is only the recent window for the drawer and the activity bars.
   const workers = useMemo(() => {
     const ms = SPANS.find((s) => s.value === span)?.ms ?? null
     const now = Date.now()
     return (data?.workers ?? []).map((w) => {
+      const st = w.buckets ? spanTotals(w.buckets.map(([t, wd, ok, fail, sum]) => ({ t, w: wd, ok, fail, ms: sum })), now, ms) : recordTotals(w.history, now, ms)
       const h = ms == null ? w.history : w.history.filter((r) => now - r.ts <= ms)
-      const ok = h.filter((r) => r.ok).length
-      return { ...w, history: h, totalRequests: h.length, successRate: h.length ? ok / h.length : 0 }
+      return { ...w, history: h, totalRequests: st.requests, okCount: st.ok, msSum: st.ms, successRate: st.requests ? st.ok / st.requests : 0 }
     })
   }, [data, span])
 
   const summary = data?.summary
-  const rate = useMemo(() => {
-    const tot = workers.reduce((a, w) => a + w.totalRequests, 0)
-    if (!tot) return 0
-    return Math.round((workers.reduce((a, w) => a + w.history.filter((r) => r.ok).length, 0) / tot) * 100)
-  }, [workers])
+  const totalReqs = workers.reduce((a, w) => a + w.totalRequests, 0)
+  const rate = useMemo(() => (totalReqs ? Math.round((workers.reduce((a, w) => a + w.okCount, 0) / totalReqs) * 100) : 0), [workers, totalReqs])
   const spanLabel = SPANS.find((s) => s.value === span)?.label ?? ''
   const alive = summary?.activeWorkers ?? 0
   const total = summary?.totalWorkers ?? 0
-  const totalReqs = workers.reduce((a, w) => a + w.totalRequests, 0)
-  const avgMs = useMemo(() => {
-    const all = workers.flatMap((w) => w.history)
-    if (!all.length) return 0
-    return Math.round(all.reduce((a, r) => a + r.ms, 0) / all.length)
-  }, [workers])
+  const avgMs = useMemo(() => (totalReqs ? Math.round(workers.reduce((a, w) => a + w.msSum, 0) / totalReqs) : 0), [workers, totalReqs])
 
   // Request volume across workers (per-worker buckets → bar chart)
   const vol = useMemo(() => {

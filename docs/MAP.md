@@ -79,7 +79,8 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 | Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sb-cache-v168:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource |
 | Browser `sessionStorage` | tab session | `sud-orders-pill-hidden` (run id whose pill was hidden) | orders-loader |
 | Zustand `app-store` | page | active company, section, surface, `docPrefill` | components |
-| Server memory (`globalThis`) | process | `__publicOrdersJob` (queue), health pools (`health-registry`), metrics | company-job / cf-worker-pool |
+| Server memory (`globalThis`) | process | `__publicOrdersJob` (queue), health pools (`__sudHealthPools`, live cooldowns only), `__sudHealthStore` (request history, mirrored to disk), metrics | company-job / cf-worker-pool / health-store |
+| Worker health history (disk) | `~/.sud-tizimi/worker-health.json` (0600; `WORKER_HEALTH_FILE`) | hourly buckets 35 d → daily buckets forever + last 300 raw records per worker×origin; flushed every 15 s and on exit | `lib/health-store` (server) · `lib/health-span` (pure, also read by Settings) · `/api/settings/health` |
 | Server module caches | TTL | stats 60 s (`stats.ts`), court cases 10 min (`court-case.ts`), orginfo TIN 24 h (`orginfo.ts`), bill status 3 min, `middleware.coalesce` (in-flight only), rate-limit buckets | libs |
 | Disk (outside repo) | permanent, **never deleted by the app** | `~/.sud-tizimi/public-orders/{shards,checked.jsonl}` (`PUBLIC_ORDERS_DIR`) | `public-orders/store.ts` |
 | Disk (repo) | – | `workers.json` (worker URLs, via settings), `.sud-restart` sentinel, `dev.log` | workers-config / update route |
