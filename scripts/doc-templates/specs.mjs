@@ -3,6 +3,9 @@
 // verify-templates.mjs reads the same places to prove the round trip. No name, passport number, phone number or case
 // number is written down anywhere in the repository. (The two IIO documents are in iio-specs.mjs, same idea.)
 //
+// `file` is the original's id: the 8 hex characters its file name starts with (`srcFile` in xml-edit.mjs finds it in $SRC,
+// whatever follows: the originals' names carry people's names, so none is written down here).
+//
 // The ops run IN THIS ORDER (it is the order the old text-matched builder used, so the output is byte-identical).
 // See `applyOps` in xml-edit.mjs for the op fields. `keep: true` = a company constant (it is also a default in
 // src/lib/documents/registry.ts), so the leak check skips it.
@@ -41,7 +44,7 @@ export const SPECS = [
   // ---- visa ---------------------------------------------------------------------------------------------------
   {
     name: 'visa1_invitation',
-    file: '94f688b9-Invitation_Letter_Person_Person.docx',
+    file: '94f688b9',
     ops: [
       { key: 'company_en', sel: { find: 'We hereby confirm' }, sub: { from: 'confirm that ', to: ', registered at' }, keep: true },
       { key: 'company_address_en', sel: { find: 'We hereby confirm' }, sub: { from: 'registered at ', to: ', Republic of Uzbekistan' }, keep: true },
@@ -58,7 +61,7 @@ export const SPECS = [
   },
   {
     name: 'visa2_kafolat',
-    file: '9dc3fda2-Kafolat_xati_Person_Person.docx',
+    file: '9dc3fda2',
     ops: [
       ...outNoAndDate(0, 1),
       { key: 'citizenship_sentence', sel: { find: 'Ushbu xat bilan' }, sub: { from: 'etilayotgan ', to: ' fuqarolarini' } },
@@ -69,7 +72,7 @@ export const SPECS = [
   },
   {
     name: 'visa3_talabnoma',
-    file: '82047ae6-Viza_talabnomasi_Person_Person.docx',
+    file: '82047ae6',
     ops: [
       ...outNoAndDate(0, 2),
       { key: 'company', sel: { find: 'yordam berishingizni' }, sub: { to: ' O' }, keep: true },
@@ -92,7 +95,7 @@ export const SPECS = [
   // ---- court petitions ----------------------------------------------------------------------------------------
   {
     name: 'court_copy',
-    file: '211051e2-ish_hujjatlaridan_nusxa_olish_to_g_risida.docx',
+    file: '211051e2',
     ops: [
       ...COURT_HEAD,
       { key: 'company', sel: { tbl: 0, row: 3, cell: 1, p: 0 }, sub: { to: ' ishonchli vakili' }, keep: true },
@@ -103,7 +106,7 @@ export const SPECS = [
   },
   {
     name: 'court_postpone',
-    file: 'e0eb5ba2-sud_majlisini_keyinga_qoldirish_to_g_risida.docx',
+    file: 'e0eb5ba2',
     ops: [
       ...COURT_HEAD,
       // the reason paragraph BEFORE the company (it contains the company name)
@@ -118,7 +121,7 @@ export const SPECS = [
   },
   {
     name: 'court_deadline',
-    file: '1b4c14b2-Muddatni_tiklash_togrisida.docx',
+    file: '1b4c14b2',
     ops: [
       { key: 'court', sel: { tbl: 0, row: 0, cell: 0, p: 0 }, sub: { to: 'iga' }, keep: true },
       { key: 'applicant_person', sel: { tbl: 0, row: 2, cell: 1, p: 0 } },
@@ -128,7 +131,7 @@ export const SPECS = [
   },
   {
     name: 'court_cancel',
-    file: 'f296cd33-Sud_buyrugi_bekor.docx',
+    file: 'f296cd33',
     // the original doubles a word («sudi sudi»): a deliberate wording fix, no value involved
     textFix: [['tumanlararo sudi sudi tomonidan', 'tumanlararo sudi tomonidan']],
     ops: [

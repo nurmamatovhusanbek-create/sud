@@ -9,7 +9,7 @@
 // scrubbed (no first-page preview image, no author names). The two IIO templates: build-iio.mjs.
 import fs from 'node:fs'
 import path from 'node:path'
-import { JSZip, applyOps, scrubPackage, writeZip } from './xml-edit.mjs'
+import { JSZip, srcFile, applyOps, scrubPackage, writeZip } from './xml-edit.mjs'
 import { normalizeBanner } from './banner.mjs'
 import { SPECS } from './specs.mjs'
 
@@ -18,7 +18,7 @@ const OUT = process.argv[2] || '/tmp/out-templates'
 fs.mkdirSync(OUT, { recursive: true })
 
 for (const spec of SPECS) {
-  const zip = await JSZip.loadAsync(fs.readFileSync(path.join(SRC, spec.file)))
+  const zip = await JSZip.loadAsync(fs.readFileSync(srcFile(SRC, spec.file)))
   const xml = await zip.file('word/document.xml').async('string')
   zip.file('word/document.xml', applyOps(xml, spec.ops))
   await scrubPackage(zip) // no preview image of the original, no author names

@@ -10,7 +10,7 @@ byte-for-byte.
 ## Regenerating
 
 The **source** documents contain real personal data (names, passport numbers, phone numbers) and are
-**intentionally not committed**. Point `SRC` at the folder holding the originals:
+**intentionally not committed**. Point `SRC` at the folder holding the originals (the specs name each one by the 8-hex id its file name starts with, e.g. `94f688b9-…docx`; the names carry people's names, so they are not written down):
 
 ```bash
 # visa letters + court petitions: values are located by PLACE in specs.mjs (table cell / label / marker)

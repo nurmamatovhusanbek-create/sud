@@ -9,7 +9,7 @@
 //   keep  the value is a company constant, not personal data (the PII check skips it)
 
 // ---- IIO / Kafolat xati (guarantee letter to the district MvaPB) -----------------------------------------------
-export const IIO1_FILE = 'f3ace04c-IIO_FMB_MvaPB.docx'
+export const IIO1_FILE = 'f3ace04c'
 export const IIO1 = [
   { key: 'doc_date', sel: { tbl: 0, row: 1, cell: 0, p: 0 }, keep: true },
   { key: 'district_office', sel: { tbl: 0, row: 0, cell: 1, p: 1 }, sub: { to: ' BOSHLIG‘IGA' }, keep: true },
@@ -27,7 +27,7 @@ export const IIO1 = [
 ]
 
 // ---- IIO / Roʻyxatga olish talabnomasi (request for temporary registration) ------------------------------------
-export const IIO2_FILE = 'da5dc92a-Royxatga_olish_talabnomasi.docx'
+export const IIO2_FILE = 'da5dc92a'
 const MAIN = { tbl: 1 }
 export const IIO2 = [
   // header: «YANGIHAYOT IIO FMB / MvaPB BOSHLIG‘IGA» is two lines; the district goes on the first, «MvaPB» moves up with it

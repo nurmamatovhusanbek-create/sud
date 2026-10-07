@@ -5,7 +5,7 @@
 // the original itself says. The IIO templates: verify-iio.mjs.
 import fs from 'node:fs'
 import path from 'node:path'
-import { JSZip, valueOf } from './xml-edit.mjs'
+import { JSZip, srcFile, valueOf } from './xml-edit.mjs'
 import { SPECS } from './specs.mjs'
 import { checkTemplate } from './verify-lib.mjs'
 
@@ -14,7 +14,7 @@ const TPL = process.argv[2] || './out-templates'
 
 let failures = 0
 for (const spec of SPECS) {
-  const srcZip = await JSZip.loadAsync(fs.readFileSync(path.join(SRC, spec.file)))
+  const srcZip = await JSZip.loadAsync(fs.readFileSync(srcFile(SRC, spec.file)))
   const srcXml = await srcZip.file('word/document.xml').async('string')
   const values = {}
   const personal = []

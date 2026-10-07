@@ -4,7 +4,7 @@
 // scrubbed (no preview image, no author metadata). Verify with verify-iio.mjs, then copy into src/lib/documents/templates/.
 import fs from 'node:fs'
 import path from 'node:path'
-import { JSZip, applySpecs, scrubPackage, writeZip } from './xml-edit.mjs'
+import { JSZip, srcFile, applySpecs, scrubPackage, writeZip } from './xml-edit.mjs'
 import { normalizeBanner } from './banner.mjs'
 import { IIO1, IIO1_FILE, IIO2, IIO2_FILE } from './iio-specs.mjs'
 
@@ -12,8 +12,8 @@ const SRC = process.env.SRC || '/root/.claude/uploads/eefe577e-0365-5422-b318-9c
 const OUT = process.argv[2] || './out-templates'
 fs.mkdirSync(OUT, { recursive: true })
 
-async function build(name, srcFile, specs) {
-  const zip = await JSZip.loadAsync(fs.readFileSync(path.join(SRC, srcFile)))
+async function build(name, srcFileId, specs) {
+  const zip = await JSZip.loadAsync(fs.readFileSync(srcFile(SRC, srcFileId)))
   const xml = await zip.file('word/document.xml').async('string')
   zip.file('word/document.xml', applySpecs(xml, specs))
   await scrubPackage(zip)

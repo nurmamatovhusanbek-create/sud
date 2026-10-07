@@ -6,7 +6,17 @@
 //  - by its PLACE  (`setAt` / `readAt`): a table cell + paragraph, or a paragraph found by a phrase, and optionally the
 //    text between a label and a marker. This is how PERSONAL values are located: the builder never has to contain a
 //    name, a passport number or a phone number, so none of them ends up in the repository.
+import fs from 'node:fs'
+import path from 'node:path'
 import JSZip from 'jszip'
+
+/** The original whose file name starts with `id` (the 8 hex characters); an exact file name works too. */
+export function srcFile(dir, id) {
+  if (fs.existsSync(path.join(dir, id))) return path.join(dir, id)
+  const hit = fs.readdirSync(dir).filter((n) => n.startsWith(id))
+  if (hit.length !== 1) throw new Error(`expected exactly one original starting with «${id}» in ${dir}, found ${hit.length}`)
+  return path.join(dir, hit[0])
+}
 
 // nbsp → normal space so targets typed with normal spaces still match (only affects runs a replacement rewrites).
 export const unesc = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/ /g, ' ')

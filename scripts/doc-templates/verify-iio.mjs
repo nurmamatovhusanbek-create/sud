@@ -8,7 +8,7 @@
 // Nothing here knows a personal value: they all come out of the original at run time.
 import fs from 'node:fs'
 import path from 'node:path'
-import { JSZip, readAt } from './xml-edit.mjs'
+import { JSZip, srcFile, readAt } from './xml-edit.mjs'
 import { checkTemplate } from './verify-lib.mjs'
 import { IIO1, IIO1_FILE, IIO2, IIO2_FILE, IIO2_DISTRICT_EXTRA } from './iio-specs.mjs'
 
@@ -32,7 +32,7 @@ const cases = [
 
 let failures = 0
 for (const c of cases) {
-  const srcZip = await JSZip.loadAsync(fs.readFileSync(path.join(SRC, c.file)))
+  const srcZip = await JSZip.loadAsync(fs.readFileSync(srcFile(SRC, c.file)))
   const srcXml = await srcZip.file('word/document.xml').async('string')
   const values = {}
   const personal = []
