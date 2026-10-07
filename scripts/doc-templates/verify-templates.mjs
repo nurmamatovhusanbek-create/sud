@@ -28,18 +28,10 @@ const cases={
    visa_place:'Qohira shahridagi O’zbekiston elchixonasi', cities:'Toshkent', residence:'“Simma” mehmonxonasi',
    reg_justice:'№2013433, 17.10.2014', reg_consular:'20610', responsible:'Person N. +998 00 000 00 00',
    greeter:'Person H. +998 00 000 00 00', director:'Turgunov Sh.A.' } },
- iio1_kafolat:{ src:'523e05ce-IIO_FMB_MvaPB.docx', vals:{
-   doc_date:'2026 yil « ___ » ______', district_office:'YANGIHAYOT IIO FMB MvaPB', citizenship:'Xitoy',
-   full_name:'Mao Hunyu', dob:'12.10.1995', birthplace:'Jilin', passport:'ZZ 0000000', sex:'Erkak',
-   company:'“Artikul Aziya Kabel” MCHJ QK', position:'ishlash uchun', director:'Turgunov Sh.A.' } },
- iio2_royxat:{ src:'ded48e95-Royxatga_olish_talabnomasi.docx', vals:{
-   full_name:'Person Anas', children:'yo‘q', citizenship:'Hindiston', sex:'Erkak', birthplace:'Uttar Pradesh',
-   dob:'09.01.1999', company:'“Artikul Aziya Kabel” MCHJ QK', passport:'S8018606', visa_type:'B2', visa_no:'4933652',
-   visa_issuer:'“Alukabel Payrav” MCHJ XK', visa_from:'18.08.2026', visa_to:'18.08.2027', visa_days:'180',
-   responsible:'Test Person', director:'Turgunov Sh.A.' } },
 }
 
-const PII=['Test Person','Person Person','Mao Hunyu','Person Anas','ZZ 0000000','ZZ 0000000','S8018606','4933652','Person','Person','Person','Jilin','Uttar Pradesh']
+// (iio1_kafolat / iio2_royxat are checked by verify-iio.mjs, which reads the values out of the originals)
+const PII=['Test Person','Person Person','ZZ 0000000','Person','Person','Person']
 let fail=0
 for(const [name,c] of Object.entries(cases)){
   const origXml=await xmlOf(fs.readFileSync(path.join(SRC,c.src)))

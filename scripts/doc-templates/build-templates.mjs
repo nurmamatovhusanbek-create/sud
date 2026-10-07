@@ -2,141 +2,25 @@
 // Byte-precise string surgery on word/document.xml (no DOM reserialization),
 // so Word compatibility is preserved. Collapses run-fragmented values into a
 // single placeholder run; run-time filling is then trivial {{key}} replace.
+//
+// The helpers live in xml-edit.mjs (shared with build-iio.mjs). The two IIO templates (iio1_kafolat, iio2_royxat) are
+// built by build-iio.mjs, which finds values by PLACE instead of by value (so it holds no personal data).
 import fs from 'node:fs'
 import path from 'node:path'
-import JSZip from 'jszip'
+import { JSZip, paraReplace, cellSet, scrubPackage, writeZip } from './xml-edit.mjs'
 
-const SRC = '/root/.claude/uploads/eefe577e-0365-5422-b318-9c523988a4c3'
+const SRC = process.env.SRC || '/root/.claude/uploads/eefe577e-0365-5422-b318-9c523988a4c3'
 const OUT = process.argv[2] || '/tmp/out-templates'
 fs.mkdirSync(OUT, { recursive: true })
-
-// nbsp → normal space so targets typed with normal spaces still match (only
-// affects runs a replacement actually rewrites).
-const unesc = (s) => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/ /g,' ')
-const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-
-function tokenize(xml){
-  const re = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g
-  const runs = []
-  let m
-  while((m = re.exec(xml))){
-    const tagStart = m.index
-    const innerStart = m.index + m[0].indexOf('>') + 1
-    const innerEnd = m.index + m[0].length - '</w:t>'.length
-    runs.push({ tagStart, innerStart, innerEnd, inner: m[1] })
-  }
-  const texts = runs.map(r => unesc(r.inner))
-  return { runs, texts }
-}
-
-// editsMap: Map<runIndex, newUnescapedInner>
-function editRuns(xml, editsMap){
-  const { runs } = tokenize(xml)
-  const idx = [...editsMap.keys()].sort((a,b)=>b-a)
-  for(const i of idx){
-    const r = runs[i]
-    const repl = `<w:t xml:space="preserve">${esc(editsMap.get(i))}</w:t>`
-    xml = xml.slice(0, r.tagStart) + repl + xml.slice(r.innerEnd + '</w:t>'.length)
-  }
-  return xml
-}
-
-function locate(texts, target, occ){
-  // returns {r0,r1,localStart,localEnd} for occ-th occurrence in the concat, or null
-  const bounds = []
-  let acc = 0
-  for(const t of texts){ bounds.push(acc); acc += t.length }
-  const full = texts.join('')
-  let from = 0, found = -1, seen = 0
-  for(;;){
-    const p = full.indexOf(target, from)
-    if(p < 0) break
-    if(occ === 'all' || seen === occ){ found = p; if(occ !== 'all') break }
-    seen++; from = p + Math.max(1,target.length)
-    if(occ === 'all' && found>=0) break
-  }
-  if(occ === 'all'){
-    // handled by caller looping; here return first
-  }
-  if(found < 0) return null
-  const start = found, end = found + target.length
-  const runOf = (pos, isEnd) => {
-    for(let i=0;i<texts.length;i++){
-      const s = bounds[i], e = bounds[i] + texts[i].length
-      if(isEnd){ if(pos > s && pos <= e) return i } else { if(pos >= s && pos < e) return i }
-    }
-    return texts.length - 1
-  }
-  const r0 = runOf(start,false), r1 = runOf(end,true)
-  return { r0, r1, localStart: start - bounds[r0], localEnd: end - bounds[r1] }
-}
-
-function paraReplace(xml, target, ph, occ='all'){
-  if(occ === 'all'){
-    let guard = 0
-    for(;;){
-      const { texts } = tokenize(xml)
-      const loc = locate(texts, target, 0)
-      if(!loc) break
-      xml = applyLoc(xml, texts, loc, ph)
-      if(++guard > 200) throw new Error('loop guard '+target)
-    }
-    if(guard === 0) throw new Error('NOT FOUND (all): '+target)
-    return xml
-  } else {
-    const { texts } = tokenize(xml)
-    const loc = locate(texts, target, occ)
-    if(!loc) throw new Error(`NOT FOUND (occ ${occ}): ${target}`)
-    return applyLoc(xml, texts, loc, ph)
-  }
-}
-
-function applyLoc(xml, texts, loc, ph){
-  const { r0, r1, localStart, localEnd } = loc
-  const edits = new Map()
-  if(r0 === r1){
-    edits.set(r0, texts[r0].slice(0,localStart) + ph + texts[r0].slice(localEnd))
-  } else {
-    edits.set(r0, texts[r0].slice(0,localStart) + ph)
-    for(let i=r0+1;i<r1;i++) edits.set(i,'')
-    edits.set(r1, texts[r1].slice(localEnd))
-  }
-  return editRuns(xml, edits)
-}
-
-// find <w:tc ...>...</w:tc> spans (non-nested assumption) and set occ-th whose
-// stripped text === cellText to a single placeholder run.
-function cellSet(xml, cellText, ph, occ=0){
-  const re = /<w:tc\b[\s\S]*?<\/w:tc>/g
-  let m, seen = 0
-  while((m = re.exec(xml))){
-    const span = m[0]
-    const inners = [...span.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)].map(x=>unesc(x[1]))
-    const txt = inners.join('').trim()
-    if(txt === cellText){
-      if(seen === occ){
-        // edit runs within this tc: first -> ph, rest -> ''
-        const abs = m.index
-        const { runs } = tokenize(xml)
-        const within = runs.map((r,i)=>({r,i})).filter(o=>o.r.tagStart>=abs && o.r.tagStart<abs+span.length)
-        const edits = new Map()
-        within.forEach((o,k)=> edits.set(o.i, k===0 ? ph : ''))
-        return editRuns(xml, edits)
-      }
-      seen++
-    }
-  }
-  throw new Error(`CELL NOT FOUND occ ${occ}: ${cellText}`)
-}
 
 async function build(name, srcFile, fn){
   const zip = await JSZip.loadAsync(fs.readFileSync(path.join(SRC, srcFile)))
   let xml = await zip.file('word/document.xml').async('string')
   xml = fn(xml)
   zip.file('word/document.xml', xml)
-  const buf = await zip.generateAsync({ type:'nodebuffer', compression:'DEFLATE', compressionOptions:{ level:6 } })
-  fs.writeFileSync(path.join(OUT, name + '.docx'), buf)
-  console.log('OK', name, buf.length, 'bytes')
+  await scrubPackage(zip) // no preview image of the original, no author names
+  const bytes = await writeZip(zip, path.join(OUT, name + '.docx'), fs)
+  console.log('OK', name, bytes, 'bytes')
 }
 
 // ---- per-document replacement specs ----
@@ -201,39 +85,7 @@ await build('visa3_talabnoma','82047ae6-Viza_talabnomasi_Person_Person.docx', (x
   return xml
 })
 
-await build('iio1_kafolat','523e05ce-IIO_FMB_MvaPB.docx', (xml)=>{
-  xml = paraReplace(xml, '2026 yil « ___ » ______', '{{doc_date}}')
-  xml = paraReplace(xml, 'YANGIHAYOT IIO FMB MvaPB', '{{district_office}}')
-  xml = paraReplace(xml, 'Xitoy', '{{citizenship}}', 'all')
-  xml = paraReplace(xml, 'Mao Hunyu', '{{full_name}}')
-  xml = paraReplace(xml, '12.10.1995', '{{dob}}')
-  xml = paraReplace(xml, 'Jilin', '{{birthplace}}')
-  xml = paraReplace(xml, 'ZZ 0000000', '{{passport}}')
-  xml = cellSet(xml, 'Erkak', '{{sex}}', 0)
-  xml = paraReplace(xml, '“Artikul Aziya Kabel” MCHJ QK', '{{company}}', 'all')
-  xml = paraReplace(xml, 'ishlash uchun', '{{position}}')
-  xml = paraReplace(xml, 'Turgunov Sh.A.', '{{director}}')
-  return xml
-})
-
-await build('iio2_royxat','ded48e95-Royxatga_olish_talabnomasi.docx', (xml)=>{
-  xml = paraReplace(xml, 'Person Anas', '{{full_name}}')
-  xml = paraReplace(xml, 'Farzandlari: yo‘q', 'Farzandlari: {{children}}')
-  xml = paraReplace(xml, 'Hindiston', '{{citizenship}}')
-  xml = paraReplace(xml, 'Jinsi: Erkak', 'Jinsi: {{sex}}')
-  xml = paraReplace(xml, 'Uttar Pradesh', '{{birthplace}}')
-  xml = paraReplace(xml, '09.01.1999', '{{dob}}')
-  xml = paraReplace(xml, '“Artikul Aziya Kabel” MCHJ QK', '{{company}}', 'all')
-  xml = paraReplace(xml, 'S8018606', '{{passport}}')
-  xml = paraReplace(xml, 'B2, 4933652', '{{visa_type}}, {{visa_no}}')
-  xml = paraReplace(xml, '“Alukabel Payrav” MCHJ XK', '{{visa_issuer}}')
-  xml = paraReplace(xml, '18.08.2026', '{{visa_from}}')
-  xml = paraReplace(xml, '18.08.2027', '{{visa_to}}')
-  xml = paraReplace(xml, '180 kun', '{{visa_days}} kun')
-  xml = paraReplace(xml, 'Test Person', '{{responsible}}')
-  xml = paraReplace(xml, 'Turgunov Sh.A.', '{{director}}')
-  return xml
-})
+// iio1_kafolat and iio2_royxat: see build-iio.mjs (built from the 2026-10 originals, values located by place)
 
 // ---- court petitions (Sud arizalari) ----------------------------------------
 

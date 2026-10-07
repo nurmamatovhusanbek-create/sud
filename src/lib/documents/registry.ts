@@ -62,6 +62,9 @@ export interface TabDef {
   letterhead?: boolean
   /** field key that must be filled before a document can be generated. */
   requireKey?: string
+  /** Prefill for this category that differs from the field's global default: the same field can mean different things
+   *  in two categories («Lavozim» is a job title in a visa letter, «ishlash uchun» in the IIO guarantee letter). */
+  defaults?: Record<string, string>
 }
 
 // ---- field catalog ----------------------------------------------------------
@@ -107,12 +110,23 @@ export const FIELDS: Record<string, FieldDef> = {
 
   // ro'yxatga olish extras
   children: { key: 'children', label: 'Farzandlari', default: 'yo‘q' },
-  visa_type: { key: 'visa_type', label: 'Viza turi', placeholder: 'Masalan: B2' },
-  visa_no: { key: 'visa_no', label: 'Viza raqami', placeholder: 'Raqam', mono: true },
-  visa_issuer: { key: 'visa_issuer', label: 'Viza kim tomonidan berilgan', placeholder: 'Korxona / tashkilot' },
-  visa_from: { key: 'visa_from', label: 'Viza amal qiladi — dan', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
-  visa_to: { key: 'visa_to', label: 'Viza amal qiladi — gacha', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
+  // the real form writes «–» when the person has no visa, and gives who issued it and for how long on ONE line
+  visa_type: { key: 'visa_type', label: 'Viza turi', default: '–', placeholder: 'Masalan: B2', hint: 'Viza boʻlmasa «–» qoldiring' },
+  visa_no: { key: 'visa_no', label: 'Viza raqami', default: '–', placeholder: 'Raqam', mono: true },
+  visa_issuer: {
+    key: 'visa_issuer', label: 'Viza kim tomonidan va muddati', default: '–',
+    placeholder: '“Kompaniya” MCHJ, 18.08.2026dan 18.08.2027gacha', hint: 'Bitta satr: kim bergan va qaysi muddatga. Viza boʻlmasa «–»',
+  },
   visa_days: { key: 'visa_days', label: 'Muddat (kun)', default: '180', mono: true },
+  // the rest of the registration request: entry, where the person lives, who gave the housing, who handles the papers
+  entry_date: { key: 'entry_date', label: 'Oʻzbekistonga kirgan sana', kind: 'date', placeholder: 'kk.oo.yyyy', mono: true },
+  stay_address: { key: 'stay_address', label: 'Vaqtinchalik yashash manzili', placeholder: 'MFY, koʻcha, uy, xonadon' },
+  host_name: { key: 'host_name', label: 'Uy-joy bergan shaxs (F.I.Sh)', placeholder: 'Familiya Ism Otasining ismi' },
+  host_phone: { key: 'host_phone', label: 'Uy-joy bergan shaxsning telefoni', placeholder: '+998 00 000 00 00', mono: true },
+  resp_name: { key: 'resp_name', label: 'Masʼul shaxs (F.I.Sh)', placeholder: 'Hujjatlarni rasmiylashtiruvchi: Familiya Ism' },
+  resp_passport: { key: 'resp_passport', label: 'Masʼul shaxsning pasporti', placeholder: 'AA 0000000', mono: true },
+  resp_phone: { key: 'resp_phone', label: 'Masʼul shaxs: xizmat tel.', placeholder: '+998 00 000 00 00', mono: true },
+  resp_mobile: { key: 'resp_mobile', label: 'Masʼul shaxs: uyali tel.', placeholder: '+998 00 000 00 00', mono: true },
 
   // ---- court petitions (Sud arizalari) --------------------------------------
   court: { key: 'court', label: 'Sud nomi', placeholder: 'Toshkent tumanlararo iqtisodiy sud', hint: '«sud» bilan tugasin — «…ga», «…ning» avtomatik qoʻshiladi' },
@@ -166,7 +180,13 @@ export const DOCS: DocDef[] = [
     id: 'iio2_royxat', tab: 'iio', lang: 'uz', slug: 'royxatga-olish-talabnomasi',
     title: 'Roʻyxatga olish talabnomasi', subtitle: 'Vaqtincha roʻyxatga olish (MvaPB)',
     file: 'iio2_royxat.docx',
-    fields: ['company', 'director', 'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'children', 'visa_type', 'visa_no', 'visa_issuer', 'visa_from', 'visa_to', 'visa_days', 'responsible'],
+    fields: [
+      'company', 'director', 'out_no', 'doc_date', 'district_office',
+      'full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'children',
+      'visa_type', 'visa_no', 'visa_issuer', 'visa_days',
+      'entry_date', 'stay_address', 'host_name', 'host_phone',
+      'resp_name', 'resp_passport', 'resp_phone', 'resp_mobile',
+    ],
   },
   // ---- court petitions (Sud arizalari) — separate: one card + form per doc ----
   {
@@ -210,11 +230,13 @@ export const TABS: TabDef[] = [
     id: 'iio', label: 'Ichki ishlar',
     intro: 'Tuman IIO / MvaPB uchun kafolat xati va vaqtincha roʻyxatga olish talabnomasi.',
     groups: [
-      { title: 'Korxona', keys: ['company', 'director', 'doc_date', 'district_office'] },
+      { title: 'Korxona', keys: ['company', 'director', 'out_no', 'doc_date', 'district_office'] },
       { title: 'Chet ellik xodim', keys: ['full_name', 'sex', 'dob', 'birthplace', 'citizenship', 'passport', 'position'] },
     ],
     letterhead: true,
     requireKey: 'full_name',
+    // the guarantee letter's «Ish joyi, lavozimi» cell reads «<company> ishlash uchun»
+    defaults: { position: 'ishlash uchun' },
   },
   {
     id: 'court', label: 'Sud arizalari',
@@ -285,7 +307,7 @@ function defaultsFor(keys: string[]): Record<string, string> {
 export function categoryDefaults(tab: TabDef): Record<string, string> {
   const keys = new Set<string>(groupKeys(tab))
   docsByTab(tab.id).forEach((d) => d.fields.forEach((k) => keys.add(k)))
-  return defaultsFor([...keys])
+  return { ...defaultsFor([...keys]), ...tab.defaults }
 }
 
 /** Initial values for a single document's own form. */
