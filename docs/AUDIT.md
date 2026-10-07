@@ -6,7 +6,7 @@ Newest first. Each finding: **status** · what · where. «Deferred» items are 
 
 ### Fixed
 - **Preview images in templates** · Word stores a thumbnail of the first page (`docProps/thumbnail.emf`) in every `.docx`. Five committed templates (`iio1_kafolat`, `iio2_royxat`, `court_copy`, `court_postpone`, `court_deadline`) carried one of the ORIGINAL document, with the foreign nationals' names, passport numbers and a phone number readable (and `pretenzia` / `talabnoma-uz` carried previews too). The old verifier checked only `document.xml`. All templates are scrubbed (preview image, author names); a test now fails if one comes back. **The old blobs are still in git history**: if the repository is, or may become, visible to anyone else, history needs rewriting (owner decision).
-- **Builders held personal values** · `build-templates.mjs` / `verify-templates.mjs` still contain literal names and passport numbers of the other (visa, court) originals as replacement targets. The two IIO builders no longer do (values are located by place). Converting the rest to the same by-place specs is a follow-up.
+- **Builders held personal values** · `build-templates.mjs` / `verify-templates.mjs` contained literal names, passport numbers, phone numbers and a case number of the originals as replacement targets. All builders now locate values by place (`specs.mjs`, `iio-specs.mjs`) and the verifiers read them back from the originals, so `scripts/` holds none (the rebuilt templates are byte-identical to the shipped ones). The values remain in git HISTORY.
 
 ## 2026-10-05 — security pass after background jobs, snapshots and the hard refresh
 

@@ -52,7 +52,7 @@ describe('a template carries nothing of the original document', () => {
       for (const n of Object.keys(zip.files).filter((n) => /^word\/(document|header\d*|footer\d*)\.xml$/.test(n))) {
         text += wordText(await zip.file(n)!.async('string')) + '\n'
       }
-      expect(text.match(/\b[A-Z]{1,2}\s?\d{7}\b/g) ?? []).toEqual([]) // ZZ 0000000, ZZ 0000000 …
+      expect(text.match(/\b[A-Z]{1,2}\s?\d{7}\b/g) ?? []).toEqual([]) // two letters + seven digits, as on a real passport
       expect(text.match(/\+998[\s(]*\d[\d\s()-]{6,}/g) ?? []).toEqual([])
     })
   }

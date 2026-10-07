@@ -270,6 +270,44 @@ export function applySpecs(xml, specs) {
   return xml
 }
 
+// ---- by-place ops (value read from the ORIGINAL at a place, then replaced like the old text-matched specs did) ------
+
+/**
+ * An op describes one placeholder:
+ *   key | ph   the placeholder `{{key}}`, or the literal `ph` (may carry fixed words around the placeholder)
+ *   sel, sub   WHERE the value sits in the original (see `readAt`); `read: [{sel, sub}, …]` joins several places
+ *   occ        'all' (default): every occurrence of the value; a number: that occurrence only
+ *   cell       the value is a whole table cell: replaced through `cellSet`
+ *   keep       the value is a company constant, not personal data (the verifier's leak check skips it)
+ *   fix        [from, to]: a deliberate wording fix of the original (no value involved)
+ *   as         { from, to, trim }: when the replaced span is wider than the value (it includes fixed words that stay
+ *              around the placeholder in `ph`), where the VALUE itself is — used by the verifier to fill it back
+ * The value is read from the original once, up front, so the order of ops cannot change what a later op reads.
+ */
+export function readOp(srcXml, op) {
+  const parts = op.read ?? [{ sel: op.sel, sub: op.sub }]
+  return parts.map((p) => readAt(srcXml, p.sel, p.sub)).join('')
+}
+
+/** The value a placeholder stands for (the verifier fills it back): the replaced span, or its `as` part. */
+export function valueOf(srcXml, op) {
+  return op.as ? readAt(srcXml, op.sel, op.as) : readOp(srcXml, op)
+}
+
+export function applyOps(srcXml, ops) {
+  let xml = srcXml
+  for (const op of ops) {
+    if (op.fix) {
+      xml = paraReplace(xml, op.fix[0], op.fix[1], 'all')
+      continue
+    }
+    const value = readOp(srcXml, op)
+    const ph = op.ph !== undefined ? op.ph : `{{${op.key}}}`
+    xml = op.cell ? cellSet(xml, value.trim(), ph, op.occ ?? 0) : paraReplace(xml, value, ph, op.occ ?? 'all')
+  }
+  return xml
+}
+
 // ---- package hygiene --------------------------------------------------------------------------------------------
 
 /**
