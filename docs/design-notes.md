@@ -162,6 +162,8 @@ Guarded like every route; id is validated against the registry (path-traversal i
 
 Shared `useLetterhead()` hook + `LetterheadRow`; swaps `word/media/image1.png` (blank transparent PNG / uploaded / keep template's). Reused by both the visa docs and Talabnoma.
 
+**Banner geometry:** every template's banner is ONE inline picture in a first-page header, page-wide and top-flush (negative indents, header distance 0; `scripts/doc-templates/banner.mjs`). The swap is `lib/documents/banner.ts` (`applyLetterhead`), shared by the downloads, Talabnoma and the preview: new PNG in, picture height = page width × PNG height/width, so it is never stretched and always touches both page edges. Don't go back to anchored pictures: docx-preview ignores `relativeFrom="page"`, so any anchor renders differently in the preview than in Word.
+
 
 ## 🌐 SCRAPING — sources, network, workers
 

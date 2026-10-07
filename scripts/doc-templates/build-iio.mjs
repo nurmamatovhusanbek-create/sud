@@ -5,6 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { JSZip, applySpecs, scrubPackage, writeZip } from './xml-edit.mjs'
+import { normalizeBanner } from './banner.mjs'
 import { IIO1, IIO1_FILE, IIO2, IIO2_FILE } from './iio-specs.mjs'
 
 const SRC = process.env.SRC || '/root/.claude/uploads/eefe577e-0365-5422-b318-9c523988a4c3'
@@ -16,6 +17,7 @@ async function build(name, srcFile, specs) {
   const xml = await zip.file('word/document.xml').async('string')
   zip.file('word/document.xml', applySpecs(xml, specs))
   await scrubPackage(zip)
+  await normalizeBanner(zip) // full-width inline banner in a first-page header
   const bytes = await writeZip(zip, path.join(OUT, name + '.docx'), fs)
   console.log('OK', name, bytes, 'bytes')
 }

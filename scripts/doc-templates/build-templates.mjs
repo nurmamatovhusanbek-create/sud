@@ -10,6 +10,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { JSZip, applyOps, scrubPackage, writeZip } from './xml-edit.mjs'
+import { normalizeBanner } from './banner.mjs'
 import { SPECS } from './specs.mjs'
 
 const SRC = process.env.SRC || '/root/.claude/uploads/eefe577e-0365-5422-b318-9c523988a4c3'
@@ -21,6 +22,7 @@ for (const spec of SPECS) {
   const xml = await zip.file('word/document.xml').async('string')
   zip.file('word/document.xml', applyOps(xml, spec.ops))
   await scrubPackage(zip) // no preview image of the original, no author names
+  await normalizeBanner(zip) // full-width inline banner in a first-page header (banner.mjs)
   const bytes = await writeZip(zip, path.join(OUT, spec.name + '.docx'), fs)
   console.log('OK', spec.name, bytes, 'bytes')
 }

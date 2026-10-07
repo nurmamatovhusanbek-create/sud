@@ -23,12 +23,26 @@ SRC=<folder> node scripts/doc-templates/verify-iio.mjs ./out
 
 cp ./out/*.docx src/lib/documents/templates/
 node scripts/doc-templates/scrub-templates.mjs src/lib/documents/templates   # idempotent safety net
+node scripts/doc-templates/banner.mjs src/lib/documents/templates            # idempotent: banner as a full-width inline picture (see below)
 ```
 
 Every builder finds a value by its PLACE (`readAt` / `applyOps` in `xml-edit.mjs`; the specs in `specs.mjs` and
 `iio-specs.mjs`), reads it out of the original at run time, and replaces it. **No name, passport number, phone number
 or case number is written down anywhere in the repository**; the verifiers read the same places to get the values back.
 For a new template add a spec: the table row/cell or the label and marker around each value.
+
+## The letterhead banner
+
+Every template with a banner (`word/media/image1.png`) has the same construction, made by `banner.mjs` (the builders run
+it; `src/lib/documents/__tests__/banner.test.ts` enforces it): a **first-page header** (`word/header1.xml`, `w:titlePg`)
+with one **inline** picture as wide as the page, the paragraph indented by minus the page margins and the header
+distance set to 0, so the picture touches the left, right and top page edges and the body starts below it. The
+originals' anchors (page/margin/paragraph relative, wrap polygons, a floating table at a hand-tuned offset) are removed:
+their box ratio rarely matched the picture, so a swapped-in letterhead was stretched and missed an edge.
+
+At fill time `src/lib/documents/banner.ts` (shared by the downloads and the live preview) replaces the PNG and sets the
+picture's height from the new PNG's own proportions at the page width. No letterhead + «blank» keeps the template's
+box (the space stays, the branding goes).
 
 ## What a template must NOT carry
 

@@ -83,7 +83,7 @@ export function LetterheadRow({ value, onChange }: { value: string; onChange: (v
       <div className="lh-ctl">
         <span className="doc-field-label">Korxona blankasi (letterhead)</span>
         <div className="faint" style={{ fontSize: 12, margin: '4px 0 10px', lineHeight: 1.4 }}>
-          Yuklanmasa, hujjat tepasida blanka uchun boʻsh joy qoldiriladi. Keng banner tavsiya etiladi (masalan 1600×420 px).
+          Yuklanmasa, hujjat tepasida blanka uchun boʻsh joy qoldiriladi. Banner sahifaning toʻliq kengligida chiqadi, balandligi rasmga qarab belgilanadi (siqilmaydi). Keng va past rasm tavsiya etiladi (masalan 1600×420 px).
         </div>
         <div className="p-row" style={{ gap: 8 }}>
           <button className="btn btn-outline btn-sm" onClick={() => inputRef.current?.click()}>

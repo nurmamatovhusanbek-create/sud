@@ -17,7 +17,8 @@ import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import { Loader2, TriangleAlert } from 'lucide-react'
 import { fetchDocTemplate } from '@/lib/api-client'
-import { BLANK_PNG_B64, MARK_OPEN, MARK_RE, markXml } from '@/lib/documents/fill.shared'
+import { MARK_OPEN, MARK_RE, markXml } from '@/lib/documents/fill.shared'
+import { applyLetterhead } from '@/lib/documents/banner'
 import { FIELDS } from '@/lib/documents/registry'
 
 interface Tpl {
@@ -40,14 +41,6 @@ const RENDER_OPTS = {
   renderComments: false,
   renderChanges: false,
 } as const
-
-function b64ToBytes(b64: string): Uint8Array {
-  const raw = b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64
-  const bin = atob(raw)
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
-}
 
 // An empty spot shows the field's example text (e.g. «Toshkent tumanlararo
 // iqtisodiy sud»), which reads like the finished sentence; the label is the
@@ -142,10 +135,7 @@ export function DocPreview({
       try {
         const z = await JSZip.loadAsync(tpl.buf)
         z.file('word/document.xml', markXml(tpl.xml, values, hintOf))
-        if (tpl.hasBanner) {
-          const png = letterhead || (blank ? BLANK_PNG_B64 : '')
-          if (png) z.file('word/media/image1.png', b64ToBytes(png))
-        }
+        if (tpl.hasBanner) await applyLetterhead(z, letterhead, blank)
         const bytes = await z.generateAsync({ type: 'uint8array', compression: 'STORE' })
         if (id !== seq.current) return
 

@@ -12,11 +12,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
 import { docById } from './registry'
-import { BLANK_PNG_B64, fillXml } from './fill.shared'
-
-// Transparent banner used when no letterhead is supplied (see fill.shared.ts).
-const BLANK_PNG = Buffer.from(BLANK_PNG_B64, 'base64')
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+import { fillXml } from './fill.shared'
+import { applyLetterhead } from './banner'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
 
@@ -61,14 +58,8 @@ export async function generateDocx(
   const xml = await docXmlFile.async('string')
   zip.file('word/document.xml', fillXml(xml, values))
 
-  // Letterhead swap (only when the template embeds a banner):
-  //  - uploaded PNG   → use it
-  //  - none + blank   → transparent PNG (keep the space, drop the branding)
-  //  - none, no blank → leave the embedded banner untouched
-  if (zip.file('word/media/image1.png')) {
-    const png = decodePng(opts.letterhead) ?? (opts.blankIfNone ? BLANK_PNG : null)
-    if (png) zip.file('word/media/image1.png', png)
-  }
+  // uploaded PNG → used, fitted to the page width; none + blank → transparent; none → the embedded banner stays
+  await applyLetterhead(zip, opts.letterhead, !!opts.blankIfNone)
 
   const buffer = await zip.generateAsync({
     type: 'nodebuffer',
@@ -79,20 +70,6 @@ export async function generateDocx(
   const person = slug(values.full_name || values.applicant_person || values.rep_name || values.case_number || 'hujjat')
   const filename = `${def.slug}-${person}-${stamp()}.docx`
   return { buffer, filename }
-}
-
-/** Decode a base64 PNG (data-URL or raw). Returns null if absent or not a PNG. */
-function decodePng(b64?: string): Buffer | null {
-  if (!b64) return null
-  try {
-    const raw = b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64
-    const buf = Buffer.from(raw, 'base64')
-    if (buf.length < 8 || buf.length > 12 * 1024 * 1024) return null
-    if (!buf.subarray(0, 8).equals(PNG_MAGIC)) return null
-    return buf
-  } catch {
-    return null
-  }
 }
 
 function stamp(): string {
