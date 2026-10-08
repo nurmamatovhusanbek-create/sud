@@ -88,8 +88,9 @@ Both document APIs need their templates traced into the standalone build (`outpu
   - **Every `setInterval`/listener needs a cleanup on every exit path** (`use-resource.ts` skipped
     `clearInterval` on its abort branch → a 500 ms timer re-rendering the owning list forever).
   - `bun run dev` runs the dev build of React, roughly 2× slower on interactions than `bun run start`;
-    judge performance on a production build. (`next build` needs Google Fonts, which sandboxes block —
-    to measure here, stub the two `next/font/google` imports in `layout.tsx` temporarily and revert.)
+    judge performance on a production build. (Fonts are self-hosted: `src/app/fonts.css` + `src/app/fonts/*.woff2`,
+    so `next build`/`next dev` need no network. Never go back to `next/font/google`: it downloads at compile time
+    and a failed download breaks the whole dev server with «next/font/google queries have exactly one entry».)
   - Measure with Playwright + CDP `Performance.getMetrics` (TaskDuration, RecalcStyleCount, LayoutCount)
     and a frame-gap sampler, A/B-ing CSS with `page.addStyleTag`. Beware: a `requestAnimationFrame`
     sampler makes the browser tick every animation each frame — compare like with like.

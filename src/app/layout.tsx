@@ -1,24 +1,13 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { OrdersLoader } from "@/components/shell/orders-loader";
 import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
+// v18 faces (Plus Jakarta Sans for the UI, IBM Plex Mono for figures) are self-hosted: fonts.css + ./fonts/*.woff2.
+// Not next/font/google: that downloads from Google at dev/build time and fails offline or behind a firewall.
+import "./fonts.css";
 import "./globals.css";
 import "./prototype.css";
-
-// v18 faces: Plus Jakarta Sans (UI) + IBM Plex Mono (figures).
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-sans-face",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const plex = IBM_Plex_Mono({
-  variable: "--font-mono-face",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600"],
-});
 
 export const metadata: Metadata = {
   title: "Sud tizimi",
@@ -42,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" className={`${jakarta.variable} ${plex.variable}`} suppressHydrationWarning>
+    <html lang="uz" suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground">
         <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           {children}

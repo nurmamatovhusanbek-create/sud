@@ -160,8 +160,8 @@
   --space-20:   80px;
 
   /* 6. TYPOGRAPHY — Inter (Cyrillic) UI + JetBrains Mono for figures */
-  --font-sans: var(--font-sans-face), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-face), "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
   --type-display-size: 32px;  --type-display-lh: 1.08; --type-display-w: 700; --type-display-tr: -0.02em;
   --type-h1-size: 22px;       --type-h1-lh: 1.2;       --type-h1-w: 680;     --type-h1-tr: -0.01em;

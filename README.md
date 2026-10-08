@@ -133,7 +133,7 @@ Next.js server ── src/sources + src/lib scrapers (billing, court-case, orgin
         └── Cloudflare Worker pool (cloudflare-worker/proxy.js) → *.sud.uz / orginfo / chamber
 ```
 
-The whole client is same-origin (API on `/api`, fonts self-hosted by `next/font`, no
+The whole client is same-origin (API on `/api`, fonts self-hosted in `src/app/fonts`, no
 external scripts). Response security headers (a tight CSP, `X-Frame-Options: DENY`,
 `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `noindex`) are set in
 `next.config.ts`; API responses are `Cache-Control: no-store`.
