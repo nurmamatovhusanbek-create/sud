@@ -19,6 +19,7 @@ import { Loader2, TriangleAlert } from 'lucide-react'
 import { fetchDocTemplate } from '@/lib/api-client'
 import { MARK_OPEN, MARK_RE, markXml } from '@/lib/documents/fill.shared'
 import { applyLetterhead } from '@/lib/documents/banner'
+import { sourceKey, withDerived } from '@/lib/documents/derive'
 import { FIELDS } from '@/lib/documents/registry'
 
 interface Tpl {
@@ -134,7 +135,7 @@ export function DocPreview({
     const t = setTimeout(async () => {
       try {
         const z = await JSZip.loadAsync(tpl.buf)
-        z.file('word/document.xml', markXml(tpl.xml, values, hintOf))
+        z.file('word/document.xml', markXml(tpl.xml, withDerived(values), hintOf, sourceKey))
         if (tpl.hasBanner) await applyLetterhead(z, letterhead, blank)
         const bytes = await z.generateAsync({ type: 'uint8array', compression: 'STORE' })
         if (id !== seq.current) return

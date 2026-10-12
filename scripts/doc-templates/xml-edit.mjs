@@ -234,6 +234,14 @@ function span(sel, sub = {}, para) {
   const full = idx.map((i) => texts[i]).join('')
   let start = 0
   let end = full.length
+  if (sub.at !== undefined) {
+    // the nth occurrence of a literal (a bracketed placeholder of the source, a date, a number): its own span
+    let p = -1
+    for (let k = 0; k <= (sub.nth ?? 0); k++) p = full.indexOf(sub.at, p + 1)
+    if (p < 0) throw new Error(`${JSON.stringify(sub.at)} (#${sub.nth ?? 0}) not found in ${JSON.stringify(sel)}`)
+    start = p
+    end = p + sub.at.length
+  }
   if (sub.from !== undefined) {
     const p = sub.fromLast ? full.lastIndexOf(sub.from) : full.indexOf(sub.from)
     if (p < 0) throw new Error(`label ${JSON.stringify(sub.from)} not found in ${JSON.stringify(sel)}`)
@@ -316,6 +324,39 @@ export function applyOps(srcXml, ops) {
     xml = op.cell ? cellSet(xml, value.trim(), ph, op.occ ?? 0) : paraReplace(xml, value, ph, op.occ ?? 'all')
   }
   return xml
+}
+
+/**
+ * Put `ph` into an EMPTY table cell paragraph (a blank row of a form the user now fills). `sel` is { tbl, row, cell, p }.
+ * The run copies the paragraph mark's run properties so the text takes the cell's font. Throws if it already holds text.
+ */
+export function setCellText(xml, sel, ph) {
+  const tbls = [...xml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)]
+  const t = tbls[sel.tbl]
+  if (!t) throw new Error(`no table ${sel.tbl}`)
+  const rows = [...t[0].matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g)]
+  const r = rows[sel.row]
+  if (!r) throw new Error(`no row ${sel.row} in table ${sel.tbl}`)
+  const cells = [...r[0].matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)]
+  const c = cells[sel.cell]
+  if (!c) throw new Error(`no cell ${sel.cell}`)
+  const paras = [...c[0].matchAll(/<w:p(?:\s[^>]*)?\/>|<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)]
+  const pm = paras[sel.p ?? 0]
+  if (!pm) throw new Error(`no paragraph ${sel.p ?? 0}`)
+  const para = pm[0]
+  if (/<w:t[ >]/.test(para)) throw new Error(`cell ${JSON.stringify(sel)} is not empty`)
+  const rPr = /<w:pPr>[\s\S]*?(<w:rPr>[\s\S]*?<\/w:rPr>)[\s\S]*?<\/w:pPr>/.exec(para)?.[1] ?? ''
+  const run = `<w:r>${rPr}<w:t xml:space="preserve">${ph}</w:t></w:r>`
+  const next = para.endsWith('</w:p>') ? para.replace(/<\/w:p>$/, `${run}</w:p>`) : para.replace(/\/>$/, `>${run}</w:p>`)
+  const cellNew = c[0].replace(para, next)
+  const rowNew = r[0].replace(c[0], cellNew)
+  const tblNew = t[0].replace(r[0], rowNew)
+  return xml.replace(t[0], tblNew)
+}
+
+/** Deliberate wording fixes of a SOURCE, applied before anything is read from it: [[from, to], …] (every occurrence). */
+export function fixSource(xml, fixes = []) {
+  return fixes.reduce((x, [a, b]) => paraReplace(x, a, b, 'all'), xml)
 }
 
 // ---- package hygiene --------------------------------------------------------------------------------------------

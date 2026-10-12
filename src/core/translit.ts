@@ -42,3 +42,57 @@ function transliterate(text: string): string {
   }
   return out
 }
+
+// ---- Uzbek Latin → Russian Cyrillic (names in the Russian half of a bilingual document) ------------------------------
+// Russian-style, the way names are written in Russian paperwork: «Nurmamat oʻgʻli» → «Нурмамат угли»,
+// «Azimjanovich» → «Азимжанович», «Erkin» → «Эркин». Longest digraph first; capitalisation follows the source.
+
+const LAT_DIGRAPH: [string, string][] = [
+  ['sh', 'ш'], ['ch', 'ч'], ['yo', 'ё'], ['yu', 'ю'], ['ya', 'я'], ['ye', 'е'], ['ng', 'нг'],
+]
+const LAT_SINGLE: Record<string, string> = {
+  a: 'а', b: 'б', c: 'к', d: 'д', e: 'е', f: 'ф', g: 'г', h: 'х', i: 'и', j: 'ж', k: 'к', l: 'л', m: 'м', n: 'н',
+  o: 'о', p: 'п', q: 'к', r: 'р', s: 'с', t: 'т', u: 'у', v: 'в', w: 'в', x: 'х', y: 'й', z: 'з',
+}
+const TUTUQ = /[ʻʼ‘’'`´]/
+
+export function uzLatToRu(text: string): string {
+  const src = text
+  const lower = src.toLowerCase()
+  let out = ''
+  let i = 0
+  const cap = (ru: string, at: number, len: number) => {
+    const first = src[at]
+    if (first === first.toLowerCase()) return ru
+    const rest = src.slice(at + 1, at + len)
+    const allUpper = rest.length > 0 && rest === rest.toUpperCase() && rest !== rest.toLowerCase()
+    const next = src[at + len]
+    const wordUpper = allUpper || (len === 1 && !!next && next === next.toUpperCase() && next !== next.toLowerCase())
+    return wordUpper ? ru.toUpperCase() : ru.charAt(0).toUpperCase() + ru.slice(1)
+  }
+  while (i < src.length) {
+    const two = lower.slice(i, i + 2)
+    // oʻ / gʻ (the tutuq belgisi follows the letter)
+    if ((lower[i] === 'o' || lower[i] === 'g') && TUTUQ.test(src[i + 1] ?? '')) {
+      out += cap(lower[i] === 'o' ? 'у' : 'г', i, 2)
+      i += 2
+      continue
+    }
+    const di = LAT_DIGRAPH.find(([l]) => l === two)
+    if (di) {
+      out += cap(di[1], i, 2)
+      i += 2
+      continue
+    }
+    const ch = lower[i]
+    if (ch === 'e') {
+      const prev = lower[i - 1] ?? ''
+      // «Э» at the start of a word, «е» elsewhere (Эркин, Шерзод)
+      out += cap(!prev || !/[a-zа-я]/.test(prev) ? 'э' : 'е', i, 1)
+    } else if (ch in LAT_SINGLE) out += cap(LAT_SINGLE[ch], i, 1)
+    else if (TUTUQ.test(src[i])) out += '' // a stray apostrophe inside a word
+    else out += src[i]
+    i++
+  }
+  return out
+}

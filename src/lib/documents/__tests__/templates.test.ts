@@ -9,20 +9,29 @@ import path from 'node:path'
 import JSZip from 'jszip'
 import { DOCS, FIELDS, categoryDefaults, docById, tabById } from '../registry'
 import { generateDocx } from '../fill.server'
+import { DERIVED_RULES, sourceKey } from '../derive'
 
 const DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
 const FILES = fs.readdirSync(DIR).filter((f) => f.endsWith('.docx'))
 
 const load = (file: string) => JSZip.loadAsync(fs.readFileSync(path.join(DIR, file)))
 const wordText = (xml: string) => [...xml.matchAll(/<w:t\b[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('')
-const placeholders = (xml: string) => new Set([...xml.matchAll(/\{\{([a-z_]+)\}\}/g)].map((m) => m[1]))
+const placeholders = (xml: string) => new Set([...xml.matchAll(/\{\{([a-z_0-9]+)\}\}/g)].map((m) => m[1]))
 
 describe('templates ⇄ registry', () => {
   for (const doc of DOCS) {
     test(`${doc.id}: the template uses exactly the fields the registry lists`, async () => {
       const zip = await load(doc.file)
       const used = placeholders(await zip.file('word/document.xml')!.async('string'))
-      expect([...used].sort()).toEqual([...new Set(doc.fields)].sort())
+      // a placeholder is a form field, or a spelling derived from one (derive.ts): then the input it comes from is
+      // the field the form must offer
+      const expected = new Set<string>()
+      for (const k of used) {
+        if (FIELDS[k]) expected.add(k)
+        else expect(DERIVED_RULES[k], `${doc.id}: {{${k}}} is neither a field nor a derived value`).toBeDefined()
+        expected.add(sourceKey(k))
+      }
+      expect([...expected].sort()).toEqual([...new Set(doc.fields)].sort())
     })
     test(`${doc.id}: every field is defined`, () => {
       for (const k of doc.fields) expect(FIELDS[k], `${doc.id} → ${k}`).toBeDefined()

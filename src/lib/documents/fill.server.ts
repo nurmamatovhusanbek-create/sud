@@ -14,6 +14,7 @@ import JSZip from 'jszip'
 import { docById } from './registry'
 import { fillXml } from './fill.shared'
 import { applyLetterhead } from './banner'
+import { withDerived } from './derive'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
 
@@ -56,7 +57,7 @@ export async function generateDocx(
   if (!docXmlFile) throw new Error('Shablon buzilgan')
 
   const xml = await docXmlFile.async('string')
-  zip.file('word/document.xml', fillXml(xml, values))
+  zip.file('word/document.xml', fillXml(xml, withDerived(values)))
 
   // uploaded PNG → used, fitted to the page width; none + blank → transparent; none → the embedded banner stays
   await applyLetterhead(zip, opts.letterhead, !!opts.blankIfNone)
@@ -67,7 +68,7 @@ export async function generateDocx(
     compressionOptions: { level: 6 },
   })
 
-  const person = slug(values.full_name || values.applicant_person || values.rep_name || values.case_number || 'hujjat')
+  const person = slug((def.nameKey && values[def.nameKey]) || values.full_name || values.applicant_person || values.rep_name || values.case_number || 'hujjat')
   const filename = `${def.slug}-${person}-${stamp()}.docx`
   return { buffer, filename }
 }

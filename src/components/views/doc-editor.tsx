@@ -28,14 +28,17 @@ import {
   type FieldDef,
   type TabDef,
 } from '@/lib/documents/registry'
+import { DERIVED_RULES, withDerived } from '@/lib/documents/derive'
 import { generateDocument } from '@/lib/api-client'
 import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 
 // ---- a single field --------------------------------------------------------
 
-function Field({ def, value, unused, onChange, onFocus }: {
+function Field({ def, value, auto, unused, onChange, onFocus }: {
   def: FieldDef; value: string; unused: boolean
+  /** what the field falls back to when left empty (derived from another input), shown as its hint */
+  auto?: string
   onChange: (v: string) => void; onFocus: () => void
 }) {
   const wide = def.kind === 'textarea'
@@ -56,7 +59,7 @@ function Field({ def, value, unused, onChange, onFocus }: {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={onFocus}
-          placeholder={def.placeholder}
+          placeholder={auto || def.placeholder}
           rows={3}
         />
       ) : (
@@ -66,7 +69,7 @@ function Field({ def, value, unused, onChange, onFocus }: {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={onFocus}
-          placeholder={def.placeholder}
+          placeholder={auto || def.placeholder}
         />
       )}
       {def.hint && <span className="doc-field-hint">{def.hint}</span>}
@@ -98,6 +101,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const cur = docs.find((d) => d.id === curId) ?? docs[0]
   const used = useMemo(() => new Set(cur.fields), [cur])
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
+  const effective = useMemo(() => withDerived(values), [values])
 
   const sections = useMemo(() => {
     if (!tab.groups) return sectionsFor(cur.fields)
@@ -108,9 +112,16 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const filled = cur.fields.filter((k) => values[k]?.trim()).length
   const total = cur.fields.length
 
-  const reqKey = tab.requireKey
-  const blocked = reqKey ? !values[reqKey]?.trim() : false
-  const blockHint = reqKey ? `Avval «${FIELDS[reqKey]?.label ?? reqKey}» maydonini toʻldiring` : undefined
+  // a document can name its own required field (the order needs its number, the agreement the employee)
+  const missingFor = (d: DocDef) => {
+    const k = d.requireKey ?? tab.requireKey
+    return k && !values[k]?.trim() ? k : null
+  }
+  const hintFor = (k: string) => `Avval «${FIELDS[k]?.label ?? k}» maydonini toʻldiring`
+  const reqKey = missingFor(cur)
+  const blocked = !!reqKey
+  const blockHint = reqKey ? hintFor(reqKey) : undefined
+  const blockedAll = docs.map(missingFor).find((k) => k) ?? null
 
   // page → form: jump to and focus the field behind a clicked value
   const pick = (key: string) => {
@@ -138,7 +149,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   }
 
   const runAll = async () => {
-    if (blocked) { toast.error(blockHint!); return }
+    if (blockedAll) { toast.error(hintFor(blockedAll)); return }
     setBusy('all')
     try {
       for (const d of docs) await download(d)
@@ -174,6 +185,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
                       key={k}
                       def={FIELDS[k]}
                       value={values[k] ?? ''}
+                      auto={DERIVED_RULES[k] ? effective[k] : undefined}
                       unused={!used.has(k)}
                       onChange={(v) => set(k, v)}
                       onFocus={() => setActiveKey(k)}
@@ -207,7 +219,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             <div className="sp" />
             <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{cur.lang}</span>
             {docs.length > 1 && (
-              <button className="btn btn-outline btn-sm" onClick={() => void runAll()} disabled={busy !== null || blocked} title={blocked ? blockHint : `${docs.length} ta hujjatni yuklab olish`}>
+              <button className="btn btn-outline btn-sm" onClick={() => void runAll()} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni yuklab olish`}>
                 {busy === 'all' ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <Files />}
                 <span>Barchasi ({docs.length})</span>
               </button>

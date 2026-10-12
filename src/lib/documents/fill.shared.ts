@@ -21,7 +21,7 @@ export function escapeXml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-const PLACEHOLDER = /\{\{([a-z_]+)\}\}/g
+const PLACEHOLDER = /\{\{([a-z_0-9]+)\}\}/g
 
 /**
  * Replace {{key}} placeholders. Unknown/blank keys collapse to '' so no stray
@@ -51,14 +51,18 @@ export function markXml(
   xml: string,
   values: Record<string, string>,
   labelOf: (key: string) => string,
+  /** the form field behind a template key (a derived key such as `…_ru` points at the input it is computed from,
+   *  so clicking the value in the preview opens that input); identity by default */
+  fieldOf: (key: string) => string = (k) => k,
 ): string {
   return xml.replace(PLACEHOLDER, (_m, key: string) => {
     const v = values[key]
     const has = !!v
-    return `${OPEN}${has ? '' : '!'}${key}${MID}${escapeXml(has ? v : labelOf(key))}${CLOSE}`
+    const field = fieldOf(key)
+    return `${OPEN}${has ? '' : '!'}${field}${MID}${escapeXml(has ? v : labelOf(field))}${CLOSE}`
   })
 }
 
 /** Matches one marked value in rendered text: [1]=empty flag, [2]=key, [3]=text. */
-export const MARK_RE = /(!?)([a-z_]+)([\s\S]*?)/g
+export const MARK_RE = /(!?)([a-z_0-9]+)([\s\S]*?)/g
 export const MARK_OPEN = OPEN

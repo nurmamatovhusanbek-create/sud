@@ -21,6 +21,11 @@ SRC=<folder> node scripts/doc-templates/verify-templates.mjs ./out
 SRC=<folder> node scripts/doc-templates/build-iio.mjs ./out
 SRC=<folder> node scripts/doc-templates/verify-iio.mjs ./out
 
+# the two «Tijorat siri» templates (ts1_buyruq, ts2_kelishuv): Russian | Uzbek side by side, no personal data in them;
+# specs in secret-specs.mjs (bracketed blanks, dates, numbers by place), derived spellings in src/lib/documents/derive.ts
+SRC=<folder> node scripts/doc-templates/build-secret.mjs ./out
+SRC=<folder> node scripts/doc-templates/verify-secret.mjs ./out
+
 cp ./out/*.docx src/lib/documents/templates/
 node scripts/doc-templates/scrub-templates.mjs src/lib/documents/templates   # idempotent safety net
 node scripts/doc-templates/banner.mjs src/lib/documents/templates            # idempotent: banner as a full-width inline picture (see below)

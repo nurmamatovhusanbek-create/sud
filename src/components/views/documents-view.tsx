@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  X, Plane, Landmark, Scale, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
+  X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
 } from 'lucide-react'
 import {
   TABS,
@@ -39,6 +39,7 @@ const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
   iio: <Landmark />,
   court: <Scale />,
+  secret: <Lock />,
 }
 
 // ---- cards -----------------------------------------------------------------
@@ -47,6 +48,7 @@ const CAT_BLURB: Record<DocTab, string> = {
   visa: 'Taklifnoma, kafolat, viza talabnomasi',
   iio: 'IIO / MvaPB kafolat va roʻyxat xati',
   court: 'Sudga arizalar va iltimosnomalar',
+  secret: 'Tijorat siri buyrugʻi va xodim bilan kelishuv',
 }
 
 function CategoryCard({ tab, onOpen }: { tab: TabDef; onOpen: () => void }) {
