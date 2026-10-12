@@ -11,7 +11,7 @@ export const maxDuration = 30
  * POST /api/pretenzia/generate
  * body: {
  *   claimDate: ISO,
- *   constants: { creditorName, debtorName, debtorAddress, courtName,
+ *   constants: { creditorName, debtorName, debtorForm, debtorAddress, courtName,
  *                director, executor, executorPhone },
  *   contracts: [{ no, date: ISO, mainDebtTiyin, paymentTiyin, delayStart: ISO }],
  *   terms?: { ratePerDay, capFraction }
@@ -48,6 +48,7 @@ async function POST_impl(req: NextRequest) {
   const constants: ClaimConstants = {
     creditorName: asString(c.creditorName),
     debtorName: asString(c.debtorName),
+    debtorForm: asString(c.debtorForm),
     debtorAddress: asString(c.debtorAddress),
     courtName: asString(c.courtName),
     director: asString(c.director),

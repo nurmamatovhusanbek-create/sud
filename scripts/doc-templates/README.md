@@ -28,6 +28,7 @@ SRC=<folder> node scripts/doc-templates/verify-secret.mjs ./out
 
 cp ./out/*.docx src/lib/documents/templates/
 node scripts/doc-templates/scrub-templates.mjs src/lib/documents/templates   # idempotent safety net
+node scripts/doc-templates/debtor-form.mjs src/lib/documents/templates       # idempotent: the demand letters write the debtor's legal form from {{debtor_form}}
 node scripts/doc-templates/banner.mjs src/lib/documents/templates            # idempotent: banner as a full-width inline picture (see below)
 ```
 

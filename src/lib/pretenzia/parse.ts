@@ -18,6 +18,7 @@
 
 import JSZip from 'jszip'
 import { toTiyin } from '@/core/pretenzia'
+import { splitParty } from '@/core/legal-forms'
 
 export interface DebtorContract {
   /** Contract number without the «№», e.g. «K1125545». */
@@ -35,8 +36,13 @@ export interface SverkaParseResult {
   /** Reconciliation period end («на dd.mm.yyyy»), when found — a sensible
    *  default for the claim date. */
   periodEnd?: Date
+  /** the first party of the reconciliation (the sheet is «По данным <us>»), as written in the file */
   creditorName?: string
+  /** its legal form, as a `LEGAL_FORMS` code («OOO», «AO»…), when the sheet says it */
+  creditorForm?: string
+  /** the OTHER party */
   debtorName?: string
+  debtorForm?: string
   /** Every contract block seen (incl. fully-paid ones) — for a "N of M" hint. */
   totalBlocks: number
 }
@@ -131,6 +137,35 @@ function toDate(dd: string, mm: string, yyyy: string): Date {
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd))
 }
 
+/**
+ * The two parties of an «Акт сверки», whatever their legal forms. The header says it twice:
+ *   «взаимных расчетов за период: …\nмежду "<us>" <form>\nи "<them>" <form>»  and  «По данным <us>, сум | По данным <them>, сум».
+ * The first party is the sheet's own side (the columns the parser reads), the second is the OTHER company the letter
+ * is addressed to. Returns null when neither sentence is found.
+ */
+export function findParties(cells: string[]): { creditor: { name: string; code: string }; debtor: { name: string; code: string } } | null {
+  for (const t of cells) {
+    // «между A\nи B»: the line break is what separates them when a name itself contains « и »
+    const m = /между\s+([\s\S]+?)\s*\n\s*и\s+([\s\S]+)$/i.exec(t) ?? /между\s+([\s\S]+?)\s+и\s+((?:["“«]|[A-ZА-ЯЁ])[\s\S]+)$/.exec(t)
+    if (m) {
+      const creditor = splitParty(m[1])
+      const debtor = splitParty(m[2])
+      if (creditor.name && debtor.name) return { creditor, debtor }
+    }
+  }
+  const named: string[] = []
+  for (const t of cells) {
+    const m = /По данным\s+([\s\S]+?)\s*,?\s*сум(?![\p{L}\p{N}])/iu.exec(t)
+    if (m && !named.includes(m[1].trim())) named.push(m[1].trim())
+  }
+  if (named.length >= 2) {
+    const creditor = splitParty(named[0])
+    const debtor = splitParty(named[1])
+    if (creditor.name && debtor.name) return { creditor, debtor }
+  }
+  return null
+}
+
 export async function parseSverka(data: ArrayBuffer | Uint8Array): Promise<SverkaParseResult> {
   const zip = await JSZip.loadAsync(data)
 
@@ -174,27 +209,19 @@ export async function parseSverka(data: ArrayBuffer | Uint8Array): Promise<Sverk
     }
   }
 
-  // Extract party names + period end from the free-text rows.
-  let creditorName: string | undefined
-  let debtorName: string | undefined
+  // Period end from the free-text rows; the two parties from the header sentence (see findParties).
   let periodEnd: Date | undefined
   for (const row of sortedRows) {
     for (const v of grid.get(row)!.values()) {
-      const t = str(v)
-      if (!periodEnd) {
-        const pm = PERIOD_END_RE.exec(t)
-        if (pm) periodEnd = toDate(pm[1], pm[2], pm[3])
-      }
-      if (!creditorName) {
-        const cm = /между\s+"+([^"]+?)"+\s+Mas'uliyati/i.exec(t)
-        if (cm) creditorName = cm[1].trim()
-      }
-      if (!debtorName) {
-        const dm = /и\s+"+([^"]+?)"+\s+Aksiyadorlik/i.exec(t)
-        if (dm) debtorName = dm[1].trim()
-      }
+      const pm = periodEnd ? null : PERIOD_END_RE.exec(str(v))
+      if (pm) periodEnd = toDate(pm[1], pm[2], pm[3])
     }
   }
+  const parties = findParties(sortedRows.flatMap((r) => [...grid.get(r)!.values()].map(str)))
+  const creditorName = parties?.creditor.name || undefined
+  const creditorForm = parties?.creditor.code || undefined
+  const debtorName = parties?.debtor.name || undefined
+  const debtorForm = parties?.debtor.code || undefined
 
   // Walk contract blocks.
   const contracts: DebtorContract[] = []
@@ -244,5 +271,5 @@ export async function parseSverka(data: ArrayBuffer | Uint8Array): Promise<Sverk
   }
   flush()
 
-  return { contracts, periodEnd, creditorName, debtorName, totalBlocks }
+  return { contracts, periodEnd, creditorName, creditorForm, debtorName, debtorForm, totalBlocks }
 }

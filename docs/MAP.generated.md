@@ -52,6 +52,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `dates.ts` | components/sections/cases.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, lib/report/model.ts, lib/report/render.ts, sources/index.ts | core/__tests__/dates.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
+| `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, lib/orders-watchlist.ts, +4 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
@@ -111,8 +112,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orders-watchlist.ts` | components/shell/orders-auto-check.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts |
-| `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts |
-| `pretenzia/parse.ts` | components/views/pretenzia-view.tsx |  |
+| `pretenzia/constants.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
+| `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts |
+| `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts |  |
 | `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |

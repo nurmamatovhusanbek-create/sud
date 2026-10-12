@@ -4,6 +4,7 @@
  * the server .docx fill. Keys here must match pretenzia.docx exactly.
  */
 
+import { formLabel } from '@/core/legal-forms'
 import {
   computeClaim,
   formatSum,
@@ -20,6 +21,9 @@ import {
 export interface ClaimConstants {
   creditorName: string
   debtorName: string
+  /** the debtor's legal form as a `LEGAL_FORMS` code («AO», «OOO»); written «АО» before the name in the Russian
+   *  letter and «AJ» after it in the Uzbek one. Empty = the sheet did not say, so none is written. */
+  debtorForm?: string
   debtorAddress: string
   courtName: string
   director: string
@@ -55,6 +59,7 @@ export function renderClaimValues(c: ClaimContractInput, k: ClaimConstants): Rec
     claim_date: formatDate(k.claimDate),
     creditor_name: k.creditorName,
     debtor_name: k.debtorName,
+    debtor_form: formLabel(k.debtorForm, lang),
     debtor_address: k.debtorAddress,
     court_name: k.courtName,
     director: k.director,

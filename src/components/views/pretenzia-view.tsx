@@ -20,6 +20,7 @@ import { parseSverka, type SverkaParseResult } from '@/lib/pretenzia/parse'
 import { computeClaim, addBankingDays, formatSum, formatDate } from '@/core/pretenzia'
 import { generatePretenzia } from '@/lib/api-client'
 import { LetterheadRow } from '@/components/proto/letterhead'
+import { resolveParties } from '@/lib/pretenzia/constants'
 
 type Lang = 'ru' | 'uz'
 
@@ -102,6 +103,8 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
       for (const c of r.contracts) next[c.no] = { sel: true, delayStart: toInput(addBankingDays(c.date, GRACE_DAYS)) }
       setRows(next)
       setResult(r)
+      // what was typed for the PREVIOUS file's companies must not follow the new one (director, court, executor stay)
+      setConsts((c) => { const { creditorName: _a, debtorName: _b, debtorAddress: _c, ...rest } = c; return rest })
       setClaimDate(toInput(r.periodEnd ?? new Date()))
     } catch {
       setResult(null)
@@ -136,9 +139,16 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
 
   const selectedCount = result ? result.contracts.filter((c) => rows[c.no]?.sel).length : 0
 
+  // who the letter is between: typed > what the Excel says > the sample (see resolveParties)
+  const parties = useMemo(() => resolveParties(consts, result, DEFAULTS[lang] as never), [consts, result, lang])
+
   const resolvedConstants = (): Record<string, string> => {
     const out: Record<string, string> = {}
     for (const { key } of CONST_FIELDS) out[key] = (consts[key]?.trim() || DEFAULTS[lang][key])
+    out.creditorName = parties.creditorName
+    out.debtorName = parties.debtorName
+    out.debtorForm = parties.debtorForm
+    out.debtorAddress = parties.debtorAddress
     return out
   }
 
@@ -214,10 +224,10 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
         <>
           <div className="pz-summary">
             <div>
-              <span className="lbl">Kreditor</span><b>{result.creditorName || DEFAULTS[lang].creditorName}</b>
+              <span className="lbl">Kreditor</span><b>{parties.creditorName}</b>
             </div>
             <div>
-              <span className="lbl">Qarzdor</span><b>{result.debtorName || DEFAULTS[lang].debtorName}</b>
+              <span className="lbl">Qarzdor</span><b>{parties.debtorName}</b>
             </div>
             <div>
               <span className="lbl">Qarzdor shartnomalar</span>
@@ -273,7 +283,11 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
             })}
           </div>
 
-          <details className="pz-consts">
+          {parties.addressMissing && (
+            <div className="pz-alert"><AlertTriangle />Qarzdorning manzili faylda yoʻq — «Hujjat rekvizitlari» da kiriting, aks holda talabnomada manzil boʻsh qoladi.</div>
+          )}
+
+          <details className="pz-consts" key={parties.addressMissing ? 'need-address' : 'ok'} open={parties.addressMissing || undefined}>
             <summary>Hujjat rekvizitlari (blanka, kreditor, sud, imzo) — oʻzgartirish ixtiyoriy</summary>
             <div style={{ padding: '4px 0 14px' }}>
               <LetterheadRow value={letterhead} onChange={onLetterhead} />
@@ -285,14 +299,19 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
                   <input
                     className="dinput"
                     value={consts[key] ?? ''}
-                    placeholder={DEFAULTS[lang][key]}
+                    placeholder={
+                      key === 'creditorName' ? parties.creditorName
+                        : key === 'debtorName' ? parties.debtorName
+                          : key === 'debtorAddress' ? (parties.addressMissing ? 'Faylda yoʻq — kiriting' : parties.debtorAddress)
+                            : DEFAULTS[lang][key]
+                    }
                     onChange={(e) => setConsts((s) => ({ ...s, [key]: e.target.value }))}
                   />
                 </label>
               ))}
             </div>
             <p className="faint" style={{ fontSize: 12, margin: '2px 2px 0' }}>
-              Boʻsh qoldirilgan maydonlar uchun namunadagi qiymat ishlatiladi.
+              Kreditor va qarzdor nomi fayldan aniqlanadi; boʻsh qoldirilgan boshqa maydonlar uchun namunadagi qiymat ishlatiladi.
             </p>
           </details>
 

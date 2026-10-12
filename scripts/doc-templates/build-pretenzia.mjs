@@ -96,6 +96,8 @@ xml = replace(xml, '(частичная оплата составила 272 628 
 xml = replace(xml, 'Юнусабадский район ул. Осиё 8-дом', '{{debtor_address}}')
 xml = replace(xml, 'Ташкентский межрайонный экономический суд', '{{court_name}}')
 xml = replace(xml, 'HUDUDIY ELEKTR TARMOQLARI', '{{debtor_name}}', { all: true })
+// the debtor's legal form is read from the sheet (АО, ООО, …), not fixed to the sample's
+xml = replace(xml, 'АО «{{debtor_name}}»', '{{debtor_form}} «{{debtor_name}}»', { all: true })
 xml = replace(xml, 'ARTIKUL AZIYA KABEL', '{{creditor_name}}')
 xml = replace(xml, '5 811 359 400,00', '{{supplied}}')
 xml = replace(xml, '5 538 730 518,42', '{{main_debt}}', { all: true })
