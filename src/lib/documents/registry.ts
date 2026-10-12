@@ -160,7 +160,7 @@ export const FIELDS: Record<string, FieldDef> = {
   sc_company_uz: { key: 'sc_company_uz', label: 'Korxona nomi (oʻzbekcha)', default: '“Artikul Aziya Kabel” MChJ QK' },
   sc_addr_ru: { key: 'sc_addr_ru', label: 'Manzil (ruscha)', default: 'г. Ташкент, Янгихаётский район, Южная промзона, Файзли МСГ' },
   sc_addr_uz: { key: 'sc_addr_uz', label: 'Manzil (oʻzbekcha)', default: 'Toshkent sh., Yangihayot tumani, Janubiy ishlab chiqarish hududi, Fayzli MFY' },
-  sc_tin: { key: 'sc_tin', label: 'STIR', default: '302 678 824', mono: true },
+  sc_tin: { key: 'sc_tin', label: 'STIR', placeholder: '000 000 000', mono: true },
   sc_email: { key: 'sc_email', label: 'E-mail', default: 'vedartikul@gmail.com' },
   dir_full: {
     key: 'dir_full', label: 'Direktor (toʻliq, lotinda)', default: 'Turgunov Sherzod Azimjanovich',
