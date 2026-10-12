@@ -128,4 +128,4 @@ async function GET_impl() {
   })
 }
 
-export const GET = guard(GET_impl)
+export const GET = guard(GET_impl, { rateLimit: false }) // memory + small file read, polled by the footer and the Settings tab: never the budget of the scraping routes

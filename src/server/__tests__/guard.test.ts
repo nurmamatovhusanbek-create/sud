@@ -60,7 +60,7 @@ describe('guard refusals are visible', () => {
 describe('rate limit', () => {
   test('a rotating X-Forwarded-For does not buy a fresh budget (the header is whatever the caller typed)', async () => {
     const statuses: number[] = []
-    for (let i = 0; i < 40; i++) statuses.push((await open(req('/api/rl-test', { 'x-forwarded-for': `10.0.0.${i}` }))).status)
+    for (let i = 0; i < 150; i++) statuses.push((await open(req('/api/rl-test', { 'x-forwarded-for': `10.0.0.${i}` }))).status)
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200])
     expect(statuses).toContain(429)
     expect(securitySnapshot().counts.rate_limited).toBeGreaterThan(0)

@@ -36,4 +36,4 @@ async function GET_impl(req: NextRequest) {
   })
 }
 
-export const GET = guard(GET_impl)
+export const GET = guard(GET_impl, { rateLimit: false }) // a static template file: never the budget of the scraping routes

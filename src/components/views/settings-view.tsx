@@ -592,13 +592,17 @@ function HealthTab() {
   const [loading, setLoading] = useState(true)
   const [auto, setAuto] = useState(false)
   const [span, setSpan] = useState<Span>('today')
+  const [why, setWhy] = useState('') // the server's own reason when it refused (rate limit, token), not a guess
 
   const load = useCallback(async () => {
     setLoading(true) // v208: "Qayta urinish" now shows the skeleton while retrying
     try {
       const res = await fetch('/api/settings/health', { headers: authHeaders() })
-      const json = (await res.json()) as HealthData & { ok?: boolean }
-      if (json && (json.ok || json.workers)) setData(json)
+      const json = (await res.json()) as HealthData & { ok?: boolean; error?: string }
+      if (json && (json.ok || json.workers)) {
+        setData(json)
+        setWhy('')
+      } else setWhy(typeof json?.error === 'string' ? json.error : '')
     } catch {
       /* keep previous */
     } finally {
@@ -699,7 +703,7 @@ function HealthTab() {
 
   if (loading && !data) return <SkRows n={4} />
   if (!data)
-    return <EmptyBlock icon={<Activity />} title="Holat olinmadi" hint="Server /api/settings/health javob bermadi." action={<button className="btn btn-outline btn-sm" onClick={() => void load()}>Qayta urinish</button>} />
+    return <EmptyBlock icon={<Activity />} title="Holat olinmadi" hint={why || "Server /api/settings/health javob bermadi."} action={<button className="btn btn-outline btn-sm" onClick={() => void load()}>Qayta urinish</button>} />
 
   return (
     <div>

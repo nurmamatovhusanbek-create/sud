@@ -30,4 +30,4 @@ async function GET_impl() {
   }
 }
 
-export const GET = guard(GET_impl)
+export const GET = guard(GET_impl, { rateLimit: false }) // a static source string: never the budget of the scraping routes

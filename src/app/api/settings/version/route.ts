@@ -125,4 +125,4 @@ async function GET_impl(request: Request) {
   })
 }
 
-export const GET = guard(GET_impl)
+export const GET = guard(GET_impl, { rateLimit: false }) // cheap read of the running version: never the budget of the scraping routes

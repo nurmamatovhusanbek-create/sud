@@ -94,7 +94,7 @@ export const config = {
   /** Per-IP rate limit for expensive scrape endpoints (blueprint §5.4). */
   rateLimit: {
     windowMs: int('RATE_LIMIT_WINDOW_MS', 60_000, { min: 1_000 }),
-    max: int('RATE_LIMIT_MAX', 30, { min: 1 }),
+    max: int('RATE_LIMIT_MAX', 120, { min: 1 }),
   },
 
   /** Cloudflare Worker proxy pool (blueprint §3.2). NO stranger fallbacks. */
