@@ -16,18 +16,18 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/court-cases/export` | GET | GET /api/court-cases/export?tin=302678824&courtTypes=economic,civil | `court-cases/export/route.ts` |
 | `/api/court-cases` | GET | GET /api/court-cases?courtType=economic&mode=tin&value=302678824 | `court-cases/route.ts` |
 | `/api/documents/generate` | POST | POST /api/documents/generate body: { docId: string, values: Record<string,string> } | `documents/generate/route.ts` |
-| `/api/documents/template` | GET | GET /api/documents/template?id=<docId> | `documents/template/route.ts` |
+| `/api/documents/template` | GET (no-rate-limit) | GET /api/documents/template?id=<docId> | `documents/template/route.ts` |
 | `/api/pretenzia/generate` | POST | POST /api/pretenzia/generate | `pretenzia/generate/route.ts` |
 | `/api/public-orders/cache` | GET (no-rate-limit) |  | `public-orders/cache/route.ts` |
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
-| `/api/settings/health` | GET | GET /api/settings/health (history now saved on disk: lib/health-store) | `settings/health/route.ts` |
+| `/api/settings/health` | GET (no-rate-limit) | GET /api/settings/health (history now saved on disk: lib/health-store) | `settings/health/route.ts` |
 | `/api/settings/security` | GET | GET /api/settings/security | `settings/security/route.ts` |
 | `/api/settings/update` | POST (privileged) | POST /api/settings/update | `settings/update/route.ts` |
-| `/api/settings/version` | GET | GET /api/settings/version | `settings/version/route.ts` |
-| `/api/settings/workers/code` | GET | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
+| `/api/settings/version` | GET (no-rate-limit) | GET /api/settings/version | `settings/version/route.ts` |
+| `/api/settings/workers/code` | GET (no-rate-limit) | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
 | `/api/settings/workers` | GET, POST (privileged), DELETE (privileged) | GET/POST/DELETE /api/settings/workers | `settings/workers/route.ts` |
 | `/api/settings/workers/test` | POST (privileged) | POST /api/settings/workers/test Body: { url: string, timeoutMs?: number } | `settings/workers/test/route.ts` |
 | `/api/snapshot` | DELETE | DELETE /api/snapshot?tin=302678824 | `snapshot/route.ts` |
