@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
-import { daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
+import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
@@ -105,18 +105,14 @@ export function WatchlistView() {
     let hearingsOk = false
     try {
       const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
-        // a PARTIAL answer (a court site failed) counts too few cases: writing them would lower what a complete one learned
-        if (res.ok && !(res.partial && res.partial.length > 0) && res.data.errors.length === 0) {
+        if (!res.ok) return
+        const s = res.data
+        // company facts (name, status, rating) are written from every answer; the case counts only from a complete one
+        const facts = companyFactsPatch(s)
+        patchRecord(stir, { name: facts.name, meta: facts.meta })
+        if (!(res.partial && res.partial.length > 0) && s.errors.length === 0) {
           statsOk = true
-          const s = res.data
-          patchMeta(stir, {
-            cases: s.summary.total,
-            ...orderCasesPatch(s.cases),
-            winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
-            // a source that did not answer must not erase what an earlier refresh learned (status «Faoliyatda», rating)
-            ...(s.company?.status ? { status: s.company.status } : {}),
-            ...(s.rating ? { rating: s.rating.category, score: s.rating.score } : {}),
-          })
+          patchMeta(stir, { cases: s.summary.total, ...orderCasesPatch(s.cases), winRate: winRate(s.summary.win, s.summary.lose) ?? undefined })
         }
       }
       const applyHearings = (res: Awaited<ReturnType<typeof getUpcomingHearings>>) => {

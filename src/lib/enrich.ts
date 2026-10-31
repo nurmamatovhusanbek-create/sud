@@ -9,7 +9,7 @@
 
 import { winRate } from '@/core/rates'
 import { getStats, getUpcomingHearings } from './api-client'
-import { hearingMetaPatch, orderCasesPatch, patchMeta } from './registry'
+import { companyFactsPatch, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord } from './registry'
 
 export interface EnrichResult {
   /** the stats came back COMPLETE (every court answered) */
@@ -27,18 +27,20 @@ export async function enrichCompanyDetailed(stir: string, force = false): Promis
   let hearingsOk = false
 
   const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
+    if (!res.ok) return
+    const s = res.data
+    // the COMPANY facts (name, status, rating) come from orginfo / chamber, not from the courts: they are written
+    // from every answer, partial or not
+    const facts = companyFactsPatch(s)
+    patchRecord(stir, { name: facts.name, meta: facts.meta })
     // a PARTIAL answer (a court site failed) counts too few cases: writing them would replace what an earlier,
     // complete refresh learned with a lower number
-    if (res.ok && !(res.partial && res.partial.length > 0) && res.data.errors.length === 0) {
+    if (!(res.partial && res.partial.length > 0) && s.errors.length === 0) {
       statsOk = true
-      const s = res.data
       patchMeta(stir, {
         cases: s.summary.total,
         ...orderCasesPatch(s.cases),
         winRate: winRate(s.summary.win, s.summary.lose) ?? undefined,
-        // a source that did not answer must not erase what an earlier refresh learned (status «Faoliyatda», rating)
-        ...(s.company?.status ? { status: s.company.status } : {}),
-        ...(s.rating ? { rating: s.rating.category, score: s.rating.score } : {}),
       })
     }
   }

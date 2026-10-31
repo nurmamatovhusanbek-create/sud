@@ -125,6 +125,7 @@ export const CompanyStatsSchema = z.object({
     })
     .nullable()
     .optional(),
+  ratingFailed: z.boolean().optional(),
 })
 
 export const StatsResponseSchema = z.object({

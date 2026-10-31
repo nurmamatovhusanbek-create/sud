@@ -38,7 +38,7 @@ export const statsSource = defineSource<string, CompanyStats>({
 // ---- company info (orginfo.uz + chamber.uz) ---------------------------------
 
 import { forgetCompany, getCompanyByTin } from '@/lib/orginfo'
-import { getCompanyRating } from '@/lib/chamber'
+import { getCompanyRatingDetailed } from '@/lib/chamber'
 
 export interface CompanyInfoMapped {
   tin: string
@@ -99,16 +99,20 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
     const partial: { source: string; error: string }[] = []
     const [orginfoResult, chamberResult] = await Promise.allSettled([
       getCompanyByTin(tin),
-      getCompanyRating(tin),
+      getCompanyRatingDetailed(tin),
     ])
     const company = orginfoResult.status === 'fulfilled' ? orginfoResult.value : null
-    const rating = chamberResult.status === 'fulfilled' ? chamberResult.value : null
+    const rating = chamberResult.status === 'fulfilled' ? chamberResult.value.rating : null
     if (orginfoResult.status === 'rejected') {
       partial.push({ source: 'orginfo', error: orginfoResult.reason instanceof Error ? orginfoResult.reason.message : String(orginfoResult.reason) })
     }
     // «not found» is also worth saying: the card would otherwise just show dashes
     if (orginfoResult.status === 'fulfilled' && !orginfoResult.value) {
       partial.push({ source: 'orginfo', error: 'orginfo.uz saytida kompaniya topilmadi' })
+    }
+    // «no rating» is only a fact when chamber answered; a failed call must show up in `partial` so the answer is not kept for a day
+    if (chamberResult.status === 'fulfilled' && chamberResult.value.failed) {
+      partial.push({ source: 'chamber', error: 'chamber.uz javob bermadi (reyting olinmadi)' })
     }
     if (chamberResult.status === 'rejected') {
       partial.push({ source: 'chamber', error: chamberResult.reason instanceof Error ? chamberResult.reason.message : String(chamberResult.reason) })

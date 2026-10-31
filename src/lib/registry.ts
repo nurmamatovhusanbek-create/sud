@@ -255,6 +255,51 @@ export function patchMeta(stir: string, patch: CompanyMeta): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sud:registry-changed'))
 }
 
+/** A real company name, not the «STIR 123456789» placeholder the server falls back to when no source named the company. */
+export function isRealName(n: string | undefined | null): n is string {
+  return !!n && n.trim().length > 1 && !/^STIR\s*\d*$/i.test(n.trim())
+}
+
+/** What a stats (or company-info) answer tells about the COMPANY itself, as far as the answer has it. */
+export interface CompanyFacts {
+  company?: { name?: string; shortName?: string; officialName?: string; status?: string } | null
+  rating?: { category?: string | null; score?: unknown } | null
+}
+
+/**
+ * Write what an answer says about the company into the registry: its NAME (cards show «STIR …» until this runs),
+ * its status and its chamber RATING. These come from independent sources (orginfo, chamber) and are valid even when a
+ * COURT site failed, so they are written from partial answers too; a source that did not answer never erases what an
+ * earlier one learned (an absent field is simply not in the patch).
+ */
+export function companyFactsPatch(d: CompanyFacts): { name?: string; meta: CompanyMeta } {
+  const c = d.company ?? undefined
+  const name = [c?.shortName, c?.officialName, c?.name].find(isRealName)
+  const meta: CompanyMeta = {}
+  if (c?.status) meta.status = c.status
+  const cat = d.rating?.category
+  // chamber answers «-» with a 0 score for a company it has no category for: that is no rating
+  if (cat && cat !== '-') {
+    meta.rating = cat
+    if (typeof d.rating?.score === 'number') meta.score = d.rating.score
+  }
+  return { ...(name ? { name: name.trim() } : {}), meta }
+}
+
+/** Patch a company's registry record (name and/or meta) in ONE write; only a record that exists is touched. */
+export function patchRecord(stir: string, patch: { name?: string; meta?: CompanyMeta }): void {
+  if (typeof window === 'undefined') return
+  const store = ensureMigrated()
+  const rec = store[stir]
+  if (!rec) return
+  const nameChanged = !!patch.name && rec.name !== patch.name
+  const metaChanged = !!patch.meta && Object.entries(patch.meta).some(([k, v]) => v !== undefined && (rec.meta as Record<string, unknown> | undefined)?.[k] !== v)
+  if (!nameChanged && !metaChanged) return
+  if (nameChanged) rec.name = patch.name
+  if (patch.meta) rec.meta = { ...(rec.meta || {}), ...patch.meta }
+  writeStore(store)
+}
+
 export function removeRecord(stir: string): void {
   const store = ensureMigrated()
   delete store[stir]

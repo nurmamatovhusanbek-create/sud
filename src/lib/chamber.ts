@@ -56,8 +56,18 @@ import { fetchViaWorkers } from './net/worker-fetch'
  * v206: single hedged scheduler call, same ChamberRating | null return.
  */
 export async function getCompanyRating(tin: string): Promise<ChamberRating | null> {
+  return (await getCompanyRatingDetailed(tin)).rating
+}
+
+/**
+ * The same lookup, but it says WHY there is no rating: `failed` = the source could not be reached or answered with an
+ * error (so «no rating» is unknown and must be retried, not remembered for a day); `failed: false` + `rating: null` =
+ * chamber answered and has no rating for this company.
+ */
+export async function getCompanyRatingDetailed(tin: string): Promise<{ rating: ChamberRating | null; failed: boolean }> {
   const cleanTin = tin.trim()
-  if (!/^\d{9}$/.test(cleanTin)) return null
+  if (!/^\d{9}$/.test(cleanTin)) return { rating: null, failed: false }
+  let failed = false
 
   const targetUrl = `https://admin.chamber.uz/api/GetCompanyCriteries/${cleanTin}`
 
@@ -96,15 +106,17 @@ export async function getCompanyRating(tin: string): Promise<ChamberRating | nul
       headers: { Accept: 'application/json' },
     })
     if (res.ok) data = await res.json()
+    else if (res.status >= 500 || res.status === 429 || res.status === 408) failed = true // an error, not «no such company»
   } catch {
-    /* all workers failed */
+    /* all workers failed, or the body was not JSON */
+    failed = true
   }
   if (!data || !data.tin) {
-    console.log(`[chamber] no rating data for TIN ${cleanTin} (workers exhausted or empty body)`)
-    return null
+    console.log(`[chamber] no rating data for TIN ${cleanTin} (${failed ? 'the source failed' : 'chamber has none'})`)
+    return { rating: null, failed }
   }
   console.log(`[chamber] TIN ${cleanTin} — rating via scheduler (admin.chamber.uz)`)
-  return {
+  return { failed: false, rating: {
     tin: data.tin,
     name: data.name || data.nameUz || '',
     nameRu: data.nameRu || '',
@@ -124,7 +136,7 @@ export async function getCompanyRating(tin: string): Promise<ChamberRating | nul
     okedShortName: data.okedDetail?.name_short_ru || '',
     employeeLimitMf: data.okedDetail?.employee_limit_mf ?? 0,
     employeeLimitLf: data.okedDetail?.employee_limit_lf ?? 0,
-  }
+  } }
 }
 
 /**

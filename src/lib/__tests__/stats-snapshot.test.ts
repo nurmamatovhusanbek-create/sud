@@ -35,6 +35,10 @@ afterAll(() => fs.rmSync(DIR, { recursive: true, force: true }))
 const kept = () => (['stats', 'info', 'bills', 'court:economic', 'court:civil'] as const).filter((p) => readSnapshot(TIN, p))
 
 describe('statsComplete', () => {
+  test('a chamber failure makes it incomplete: the rating would stay missing for the whole day', () => {
+    expect(statsComplete(stats({ ratingFailed: true }))).toBe(false)
+    expect(statsComplete(stats({ rating: null }))).toBe(true) // chamber answered: this company simply has no rating
+  })
   test('court errors or the «STIR …» placeholder name make it incomplete', () => {
     expect(statsComplete(stats())).toBe(true)
     expect(statsComplete(partial())).toBe(false)

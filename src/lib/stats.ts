@@ -19,7 +19,7 @@
 
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { getCompanyByTin } from './orginfo'
-import { getCompanyRating } from './chamber'
+import { getCompanyRatingDetailed } from './chamber'
 import { assignRoles, classifyOutcome } from '@/core/classify'
 
 // ---- Types (returned to API + consumed by client) --------------------
@@ -80,6 +80,9 @@ export interface CompanyStats {
   errors: CourtTypeError[]
   /** Contractor rating from chamber.uz (null when the source failed). */
   rating: StatsRating | null
+  /** chamber.uz could not be reached / answered with an error: the rating is UNKNOWN (not «none»), so this answer is not
+   *  kept for a day and is asked again on the next open */
+  ratingFailed?: boolean
 }
 
 // Name matching + outcome classification live in the pure core (one tested implementation).
@@ -186,7 +189,7 @@ async function fetchCompanyStatsInternal(
 
   const [orginfoResult, chamberResult, ...courtResults] = await Promise.allSettled([
     getCompanyByTin(tin).catch(e => { throw e }),
-    getCompanyRating(tin),
+    getCompanyRatingDetailed(tin),
     // v153: searchCourtCasesDetailed (not searchCourtCases) — also reports
     // `incomplete` when a source failed on every proxy/retry, so we can warn
     // instead of silently returning a too-low total. See court-case.ts.
@@ -201,11 +204,14 @@ async function fetchCompanyStatsInternal(
   // v204 (P-E): keep the rating that getCompanyRating already fetched — it
   // used to be fetched and thrown away outside the stats payload.
   let rating: StatsRating | null = null
-  if (chamberResult.status === 'fulfilled' && chamberResult.value) {
-    chamberName = chamberResult.value.name || chamberResult.value.nameLat || chamberResult.value.nameRu || ''
+  // «rejected» and «answered with an error» both mean the rating is UNKNOWN (retry it), unlike «chamber has none»
+  const chamberRating = chamberResult.status === 'fulfilled' ? chamberResult.value.rating : null
+  const ratingFailed = chamberResult.status === 'rejected' || (chamberResult.status === 'fulfilled' && chamberResult.value.failed)
+  if (chamberRating) {
+    chamberName = chamberRating.name || chamberRating.nameLat || chamberRating.nameRu || ''
     rating = {
-      score: typeof chamberResult.value.criteriaAll === 'number' ? chamberResult.value.criteriaAll : 0,
-      category: chamberResult.value.type || '-',
+      score: typeof chamberRating.criteriaAll === 'number' ? chamberRating.criteriaAll : 0,
+      category: chamberRating.type || '-',
     }
   }
   if (orginfoResult.status === 'fulfilled' && orginfoResult.value) {
@@ -231,9 +237,7 @@ async function fetchCompanyStatsInternal(
       company = {
         name: chamberName,
         tin,
-        region: chamberResult.status === 'fulfilled' && chamberResult.value
-          ? chamberResult.value.regionNameUz || ''
-          : '',
+        region: chamberRating?.regionNameUz || '',
       }
       companyNames.push(chamberName)
     } else {
@@ -329,6 +333,7 @@ async function fetchCompanyStatsInternal(
     summary,
     errors,
     rating,
+    ...(ratingFailed ? { ratingFailed: true } : {}),
   }
 }
 

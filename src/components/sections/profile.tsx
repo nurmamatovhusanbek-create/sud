@@ -16,7 +16,7 @@ import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
-import { patchMeta } from '@/lib/registry'
+import { patchMeta, patchRecord, companyFactsPatch } from '@/lib/registry'
 import { ratingBandFamily } from '@/core/status'
 import type { CompanyInfoData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
@@ -57,6 +57,11 @@ export function ProfileSection() {
     if (state.status === 'success' || state.status === 'partial') {
       const c = state.data.company
       if (c?.shortName || c?.officialName) patchCompany({ name: c.shortName || c.officialName })
+      // …and into the registry, with the rating: the home / watchlist cards read them from there
+      if (company) {
+        const facts = companyFactsPatch(state.data)
+        patchRecord(company.stir, { name: facts.name, meta: facts.meta })
+      }
       if (c?.status) {
         patchCompany({ status: c.status })
         // also remember it in the registry: the home «faol kompaniya» count and the Faol filter read it from there
