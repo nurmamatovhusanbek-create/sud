@@ -90,7 +90,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
 | `bills-snapshot.ts` | api/bills/route | lib/__tests__/bills-snapshot.test.ts |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
+| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
