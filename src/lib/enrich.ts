@@ -8,13 +8,32 @@
  */
 
 import { winRate } from '@/core/rates'
-import { getStats, getUpcomingHearings } from './api-client'
-import { companyFactsPatch, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord } from './registry'
+import { getRating, getStats, getUpcomingHearings } from './api-client'
+import { companyFactsPatch, getRecord, hearingMetaPatch, isRealName, orderCasesPatch, patchMeta, patchRecord } from './registry'
 
 export interface EnrichResult {
   /** the stats came back COMPLETE (every court answered) */
   stats: boolean
   hearings: boolean
+}
+
+/**
+ * The chamber rating on its own fast path (/api/rating), written to the registry the moment it arrives: it must not
+ * wait for the court searches of the stats scrape. A failure changes nothing (the known rating stays). Resolves to the
+ * rating it got, so a caller can show it right away.
+ */
+export async function refreshRating(stir: string, force = false): Promise<{ category: string; score: number | null } | null> {
+  try {
+    const res = await getRating(stir, { force })
+    if (!res.ok) return null
+    const named = isRealName(getRecord(stir)?.name)
+    // chamber's own name only fills a company that has none yet (orginfo / stats names win)
+    const facts = companyFactsPatch({ company: named ? undefined : { name: res.data.name }, rating: res.data.rating })
+    patchRecord(stir, { name: facts.name, meta: facts.meta })
+    return res.data.rating
+  } catch {
+    return null
+  }
 }
 
 export async function enrichCompany(stir: string, force = false): Promise<boolean> {
@@ -25,6 +44,8 @@ export async function enrichCompany(stir: string, force = false): Promise<boolea
 export async function enrichCompanyDetailed(stir: string, force = false): Promise<EnrichResult> {
   let statsOk = false
   let hearingsOk = false
+  // started first and not awaited by the court searches: the rating is on the card within a second or two
+  const ratingDone = refreshRating(stir, force)
 
   const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
     if (!res.ok) return
@@ -66,5 +87,6 @@ export async function enrichCompanyDetailed(stir: string, force = false): Promis
   } catch {
     /* best-effort */
   }
+  await ratingDone
   return { stats: statsOk, hearings: hearingsOk }
 }

@@ -143,3 +143,59 @@ describe('chamber rating: failed vs none', () => {
     expect(await getCompanyRating(TIN)).toBeNull()
   })
 })
+
+// ---- the quick rating (its own request, not the stats) ----------------------------------------------------------------
+describe('quick rating', () => {
+  const TIN = '302121267'
+  const found = { tin: TIN, name: 'PROCAB', criteriaAll: 71, type: 'BBB' }
+  let calls = 0
+  const countingFetch = globalThis.fetch
+  beforeEach(async () => {
+    const { __resetRatingCacheForTests } = await import('../rating-service')
+    __resetRatingCacheForTests()
+    calls = 0
+    globalThis.fetch = (async (...a: Parameters<typeof fetch>) => {
+      calls++
+      return (countingFetch as typeof fetch)(...a)
+    }) as unknown as typeof fetch
+  })
+  afterEach(() => {
+    globalThis.fetch = countingFetch
+  })
+
+  test('category, score and chamber name; asked once within the cache window', async () => {
+    const { getQuickRating } = await import('../rating-service')
+    reply = { status: 200, body: found }
+    const a = await getQuickRating(TIN)
+    expect(a).toEqual({ category: 'BBB', score: 71, name: 'PROCAB', failed: false })
+    const before = calls
+    expect(await getQuickRating(TIN)).toEqual(a)
+    expect(calls).toBe(before) // the second read came from memory
+  })
+  test('force asks again', async () => {
+    const { getQuickRating } = await import('../rating-service')
+    reply = { status: 200, body: found }
+    await getQuickRating(TIN)
+    const before = calls
+    reply = { status: 200, body: { ...found, type: 'A', criteriaAll: 80 } }
+    expect((await getQuickRating(TIN, { force: true })).category).toBe('A')
+    expect(calls).toBeGreaterThan(before)
+  })
+  test('a failure is reported and NEVER remembered: the next call asks again and can succeed', async () => {
+    const { getQuickRating } = await import('../rating-service')
+    reply = 'throw'
+    expect(await getQuickRating(TIN)).toMatchObject({ category: null, failed: true })
+    reply = { status: 200, body: found }
+    expect(await getQuickRating(TIN)).toMatchObject({ category: 'BBB', failed: false })
+  })
+  test('chamber has no rating for the company: category null, not a failure', async () => {
+    const { getQuickRating } = await import('../rating-service')
+    reply = { status: 200, body: {} }
+    expect(await getQuickRating(TIN)).toEqual({ category: null, score: null, name: '', failed: false })
+  })
+  test('«-» is no category', async () => {
+    const { getQuickRating } = await import('../rating-service')
+    reply = { status: 200, body: { tin: TIN, name: 'X Y', criteriaAll: 0, type: '-' } }
+    expect(await getQuickRating(TIN)).toMatchObject({ category: null, score: null, name: 'X Y' })
+  })
+})

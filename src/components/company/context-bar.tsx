@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { ageLabel } from '@/core/age'
 import { useDataAge } from '@/lib/data-age'
 import { hardRefreshWithToast, useRefreshing } from '@/lib/hard-refresh'
+import { refreshRating } from '@/lib/enrich'
 import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 import { bandFromFamily } from '@/components/proto/primitives'
 
@@ -46,6 +47,17 @@ export function ContextBar() {
   const watching = company ? (rv >= 0 ? isWatched(company.stir) : false) : false
   const refreshing = useRefreshing(company?.stir)
   const age = useDataAge(company?.stir)
+  const patchCompany = useAppStore((s) => s.patchCompany)
+  const stirNow = company?.stir
+  // a company opened newly: its chamber rating on the header and the registry within a second, not after the stats
+  useEffect(() => {
+    if (!stirNow) return
+    let alive = true
+    void refreshRating(stirNow).then((r) => {
+      if (alive && r) patchCompany({ rating: { category: r.category, score: r.score } })
+    })
+    return () => { alive = false }
+  }, [stirNow, patchCompany])
   // the label ages while the page stays open
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {

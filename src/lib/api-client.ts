@@ -87,6 +87,11 @@ export function getSecurityStatus(signal?: AbortSignal) {
   return request<SecurityStatus>('/api/settings/security', signal)
 }
 
+/** The chamber.uz rating alone (fast; see /api/rating). */
+export function getRating(tin: string, opts?: { force?: boolean; signal?: AbortSignal }) {
+  return request<{ rating: { category: string; score: number | null } | null; name: string }>(`/api/rating?tin=${tin}${opts?.force ? '&force=1' : ''}`, opts?.signal)
+}
+
 export function getCompanyInfo(tin: string, opts?: { force?: boolean; signal?: AbortSignal }) {
   return request<CompanyInfoData>(`/api/company-info?tin=${tin}${opts?.force ? '&force=1' : ''}`, opts?.signal)
 }

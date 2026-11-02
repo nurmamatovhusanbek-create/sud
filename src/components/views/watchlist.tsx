@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
+import { refreshRating } from '@/lib/enrich'
 import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
@@ -103,6 +104,8 @@ export function WatchlistView() {
     enrichedRef.current.add(stir)
     let statsOk = false
     let hearingsOk = false
+    // the rating does not wait for the court searches (see refreshRating)
+    const ratingDone = refreshRating(stir, force).then(() => setTick((t) => t + 1))
     try {
       const applyStats = (res: Awaited<ReturnType<typeof getStats>>) => {
         if (!res.ok) return
@@ -137,6 +140,7 @@ export function WatchlistView() {
     } finally {
       setTick((t) => t + 1)
     }
+    await ratingDone
     if (!statsOk && !hearingsOk) {
       throw new Error('enrichment failed: both sources unavailable')
     }
