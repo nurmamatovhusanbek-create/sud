@@ -16,7 +16,7 @@ import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
-import { patchMeta, patchRecord, companyFactsPatch } from '@/lib/registry'
+import { patchMeta, patchRecord, companyFactsPatch, getRecord } from '@/lib/registry'
 import { ratingBandFamily } from '@/core/status'
 import type { CompanyInfoData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
@@ -59,7 +59,7 @@ export function ProfileSection() {
       if (c?.shortName || c?.officialName) patchCompany({ name: c.shortName || c.officialName })
       // …and into the registry, with the rating: the home / watchlist cards read them from there
       if (company) {
-        const facts = companyFactsPatch(state.data)
+        const facts = companyFactsPatch(state.data, meta?.fetchedAt)
         patchRecord(company.stir, { name: facts.name, meta: facts.meta })
       }
       if (c?.status) {
@@ -67,14 +67,9 @@ export function ProfileSection() {
         // also remember it in the registry: the home «faol kompaniya» count and the Faol filter read it from there
         if (company) patchMeta(company.stir, { status: c.status })
       }
-      if (state.data.rating?.category) {
-        patchCompany({
-          rating: {
-            category: state.data.rating.category,
-            score: typeof state.data.rating.score === 'number' ? (state.data.rating.score as number) : null,
-          },
-        })
-      }
+      // the header shows what the registry holds after the write above (a day-old snapshot's rating cannot roll back a fresher one)
+      const held = company ? getRecord(company.stir)?.meta : undefined
+      if (held?.rating) patchCompany({ rating: { category: held.rating, score: held.score ?? null } })
     }
   }, [state.status, patchCompany])
 

@@ -28,7 +28,7 @@ export async function refreshRating(stir: string, force = false): Promise<{ cate
     if (!res.ok) return null
     const named = isRealName(getRecord(stir)?.name)
     // chamber's own name only fills a company that has none yet (orginfo / stats names win)
-    const facts = companyFactsPatch({ company: named ? undefined : { name: res.data.name }, rating: res.data.rating })
+    const facts = companyFactsPatch({ company: named ? undefined : { name: res.data.name }, rating: res.data.rating }, Date.now())
     patchRecord(stir, { name: facts.name, meta: facts.meta })
     return res.data.rating
   } catch {
@@ -52,7 +52,7 @@ export async function enrichCompanyDetailed(stir: string, force = false): Promis
     const s = res.data
     // the COMPANY facts (name, status, rating) come from orginfo / chamber, not from the courts: they are written
     // from every answer, partial or not
-    const facts = companyFactsPatch(s)
+    const facts = companyFactsPatch(s, res.meta?.fetchedAt)
     patchRecord(stir, { name: facts.name, meta: facts.meta })
     // a PARTIAL answer (a court site failed) counts too few cases: writing them would replace what an earlier,
     // complete refresh learned with a lower number

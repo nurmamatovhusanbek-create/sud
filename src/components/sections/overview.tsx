@@ -59,7 +59,7 @@ import type { CompanyStats } from '@/lib/api-types'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { patchMeta, patchRecord, companyFactsPatch, allRecords, orderCasesPatch } from '@/lib/registry'
+import { patchMeta, patchRecord, companyFactsPatch, getRecord, allRecords, orderCasesPatch } from '@/lib/registry'
 import { billsTotals, getCachedBills, subscribeBills, billsCacheVersion } from '@/lib/bills-cache'
 import { billStatusFamilySafe } from './bills-helpers'
 import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSum } from '@/core/billing-format'
@@ -684,11 +684,14 @@ function OverviewView({
       // the company's name, status and chamber rating go to the registry from every answer (the home card shows
       // «STIR …» and a stale rating until they do); the case counts only from a COMPLETE one: a court site that failed
       // counts too few cases
-      const facts = companyFactsPatch(d)
+      const facts = companyFactsPatch(d, meta?.fetchedAt)
       patchRecord(stir, { name: facts.name, meta: facts.meta })
       // the header (context bar) shows the same name and rating as soon as the stats land, whichever tab is open
       if (facts.name) patchCompany({ name: facts.name })
-      if (facts.meta.rating) patchCompany({ rating: { category: facts.meta.rating, score: facts.meta.score ?? null } })
+      // the header shows what the REGISTRY holds after the write, not this answer's rating: a day-old snapshot's one
+      // must not roll back a fresher reading
+      const held = getRecord(stir)?.meta
+      if (held?.rating) patchCompany({ rating: { category: held.rating, score: held.score ?? null } })
       if (state.status === 'success' && d.errors.length === 0) {
         const wr = calcWinRate(d.summary.win, d.summary.lose)
         patchMeta(stir, { cases: d.summary.total, ...orderCasesPatch(d.cases), winRate: wr ?? undefined })

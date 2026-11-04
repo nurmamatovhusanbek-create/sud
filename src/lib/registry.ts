@@ -37,6 +37,9 @@ export interface CompanyMeta {
   status?: string
   rating?: string | null
   score?: number | null
+  /** when the rating above was read from chamber (ms). An answer carrying an OLDER reading (a day-old snapshot) never
+   *  replaces it, so a fresh rating cannot be rolled back by a slower, staler answer. */
+  ratingAt?: number
   cases?: number
   winRate?: number
   /** ISO date of the next scheduled hearing, when known. */
@@ -270,9 +273,10 @@ export interface CompanyFacts {
  * Write what an answer says about the company into the registry: its NAME (cards show «STIR …» until this runs),
  * its status and its chamber RATING. These come from independent sources (orginfo, chamber) and are valid even when a
  * COURT site failed, so they are written from partial answers too; a source that did not answer never erases what an
- * earlier one learned (an absent field is simply not in the patch).
+ * earlier one learned (an absent field is simply not in the patch). `at` = when the answer's data was read from the
+ * source (ms; a snapshot's `fetchedAt`): the rating carries it so an older reading cannot overwrite a newer one.
  */
-export function companyFactsPatch(d: CompanyFacts): { name?: string; meta: CompanyMeta } {
+export function companyFactsPatch(d: CompanyFacts, at?: number): { name?: string; meta: CompanyMeta } {
   const c = d.company ?? undefined
   const name = [c?.shortName, c?.officialName, c?.name].find(isRealName)
   const meta: CompanyMeta = {}
@@ -282,6 +286,8 @@ export function companyFactsPatch(d: CompanyFacts): { name?: string; meta: Compa
   if (cat && cat !== '-') {
     meta.rating = cat
     if (typeof d.rating?.score === 'number') meta.score = d.rating.score
+    // when this reading was taken (0 = unknown: it loses against any reading with a known time)
+    meta.ratingAt = at ?? 0
   }
   return { ...(name ? { name: name.trim() } : {}), meta }
 }
@@ -292,11 +298,18 @@ export function patchRecord(stir: string, patch: { name?: string; meta?: Company
   const store = ensureMigrated()
   const rec = store[stir]
   if (!rec) return
+  let meta = patch.meta
+  // a rating read EARLIER than the one we hold (the stats of a day-old snapshot arriving after the fast chamber read)
+  // must not roll it back
+  if (meta && meta.ratingAt !== undefined && rec.meta?.ratingAt !== undefined && rec.meta.ratingAt > meta.ratingAt) {
+    const { rating: _r, score: _s, ratingAt: _t, ...rest } = meta
+    meta = rest
+  }
   const nameChanged = !!patch.name && rec.name !== patch.name
-  const metaChanged = !!patch.meta && Object.entries(patch.meta).some(([k, v]) => v !== undefined && (rec.meta as Record<string, unknown> | undefined)?.[k] !== v)
+  const metaChanged = !!meta && Object.entries(meta).some(([k, v]) => v !== undefined && (rec.meta as Record<string, unknown> | undefined)?.[k] !== v)
   if (!nameChanged && !metaChanged) return
   if (nameChanged) rec.name = patch.name
-  if (patch.meta) rec.meta = { ...(rec.meta || {}), ...patch.meta }
+  if (meta) rec.meta = { ...(rec.meta || {}), ...meta }
   writeStore(store)
 }
 

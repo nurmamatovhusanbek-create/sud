@@ -111,7 +111,7 @@ export function WatchlistView() {
         if (!res.ok) return
         const s = res.data
         // company facts (name, status, rating) are written from every answer; the case counts only from a complete one
-        const facts = companyFactsPatch(s)
+        const facts = companyFactsPatch(s, res.meta?.fetchedAt)
         patchRecord(stir, { name: facts.name, meta: facts.meta })
         if (!(res.partial && res.partial.length > 0) && s.errors.length === 0) {
           statsOk = true

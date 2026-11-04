@@ -35,7 +35,7 @@ const read = (stir: string) => JSON.parse((g.localStorage as Mem).getItem('sud-r
 describe('companyFactsPatch', () => {
   test('the name, status and rating of a stats answer', () => {
     const p = registry.companyFactsPatch({ company: { name: 'PROCAB', shortName: 'PROCAB MCHJ', status: 'Faoliyatda' }, rating: { category: 'BBB', score: 61 } })
-    expect(p).toEqual({ name: 'PROCAB MCHJ', meta: { status: 'Faoliyatda', rating: 'BBB', score: 61 } })
+    expect(p).toEqual({ name: 'PROCAB MCHJ', meta: { status: 'Faoliyatda', rating: 'BBB', score: 61, ratingAt: 0 } })
   })
   test('the «STIR …» placeholder is no name', () => {
     expect(registry.companyFactsPatch({ company: { name: 'STIR 302121267' } })).toEqual({ meta: {} })
@@ -48,7 +48,7 @@ describe('companyFactsPatch', () => {
     expect(registry.companyFactsPatch({ company: { name: 'A B' }, rating: null }).meta).toEqual({})
   })
   test('a score that is not a number is left out', () => {
-    expect(registry.companyFactsPatch({ rating: { category: 'A', score: 'x' } }).meta).toEqual({ rating: 'A' })
+    expect(registry.companyFactsPatch({ rating: { category: 'A', score: 'x' } }).meta).toEqual({ rating: 'A', ratingAt: 0 })
   })
 })
 
@@ -72,6 +72,35 @@ describe('patchRecord', () => {
     expect(read('302121267').meta).toMatchObject({ rating: 'BBB', score: 62 })
     registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ company: { name: 'X Y' }, rating: null }).meta }) // chamber failed this time
     expect(read('302121267').meta).toMatchObject({ rating: 'BBB', score: 62 })
+  })
+  test('an OLDER reading cannot roll a fresher rating back (the reported bug: the fast chamber rating was replaced a moment later by the day-old snapshot of the stats)', () => {
+    seed()
+    const day = 24 * 3600_000
+    const now = Date.now()
+    // the fast chamber read lands first
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'BBB', score: 62 } }, now).meta })
+    // …then the stats arrive, served from a snapshot taken yesterday, with yesterday's rating
+    registry.patchRecord('302121267', { name: 'PROCAB MCHJ', meta: registry.companyFactsPatch({ company: { name: 'PROCAB MCHJ', status: 'Faoliyatda' }, rating: { category: 'D', score: 10 } }, now - day).meta })
+    const r = read('302121267')
+    expect(r.meta).toMatchObject({ rating: 'BBB', score: 62, ratingAt: now }) // the rating stays
+    expect(r).toMatchObject({ name: 'PROCAB MCHJ' }) // …while the rest of that answer (name, status) is still taken
+    expect(r.meta.status).toBe('Faoliyatda')
+  })
+  test('a NEWER or equal reading replaces it (a forced scrape, a later refresh); an unknown time loses to a known one', () => {
+    seed()
+    const now = Date.now()
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'B', score: 40 } }, now).meta })
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'A', score: 80 } }, now + 1000).meta })
+    expect(read('302121267').meta).toMatchObject({ rating: 'A', score: 80 })
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'A', score: 81 } }, now + 1000).meta })
+    expect(read('302121267').meta.score).toBe(81)
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'D', score: 5 } }).meta }) // no time
+    expect(read('302121267').meta).toMatchObject({ rating: 'A', score: 81 })
+  })
+  test('a record that holds no reading yet takes whatever comes (also an answer with no time)', () => {
+    seed()
+    registry.patchRecord('302121267', { meta: registry.companyFactsPatch({ rating: { category: 'C', score: 20 } }).meta })
+    expect(read('302121267').meta).toMatchObject({ rating: 'C', score: 20 })
   })
   test('nothing new, nothing written (no event storm on every re-open)', () => {
     seed()
