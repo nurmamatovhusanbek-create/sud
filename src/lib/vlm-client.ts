@@ -23,7 +23,7 @@ type Fetch = (input: string, init: RequestInit) => Promise<Response>
 /** Z.ai's models think before answering unless told not to (a captcha needs one number, fast); other providers reject the field. */
 const isZai = (baseUrl: string): boolean => /(^|\.)z\.ai$/i.test(new URL(baseUrl).hostname) || /bigmodel\.cn$/i.test(new URL(baseUrl).hostname)
 
-/** Gemini 2.5 «thinks» before answering and its thinking tokens count against max_tokens (a tiny limit gives an empty answer): switch it off. */
+/** Gemini «thinks» before answering (11 s instead of 1 s on gemini-3.1-flash-lite) and its thinking tokens count against max_tokens: ask for the least thinking. «none» is refused by the 3.x models, «minimal» is accepted by 3.1 and 3.5. */
 const isGemini = (baseUrl: string): boolean => new URL(baseUrl).hostname.toLowerCase() === 'generativelanguage.googleapis.com'
 
 export async function callVision(cfg: Pick<VlmInput, 'baseUrl' | 'model' | 'apiKey'>, req: VisionRequest, fetchImpl: Fetch = fetch): Promise<string> {
@@ -41,7 +41,7 @@ export async function callVision(cfg: Pick<VlmInput, 'baseUrl' | 'model' | 'apiK
     max_tokens: isGemini(cfg.baseUrl) ? 256 : 24,
     temperature: 0,
     ...(isZai(cfg.baseUrl) ? { thinking: { type: 'disabled' } } : {}),
-    ...(isGemini(cfg.baseUrl) ? { reasoning_effort: 'none' } : {}),
+    ...(isGemini(cfg.baseUrl) ? { reasoning_effort: 'minimal' } : {}),
   }
   let res: Response
   try {

@@ -28,8 +28,8 @@ export const VLM_PRESETS: readonly VlmPreset[] = [
     note: 'Qwen 3.8 27B — rasm oʻqiy oladi (haqiqiy kalit bilan sinalgan). Groq modellarni almashtirib turadi: «Sinash» rad etsa, console.groq.com/docs/models dan vision modelini tanlang. Bepul darajada cheklov bor.',
   },
   {
-    provider: 'gemini', label: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', keyPage: 'aistudio.google.com → Get API key',
-    note: 'Gemini rasm oʻqiy oladi; Google AI Studio kaliti bepul darajaga ega (limitlar va model nomlarini ai.google.dev da tekshiring: ular oʻzgarib turadi). «Sinash» tugmasi haqiqiy natijani koʻrsatadi.',
+    provider: 'gemini', label: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-3.5-flash-lite', keyPage: 'aistudio.google.com → Get API key',
+    note: 'Gemini 3.5 Flash-Lite rasm oʻqiydi (haqiqiy kalit bilan sinalgan, ~1 soniya). Google eski modellarni yangi foydalanuvchilardan yopib turadi: «Sinash» rad etsa, ai.google.dev dan joriy modelni tanlang. Bepul daraja limitlarini ham oʻsha yerda tekshiring.',
   },
   {
     provider: 'custom', label: 'Boshqa (OpenAI-mos)', baseUrl: '', model: '', keyPage: '',
