@@ -24,8 +24,8 @@ export const VLM_PRESETS: readonly VlmPreset[] = [
     note: 'GLM-4.6V-Flash — bepul vision modeli (Z.ai hujjatlarida tekshiring: model nomlari oʻzgarib turadi).',
   },
   {
-    provider: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'meta-llama/llama-4-scout-17b-16e-instruct', keyPage: 'console.groq.com → API Keys',
-    note: 'Llama 4 Scout — vision modeli; Groq bepul darajasida cheklov bor.',
+    provider: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'qwen/qwen3.8-27b', keyPage: 'console.groq.com → API Keys',
+    note: 'Qwen 3.8 27B — rasm oʻqiy oladi (haqiqiy kalit bilan sinalgan). Groq modellarni almashtirib turadi: «Sinash» rad etsa, console.groq.com/docs/models dan vision modelini tanlang. Bepul darajada cheklov bor.',
   },
   {
     provider: 'custom', label: 'Boshqa (OpenAI-mos)', baseUrl: '', model: '', keyPage: '',
