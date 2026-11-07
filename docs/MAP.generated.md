@@ -57,7 +57,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
-| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, lib/orders-watchlist.ts, +4 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, lib/orders-watchlist.ts, +6 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/rating/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
@@ -123,9 +123,11 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts |  |
 | `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
-| `public-orders/data-dir.ts` | lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts |
+| `public-orders/data-dir.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts |
+| `public-orders/order-pdf.ts` | api/public-orders/file/route | lib/public-orders/__tests__/order-pdf.test.ts |
+| `public-orders/pdf-store.ts` | api/public-orders/file/route | lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |

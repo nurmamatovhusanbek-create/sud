@@ -1,15 +1,27 @@
 import { guard } from '@/server/middleware'
 import { jsonFail } from '@/server/envelope'
 import { fetchOrderFile } from '@/lib/public-orders/source'
-import { isOrderFileId, parseMultipartFile, pdfFileName } from '@/core/public-orders'
+import { isOrderFileId, pdfFileName } from '@/core/public-orders'
+import { createOrderPdfLoader, NotPdfError } from '@/lib/public-orders/order-pdf'
+import { readPdf, writePdf } from '@/lib/public-orders/pdf-store'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+// one loader for the whole server: disk cache, one captcha at a time, same order joins the running request
+const loadPdf = createOrderPdfLoader({
+  read: readPdf,
+  write: writePdf,
+  fetch: fetchOrderFile,
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  now: Date.now,
+})
+
 /**
  * GET /api/public-orders/file?id=<pdf id>[&name=…]  → the order as a PDF.
- * The upstream wraps it in a multipart envelope; we cut the PDF out and serve it as application/pdf.
+ * Served from disk when downloaded before (a published order never changes: one captcha per order, ever); otherwise
+ * fetched through a queue. The upstream wraps it in a multipart envelope; we cut the PDF out and serve application/pdf.
  * Only a uuid reaches the upstream URL.
  */
 export const GET = guard(async (req) => {
@@ -17,11 +29,8 @@ export const GET = guard(async (req) => {
   const id = url.searchParams.get('id') ?? ''
   if (!isOrderFileId(id)) return jsonFail('Fayl identifikatori notoʻgʻri', 'bad_request', 400)
   try {
-    const raw = await fetchOrderFile(id)
-    const part = parseMultipartFile(raw)
-    const bytes = part?.bytes ?? raw // some files may already be plain
-    if (Buffer.from(bytes.subarray(0, 5)).toString('latin1') !== '%PDF-') return jsonFail('Fayl PDF emas', 'upstream_error', 502)
-    const name = pdfFileName(part?.filename ?? url.searchParams.get('name') ?? '', 'qaror')
+    const { bytes, filename } = await loadPdf(id)
+    const name = pdfFileName(filename ?? url.searchParams.get('name') ?? '', 'qaror')
     return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
@@ -31,6 +40,7 @@ export const GET = guard(async (req) => {
       },
     })
   } catch (e) {
+    if (e instanceof NotPdfError) return jsonFail('Fayl PDF emas', 'upstream_error', 502)
     return jsonFail(e instanceof Error ? e.message : 'Faylni olib boʻlmadi', 'upstream_error', 502)
   }
 })
