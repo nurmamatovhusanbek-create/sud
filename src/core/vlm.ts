@@ -78,6 +78,16 @@ export function validateVlmInput(i: Partial<VlmInput>): { ok: true; value: VlmIn
   return { ok: true, value: { provider, baseUrl, model, apiKey } }
 }
 
+/** One saved provider is identified by its kind (a custom endpoint by its host): saving it again replaces it, a different one is added. */
+export const vlmId = (v: Pick<VlmInput, 'provider' | 'baseUrl'>): string => {
+  if (v.provider !== 'custom') return v.provider
+  try {
+    return `custom:${new URL(v.baseUrl).hostname.toLowerCase()}`
+  } catch {
+    return 'custom'
+  }
+}
+
 /** «sk-…abcd» for display: never more than the last four characters. */
 export const keyHint = (key: string): string => (key.length > 8 ? `••••${key.slice(-4)}` : '••••')
 

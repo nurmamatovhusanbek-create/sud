@@ -38,8 +38,9 @@ export const PUBLIC_DOWNLOAD_CAPTCHA: CaptchaSite = { siteKey: 'site_1842e42b6e3
 import { fetchViaWorkers, pickWorker } from './net/worker-fetch'
 import { directOriginOf } from './net/direct-route'
 import { config } from '@/server/config'
-import { readSavedVlm } from './vlm-config'
+import { readSavedVlmList } from './vlm-config'
 import { callVision } from './vlm-client'
+import { createVlmPool } from './vlm-pool'
 import { MATH_PROMPT, parseIntegerAnswer } from './vlm-test'
 
 /**
@@ -141,14 +142,17 @@ async function getZai() {
   return zaiPromise as Promise<Awaited<ReturnType<typeof ZAI.create>>>
 }
 
+const vlmPool = createVlmPool({ list: readSavedVlmList, call: callVision, now: Date.now, log: (l) => console.error(l) })
+
 /** Read a math captcha image and return the numeric answer. */
 async function solveMathImage(imageBase64: string): Promise<number> {
-  // The key the operator saved in Settings wins; the environment / SDK file below stay the fallback.
-  const saved = readSavedVlm()
-  if (saved) {
-    const text = await callVision(saved, { imageBase64, prompt: MATH_PROMPT })
+  // The keys the operator saved in Settings win (taken in turn, failing over to the next one); the environment / SDK
+  // file below stay the fallback when nothing is saved.
+  if (readSavedVlmList().length) {
+    const { text, via } = await vlmPool.ask({ imageBase64, prompt: MATH_PROMPT })
     const n = parseIntegerAnswer(text)
-    if (n === null) throw new Error('VLM did not return a number: ' + text)
+    if (n === null) throw new Error(`VLM (${via}) did not return a number: ` + text)
+    console.log(`[captcha] VLM ${via} read the picture: answer=${n}`)
     return n
   }
   const zai = await getZai()
@@ -417,7 +421,7 @@ export async function getCaptchaToken(
     console.log(`[captcha] analyze result: score=${analyze.score}, challengeRequired=${analyze.challengeRequired}, hasToken=${!!analyze.token}, hasChallenge=${!!analyze.challenge}`)
 
     if (!analyze.challengeRequired && analyze.token) {
-      console.log('[captcha] got token directly (score high enough)')
+      console.log('[captcha] got token directly (score high enough) — no VLM needed')
       return analyze.token
     }
 
@@ -448,19 +452,23 @@ export async function getCaptchaToken(
           3,
           worker,
         )
-        if (result.success && result.token) return result.token
+        if (result.success && result.token) {
+          console.log('[captcha] math captcha SOLVED with VLM → token received')
+          return result.token
+        }
+        console.error(`[captcha] math captcha NOT solved: sud rejected the VLM's answer (answer=${answer}, attemptsRemaining=${result.attemptsRemaining ?? '?'}) → retrying with a new picture`)
       } catch (e) {
         // v161: Vision API (internal-api.z.ai) may not be accessible from all
         // networks. Log the error clearly but don't crash — the billing search
         // can still succeed if the captcha score was high enough (no challenge
         // needed). The error falls through to the next attempt.
         const msg = e instanceof Error ? e.message : String(e)
-        if (/Configuration file not found|z-ai-config/.test(msg)) {
-          console.error('[captcha] VLM sozlanmagan — matematik captcha yechilmaydi. .env ga VLM_API_KEY va VLM_BASE_URL ni qoʻying (yoki .z-ai-config yarating), soʻng serverni qayta ishga tushiring.')
+        if (/Configuration file not found|z-ai-config|VLM sozlanmagan/.test(msg)) {
+          console.error('[captcha] math captcha NOT solved: VLM sozlanmagan. Sozlamalar › Captcha da kalit saqlang (yoki .env ga VLM_API_KEY va VLM_BASE_URL ni qoʻying).')
         } else if (msg.includes('ConnectionRefused') || msg.includes('Unable to connect')) {
           console.error('[captcha] Vision API isqib bo\'lmadi (internal-api.z.ai). Matematika captchasini yechish o\'tkazib yuborildi.')
         } else {
-          console.error(`[captcha] math challenge error: ${msg.slice(0, 150)}`)
+          console.error(`[captcha] math captcha NOT solved: ${msg.slice(0, 200)}`)
         }
         // fall through to next attempt
       }

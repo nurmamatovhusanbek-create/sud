@@ -130,31 +130,49 @@ describe('callVision', () => {
   })
 })
 
-describe('saved setting', () => {
-  beforeEach(() => cfgMod.clearSavedVlm())
-  const v = { provider: 'groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'm-1', apiKey: 'gsk_abcdefgh1234' } as const
+describe('saved settings (several providers)', () => {
+  beforeEach(() => cfgMod.removeVlm())
+  const g = { provider: 'groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'm-1', apiKey: 'gsk_abcdefgh1234' } as const
+  const m = { provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gm', apiKey: 'AQ.abcdefgh9999' } as const
 
-  test('nothing saved → not configured (no env)', () => {
-    expect(cfgMod.readSavedVlm()).toBeNull()
+  test('nothing saved → empty (no env)', () => {
+    expect(cfgMod.readSavedVlmList()).toEqual([])
+    expect(cfgMod.vlmStatus().configured).toBe(false)
   })
-  test('save → read → status shows only a hint', () => {
-    cfgMod.saveVlm(v)
-    expect(cfgMod.readSavedVlm()).toEqual(v)
+  test('add two, replace one in place, status shows only hints', () => {
+    cfgMod.upsertVlm(g)
+    cfgMod.upsertVlm(m)
+    cfgMod.upsertVlm({ ...g, model: 'm-2' })
+    expect(cfgMod.readSavedVlmList().map((v) => [v.provider, v.model])).toEqual([['groq', 'm-2'], ['gemini', 'gm']])
     const s = cfgMod.vlmStatus()
-    expect(s).toMatchObject({ configured: true, source: 'saved', provider: 'groq', model: 'm-1', keyHint: '••••1234' })
+    expect(s.providers.map((p) => p.keyHint)).toEqual(['••••1234', '••••9999'])
     expect(JSON.stringify(s)).not.toContain('gsk_abcdefgh')
+    expect(JSON.stringify(s)).not.toContain('AQ.abcdefgh')
   })
   test('the file is private (0600)', () => {
-    cfgMod.saveVlm(v)
+    cfgMod.upsertVlm(g)
     if (process.platform !== 'win32') expect(fs.statSync(cfgMod.vlmFile()).mode & 0o777).toBe(0o600)
+  })
+  test('remove one / remove all (the file goes away)', () => {
+    cfgMod.upsertVlm(g)
+    cfgMod.upsertVlm(m)
+    cfgMod.removeVlm('groq')
+    expect(cfgMod.readSavedVlmList().map((v) => v.provider)).toEqual(['gemini'])
+    cfgMod.removeVlm()
+    expect(cfgMod.readSavedVlmList()).toEqual([])
+    expect(fs.existsSync(cfgMod.vlmFile())).toBe(false)
+  })
+  test('the first version\'s single-object file is still read', () => {
+    fs.writeFileSync(cfgMod.vlmFile(), JSON.stringify(g))
+    expect(cfgMod.readSavedVlmList()).toEqual([g])
   })
   test('a damaged file reads as «none», never throws', () => {
     fs.writeFileSync(cfgMod.vlmFile(), '{not json')
-    expect(cfgMod.readSavedVlm()).toBeNull()
+    expect(cfgMod.readSavedVlmList()).toEqual([])
   })
-  test('clear removes it', () => {
-    cfgMod.saveVlm(v)
-    cfgMod.clearSavedVlm()
-    expect(cfgMod.readSavedVlm()).toBeNull()
+  test('savedVlm finds the key of a provider by id', () => {
+    cfgMod.upsertVlm(m)
+    expect(cfgMod.savedVlm('gemini')?.apiKey).toBe('AQ.abcdefgh9999')
+    expect(cfgMod.savedVlm('groq')).toBeNull()
   })
 })

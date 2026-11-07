@@ -28,7 +28,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/settings/security` | GET | GET /api/settings/security | `settings/security/route.ts` |
 | `/api/settings/update` | POST (privileged) | POST /api/settings/update | `settings/update/route.ts` |
 | `/api/settings/version` | GET (no-rate-limit) | GET /api/settings/version | `settings/version/route.ts` |
-| `/api/settings/vlm` | GET (no-rate-limit), POST, DELETE | GET → status: configured?, provider, base URL, model, last four characters of the key (never the key) | `settings/vlm/route.ts` |
+| `/api/settings/vlm` | GET (no-rate-limit), POST, DELETE | GET → status: the saved providers (id, kind, base URL, model, last four characters of the key; never the key) | `settings/vlm/route.ts` |
 | `/api/settings/vlm/test` | POST | POST /api/settings/vlm/test Body: { provider, baseUrl, model, apiKey? } | `settings/vlm/test/route.ts` |
 | `/api/settings/workers/code` | GET (no-rate-limit) | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
 | `/api/settings/workers` | GET, POST (privileged), DELETE (privileged) | GET/POST/DELETE /api/settings/workers | `settings/workers/route.ts` |
@@ -65,7 +65,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, lib/documents/derive.ts, lib/documents/from-case.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
-| `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts |
+| `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
 
 ### Server middleware / config / security
 
@@ -149,8 +149,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
-| `vlm-client.ts` | lib/billing.ts, lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
+| `vlm-client.ts` | lib/billing.ts, lib/vlm-pool.ts, lib/vlm-test.ts | lib/__tests__/vlm-pool.test.ts, lib/__tests__/vlm.test.ts |
 | `vlm-config.ts` | api/settings/vlm/route, lib/billing.ts, lib/vlm-request.ts | lib/__tests__/vlm.test.ts |
+| `vlm-pool.ts` | lib/billing.ts | lib/__tests__/vlm-pool.test.ts |
 | `vlm-request.ts` | api/settings/vlm/route, api/settings/vlm/test/route |  |
 | `vlm-test-image.ts` | lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
 | `vlm-test.ts` | api/settings/vlm/test/route, lib/billing.ts | lib/__tests__/vlm.test.ts |

@@ -11,15 +11,20 @@ import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, FlaskConical, Trash2, XCircle, ScanEye } from 'lucide-react'
 import { toast } from 'sonner'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
-import { VLM_PRESETS, presetOf, type VlmFailure, type VlmProvider } from '@/core/vlm'
+import { VLM_PRESETS, presetOf, vlmId, type VlmFailure, type VlmProvider } from '@/core/vlm'
 
+interface SavedProvider {
+  id: string
+  provider: VlmProvider
+  baseUrl: string
+  model: string
+  keyHint: string
+}
 interface Status {
   configured: boolean
   source: 'saved' | 'env' | 'none'
-  provider?: VlmProvider
-  baseUrl?: string
-  model?: string
-  keyHint?: string
+  providers: SavedProvider[]
+  env?: { baseUrl: string; keyHint: string }
 }
 interface TestOut {
   ok: boolean
@@ -59,14 +64,7 @@ export function VlmTab() {
   const load = useCallback(async () => {
     try {
       const r = await unwrap<Status>(await fetch('/api/settings/vlm', { headers: authHeaders() }))
-      if (r.ok && typeof r.data.configured === 'boolean') {
-        setStatus(r.data)
-        if (r.data.source === 'saved' && r.data.provider) {
-          setProvider(r.data.provider)
-          setBaseUrl(r.data.baseUrl ?? '')
-          setModel(r.data.model ?? '')
-        }
-      }
+      if (r.ok && typeof r.data.configured === 'boolean' && Array.isArray(r.data.providers)) setStatus(r.data)
     } catch {
       /* the form still works without it */
     }
@@ -84,7 +82,8 @@ export function VlmTab() {
   }
 
   const body = () => JSON.stringify({ provider, baseUrl, model, apiKey })
-  const haveKey = !!apiKey.trim() || status?.source === 'saved'
+  const formId = vlmId({ provider, baseUrl })
+  const haveKey = !!apiKey.trim() || !!status?.providers.some((p) => p.id === formId)
 
   async function test() {
     setBusy('test')
@@ -115,7 +114,7 @@ export function VlmTab() {
       if (r.ok) {
         setStatus(r.data)
         setApiKey('')
-        toast.success('Saqlandi: captcha shu kalit bilan oʻqiladi')
+        toast.success('Saqlandi: captcha saqlangan kalitlar bilan navbatma-navbat oʻqiladi')
       } else toast.error(`Saqlanmadi: ${r.error}`)
     } catch {
       toast.error('Saqlab boʻlmadi')
@@ -124,14 +123,14 @@ export function VlmTab() {
     }
   }
 
-  async function forget() {
+  async function forget(id: string) {
     try {
-      const res = await fetch('/api/settings/vlm', { method: 'DELETE', headers: privilegedHeaders() })
+      const res = await fetch(`/api/settings/vlm?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: privilegedHeaders() })
       const r = await unwrap<Status>(res)
       if (r.ok) {
         setStatus(r.data)
         setOut(null)
-        toast.success('Kalit oʻchirildi')
+        toast.success('Oʻchirildi')
       }
     } catch {
       toast.error('Oʻchirib boʻlmadi')
@@ -148,15 +147,38 @@ export function VlmTab() {
           <h2>Captcha oʻqish (VLM)</h2>
           {status?.configured && (
             <span className="badge b-pos" style={{ marginLeft: 'auto' }}>
-              {status.source === 'saved' ? `Saqlangan · ${status.keyHint}` : `Muhit oʻzgaruvchisi · ${status.keyHint}`}
+              {status.source === 'saved' ? `${status.providers.length} ta saqlangan` : `Muhit oʻzgaruvchisi · ${status.env?.keyHint}`}
             </span>
           )}
         </div>
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
-          billing.sud.uz baʼzan arifmetik rasm-captcha soʻraydi; uni rasm oʻqiy oladigan (vision) model yechadi. Har bir foydalanuvchi oʻz kalitini kiritadi:
-          kalit faqat shu kompyuterda (<span className="mono">~/.sud-tizimi/vlm.json</span>) saqlanadi, brauzerga qaytarilmaydi va hech qachon gitga tushmaydi.
+          billing.sud.uz baʼzan arifmetik rasm-captcha soʻraydi; uni rasm oʻqiy oladigan (vision) model yechadi. Har bir foydalanuvchi oʻz kalitini kiritadi,
+          bir nechta taʼminotchini qoʻshish mumkin: ular navbatma-navbat ishlatiladi, biri limitga yetsa yoki xato bersa darrov keyingisi ishlaydi.
+          Kalitlar faqat shu kompyuterda (<span className="mono">~/.sud-tizimi/vlm.json</span>) saqlanadi, brauzerga qaytarilmaydi va hech qachon gitga tushmaydi.
           {!status?.configured && ' Hozircha kalit yoʻq: captcha talab qilinsa hisob-kitob (toʻlovlar) olinmaydi.'}
         </p>
+
+        {!!status?.providers.length && (
+          <div className="list" style={{ marginBottom: 14 }}>
+            {status.providers.map((p, i) => (
+              <div className="kv" key={p.id}>
+                <span className="k" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span className="faint mono" style={{ fontSize: 12 }}>{i + 1}.</span>
+                  <b>{presetOf(p.provider).label}</b>
+                  <span className="mono faint" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.model} · {p.keyHint}</span>
+                </span>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => { setProvider(p.provider); setBaseUrl(p.baseUrl); setModel(p.model); setApiKey(''); setOut(null) }}>
+                    Tahrirlash
+                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={() => void forget(p.id)} disabled={!!busy} aria-label="Oʻchirish">
+                    <Trash2 />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {VLM_PRESETS.map((x) => (
@@ -183,7 +205,7 @@ export function VlmTab() {
               autoComplete="off"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={status?.source === 'saved' ? `API kalit (${status.keyHint}) — oʻzgartirmaslik uchun boʻsh qoldiring` : 'API kalit'}
+              placeholder={status?.providers.find((p) => p.id === formId) ? `API kalit (${status.providers.find((p) => p.id === formId)?.keyHint}) — oʻzgartirmaslik uchun boʻsh qoldiring` : 'API kalit'}
               spellCheck={false}
               style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}
             />
@@ -197,14 +219,8 @@ export function VlmTab() {
           </button>
           <button className="btn btn-primary" onClick={() => void save()} disabled={!haveKey || !baseUrl.trim() || !model.trim() || !!busy}>
             {busy === 'save' ? <span className="spinner" /> : null}
-            Saqlash
+            {status?.providers.some((p) => p.id === formId) ? 'Yangilash' : 'Qoʻshish'}
           </button>
-          {status?.source === 'saved' && (
-            <button className="btn btn-outline" onClick={() => void forget()} disabled={!!busy}>
-              <Trash2 />
-              Kalitni oʻchirish
-            </button>
-          )}
         </div>
 
         {out && (
