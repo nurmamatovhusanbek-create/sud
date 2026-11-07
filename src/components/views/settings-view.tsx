@@ -18,6 +18,7 @@ import {
   GitBranch,
   Library,
   Plus,
+  ScanEye,
   RefreshCw,
   Server,
   Shield,
@@ -34,6 +35,7 @@ import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
+import { VlmTab } from '@/components/views/vlm-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -117,6 +119,32 @@ const REASON_LABELS: Record<string, string> = {
   network_error: 'Tarmoq xatosi',
   not_https: 'HTTPS emas',
   private_host: 'Manzil ichki tarmoqqa ishora qiladi',
+}
+
+/** Run the REAL worker probe (/api/settings/workers/test) and say the result in a toast. Used by the drawer's button;
+ *  it used to toast «test yuborildi» and send nothing, so a test never ran and never reported. */
+async function runWorkerTest(url: string, label: string): Promise<TestResult | null> {
+  const id = toast.loading(`${label}: sinalmoqda…`)
+  let result: (TestResult & { error?: string }) | null = null
+  try {
+    const res = await fetch('/api/settings/workers/test', {
+      method: 'POST',
+      headers: privilegedHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ url, timeoutMs: 10000 }),
+    })
+    const json = (await res.json().catch(() => null)) as (TestResult & { error?: string }) | null
+    result = json && typeof json.ok === 'boolean' ? json : null
+    if (!result && json?.error) {
+      toast.error(`${label}: ${json.error}`, { id })
+      return null
+    }
+  } catch {
+    /* handled below */
+  }
+  if (!result) toast.error(`${label}: testni oʻtkazib boʻlmadi`, { id })
+  else if (result.ok) toast.success(`${label}: ishlayapti · ${result.responseMs ?? '-'}ms${result.caseCount ? ` · ${result.caseCount} ish` : ''}`, { id })
+  else toast.error(`${label}: ishlamadi · ${REASON_LABELS[result.reason ?? ''] || result.reason || 'xato'}`, { id })
+  return result
 }
 
 // ---- Updates tab ------------------------------------------------------------------
@@ -692,7 +720,7 @@ function HealthTab() {
           </>
         ),
         footer: (
-          <button className="btn btn-primary" onClick={() => toast(`${w.label || w.workerUrl}: test yuborildi`)}>
+          <button className="btn btn-primary" onClick={() => void runWorkerTest(w.workerUrl, w.label || w.workerUrl).then(() => void load())}>
             <FlaskConical />
             <span>Workerni sinash</span>
           </button>
@@ -823,7 +851,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'security'
+type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -857,6 +885,10 @@ export function SettingsView() {
           <Library />
           Qarorlar
         </button>
+        <button className={`set-tab ${tab === 'vlm' ? 'on' : ''}`} onClick={() => setTab('vlm')}>
+          <ScanEye />
+          Captcha
+        </button>
         <button className={`set-tab ${tab === 'security' ? 'on' : ''}`} onClick={() => setTab('security')}>
           <ShieldCheck />
           Xavfsizlik
@@ -867,6 +899,7 @@ export function SettingsView() {
       {tab === 'workers' && <WorkersTab />}
       {tab === 'health' && <HealthTab />}
       {tab === 'orders' && <OrdersTab />}
+      {tab === 'vlm' && <VlmTab />}
       {tab === 'security' && <SecurityTab />}
     </div>
   )

@@ -167,7 +167,7 @@ Key env variables (see `.env.example` for the full list):
 | `CF_WORKER_URLS` | Comma-separated list of your Cloudflare Worker URLs |
 | `CF_WORKER_SECRET` | Shared secret the app sends and `proxy.js` checks |
 | `APP_API_TOKEN` | Bearer token guarding the app's own API routes (**required in production**) |
-| `VLM_API_KEY`, `VLM_BASE_URL` | Math-captcha solver (VLM): set both to enable it (optional `VLM_TOKEN`); rotate any previously committed key |
+| `VLM_API_KEY`, `VLM_BASE_URL` | Math-captcha solver (VLM): set both to enable it (optional `VLM_TOKEN`); rotate any previously committed key. Usually not needed: each user can paste their own key in Settings › Captcha (saved in `~/.sud-tizimi/vlm.json`), which takes precedence |
 | `CACHE_BACKEND`, `CACHE_TTL_*` | `memory` (single-node) or `kv` (multi-node) + TTLs |
 | `ALERT_WINDOW_DAYS` | "Hearings due soon" window for watchlist alerts |
 

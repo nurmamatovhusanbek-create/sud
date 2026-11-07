@@ -28,6 +28,9 @@ const BILLING_API = 'https://billing.sud.uz'
 // stops the rate-limit wall.
 import { fetchViaWorkers, pickWorker } from './net/worker-fetch'
 import { config } from '@/server/config'
+import { readSavedVlm } from './vlm-config'
+import { callVision } from './vlm-client'
+import { MATH_PROMPT, parseIntegerAnswer } from './vlm-test'
 
 /**
  * billing.sud.uz sits behind its own Cloudflare and blocks many IPs
@@ -130,6 +133,14 @@ async function getZai() {
 
 /** Read a math captcha image and return the numeric answer. */
 async function solveMathImage(imageBase64: string): Promise<number> {
+  // The key the operator saved in Settings wins; the environment / SDK file below stay the fallback.
+  const saved = readSavedVlm()
+  if (saved) {
+    const text = await callVision(saved, { imageBase64, prompt: MATH_PROMPT })
+    const n = parseIntegerAnswer(text)
+    if (n === null) throw new Error('VLM did not return a number: ' + text)
+    return n
+  }
   const zai = await getZai()
   // P0 type-hardening: the SDK's current typings require a `model` field the
   // runtime does not need (server injects the default). Type-only cast — the

@@ -28,6 +28,8 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/settings/security` | GET | GET /api/settings/security | `settings/security/route.ts` |
 | `/api/settings/update` | POST (privileged) | POST /api/settings/update | `settings/update/route.ts` |
 | `/api/settings/version` | GET (no-rate-limit) | GET /api/settings/version | `settings/version/route.ts` |
+| `/api/settings/vlm` | GET (no-rate-limit), POST, DELETE | GET → status: configured?, provider, base URL, model, last four characters of the key (never the key) | `settings/vlm/route.ts` |
+| `/api/settings/vlm/test` | POST | POST /api/settings/vlm/test Body: { provider, baseUrl, model, apiKey? } | `settings/vlm/test/route.ts` |
 | `/api/settings/workers/code` | GET (no-rate-limit) | GET /api/settings/workers/code | `settings/workers/code/route.ts` |
 | `/api/settings/workers` | GET, POST (privileged), DELETE (privileged) | GET/POST/DELETE /api/settings/workers | `settings/workers/route.ts` |
 | `/api/settings/workers/test` | POST (privileged) | POST /api/settings/workers/test Body: { url: string, timeoutMs?: number } | `settings/workers/test/route.ts` |
@@ -63,15 +65,16 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, lib/documents/derive.ts, lib/documents/from-case.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
+| `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts |
 
 ### Server middleware / config / security
 
 | File | Imported by | Tests |
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
-| `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +3 |  |
-| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +7 |  |
-| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +21 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +4 |  |
+| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +9 |  |
+| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +23 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
@@ -85,7 +88,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +18 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +19 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -109,7 +112,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
 | `identity.ts` | app/page.tsx |  |
-| `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route | lib/__tests__/public-host.test.ts |
+| `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orders-watchlist.ts` | components/shell/orders-auto-check.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts |
@@ -142,6 +145,11 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
+| `vlm-client.ts` | lib/billing.ts, lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
+| `vlm-config.ts` | api/settings/vlm/route, lib/billing.ts, lib/vlm-request.ts | lib/__tests__/vlm.test.ts |
+| `vlm-request.ts` | api/settings/vlm/route, api/settings/vlm/test/route |  |
+| `vlm-test-image.ts` | lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
+| `vlm-test.ts` | api/settings/vlm/test/route, lib/billing.ts | lib/__tests__/vlm.test.ts |
 | `worker-defaults.ts` | lib/cf-worker-pool.ts, lib/workers-config.ts |  |
 | `workers-config.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/cf-worker-pool.ts | server/__tests__/security.test.ts |
 | `xlsx.ts` | api/bills/export/route, api/court-cases/export/route, api/stats/export/route, api/upcoming-hearings/export/route | server/__tests__/security.test.ts |
@@ -212,6 +220,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia-view.tsx` | components/views/documents-view.tsx |  |
 | `security-settings.tsx` | components/views/settings-view.tsx |  |
 | `settings-view.tsx` | app/page.tsx |  |
+| `vlm-settings.tsx` | components/views/settings-view.tsx |  |
 | `watchlist.tsx` | app/page.tsx |  |
 
 ### UI helpers
@@ -261,6 +270,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `TOR_SOCKS_PORT` | server/config.ts |
 | `VLM_API_KEY` | server/config.ts |
 | `VLM_BASE_URL` | server/config.ts |
+| `VLM_CONFIG_FILE` | lib/vlm-config.ts |
 | `VLM_TOKEN` | server/config.ts |
 | `WORKER_DEAD_COOLDOWN_MS` | server/config.ts |
 | `WORKER_DEAD_THRESHOLD` | server/config.ts |
