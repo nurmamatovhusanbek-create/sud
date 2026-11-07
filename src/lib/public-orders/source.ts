@@ -1,8 +1,8 @@
 import 'server-only'
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
-import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
+import { directRoute } from '@/lib/net/direct-route'
 import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
-import { fetchOrderFileWith, type OrderFileDeps } from './order-file'
+import { DIRECT, fetchOrderFileWith, type OrderFileDeps } from './order-file'
 import type { PublicCourtType, RawPublication } from '@/core/public-orders'
 
 /**
@@ -12,8 +12,9 @@ import type { PublicCourtType, RawPublication } from '@/core/public-orders'
  * cloudflare-worker/proxy.js (which already allows `adolatapi1.sud.uz`) redeployed.
  */
 
+const PUBLIC_ORIGIN = 'https://public.sud.uz'
 const BASE = process.env.PUBLIC_ORDERS_API || 'https://adolatapi1.sud.uz'
-const DIRECT = process.env.PUBLIC_ORDERS_VIA_WORKERS !== '1'
+const DIRECT_LIST = process.env.PUBLIC_ORDERS_VIA_WORKERS !== '1'
 const HEADERS = {
   Accept: 'application/json, text/plain, */*',
   Origin: 'https://public.sud.uz',
@@ -23,7 +24,7 @@ const HEADERS = {
 
 async function fetchUpstream(path: string, opts: { timeoutMs: number; background: boolean }): Promise<Response> {
   const url = BASE + path
-  if (DIRECT) return fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
+  if (DIRECT_LIST) return fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
   return fetchViaWorkers(url, {
     originKey: 'adolatapi1.sud.uz',
     headers: HEADERS,
@@ -35,18 +36,17 @@ async function fetchUpstream(path: string, opts: { timeoutMs: number; background
 }
 
 const realDeps: OrderFileDeps = {
-  getToken: (worker) => getCaptchaToken(3, undefined, worker, PUBLIC_DOWNLOAD_CAPTCHA),
-  download: async (pdfId, token, worker) => {
-    const res = await fetchViaWorkers(`${BASE}/public/onStream/${pdfId}?recaptcha_token=${encodeURIComponent(token)}`, {
-      originKey: 'adolatapi1.sud.uz',
-      headers: HEADERS,
-      timeoutMs: 45_000,
-      maxAttempts: 1,
-      hedgeMs: 45_000, // never race a duplicate: the first request spends the token
-      priority: 'interactive',
-      worker,
-    })
-    return { status: res.status, body: new Uint8Array(await res.arrayBuffer()) }
+  getToken: (route) => getCaptchaToken(3, undefined, route === DIRECT ? directRoute(PUBLIC_ORIGIN) : route, PUBLIC_DOWNLOAD_CAPTCHA),
+  download: async (pdfId, token, route) => {
+    const url = `${BASE}/public/onStream/${pdfId}?recaptcha_token=${encodeURIComponent(token)}`
+    // never race a duplicate: the first request spends the token
+    const res =
+      route === DIRECT
+        ? await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
+        : await fetchViaWorkers(url, { originKey: 'adolatapi1.sud.uz', headers: HEADERS, timeoutMs: 45_000, maxAttempts: 1, hedgeMs: 45_000, priority: 'interactive', worker: route })
+    const body = new Uint8Array(await res.arrayBuffer())
+    if (!res.ok) console.error(`[orders-file] ${route === DIRECT ? 'direct' : 'worker'} HTTP ${res.status}: ${Buffer.from(body.subarray(0, 200)).toString('utf8').replace(/\s+/g, ' ')}`)
+    return { status: res.status, body }
   },
   pick: pickWorker,
 }
@@ -56,9 +56,6 @@ const realDeps: OrderFileDeps = {
  * token on the download; the retry/pinning rules live in order-file.ts.
  */
 export async function fetchOrderFile(pdfId: string): Promise<Uint8Array> {
-  if (getCfWorkerUrls().length === 0) {
-    throw new Error('public.sud.uz fayli captcha talab qiladi: Sozlamalar › Workerlar da kamida bitta worker qoʻshing')
-  }
   return fetchOrderFileWith(pdfId, realDeps)
 }
 

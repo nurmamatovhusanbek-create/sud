@@ -36,6 +36,7 @@ export const PUBLIC_DOWNLOAD_CAPTCHA: CaptchaSite = { siteKey: 'site_1842e42b6e3
 // billing.sud.uz instead of stampeding it. That shared cap is exactly what
 // stops the rate-limit wall.
 import { fetchViaWorkers, pickWorker } from './net/worker-fetch'
+import { directOriginOf } from './net/direct-route'
 import { config } from '@/server/config'
 import { readSavedVlm } from './vlm-config'
 import { callVision } from './vlm-client'
@@ -211,19 +212,36 @@ async function fetchJsonWithRetry<T>(
   for (let attempt = 0; attempt <= effectiveRetries; attempt++) {
     const startTime = Date.now()
     try {
-      const res = await fetchViaWorkers(url, {
-        originKey: isCaptchaUrl ? 'recaptcha.sud.uz' : 'billing.sud.uz',
-        method,
-        body,
-        headers,
-        timeoutMs: isCaptchaUrl ? 10_000 : 8_000,
-        hedgeMs: 900,
-        maxAttempts: 2,
-        worker,
-      })
+      // «direct:<origin>» = this machine talks to the site itself, as a browser on that origin would (same IP for the
+      // captcha and for what it unlocks); anything else goes through the scheduler / a pinned worker.
+      const directOrigin = directOriginOf(worker)
+      const res = directOrigin
+        ? await fetch(url, {
+            method,
+            body,
+            headers: {
+              Accept: 'application/json, text/plain, */*',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+              ...headers,
+              Origin: directOrigin,
+              Referer: `${directOrigin}/`,
+            },
+            signal: AbortSignal.timeout(isCaptchaUrl ? 10_000 : 8_000),
+            redirect: 'manual',
+          })
+        : await fetchViaWorkers(url, {
+            originKey: isCaptchaUrl ? 'recaptcha.sud.uz' : 'billing.sud.uz',
+            method,
+            body,
+            headers,
+            timeoutMs: isCaptchaUrl ? 10_000 : 8_000,
+            hedgeMs: 900,
+            maxAttempts: 2,
+            worker,
+          })
       const elapsed = Date.now() - startTime
       const label = url.split('/').pop()?.split('?')[0] ?? url
-      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via ${worker ? workerHost(worker) : 'scheduler'})`)
+      console.log(`[billing] ${label} attempt ${attempt + 1}: HTTP ${res.status} in ${elapsed}ms (via ${directOrigin ? 'this machine' : worker ? workerHost(worker) : 'scheduler'})`)
 
       // 521/522/523 = origin down. The scheduler already hedges to another
       // worker (>=500 counts as a worker/origin failure) — if we still see it,

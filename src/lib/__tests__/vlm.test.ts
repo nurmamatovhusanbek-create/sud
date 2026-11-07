@@ -97,6 +97,16 @@ describe('callVision', () => {
     })
     expect(body.thinking).toEqual({ type: 'disabled' })
   })
+  test('gemini: thinking switched off, room for the answer', async () => {
+    let body: Record<string, unknown> = {}
+    await callVision({ ...cfg, baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' }, { imageBase64: 'A', prompt: 'p' }, async (_u, init) => {
+      body = JSON.parse(String(init.body))
+      return new Response(JSON.stringify({ choices: [{ message: { content: '1' } }] }))
+    })
+    expect(body.reasoning_effort).toBe('none')
+    expect(body.max_tokens).toBe(256)
+    expect(body.thinking).toBeUndefined()
+  })
   test.each([
     [401, 'bad_key'],
     [429, 'rate_limited'],

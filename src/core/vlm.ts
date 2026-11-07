@@ -4,7 +4,7 @@
  * Pure (shared by the form and the server); the network lives in lib/vlm-client.ts.
  */
 
-export type VlmProvider = 'zai' | 'groq' | 'custom'
+export type VlmProvider = 'zai' | 'groq' | 'gemini' | 'custom'
 
 export interface VlmPreset {
   provider: VlmProvider
@@ -26,6 +26,10 @@ export const VLM_PRESETS: readonly VlmPreset[] = [
   {
     provider: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'qwen/qwen3.8-27b', keyPage: 'console.groq.com → API Keys',
     note: 'Qwen 3.8 27B — rasm oʻqiy oladi (haqiqiy kalit bilan sinalgan). Groq modellarni almashtirib turadi: «Sinash» rad etsa, console.groq.com/docs/models dan vision modelini tanlang. Bepul darajada cheklov bor.',
+  },
+  {
+    provider: 'gemini', label: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', keyPage: 'aistudio.google.com → Get API key',
+    note: 'Gemini rasm oʻqiy oladi; Google AI Studio kaliti bepul darajaga ega (limitlar va model nomlarini ai.google.dev da tekshiring: ular oʻzgarib turadi). «Sinash» tugmasi haqiqiy natijani koʻrsatadi.',
   },
   {
     provider: 'custom', label: 'Boshqa (OpenAI-mos)', baseUrl: '', model: '', keyPage: '',
@@ -63,7 +67,7 @@ export type VlmInputError = 'bad_provider' | 'bad_url' | 'no_model' | 'no_key' |
 /** Validate what the form sends. A key must be one printable token (no spaces, no line breaks); its value is never judged further. */
 export function validateVlmInput(i: Partial<VlmInput>): { ok: true; value: VlmInput } | { ok: false; error: VlmInputError } {
   const provider = i.provider
-  if (provider !== 'zai' && provider !== 'groq' && provider !== 'custom') return { ok: false, error: 'bad_provider' }
+  if (provider !== 'zai' && provider !== 'groq' && provider !== 'gemini' && provider !== 'custom') return { ok: false, error: 'bad_provider' }
   const baseUrl = normalizeBaseUrl(i.baseUrl ?? '')
   if (!baseUrl) return { ok: false, error: 'bad_url' }
   const model = (i.model ?? '').trim()
