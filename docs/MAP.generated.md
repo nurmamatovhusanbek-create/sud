@@ -90,11 +90,11 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +19 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
-| `billing.ts` | api/bills/route, lib/bills-snapshot.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
+| `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
 | `bills-snapshot.ts` | api/bills/route | lib/__tests__/bills-snapshot.test.ts |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
+| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts, lib/public-orders/source.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
@@ -124,6 +124,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
+| `public-orders/order-file.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts |
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |

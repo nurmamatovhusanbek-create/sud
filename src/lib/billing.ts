@@ -19,6 +19,15 @@ const SITE_KEY = 'site_bbdb0625df8a200e73f37ebccf0c62ac'
 const CAPTCHA_API = 'https://recaptcha.sud.uz'
 const BILLING_API = 'https://billing.sud.uz'
 
+/** A captcha «site» on recaptcha.sud.uz: its key and the action name the page announces. Same PoW → analyze → solve API for all. */
+export interface CaptchaSite {
+  siteKey: string
+  action: string
+}
+export const BILLING_CAPTCHA: CaptchaSite = { siteKey: SITE_KEY, action: 'my_checks' }
+/** public.sud.uz's «download» dialog (the order file endpoint wants this token since late 2026). */
+export const PUBLIC_DOWNLOAD_CAPTCHA: CaptchaSite = { siteKey: 'site_1842e42b6e31fb21ac22c681def0e326', action: 'download' }
+
 // v204 (P-A): billing no longer carries its own worker list or resolver.
 // v206 (rate-limit fix): billing no longer carries its own ProxyPool either —
 // every request below (PoW/captcha POSTs, search, per-bill checkStatus) goes
@@ -332,6 +341,7 @@ export async function getCaptchaToken(
   onPhase?: PhaseCallback,
   /** keep the whole session (PoW → analyze → solve) on one worker */
   worker?: string,
+  site: CaptchaSite = BILLING_CAPTCHA,
 ): Promise<string> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // 1. PoW challenge
@@ -346,7 +356,7 @@ export async function getCaptchaToken(
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteKey: SITE_KEY }),
+        body: JSON.stringify({ siteKey: site.siteKey }),
       },
       3,
       worker,
@@ -368,8 +378,8 @@ export async function getCaptchaToken(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          siteKey: SITE_KEY,
-          action: 'my_checks',
+          siteKey: site.siteKey,
+          action: site.action,
           timestamp: Date.now(),
           signals: {
             ...buildSignals(attempt),
@@ -414,7 +424,7 @@ export async function getCaptchaToken(
               challengeId: analyze.challenge.id,
               answer,
               solveTimeMs: Date.now() - solveStart,
-              siteKey: SITE_KEY,
+              siteKey: site.siteKey,
             }),
           },
           3,

@@ -1,5 +1,8 @@
 import 'server-only'
-import { fetchViaWorkers } from '@/lib/net/worker-fetch'
+import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
+import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
+import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
+import { fetchOrderFileWith, type OrderFileDeps } from './order-file'
 import type { PublicCourtType, RawPublication } from '@/core/public-orders'
 
 /**
@@ -31,11 +34,32 @@ async function fetchUpstream(path: string, opts: { timeoutMs: number; background
   })
 }
 
-/** The raw multipart-wrapped order file (see core/public-orders.ts → parseMultipartFile). */
+const realDeps: OrderFileDeps = {
+  getToken: (worker) => getCaptchaToken(3, undefined, worker, PUBLIC_DOWNLOAD_CAPTCHA),
+  download: async (pdfId, token, worker) => {
+    const res = await fetchViaWorkers(`${BASE}/public/onStream/${pdfId}?recaptcha_token=${encodeURIComponent(token)}`, {
+      originKey: 'adolatapi1.sud.uz',
+      headers: HEADERS,
+      timeoutMs: 45_000,
+      maxAttempts: 1,
+      hedgeMs: 45_000, // never race a duplicate: the first request spends the token
+      priority: 'interactive',
+      worker,
+    })
+    return { status: res.status, body: new Uint8Array(await res.arrayBuffer()) }
+  },
+  pick: pickWorker,
+}
+
+/**
+ * The raw multipart-wrapped order file (see core/public-orders.ts → parseMultipartFile). public.sud.uz wants a captcha
+ * token on the download; the retry/pinning rules live in order-file.ts.
+ */
 export async function fetchOrderFile(pdfId: string): Promise<Uint8Array> {
-  const res = await fetchUpstream(`/public/onStream/${pdfId}`, { timeoutMs: 45_000, background: false })
-  if (!res.ok) throw new Error(`public.sud.uz file: HTTP ${res.status}`)
-  return new Uint8Array(await res.arrayBuffer())
+  if (getCfWorkerUrls().length === 0) {
+    throw new Error('public.sud.uz fayli captcha talab qiladi: Sozlamalar › Workerlar da kamida bitta worker qoʻshing')
+  }
+  return fetchOrderFileWith(pdfId, realDeps)
 }
 
 /** The slow upstream search for ONE case in ONE instance (~10 s). Only ever called from the background job. */
