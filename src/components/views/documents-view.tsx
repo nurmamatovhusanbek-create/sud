@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet, Trash2,
+  X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet, FilePlus, Trash2,
 } from 'lucide-react'
 import {
   TABS,
@@ -31,6 +31,9 @@ import {
   type DocDef,
 } from '@/lib/documents/registry'
 import { PretenziyaFlow } from './pretenzia-view'
+import { CustomTemplates } from './custom-templates'
+import { listCustomDocs } from '@/lib/api-client'
+import { registerCustomDocs } from '@/lib/documents/custom'
 import { DocEditor } from './doc-editor'
 import { useLetterhead } from '@/components/proto/letterhead'
 import { useAppStore } from '@/lib/store/app-store'
@@ -41,6 +44,7 @@ const CAT_ICON: Record<DocTab, React.ReactNode> = {
   iio: <Landmark />,
   court: <Scale />,
   secret: <Lock />,
+  custom: <FilePlus />,
 }
 
 // ---- cards -----------------------------------------------------------------
@@ -50,6 +54,7 @@ const CAT_BLURB: Record<DocTab, string> = {
   iio: 'IIO / MvaPB kafolat va roʻyxat xati',
   court: 'Sudga arizalar va iltimosnomalar',
   secret: 'Tijorat siri buyrugʻi va xodim bilan kelishuv',
+  custom: 'Oʻzingiz yuklagan .docx shablonlar',
 }
 
 function CategoryCard({ tab, onOpen }: { tab: TabDef; onOpen: () => void }) {
@@ -134,6 +139,13 @@ export function DocumentsView() {
   const prefill = useAppStore((s) => s.docPrefill)
   const setDocPrefill = useAppStore((s) => s.setDocPrefill)
   const [initial, setInitial] = useState<Record<string, string> | null>(null)
+  // the operator's own templates live on the server; load them into the registry, then re-render
+  const [, setCustomVer] = useState(0)
+  const reloadCustom = async () => {
+    registerCustomDocs(await listCustomDocs().catch(() => []))
+    setCustomVer((v) => v + 1)
+  }
+  useEffect(() => { void reloadCustom() }, [])
 
   const [letterhead, updateLetterhead] = useLetterhead()
 
@@ -213,6 +225,11 @@ export function DocumentsView() {
     )
   }
 
+  // ---- own templates: upload + the list
+  if (activeTab?.id === 'custom') {
+    return <CustomTemplates onBack={() => setActive(null)} onOpen={(id) => setActiveDoc(id)} onChanged={reloadCustom} />
+  }
+
   // ---- a separate category → its document tiles
   if (activeTab) {
     return (
@@ -270,6 +287,14 @@ export function DocumentsView() {
         />
         <div className="doc-cat-cards">
           {TABS.map((t) => <CategoryCard key={t.id} tab={t} onOpen={() => setActive(t.id)} />)}
+          <button className="doc-cat rise-c" onClick={() => setActive('custom')}>
+            <div className="doc-cat-ico"><FilePlus /></div>
+            <div className="doc-cat-body">
+              <b>Oʻz shablonlarim</b>
+              <span>{CAT_BLURB.custom}</span>
+            </div>
+            <ChevronRight className="doc-cat-arrow" />
+          </button>
           <button className="doc-cat rise-c" onClick={() => setPretenzia(true)}>
             <div className="doc-cat-ico"><FileSpreadsheet /></div>
             <div className="doc-cat-body">

@@ -12,7 +12,7 @@
  * so this file must stay free of client/server-only imports.
  */
 
-export type DocTab = 'visa' | 'iio' | 'court' | 'secret'
+export type DocTab = 'visa' | 'iio' | 'court' | 'secret' | 'custom'
 export type FieldKind = 'text' | 'date' | 'textarea'
 
 export interface FieldDef {
@@ -368,6 +368,14 @@ export const TABS: TabDef[] = [
   },
 ]
 
+/** the one category all custom documents live in (a separate category: tiles, each opens its own form) */
+export const CUSTOM_TAB: TabDef = {
+  id: 'custom',
+  label: 'Oʻz shablonlarim',
+  intro: 'Oʻzingiz yuklagan .docx shablonlar. Matnda {{maydon}} belgilari boʻlsa, ular forma maydoniga aylanadi.',
+  separate: true,
+}
+
 // ---- form sections ----------------------------------------------------------
 // Separate categories (court) have no shared panels, so their long field list is
 // split into readable sections in the editor. Unlisted keys fall into "Maʼlumotlar".
@@ -396,7 +404,7 @@ export function sectionsFor(keys: string[]): { title: string; keys: string[] }[]
 // ---- helpers ----------------------------------------------------------------
 
 export function tabById(id: DocTab): TabDef | undefined {
-  return TABS.find((t) => t.id === id)
+  return TABS.find((t) => t.id === id) ?? (id === 'custom' ? CUSTOM_TAB : undefined)
 }
 
 export function docsByTab(id: DocTab): DocDef[] {

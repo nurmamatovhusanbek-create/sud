@@ -15,6 +15,8 @@ import { docById } from './registry'
 import { fillXml } from './fill.shared'
 import { applyLetterhead } from './banner'
 import { withDerived } from './derive'
+import { isCustomId } from './custom'
+import { ensureCustomRegistered, readCustomTemplate } from './custom.server'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
 
@@ -34,6 +36,11 @@ export interface GenerateOpts {
 
 /** Raw bytes of a document's .docx template (also served to the live preview). */
 export async function readTemplate(docId: string): Promise<Buffer> {
+  if (isCustomId(docId)) {
+    await ensureCustomRegistered()
+    if (!docById(docId)) throw new Error('Nomaʼlum hujjat turi')
+    return readCustomTemplate(docId)
+  }
   const def = docById(docId)
   if (!def) throw new Error('Nomaʼlum hujjat turi')
 
@@ -48,6 +55,7 @@ export async function generateDocx(
   values: Record<string, string>,
   opts: GenerateOpts = {},
 ): Promise<GeneratedDoc> {
+  if (isCustomId(docId)) await ensureCustomRegistered()
   const def = docById(docId)
   if (!def) throw new Error('Nomaʼlum hujjat turi')
 

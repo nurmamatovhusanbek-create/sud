@@ -142,6 +142,12 @@ Pipeline per change (debounced): template zip → `markXml` wraps each value in 
 
 Each row is laid over the form's values (what is shared is typed once) and checked with the same `validate.ts` checks; nothing blocks. **PDF** = `print-render.ts`: the same `fillXml` as the download, rendered by docx-preview off-screen and printed by the browser (the window is opened inside the click). **«Barchasi · ZIP»** zips a combined category's documents client-side. Drafts / saved profiles / checks: `drafts.ts`, `profiles.ts`, `validate.ts` (all pure, storage injected).
 
+### Own templates («Oʻz shablonlarim»)
+
+**Where:** `lib/documents/custom.ts` (pure: `scanTemplate` puts every `{{marker}}` Word split across runs back into ONE run, lowercases it, reports unreadable ones; `registerCustomDocs` puts the docs and their fields into the registry) · `custom.server.ts` (`~/.sud-tizimi/templates`, validation) · `api/documents/custom` · `views/custom-templates.tsx`
+
+A key the catalog (`FIELDS`) knows keeps its label, default, example and checks; any other key is a plain text field labelled after the key. The client loads the saved list into the registry on opening Hujjatlar; the server registers them (`ensureCustomRegistered`) before it reads or fills a `custom_…` id. Everything else (preview, drafts, checks, PDF, «Jadvaldan») works unchanged because it goes through `docById` / `FIELDS`. The route is in `next.config.ts` `outputFileTracingIncludes` only for the built-in templates: custom ones are read from disk at run time.
+
 ### Serve a template to the preview
 
 **Where:** `src/app/api/documents/template/route.ts` (`GET ?id=`)

@@ -304,6 +304,34 @@ export async function generateDocumentsZip(
   saveFile(out, `${zipName}-${new Date().toISOString().slice(0, 10)}.zip`)
 }
 
+// ---- the operator's own templates (Hujjatlar › Oʻz shablonlarim) ----
+
+export async function listCustomDocs(signal?: AbortSignal): Promise<import('@/lib/documents/custom').CustomMeta[]> {
+  const res = await fetch('/api/documents/custom', { headers: authHeaders(), signal })
+  const j = (await res.json().catch(() => null)) as { ok?: boolean; data?: unknown } | null
+  return j?.ok && Array.isArray(j.data) ? (j.data as import('@/lib/documents/custom').CustomMeta[]) : []
+}
+
+export async function uploadCustomDoc(file: File, title: string): Promise<{ meta: import('@/lib/documents/custom').CustomMeta; invalid: string[] }> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('title', title)
+  let res: Response
+  try {
+    res = await fetch('/api/documents/custom', { method: 'POST', headers: privilegedHeaders(), body: form })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+  const j = (await res.json().catch(() => null)) as { ok?: boolean; data?: { meta: import('@/lib/documents/custom').CustomMeta; invalid: string[] }; error?: string } | null
+  if (!res.ok || !j?.ok || !j.data) throw new Error(j?.error || 'Shablonni saqlab boʻlmadi')
+  return j.data
+}
+
+export async function deleteCustomDoc(id: string): Promise<void> {
+  const res = await fetch(`/api/documents/custom?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: privilegedHeaders() })
+  if (!res.ok) throw new Error('Oʻchirib boʻlmadi')
+}
+
 /** Raw .docx template for the live preview (placeholders intact). */
 export async function fetchDocTemplate(docId: string): Promise<ArrayBuffer> {
   let res: Response
