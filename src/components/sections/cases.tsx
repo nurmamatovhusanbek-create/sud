@@ -25,7 +25,7 @@ import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow }
 import { CaseOrders } from '@/components/proto/case-orders'
 import { assignRoles, type PartyRole } from '@/core/classify'
 import { isOngoingFirstInstance, orderJobCase, type KnownDecision } from '@/core/public-orders'
-import { caseToDocValues, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
+import { caseToDocValuesFor, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
@@ -370,7 +370,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
 
     // hand the scraped case to the petition forms — nothing else needs to be looked up
     const prepareDoc = (docId: string) => {
-      const values = caseToDocValues({
+      const values = caseToDocValuesFor(docId, {
         caseNumber,
         general: g ? { court: g.court, judge: g.judge, plaintiff: g.plaintiff, claimSubject: g.claimSubject } : null,
         upcoming: upcoming ? { date: upcoming.date, time: upcoming.time } : null,

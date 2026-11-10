@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet,
+  X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet, Trash2,
 } from 'lucide-react'
 import {
   TABS,
@@ -34,6 +34,7 @@ import { PretenziyaFlow } from './pretenzia-view'
 import { DocEditor } from './doc-editor'
 import { useLetterhead } from '@/components/proto/letterhead'
 import { useAppStore } from '@/lib/store/app-store'
+import { clearDraft, listDrafts, type Draft } from '@/lib/documents/drafts'
 
 const CAT_ICON: Record<DocTab, React.ReactNode> = {
   visa: <Plane />,
@@ -75,6 +76,50 @@ function DocTile({ doc, onOpen }: { doc: DocDef; onOpen: () => void }) {
       <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{doc.lang}</span>
       <ChevronRight className="doc-cat-arrow" />
     </button>
+  )
+}
+
+/** Half-filled forms saved on this computer: pick one to carry on (the editor restores it itself). */
+function DraftsList({ onOpen }: { onOpen: (key: string) => void }) {
+  const [drafts, setDrafts] = useState<Draft[]>([])
+  useEffect(() => {
+    try { setDrafts(listDrafts(window.localStorage)) } catch { /* storage blocked */ }
+  }, [])
+  const rows = drafts
+    .map((d) => {
+      const [kind, id] = [d.key.slice(0, d.key.indexOf(':')), d.key.slice(d.key.indexOf(':') + 1)]
+      const title = kind === 'doc' ? docById(id)?.title : tabById(id as DocTab)?.label
+      return title ? { d, title } : null
+    })
+    .filter((r): r is { d: Draft; title: string } => !!r)
+    .slice(0, 5)
+  if (!rows.length) return null
+  return (
+    <div style={{ margin: '0 0 18px' }}>
+      <div className="nav-label" style={{ margin: '0 0 8px' }}>Qoralamalar</div>
+      <div className="list">
+        {rows.map(({ d, title }) => (
+          <div className="kv" key={d.key}>
+            <button className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'flex-start', minWidth: 0 }} onClick={() => onOpen(d.key)}>
+              <b>{title}</b>
+              <span className="faint" style={{ marginLeft: 8, fontSize: 12 }}>
+                {new Date(d.savedAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {Object.keys(d.values).length} ta maydon
+              </span>
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              aria-label="Qoralamani oʻchirish"
+              onClick={() => {
+                try { clearDraft(window.localStorage, d.key) } catch { /* nothing stored */ }
+                setDrafts((x) => x.filter((y) => y.key !== d.key))
+              }}
+            >
+              <Trash2 />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -213,6 +258,16 @@ export function DocumentsView() {
           <div className="empty"><div className="ico"><Search /></div><h3>Topilmadi</h3><p>«{query}» boʻyicha hujjat turi topilmadi.</p></div>
         )
       ) : (
+        <>
+        <DraftsList
+          onOpen={(key) => {
+            const id = key.slice(key.indexOf(':') + 1)
+            if (key.startsWith('doc:')) {
+              const d = docById(id)
+              if (d) openDoc(d)
+            } else setActive(id as DocTab)
+          }}
+        />
         <div className="doc-cat-cards">
           {TABS.map((t) => <CategoryCard key={t.id} tab={t} onOpen={() => setActive(t.id)} />)}
           <button className="doc-cat rise-c" onClick={() => setPretenzia(true)}>
@@ -224,6 +279,7 @@ export function DocumentsView() {
             <ChevronRight className="doc-cat-arrow" />
           </button>
         </div>
+        </>
       )}
     </div>
   )

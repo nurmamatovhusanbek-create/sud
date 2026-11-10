@@ -1,8 +1,9 @@
 import { uzCyrToLat } from '@/core/translit'
+import { docById } from './registry'
 
 /**
  * Fill a court-petition form from a case the app has ALREADY scraped — no library, no PDF needed.
- * The «Sud arizalari» templates (court_copy, court_postpone) ask for the court, the judge, the case number,
+ * The «Sud arizalari» templates (court_copy, court_postpone; court_deadline and court_cancel take the court and our company) ask for the court, the judge, the case number,
  * the claimant, the subject of the claim and the next hearing: all of that is in the case detail.
  * What only the user knows (representative, address, reason, phone) is left empty.
  */
@@ -17,7 +18,7 @@ export interface CaseFormInput {
 }
 
 /** The documents this can prefill. */
-export const PREFILLABLE_DOCS = ['court_copy', 'court_postpone'] as const
+export const PREFILLABLE_DOCS = ['court_copy', 'court_postpone', 'court_deadline', 'court_cancel'] as const
 
 const MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
 
@@ -54,4 +55,10 @@ export function caseToDocValues(i: CaseFormInput): Record<string, string> {
     hearing_time: hhmm(i.upcoming?.time),
   }
   return Object.fromEntries(Object.entries(v).filter(([, val]) => val))
+}
+
+/** The same, cut to the fields THIS document has (a document that only takes the court gets only the court). */
+export function caseToDocValuesFor(docId: string, i: CaseFormInput): Record<string, string> {
+  const fields = new Set(docById(docId)?.fields ?? [])
+  return Object.fromEntries(Object.entries(caseToDocValues(i)).filter(([k]) => fields.has(k)))
 }

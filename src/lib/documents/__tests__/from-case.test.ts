@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { caseToDocValues, formatHearingDate, PREFILLABLE_DOCS } from '../from-case'
+import { caseToDocValues, caseToDocValuesFor, formatHearingDate, PREFILLABLE_DOCS } from '../from-case'
 import { docById } from '../registry'
 import { uzCyrToLat } from '@/core/translit'
 
@@ -48,11 +48,16 @@ describe('caseToDocValues', () => {
   test('unknown parts are omitted (the form keeps its own placeholder), never written as «-»', () => {
     expect(caseToDocValues({ caseNumber: '4-1-2601/1', general: { court: '-', judge: '' }, upcoming: null })).toEqual({ case_number: '4-1-2601/1' })
   })
-  test('every key it produces is a real field of the documents it is meant for', () => {
-    const keys = Object.keys(caseToDocValues(input))
+  test('every key it produces is a real field of at least one document it is meant for', () => {
+    for (const k of Object.keys(caseToDocValues(input))) expect(PREFILLABLE_DOCS.some((id) => docById(id)!.fields.includes(k))).toBe(true)
+  })
+  test('per document: only that document\'s own fields', () => {
     for (const id of PREFILLABLE_DOCS) {
       const fields = docById(id)!.fields
-      for (const k of keys) expect(fields).toContain(k)
+      for (const k of Object.keys(caseToDocValuesFor(id, input))) expect(fields).toContain(k)
     }
+    expect(Object.keys(caseToDocValuesFor('court_deadline', { ...input, companyName: 'Alfa MCHJ' }))).toEqual(['court'])
+    expect(Object.keys(caseToDocValuesFor('court_cancel', { ...input, companyName: 'Alfa MCHJ' })).sort()).toEqual(['company', 'court'])
+    expect(caseToDocValuesFor('no_such_doc', input)).toEqual({})
   })
 })

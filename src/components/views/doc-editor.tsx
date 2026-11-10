@@ -14,8 +14,8 @@
  *  - separate (court): one document, its own fields in readable sections.
  */
 
-import { useMemo, useRef, useState } from 'react'
-import { ArrowLeft, FileDown, Files, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, FileDown, Files, Loader2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   FIELDS,
@@ -32,6 +32,8 @@ import { DERIVED_RULES, withDerived } from '@/lib/documents/derive'
 import { generateDocument } from '@/lib/api-client'
 import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
+import { SectionProfiles } from '@/components/views/doc-profiles'
+import { clearDraft, draftKeyFor, loadDraft, saveDraft } from '@/lib/documents/drafts'
 
 // ---- a single field --------------------------------------------------------
 
@@ -92,7 +94,21 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   initialValues?: Record<string, string>
 }) {
   const docs = useMemo(() => (doc ? [doc] : docsByTab(tab.id)), [doc, tab.id])
-  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(doc ? docDefaults(doc) : categoryDefaults(tab)), ...(initialValues ?? {}) }))
+  const defaults = useMemo(() => (doc ? docDefaults(doc) : categoryDefaults(tab)), [doc, tab])
+  const draftKey = draftKeyFor({ docId: doc?.id, tabId: tab.id })
+  // A half-filled form comes back after a refresh. A form opened FROM A CASE starts fresh (the case's values, not an
+  // old draft's), and its edits replace the draft.
+  const [restored, setRestored] = useState<number | null>(() => {
+    if (initialValues || typeof window === 'undefined') return null
+    try { return loadDraft(window.localStorage, draftKey)?.savedAt ?? null } catch { return null }
+  })
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    let draft: Record<string, string> = {}
+    if (!initialValues && typeof window !== 'undefined') {
+      try { draft = loadDraft(window.localStorage, draftKey)?.values ?? {} } catch { /* no draft */ }
+    }
+    return { ...defaults, ...draft, ...(initialValues ?? {}) }
+  })
   const [curId, setCurId] = useState(docs[0].id)
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -102,6 +118,19 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const used = useMemo(() => new Set(cur.fields), [cur])
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
   const effective = useMemo(() => withDerived(values), [values])
+
+  // autosave (debounced): only what differs from the defaults is stored
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try { saveDraft(window.localStorage, draftKey, values, defaults) } catch { /* storage blocked */ }
+    }, 600)
+    return () => clearTimeout(t)
+  }, [values, defaults, draftKey])
+  const resetForm = () => {
+    try { clearDraft(window.localStorage, draftKey) } catch { /* nothing stored */ }
+    setValues(defaults)
+    setRestored(null)
+  }
 
   const sections = useMemo(() => {
     if (!tab.groups) return sectionsFor(cur.fields)
@@ -176,9 +205,15 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
         {/* ---- form ---- */}
         <div className="dedit-form">
           <div className="dedit-scroll" ref={formRef}>
+            {restored !== null && (
+              <div className="dedit-restored">
+                <span>Qoralama tiklandi · {new Date(restored).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}. Shu kompyuterda saqlanadi.</span>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={resetForm}><RotateCcw /><span>Tozalash</span></button>
+              </div>
+            )}
             {sections.map((s) => (
               <section key={s.title}>
-                <div className="dedit-grp">{s.title}</div>
+                <div className="dedit-grp">{s.title}<SectionProfiles keys={s.keys} values={values} onApply={setValues} /></div>
                 <div className="dedit-fields">
                   {s.keys.map((k) => (
                     <Field
