@@ -83,6 +83,7 @@ const nextConfig: NextConfig & { agentRules?: boolean } = {
   // them in production (dev reads straight from the project tree).
   outputFileTracingIncludes: {
     "/api/documents/generate": ["./src/lib/documents/templates/*.docx"],
+    "/api/documents/generate-bulk": ["./src/lib/documents/templates/*.docx"],
     "/api/pretenzia/generate": [
       "./src/lib/documents/templates/pretenzia.docx",
       "./src/lib/documents/templates/talabnoma-uz.docx",

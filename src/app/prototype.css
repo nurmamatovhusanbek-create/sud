@@ -932,6 +932,21 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .dedit-review li.error button { color: var(--signal-negative-600); }
 .dedit-review li.warn button { color: var(--warn-text); }
 .dedit-review-a { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.dbulk { padding: 16px 18px; overflow: auto; flex: 1; min-height: 0; }
+.dbulk-h { display: flex; gap: 12px; align-items: flex-start; }
+.dbulk-h svg { width: 22px; height: 22px; color: var(--accent); flex: none; margin-top: 2px; }
+.dbulk-h p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; }
+.dbulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.dbulk-err { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12.5px; color: var(--signal-negative-600); }
+.dbulk-err svg { width: 15px; height: 15px; flex: none; }
+.dbulk-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 12px; }
+.dbulk-map label { display: grid; gap: 4px; font-size: 12px; }
+.dbulk-map label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.dbulk-map .dinput { height: 32px; font-size: 12.5px; }
+.dbulk-sum { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 6px; font-size: 13px; }
+.dbulk-problems { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; }
+.dbulk-problems li.error { color: var(--signal-negative-600); }
+.dbulk-problems li.warn { color: var(--warn-text); }
 .dedit-restored { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-md); background: var(--surface-inset); font-size: 12.5px; color: var(--text-2); }
 .dedit-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
 .dedit-fields .doc-field { grid-column: 1 / -1; }

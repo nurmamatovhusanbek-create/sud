@@ -136,6 +136,12 @@ Split view: fields left, the REAL .docx template rendered right (via `docx-previ
 
 Pipeline per change (debounced): template zip → `markXml` wraps each value in private-use sentinels (U+E000–E002) → letterhead swap → `docx-preview` renders **off-screen** → sentinels become `<span class="slot" data-k>` → DOM swapped in (no flicker, scroll kept). Empty spots show the field's example text (`placeholder`) in italics; the real download still leaves them blank. Slot tints are fixed light colors because the paper is always white, even in dark mode.
 
+### Fill one document for many rows («Jadvaldan»), PDF, ZIP
+
+**Where:** `views/doc-bulk.tsx` · `lib/documents/bulk.ts` (read csv/xlsx, match columns by field label or key, rows → values; pure) · `bulk.server.ts` + `api/documents/generate-bulk` (one .docx per row, numbered, one zip, max 300 rows) · `lib/xlsx-grid.ts` (the minimal xlsx reader, shared with `pretenzia/parse.ts`)
+
+Each row is laid over the form's values (what is shared is typed once) and checked with the same `validate.ts` checks; nothing blocks. **PDF** = `print-render.ts`: the same `fillXml` as the download, rendered by docx-preview off-screen and printed by the browser (the window is opened inside the click). **«Barchasi · ZIP»** zips a combined category's documents client-side. Drafts / saved profiles / checks: `drafts.ts`, `profiles.ts`, `validate.ts` (all pure, storage injected).
+
 ### Serve a template to the preview
 
 **Where:** `src/app/api/documents/template/route.ts` (`GET ?id=`)

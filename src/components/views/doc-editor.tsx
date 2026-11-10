@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, FileDown, FileText, Files, Loader2, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, FileDown, FileSpreadsheet, FileText, Files, Loader2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   FIELDS,
@@ -35,6 +35,7 @@ import { printSheet, renderPrintHtml } from '@/lib/documents/print-render'
 import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 import { SectionProfiles } from '@/components/views/doc-profiles'
+import { BulkPanel } from '@/components/views/doc-bulk'
 import { clearDraft, draftKeyFor, loadDraft, saveDraft } from '@/lib/documents/drafts'
 import { checkDoc, validateField, type DocCheck, type Issue } from '@/lib/documents/validate'
 
@@ -123,6 +124,8 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   // fields the person has left (their problems show then, not while typing «AA12…»)
   const [left, setLeft] = useState<Set<string>>(() => new Set())
   // the check shown before a download, with what to do when it is confirmed
+  // «Jadvaldan»: one document for many spreadsheet rows (replaces the preview while open)
+  const [bulk, setBulk] = useState(false)
   const [review, setReview] = useState<{ report: DocCheck; go: () => void } | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -330,6 +333,10 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
                 <span>Barchasi · ZIP ({docs.length})</span>
               </button>
             )}
+            <button className={`btn btn-sm ${bulk ? 'btn-primary' : 'btn-outline'}`} onClick={() => setBulk((v) => !v)} aria-pressed={bulk} title="Excel / CSV jadvalidan koʻp hujjat yaratish">
+              <FileSpreadsheet />
+              <span>Jadvaldan</span>
+            </button>
             <button className="btn btn-outline btn-sm" onClick={runPdf} disabled={busy !== null || blocked} title={blocked ? blockHint : 'Chop etish oynasida «PDF sifatida saqlash» ni tanlang'}>
               {busy === `pdf:${cur.id}` ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <FileText />}
               <span>PDF</span>
@@ -359,6 +366,9 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
               </div>
             </div>
           )}
+          {bulk ? (
+            <BulkPanel doc={cur} base={values} defaults={defaults} letterhead={tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}} />
+          ) : (
           <DocPreview
             docId={cur.id}
             values={values}
@@ -367,6 +377,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             activeKey={activeKey}
             onPick={pick}
           />
+          )}
           <div className="dedit-hint">Hujjatdagi belgilangan joyni bosing — maydon ochiladi. Boʻsh joylar faqat koʻrinishda koʻrsatiladi.</div>
         </div>
       </div>

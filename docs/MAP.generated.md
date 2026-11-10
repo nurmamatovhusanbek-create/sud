@@ -15,6 +15,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/company` | GET | GET /api/company?tin=302678824 | `company/route.ts` |
 | `/api/court-cases/export` | GET | GET /api/court-cases/export?tin=302678824&courtTypes=economic,civil | `court-cases/export/route.ts` |
 | `/api/court-cases` | GET | GET /api/court-cases?courtType=economic&mode=tin&value=302678824 | `court-cases/route.ts` |
+| `/api/documents/generate-bulk` | POST | POST /api/documents/generate-bulk body: { docId, rows: Record<string,string>[], letterhead?, blankLetterhead?  | `documents/generate-bulk/route.ts` |
 | `/api/documents/generate` | POST | POST /api/documents/generate body: { docId: string, values: Record<string,string> } | `documents/generate/route.ts` |
 | `/api/documents/template` | GET (no-rate-limit) | GET /api/documents/template?id=<docId> | `documents/template/route.ts` |
 | `/api/pretenzia/generate` | POST | POST /api/pretenzia/generate | `pretenzia/generate/route.ts` |
@@ -74,7 +75,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +4 |  |
 | `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/orders/route, +9 |  |
-| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate/route, +23 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/generate-bulk/route, +24 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
@@ -88,7 +89,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +20 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +21 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -100,15 +101,17 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
-| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
+| `documents/bulk.server.ts` | api/documents/generate-bulk/route | lib/documents/__tests__/bulk-server.test.ts |
+| `documents/bulk.ts` | api/documents/generate-bulk/route, components/views/doc-bulk.tsx, lib/documents/bulk.server.ts | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/bulk.test.ts |
+| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/drafts.ts` | components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/profiles.ts | lib/documents/__tests__/drafts.test.ts, lib/documents/__tests__/profiles.test.ts |
-| `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route | lib/documents/__tests__/banner.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
+| `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route, lib/documents/bulk.server.ts | lib/documents/__tests__/banner.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts, lib/documents/print-render.ts | lib/documents/__tests__/secret.test.ts |
-| `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
+| `documents/from-case.ts` | components/sections/cases.tsx, lib/documents/bulk.ts | lib/documents/__tests__/from-case.test.ts |
 | `documents/print-render.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/print-render.test.ts |
 | `documents/profiles.ts` | components/views/doc-profiles.tsx | lib/documents/__tests__/profiles.test.ts |
-| `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts, lib/documents/__tests__/validate.test.ts |
-| `documents/validate.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
+| `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/bulk.ts, lib/documents/fill.server.ts, +1 | lib/documents/__tests__/bulk.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts, lib/documents/__tests__/validate.test.ts |
+| `documents/validate.ts` | components/views/doc-bulk.tsx, components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/company/context-bar.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, lib/hard-refresh.ts |  |
 | `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
@@ -161,6 +164,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `vlm-test.ts` | api/settings/vlm/test/route, lib/billing.ts | lib/__tests__/vlm.test.ts |
 | `worker-defaults.ts` | lib/cf-worker-pool.ts, lib/workers-config.ts |  |
 | `workers-config.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/cf-worker-pool.ts | server/__tests__/security.test.ts |
+| `xlsx-grid.ts` | components/views/doc-bulk.tsx, lib/documents/bulk.ts, lib/pretenzia/parse.ts |  |
 | `xlsx.ts` | api/bills/export/route, api/court-cases/export/route, api/stats/export/route, api/upcoming-hearings/export/route | server/__tests__/security.test.ts |
 
 ### Hooks
@@ -221,6 +225,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `doc-bulk.tsx` | components/views/doc-editor.tsx |  |
 | `doc-editor.tsx` | components/views/documents-view.tsx |  |
 | `doc-profiles.tsx` | components/views/doc-editor.tsx |  |
 | `documents-view.tsx` | app/page.tsx |  |

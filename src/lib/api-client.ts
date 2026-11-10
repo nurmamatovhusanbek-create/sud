@@ -259,6 +259,34 @@ export async function generateDocument(
   saveFile(blob, filename)
 }
 
+/** One document for MANY rows (a spreadsheet): one .docx per row, returned as one .zip. */
+export async function generateDocumentsBulk(
+  docId: string,
+  rows: Record<string, string>[],
+  opts: { letterhead?: string; blank?: boolean } = {},
+): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch('/api/documents/generate-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ docId, rows, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank }),
+    })
+  } catch {
+    throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+  if (!res.ok) {
+    let msg = 'Hujjatlarni yaratib boʻlmadi'
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+    } catch { /* binary */ }
+    throw new Error(msg)
+  }
+  const m = (res.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)
+  saveFile(await res.blob(), m?.[1] || 'hujjatlar.zip')
+}
+
 /** Several documents from ONE form as ONE .zip (the browser would otherwise ask to allow many downloads). */
 export async function generateDocumentsZip(
   docIds: string[],
