@@ -213,11 +213,11 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
 /** Document engine — fill a .docx template and download it (Hujjatlar).
  *  `opts.letterhead` (base64 image) replaces the embedded banner; `opts.blank`
  *  blanks it when none is given (categories that offer the uploader). */
-export async function generateDocument(
+async function fetchDocumentBlob(
   docId: string,
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean } = {},
-): Promise<void> {
+  opts: { letterhead?: string; blank?: boolean },
+): Promise<{ blob: Blob; filename: string }> {
   let res: Response
   try {
     res = await fetch('/api/documents/generate', {
@@ -236,7 +236,44 @@ export async function generateDocument(
     } catch { /* binary */ }
     throw new Error(msg)
   }
-  await saveBlob(res, 'hujjat.docx')
+  const m = (res.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)
+  return { blob: await res.blob(), filename: m?.[1] || 'hujjat.docx' }
+}
+
+function saveFile(blob: Blob, filename: string): void {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(a.href)
+}
+
+export async function generateDocument(
+  docId: string,
+  values: Record<string, string>,
+  opts: { letterhead?: string; blank?: boolean } = {},
+): Promise<void> {
+  const { blob, filename } = await fetchDocumentBlob(docId, values, opts)
+  saveFile(blob, filename)
+}
+
+/** Several documents from ONE form as ONE .zip (the browser would otherwise ask to allow many downloads). */
+export async function generateDocumentsZip(
+  docIds: string[],
+  values: Record<string, string>,
+  opts: { letterhead?: string; blank?: boolean } = {},
+  zipName = 'hujjatlar',
+): Promise<void> {
+  const { default: JSZip } = await import('jszip')
+  const zip = new JSZip()
+  for (const id of docIds) {
+    const { blob, filename } = await fetchDocumentBlob(id, values, opts)
+    zip.file(filename, blob)
+  }
+  const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
+  saveFile(out, `${zipName}-${new Date().toISOString().slice(0, 10)}.zip`)
 }
 
 /** Raw .docx template for the live preview (placeholders intact). */

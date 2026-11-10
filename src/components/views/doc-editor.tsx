@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, FileDown, Files, Loader2, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, FileDown, FileText, Files, Loader2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   FIELDS,
@@ -29,7 +29,9 @@ import {
   type TabDef,
 } from '@/lib/documents/registry'
 import { DERIVED_RULES, withDerived } from '@/lib/documents/derive'
-import { generateDocument } from '@/lib/api-client'
+import { generateDocument, generateDocumentsZip } from '@/lib/api-client'
+import { openPrintWindow, printIntoWindow } from '@/lib/print'
+import { printSheet, renderPrintHtml } from '@/lib/documents/print-render'
 import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 import { SectionProfiles } from '@/components/views/doc-profiles'
@@ -221,10 +223,37 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const doAll = async () => {
     setBusy('all')
     try {
-      for (const d of docs) await download(d)
-      toast.success(`${docs.length} ta hujjat yuklab olindi`)
+      await generateDocumentsZip(docs.map((d) => d.id), values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}, tab.id === 'visa' ? 'viza-hujjatlari' : tab.id === 'iio' ? 'ichki-ishlar-hujjatlari' : `${tab.id}-hujjatlari`)
+      toast.success(`${docs.length} ta hujjat bitta ZIP faylda yuklab olindi`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hujjatlarni yaratib boʻlmadi')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // PDF = the browser's print of the same filled document («Save as PDF»); the window must open inside the click
+  const runPdf = () => {
+    if (blocked) { toast.error(blockHint!); return }
+    guarded([cur], () => void doPdf())
+  }
+  const doPdf = async () => {
+    let w: Window
+    try {
+      w = openPrintWindow()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Chop etish oynasi ochilmadi')
+      return
+    }
+    w.document.title = 'Hujjat tayyorlanmoqda…'
+    w.document.body.textContent = 'Hujjat tayyorlanmoqda…'
+    setBusy(`pdf:${cur.id}`)
+    try {
+      const pages = await renderPrintHtml(cur.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
+      printIntoWindow(w, printSheet(cur.title, pages))
+    } catch (e) {
+      try { w.close() } catch { /* already closed */ }
+      toast.error(e instanceof Error ? e.message : 'PDF tayyorlab boʻlmadi')
     } finally {
       setBusy(null)
     }
@@ -296,11 +325,15 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             <div className="sp" />
             <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{cur.lang}</span>
             {docs.length > 1 && (
-              <button className="btn btn-outline btn-sm" onClick={runAll} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni yuklab olish`}>
+              <button className="btn btn-outline btn-sm" onClick={runAll} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni bitta ZIP faylda yuklab olish`}>
                 {busy === 'all' ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <Files />}
-                <span>Barchasi ({docs.length})</span>
+                <span>Barchasi · ZIP ({docs.length})</span>
               </button>
             )}
+            <button className="btn btn-outline btn-sm" onClick={runPdf} disabled={busy !== null || blocked} title={blocked ? blockHint : 'Chop etish oynasida «PDF sifatida saqlash» ni tanlang'}>
+              {busy === `pdf:${cur.id}` ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <FileText />}
+              <span>PDF</span>
+            </button>
             <button className="btn btn-primary btn-sm" onClick={runOne} disabled={busy !== null || blocked} title={blocked ? blockHint : undefined}>
               {busy === cur.id ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <FileDown />}
               <span>Word (.docx)</span>

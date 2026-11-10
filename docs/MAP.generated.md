@@ -88,7 +88,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +19 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +20 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -99,12 +99,13 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
-| `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
-| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
+| `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
+| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/drafts.ts` | components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/profiles.ts | lib/documents/__tests__/drafts.test.ts, lib/documents/__tests__/profiles.test.ts |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route | lib/documents/__tests__/banner.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
-| `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts | lib/documents/__tests__/secret.test.ts |
+| `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts, lib/documents/print-render.ts | lib/documents/__tests__/secret.test.ts |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
+| `documents/print-render.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/print-render.test.ts |
 | `documents/profiles.ts` | components/views/doc-profiles.tsx | lib/documents/__tests__/profiles.test.ts |
 | `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts, lib/documents/__tests__/validate.test.ts |
 | `documents/validate.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
@@ -124,7 +125,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts |  |
-| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
+| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
