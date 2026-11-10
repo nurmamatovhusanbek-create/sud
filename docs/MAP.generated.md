@@ -100,13 +100,14 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
-| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
+| `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-editor.tsx, lib/documents/fill.server.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/drafts.ts` | components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/profiles.ts | lib/documents/__tests__/drafts.test.ts, lib/documents/__tests__/profiles.test.ts |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route | lib/documents/__tests__/banner.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts | lib/documents/__tests__/secret.test.ts |
 | `documents/from-case.ts` | components/sections/cases.tsx | lib/documents/__tests__/from-case.test.ts |
 | `documents/profiles.ts` | components/views/doc-profiles.tsx | lib/documents/__tests__/profiles.test.ts |
-| `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
+| `documents/registry.ts` | components/proto/doc-preview.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/fill.server.ts, lib/documents/from-case.ts | lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts, lib/documents/__tests__/validate.test.ts |
+| `documents/validate.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/company/context-bar.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, lib/hard-refresh.ts |  |
 | `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |

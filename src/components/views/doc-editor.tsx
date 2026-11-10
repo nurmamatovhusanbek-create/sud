@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, FileDown, Files, Loader2, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, FileDown, Files, Loader2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   FIELDS,
@@ -34,14 +34,17 @@ import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 import { SectionProfiles } from '@/components/views/doc-profiles'
 import { clearDraft, draftKeyFor, loadDraft, saveDraft } from '@/lib/documents/drafts'
+import { checkDoc, validateField, type DocCheck, type Issue } from '@/lib/documents/validate'
 
 // ---- a single field --------------------------------------------------------
 
-function Field({ def, value, auto, unused, onChange, onFocus }: {
+function Field({ def, value, auto, unused, issue, onChange, onFocus, onBlur }: {
   def: FieldDef; value: string; unused: boolean
+  /** a check that failed for what is typed (shown once the field has been left) */
+  issue?: Issue | null
   /** what the field falls back to when left empty (derived from another input), shown as its hint */
   auto?: string
-  onChange: (v: string) => void; onFocus: () => void
+  onChange: (v: string) => void; onFocus: () => void; onBlur: () => void
 }) {
   const wide = def.kind === 'textarea'
   // ids, dates and phones sit two-up; anything that can hold a long value (a
@@ -50,7 +53,7 @@ function Field({ def, value, auto, unused, onChange, onFocus }: {
   const short = !wide && (def.kind === 'date' || (!!def.mono && sample.length <= 22))
   return (
     <label
-      className={`doc-field${wide ? ' doc-field-wide' : ''}${short ? ' dedit-short' : ''}${unused ? ' is-unused' : ''}`}
+      className={`doc-field${wide ? ' doc-field-wide' : ''}${short ? ' dedit-short' : ''}${unused ? ' is-unused' : ''}${issue ? ` has-${issue.level}` : ''}`}
       title={unused ? 'Bu hujjatda ishlatilmaydi' : undefined}
     >
       <span className="doc-field-label">{def.label}</span>
@@ -61,6 +64,7 @@ function Field({ def, value, auto, unused, onChange, onFocus }: {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={onFocus}
+          onBlur={onBlur}
           placeholder={auto || def.placeholder}
           rows={3}
         />
@@ -71,9 +75,11 @@ function Field({ def, value, auto, unused, onChange, onFocus }: {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={onFocus}
+          onBlur={onBlur}
           placeholder={auto || def.placeholder}
         />
       )}
+      {issue && <span className={`doc-field-issue ${issue.level}`} role={issue.level === 'error' ? 'alert' : undefined}>{issue.msg}</span>}
       {def.hint && <span className="doc-field-hint">{def.hint}</span>}
     </label>
   )
@@ -112,6 +118,10 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const [curId, setCurId] = useState(docs[0].id)
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // fields the person has left (their problems show then, not while typing «AA12…»)
+  const [left, setLeft] = useState<Set<string>>(() => new Set())
+  // the check shown before a download, with what to do when it is confirmed
+  const [review, setReview] = useState<{ report: DocCheck; go: () => void } | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
   const cur = docs.find((d) => d.id === curId) ?? docs[0]
@@ -126,6 +136,8 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     }, 600)
     return () => clearTimeout(t)
   }, [values, defaults, draftKey])
+  // a check is about THESE values: as soon as one changes it is stale
+  useEffect(() => setReview(null), [values])
   const resetForm = () => {
     try { clearDraft(window.localStorage, draftKey) } catch { /* nothing stored */ }
     setValues(defaults)
@@ -164,8 +176,33 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     await generateDocument(d.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
   }
 
-  const runOne = async () => {
+  // What the download would contain, checked: filled values that look wrong, and fields left empty.
+  const checkFor = (ds: DocDef[]): DocCheck => {
+    const seen = new Set<string>()
+    const merged: DocCheck = { issues: [], empty: [] }
+    for (const d of ds) {
+      const c = checkDoc(d.fields, effective)
+      for (const i of c.issues) if (!seen.has(`i:${i.key}`)) { seen.add(`i:${i.key}`); merged.issues.push(i) }
+      for (const k of c.empty) if (!seen.has(`e:${k}`)) { seen.add(`e:${k}`); merged.empty.push(k) }
+    }
+    return merged
+  }
+
+  /** run `go` now when the check is clean, else show the check first (the person decides) */
+  const guarded = (ds: DocDef[], go: () => void) => {
+    const report = checkFor(ds)
+    if (report.issues.length) setReview({ report, go })
+    else {
+      go()
+      if (report.empty.length) toast(`${report.empty.length} ta maydon boʻsh qoldi: ${report.empty.slice(0, 3).map((k) => FIELDS[k]?.label ?? k).join(', ')}${report.empty.length > 3 ? '…' : ''}`)
+    }
+  }
+
+  const runOne = () => {
     if (blocked) { toast.error(blockHint!); return }
+    guarded([cur], () => void doOne())
+  }
+  const doOne = async () => {
     setBusy(cur.id)
     try {
       await download(cur)
@@ -177,8 +214,11 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     }
   }
 
-  const runAll = async () => {
+  const runAll = () => {
     if (blockedAll) { toast.error(hintFor(blockedAll)); return }
+    guarded(docs, () => void doAll())
+  }
+  const doAll = async () => {
     setBusy('all')
     try {
       for (const d of docs) await download(d)
@@ -222,8 +262,10 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
                       value={values[k] ?? ''}
                       auto={DERIVED_RULES[k] ? effective[k] : undefined}
                       unused={!used.has(k)}
+                      issue={left.has(k) ? validateField(k, values[k] ?? '') : null}
                       onChange={(v) => set(k, v)}
                       onFocus={() => setActiveKey(k)}
+                      onBlur={() => setLeft((p) => (p.has(k) ? p : new Set(p).add(k)))}
                     />
                   ))}
                 </div>
@@ -254,16 +296,36 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             <div className="sp" />
             <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{cur.lang}</span>
             {docs.length > 1 && (
-              <button className="btn btn-outline btn-sm" onClick={() => void runAll()} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni yuklab olish`}>
+              <button className="btn btn-outline btn-sm" onClick={runAll} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni yuklab olish`}>
                 {busy === 'all' ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <Files />}
                 <span>Barchasi ({docs.length})</span>
               </button>
             )}
-            <button className="btn btn-primary btn-sm" onClick={() => void runOne()} disabled={busy !== null || blocked} title={blocked ? blockHint : undefined}>
+            <button className="btn btn-primary btn-sm" onClick={runOne} disabled={busy !== null || blocked} title={blocked ? blockHint : undefined}>
               {busy === cur.id ? <Loader2 className="spin" style={{ width: 15, height: 15 }} /> : <FileDown />}
               <span>Word (.docx)</span>
             </button>
           </div>
+          {review && (
+            <div className="dedit-review" role="alertdialog" aria-label="Yuklashdan oldin tekshiruv">
+              <div className="dedit-review-h"><AlertTriangle /><b>Yuklashdan oldin tekshiring</b></div>
+              <ul>
+                {review.report.issues.slice(0, 8).map((i) => (
+                  <li key={i.key} className={i.level}>
+                    <button type="button" onClick={() => { setReview(null); setLeft((p) => new Set(p).add(i.key)); pick(i.key) }}>
+                      <b>{FIELDS[i.key]?.label ?? i.key}</b> — {i.msg}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {review.report.issues.length > 8 && <div className="faint" style={{ fontSize: 12 }}>…va yana {review.report.issues.length - 8} ta</div>}
+              {review.report.empty.length > 0 && <div className="faint" style={{ fontSize: 12, marginTop: 6 }}>Boʻsh maydonlar: {review.report.empty.length} ta</div>}
+              <div className="dedit-review-a">
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => { const first = review.report.issues[0]; setReview(null); if (first) pick(first.key) }}>Tuzatish</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => { const go = review.go; setReview(null); go() }}>Baribir yuklash</button>
+              </div>
+            </div>
+          )}
           <DocPreview
             docId={cur.id}
             values={values}

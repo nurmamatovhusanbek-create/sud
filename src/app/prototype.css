@@ -918,6 +918,20 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .dedit-prof { order: 2; display: inline-flex; align-items: center; gap: 4px; letter-spacing: 0; text-transform: none; font-weight: 600; }
 .dedit-prof .dinput { height: 28px; width: auto; max-width: 170px; padding: 0 8px; font-size: 12px; }
 .dedit-prof .btn { height: 28px; }
+.doc-field-issue { font-size: 11.5px; line-height: 1.35; }
+.doc-field-issue.error { color: var(--signal-negative-600); }
+.doc-field-issue.warn { color: var(--warn-text); }
+.dedit .doc-field.has-error .dinput { border-color: var(--signal-negative-500); }
+.dedit .doc-field.has-warn .dinput { border-color: var(--warn-line); }
+.dedit-review { margin: 0 0 10px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--surface-inset); border: 1px solid var(--border-subtle); font-size: 13px; }
+.dedit-review-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.dedit-review-h svg { width: 16px; height: 16px; color: var(--warn-text); }
+.dedit-review ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.dedit-review li button { all: unset; cursor: pointer; line-height: 1.4; }
+.dedit-review li button:hover { text-decoration: underline; }
+.dedit-review li.error button { color: var(--signal-negative-600); }
+.dedit-review li.warn button { color: var(--warn-text); }
+.dedit-review-a { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 .dedit-restored { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-md); background: var(--surface-inset); font-size: 12.5px; color: var(--text-2); }
 .dedit-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
 .dedit-fields .doc-field { grid-column: 1 / -1; }
