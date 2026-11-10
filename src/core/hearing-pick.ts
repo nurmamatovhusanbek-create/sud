@@ -68,3 +68,29 @@ export function pickHearing(raw: Raw, now: Date = new Date()): PickedHearing | n
   if (ahead.length) return ahead.reduce((a, b) => (key(b) < key(a) ? b : a))
   return found.reduce((a, b) => (key(b) > key(a) ? b : a))
 }
+
+const RANK: Record<HearingStage, number> = { first: 0, appeal: 1, cassation: 2 }
+
+export interface CurrentInstance {
+  stage: HearingStage
+  /** THIS instance's judge ('' when the court has not named one yet): never the first instance's judge */
+  judge: string
+  court: string
+}
+
+/**
+ * The instance a case is in NOW: the most advanced one that has a record (cassation, else appeal, else first).
+ * jadvalapi keeps the FIRST-instance court and judge at the top level and each review's own in `reviews[]`, and the
+ * judge changes with every instance, so a case in appeal showed its first-instance judge. A review that has no judge
+ * yet gives '' (the UI shows «-») rather than borrowing the first one's name.
+ */
+export function currentInstance(raw: Raw): CurrentInstance {
+  let best: { stage: HearingStage; src: Raw } = { stage: 'first', src: raw }
+  const reviews = Array.isArray(raw.reviews) ? raw.reviews : []
+  for (const r of reviews) {
+    if (!r || typeof r !== 'object') continue
+    const stage = stageOfInstance((r as Raw).instance)
+    if (stage !== 'first' && RANK[stage] > RANK[best.stage]) best = { stage, src: r as Raw }
+  }
+  return { stage: best.stage, judge: str(best.src.responsible), court: str(best.src.court) || (best.stage === 'first' ? '' : str(raw.court)) }
+}

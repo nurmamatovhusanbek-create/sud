@@ -277,7 +277,7 @@ function HearingHistory({ items }: { items: Hearing[] }) {
         {shown.map((h, i) => (
           <div key={i}>
             <b>{h.date}{h.time ? ` · ${h.time}` : ''}</b>
-            <span className="m">{hearingEn(h.status) || h.status || '-'}{h.courtroom ? ` · ${h.courtroom}` : ''}</span>
+            <span className="m">{hearingEn(h.status) || h.status || '-'}{h.courtroom ? ` · ${h.courtroom}` : ''}{h.judge && h.judge !== '-' ? ` · ${h.judge}` : ''}</span>
           </div>
         ))}
       </div>
@@ -353,7 +353,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     })
 
     const rows: DwRow[] = [
-      ['Sudya', g?.judge],
+      [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${g.currentInstance === 'cassation' ? 'Kassatsiya' : 'Apellyatsiya'}` : 'Sudya', g?.judge],
       ['Kotib', g?.secretary],
       ['Ish turi', g?.caseType],
       ['Daʼvo predmeti', g?.claimSubject],
@@ -405,7 +405,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
             <div className="dw-next">
               <div>
                 <div className="d">{upcoming.date}{upcoming.time ? ` · ${upcoming.time}` : ''}</div>
-                <div className="m">{hearingEn(upcoming.status) || upcoming.status || 'Rejalashtirilgan'}{upcoming.courtroom ? ` · ${upcoming.courtroom} zal` : ''}</div>
+                <div className="m">{hearingEn(upcoming.status) || upcoming.status || 'Rejalashtirilgan'}{upcoming.courtroom ? ` · ${upcoming.courtroom} zal` : ''}{upcoming.judge && upcoming.judge !== '-' ? ` · ${upcoming.judge}` : ''}</div>
               </div>
               {left !== null && left >= 0 && (
                 <span className="badge b-info days">{left === 0 ? 'Bugun' : `${left} kun qoldi`}</span>

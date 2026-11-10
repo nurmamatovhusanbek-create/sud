@@ -33,6 +33,8 @@ export interface CaseDetail {
   caseStatus: string
   court: string
   judge: string
+  /** the instance `court` and `judge` belong to: the one the case is in now */
+  currentInstance?: 'first' | 'appeal' | 'cassation'
   secretary: string
   plaintiff: string
   plaintiffTin: string

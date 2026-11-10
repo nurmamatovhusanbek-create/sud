@@ -95,7 +95,7 @@ import { fetchViaWorkers } from './net/worker-fetch'
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
 import type { CourtType, SearchMode, CourtCase, FullCaseData, InstanceData } from './court-case-types'
-import { pickHearing } from '@/core/hearing-pick'
+import { currentInstance, pickHearing } from '@/core/hearing-pick'
 import { daysUntil } from '@/core/dates'
 
 // ---- Status enums for UI ----
@@ -614,7 +614,7 @@ function hearingFields(raw: any): Pick<CourtCase, 'hearingDate' | 'hearingTime' 
   return {
     hearingDate: h.date,
     hearingTime: h.time,
-    judge: (review ? h.judge : '') || raw.responsible || '',
+    judge: review ? h.judge : raw.responsible || '', // each instance has its own judge: a review without one shows none, not the first instance's
     hearingStage: h.stage,
     ...(review && h.court ? { courtName: h.court } : {}),
   }
@@ -681,14 +681,16 @@ export async function getCaseDetails(
     }))
 
   const d = detailRaw || raw
+  const now = currentInstance(d) // the court and the judge of the instance the case is in now, not of the first one
   const decisionText = d.result || d.article || ''
   return {
     general: {
       caseNumber: d.casenumber || d.caseNumber || caseNumber,
       caseType: d.category || '-',
       caseStatus: d.status_name || d.instance || '-',
-      court: d.court || '-',
-      judge: d.responsible || '-',
+      court: now.court || d.court || '-',
+      judge: now.judge || '-',
+      currentInstance: now.stage,
       secretary: '-',
       plaintiff: d.claiment || d.claimant || d.plaintiff || '-',
       plaintiffTin: '-',

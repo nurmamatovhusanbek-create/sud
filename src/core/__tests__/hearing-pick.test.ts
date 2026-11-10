@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { pickHearing, stageOfInstance } from '../hearing-pick'
+import { currentInstance, pickHearing, stageOfInstance } from '../hearing-pick'
 
 const NOW = new Date(2026, 9, 5, 9, 0) // 5 Oct 2026, local
 
@@ -48,5 +48,37 @@ describe('stageOfInstance', () => {
     expect(stageOfInstance('Kassatsiya instansiyasi')).toBe('cassation')
     expect(stageOfInstance('Биринчи инстанция')).toBe('first')
     expect(stageOfInstance(undefined)).toBe('first')
+  })
+})
+
+describe('currentInstance: the judge and court of the instance the case is in now', () => {
+  const first = { instance: 'Биринчи инстанция', court: 'Toshkent iqtisodiy sudi', responsible: 'Karimov' }
+  test('first instance only: the top-level judge and court', () => {
+    expect(currentInstance(first)).toEqual({ stage: 'first', judge: 'Karimov', court: 'Toshkent iqtisodiy sudi' })
+  })
+  test('in appeal: the APPEAL judge, not the first one', () => {
+    const r = currentInstance({ ...first, reviews: [{ instance: 'Апелляция инстанцияси', court: 'Apellyatsiya sudi', responsible: 'Aliyev' }] })
+    expect(r).toEqual({ stage: 'appeal', judge: 'Aliyev', court: 'Apellyatsiya sudi' })
+  })
+  test('in cassation: the cassation judge wins over appeal and first, whatever the order', () => {
+    const r = currentInstance({
+      ...first,
+      reviews: [
+        { instance: 'Кассация инстанцияси', court: 'Kassatsiya sudi', responsible: 'Valiyev' },
+        { instance: 'Апелляция инстанцияси', court: 'Apellyatsiya sudi', responsible: 'Aliyev' },
+      ],
+    })
+    expect(r).toEqual({ stage: 'cassation', judge: 'Valiyev', court: 'Kassatsiya sudi' })
+  })
+  test('a review with no judge yet shows none: never the first instance\'s name', () => {
+    const r = currentInstance({ ...first, reviews: [{ instance: 'apellyatsiya', court: 'Apellyatsiya sudi' }] })
+    expect(r.judge).toBe('')
+    expect(r.stage).toBe('appeal')
+  })
+  test('a review with no court keeps the top-level court (never blank)', () => {
+    expect(currentInstance({ ...first, reviews: [{ instance: 'apellyatsiya', responsible: 'Aliyev' }] }).court).toBe('Toshkent iqtisodiy sudi')
+  })
+  test('junk reviews are ignored', () => {
+    expect(currentInstance({ ...first, reviews: [null, 'x', 5] as never }).stage).toBe('first')
   })
 })
