@@ -51,14 +51,16 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
-| `agenda.ts` | components/greenui/lists.tsx, components/newui/agenda.tsx, components/newui/company-table.tsx | core/__tests__/agenda.test.ts |
-| `billing-format.ts` | components/greenui/home.tsx, components/greenui/lists.tsx, components/newui/case-table.tsx, components/newui/company-table.tsx, components/sections/bills.tsx, components/sections/overview.tsx, components/views/launcher.tsx, +2 | core/__tests__/sum-compact.test.ts |
+| `agenda.ts` | components/greenui/lists.tsx, components/greenui/today.tsx, components/newui/agenda.tsx, components/newui/company-table.tsx, core/attention.ts | core/__tests__/agenda.test.ts |
+| `attention.ts` | components/greenui/today.tsx, components/views/launcher.tsx | core/__tests__/attention.test.ts |
+| `billing-format.ts` | components/greenui/lists.tsx, components/greenui/today.tsx, components/newui/case-table.tsx, components/newui/company-table.tsx, components/sections/bills.tsx, components/sections/overview.tsx, components/views/launcher.tsx, +2 | core/__tests__/sum-compact.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
+| `case-timeline.ts` | components/greenui/case-timeline.tsx | core/__tests__/case-timeline.test.ts |
 | `classify.ts` | components/greenui/lists.tsx, components/newui/case-table.tsx, components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
 | `company-sort.ts` | components/greenui/lists.tsx, components/newui/company-table.tsx, lib/company-rows.ts | core/__tests__/company-sort.test.ts |
-| `dates.ts` | components/greenui/lists.tsx, components/newui/case-table.tsx, components/sections/cases.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, lib/report/model.ts, +2 | core/__tests__/dates.test.ts |
+| `dates.ts` | components/greenui/lists.tsx, components/newui/case-table.tsx, components/sections/cases.tsx, core/case-timeline.ts, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
-| `green-home.ts` | components/greenui/home.tsx | core/__tests__/green-home.test.ts |
+| `green-home.ts` | components/greenui/today.tsx, components/views/launcher.tsx | core/__tests__/green-home.test.ts |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
@@ -67,7 +69,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/rating/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
-| `status.ts` | components/company/context-bar.tsx, components/greenui/lists.tsx, components/newui/case-table.tsx, components/newui/company-table.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, +1 | core/__tests__/status.test.ts |
+| `status.ts` | components/company/context-bar.tsx, components/greenui/lists.tsx, components/newui/case-table.tsx, components/newui/company-table.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, +2 | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, lib/documents/derive.ts, lib/documents/from-case.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
 | `ui-version.ts` | app/layout.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, +1 | core/__tests__/ui-version.test.ts |
@@ -147,7 +149,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
-| `registry.ts` | components/company/context-bar.tsx, components/greenui/home.tsx, components/greenui/lists.tsx, components/newui/company-table.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +13 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
+| `registry.ts` | components/company/context-bar.tsx, components/greenui/lists.tsx, components/newui/company-table.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/alerts.ts, +12 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
 | `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/fonts.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/generate.ts` | components/company/context-bar.tsx |  |
@@ -156,13 +158,13 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
-| `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/greenui/home.tsx, components/greenui/shell.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, +8 |  |
-| `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
+| `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/greenui/shell.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +7 |  |
+| `tab-counts.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
 | `tor.ts` | api/tor-status/route |  |
 | `ui-version.ts` | components/company/context-bar.tsx, components/proto/drawer.tsx, components/proto/page-head.tsx, components/proto/primitives.tsx, components/screens/index.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, +4 |  |
 | `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/alerts.ts, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
-| `utils.ts` | components/greenui/company-head.tsx, components/greenui/lists.tsx, components/greenui/shell.tsx, components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, +1 |  |
+| `utils.ts` | components/greenui/case-timeline.tsx, components/greenui/company-head.tsx, components/greenui/lists.tsx, components/greenui/shell.tsx, components/greenui/today.tsx, components/shell/app-shell.tsx, components/ui/button.tsx, +3 |  |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
 | `vlm-client.ts` | lib/billing.ts, lib/vlm-pool.ts, lib/vlm-test.ts | lib/__tests__/vlm-pool.test.ts, lib/__tests__/vlm.test.ts |

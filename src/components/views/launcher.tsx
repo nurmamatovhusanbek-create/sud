@@ -21,7 +21,9 @@ import type { CompanyRecord } from '@/lib/registry'
 import { formatSumCompact } from '@/core/billing-format'
 import { useUiVersion } from '@/lib/ui-version'
 import { AgendaList, CompanyList } from '@/components/screens'
-import { GreenHome } from '@/components/greenui/home'
+import { GreenToday } from '@/components/greenui/today'
+import { attentionItems } from '@/core/attention'
+import { weightedWinRate } from '@/core/green-home'
 import { usesRebuiltScreens } from '@/core/ui-version'
 
 /** companies whose status the home already tried to read this page session (one light attempt each) */
@@ -356,16 +358,31 @@ export function Launcher() {
       />
     )
     const agendaEl = <AgendaList rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
-    // Green look: the same data, drawn as a bento dashboard (components/greenui)
+    // Green look: not the same data redrawn but a different question — «what needs me today?» (core/attention)
     if (ui === 'green') {
+      const attention = attentionItems(
+        companies.map((c) => ({
+          stir: c.stir,
+          name: c.name,
+          status: c.meta?.status,
+          rating: c.meta?.rating,
+          score: c.meta?.score,
+          winRate: c.meta?.winRate,
+          upcoming: futureUpcoming(c.meta),
+          overdueTotal: c.meta?.billsLoadedAt ? c.meta.overdueTotal ?? 0 : null,
+        })),
+      )
       return (
-        <GreenHome
-          companies={companies}
-          totals={{ cases: totCases, active: statusCounts.active, unknown: statusCounts.unknown, nearHearings, nearestLabel, overdueTotal, overdueCompanies }}
+        <GreenToday
+          items={attention}
+          onOpenItem={(it) => openCompany(it.stir, { name: it.name }, it.target)}
+          totals={{ companies: companies.length, cases: totCases, overdueTotal, overdueCompanies }}
+          win={weightedWinRate(companies.map((c) => ({ cases: c.meta?.cases, winRate: c.meta?.winRate })))}
           searchBox={searchBox}
           recentChips={recentChips}
           listTools={listTools}
           companyTable={companyTable}
+          companyCount={filtered.length}
           agenda={agendaEl}
           agendaCount={agendaRows.length}
         />

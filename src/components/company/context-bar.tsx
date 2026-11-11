@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Copy, Download, FileText, RefreshCw, Star } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, Copy, Download, FileText, Gavel, Receipt, RefreshCw, Star } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/lib/store/app-store'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
@@ -23,6 +23,10 @@ import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/pr
 import { bandFromFamily } from '@/components/proto/primitives'
 import { GreenCompanyHead } from '@/components/greenui/company-head'
 import { useUiVersion } from '@/lib/ui-version'
+import { useTabCounts } from '@/lib/tab-counts'
+import { SECTIONS } from '@/lib/store/app-store'
+
+const TAB_ICON: Record<string, React.ReactNode> = { bills: <Receipt />, cases: <Gavel />, hearings: <CalendarDays />, profile: <Building2 />, overview: <BarChart3 /> }
 
 const PART_LABEL: Record<string, string> = {
   stats: 'Statistika',
@@ -45,6 +49,9 @@ const statusLabel = (s?: string) => {
 export function ContextBar() {
   const company = useAppStore((s) => s.activeCompany)
   const ui = useUiVersion()
+  const section = useAppStore((s) => s.section)
+  const setSection = useAppStore((s) => s.setSection)
+  const tabCounts = useTabCounts()
   const [copied, setCopied] = useState(false)
   const rv = useRegistryVersion()
   const watching = company ? (rv >= 0 ? isWatched(company.stir) : false) : false
@@ -98,6 +105,14 @@ export function ContextBar() {
   if (ui === 'green') {
     return (
       <GreenCompanyHead
+        tabs={SECTIONS.map((t) => ({
+          key: t.key,
+          label: t.label,
+          icon: TAB_ICON[t.key],
+          active: section === t.key,
+          count: t.key === 'bills' ? tabCounts.bills : t.key === 'cases' ? tabCounts.cases : t.key === 'hearings' ? tabCounts.hearings : undefined,
+          onClick: () => setSection(t.key),
+        }))}
         mono={company.name ? initials(company.name) : grp(company.stir).slice(0, 2)}
         name={company.name || `STIR ${grp(company.stir)}`}
         stir={grp(company.stir)}

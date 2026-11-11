@@ -45,6 +45,8 @@ import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
 import { CaseList } from '@/components/screens'
 import { GreenCasesBar } from '@/components/greenui/cases-bar'
+import { GreenCaseTimeline } from '@/components/greenui/case-timeline'
+import { classifyOutcome } from '@/core/classify'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },
@@ -812,6 +814,12 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
+          {ui === 'green' && (
+            <GreenCaseTimeline
+              rows={filtered.map((m) => { const r = roleOf(m); return { id: `${m.courtType}|${m.c.caseNumber}`, filed: m.c.dateFiled, outcome: r ? classifyOutcome(r, m.c.result) : null } })}
+              onOpen={(id) => { const [courtType, caseNumber] = id.split('|'); openCaseDetail(caseNumber, courtType as CourtType, company ?? undefined) }}
+            />
+          )}
           {usesRebuiltScreens(ui) ? (
             <CaseList
               rows={paged.map((m) => ({ c: m.c, courtType: m.courtType, role: roleOf(m) }))}

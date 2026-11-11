@@ -151,17 +151,17 @@ export function GreenShell(p: Props) {
           </span>
         </button>
 
-        <button className="gx-ws" onClick={ws.onClick} title={ws.name ? 'Kompaniyalar roʻyxatiga qaytish' : 'Bosh sahifa'}>
+        <button className={cn('gx-ws', ws.name && 'on')} onClick={ws.onClick} title={ws.name ? 'Kompaniyani yopib, Bugunga qaytish' : 'Kompaniyani qidirish'}>
           <span className={cn('gx-ws-av', !ws.name && 'all')}>{ws.name ? initials(ws.name) : 'SH'}</span>
           <span className="gx-ws-t">
-            <small>{ws.name ? 'Ochiq kompaniya' : 'Ish maydoni'}</small>
-            <b>{ws.name ?? 'Kompaniyalar'}</b>
+            <small>{ws.name ? 'Ochiq kompaniya' : 'Kompaniya tanlanmagan'}</small>
+            <b>{ws.name ?? 'Qidirish yoki tanlash'}</b>
           </span>
           <span className="gx-ws-chev" aria-hidden>⌄</span>
         </button>
 
-        <div className="gx-label">Ish maydoni</div>
-        <nav className="gx-nav" aria-label="Ish maydoni">
+        <div className="gx-label">Joylar</div>
+        <nav className="gx-nav" aria-label="Joylar">
           {p.work.map((it) => (
             <Item key={it.key} it={it} />
           ))}

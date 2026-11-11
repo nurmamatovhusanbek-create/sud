@@ -22,6 +22,7 @@ import {
   BarChart3,
   Bell,
   Building2,
+  CalendarCheck,
   CalendarDays,
   Eye,
   FileText,
@@ -57,7 +58,7 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
 
 /** The green look's page title and its one-line tagline (the top bar names the page the way the sidebar does). */
 const PAGE_TAGLINES: Record<string, string> = {
-  home: 'Kompaniyalar, majlislar va qarzdorlik — bir qarashda.',
+  home: 'Bugun nimaga eʼtibor berish kerak.',
   watchlist: 'Kuzatuvdagi kompaniyalar, ularning majlislari va qarzdorligi.',
   documents: 'Viza, sud va boshqa hujjatlarni tayyor shablonlar asosida yarating.',
   settings: 'Yangilanishlar, workerlar, captcha va koʻrinishni boshqaring.',
@@ -221,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const inWorkspace = surface === 'main' && view === 'company' && !!company
   const pageKey = surface === 'main' ? (inWorkspace ? section : 'home') : surface
-  const pageTitle = pageKey === 'home' ? 'Bosh sahifa' : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
+  const pageTitle = pageKey === 'home' ? (ui === 'green' ? 'Bugun' : 'Bosh sahifa') : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
 
   const goWorkspaceSection = (key: SectionKey) => {
     setSideOpen(false)
@@ -263,17 +264,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (ui === 'green') {
-    const mk = (key: SectionKey | 'kuzatuv'): GxNavItem => {
-      const label = key === 'kuzatuv' ? 'Kuzatuv' : (WORKSPACE_NAV.find((n) => n.key === key)?.label ?? key)
-      return { key, label, icon: NAV_ICONS[key], active: navActive(key), pip: pipFor(key), onClick: () => navClick(key) }
-    }
+    // The green look separates PLACES from a company's SECTIONS: the side column holds only places (Bugun, Kuzatuv,
+    // Hujjatlar, Sozlamalar); the sections of an open company (Toʻlovlar, Sud ishlari, …) are tabs on its own header.
+    const place = (key: string, label: string, icon: React.ReactNode, active: boolean, onClick: () => void, pip?: number): GxNavItem => ({ key, label, icon, active, pip, onClick })
+    const work: GxNavItem[] = [
+      place('today', 'Bugun', <CalendarCheck />, surface === 'main' && !inWorkspace, () => { setSideOpen(false); goLauncher() }),
+      place('kuzatuv', 'Kuzatuv', <Eye />, surface === 'watchlist', () => navClick('kuzatuv'), pipFor('kuzatuv')),
+    ]
     const sys = (key: 'documents' | 'settings', label: string, icon: React.ReactNode): GxNavItem => ({
       key, label, icon, active: surface === key, onClick: () => { setSideOpen(false); setSurface(key) },
     })
     return (
       <GreenShell
-        workspace={{ name: inWorkspace && company ? company.name || `STIR ${company.stir}` : null, stir: inWorkspace && company ? company.stir : null, onClick: () => { setSideOpen(false); goLauncher() } }}
-        work={WORKSPACE_NAV.map((n) => mk(n.key))}
+        workspace={{ name: inWorkspace && company ? company.name || `STIR ${company.stir}` : null, stir: inWorkspace && company ? company.stir : null, onClick: () => { setSideOpen(false); if (inWorkspace) goLauncher(); else { setCommandPurpose('search'); setCommandOpen(true) } } }}
+        work={work}
         system={[sys('documents', 'Hujjatlar', <FileText />), sys('settings', 'Sozlamalar', <Settings />)]}
         workerStat={workerStat}
         onWorkers={() => { setSideOpen(false); setSurface('settings') }}

@@ -6,10 +6,23 @@
  * come from company/context-bar, which stays the one place that talks to the store and the scrapers.
  */
 
+import type { ReactNode } from 'react'
 import { Copy, Download, FileText, RefreshCw, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+export interface GxTab {
+  key: string
+  label: string
+  icon: ReactNode
+  active: boolean
+  /** a count on the tab (cases, bills…) */
+  count?: number
+  onClick: () => void
+}
+
 export interface GreenCompanyHeadProps {
+  /** the company's sections: they live HERE (a dossier), not in the side column */
+  tabs: GxTab[]
   mono: string
   name: string
   stir: string
@@ -60,6 +73,15 @@ export function GreenCompanyHead(p: GreenCompanyHeadProps) {
           <span>{p.watching ? 'Kuzatuvda' : 'Kuzatish'}</span>
         </button>
       </div>
+      <nav className="gx-tabs" aria-label="Kompaniya boʻlimlari">
+        {p.tabs.map((t) => (
+          <button key={t.key} type="button" className={cn('gx-tab', t.active && 'on')} aria-current={t.active ? 'page' : undefined} onClick={t.onClick}>
+            {t.icon}
+            {t.label}
+            {t.count !== undefined ? <i>{t.count}</i> : null}
+          </button>
+        ))}
+      </nav>
     </header>
   )
 }
