@@ -88,6 +88,20 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 
 **Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components.
 
+### Two looks: «Yangi» and «Klassik» (Settings › Koʻrinish)
+
+**Where:** `src/core/ui-version.ts` (keys, parser, boot script) · `src/lib/ui-version.ts` (hooks) · `src/app/ui-new.css` · `src/components/views/appearance-settings.tsx`
+
+**One attribute.** `<html data-ui="new|classic">`, stored per browser in `sud-ui` (default `new`). `UI_BOOT_SCRIPT` is inlined in `<head>` by `app/layout.tsx` and sets the attribute before the first paint, so the other look never flashes; other tabs follow through the `storage` event.
+
+**Classic is untouched by construction.** Every selector in `ui-new.css` starts with `[data-ui='new']`; with `classic` nothing in that file matches. A change to `prototype.css` therefore changes BOTH looks: restyle the new one in `ui-new.css` only. Desktop-only layout rules there sit in `(min-width: 1081px)` so the 1080px sidebar-drawer rule keeps working.
+
+**What the new look is:** list rows ~50px with hairlines instead of 68px tiles; the sidebar in the theme's own surface, foldable to a 60px icon rail (`html[data-side='mini']`, key `sud-side-mini`, labels become tooltips, counts become corner badges); cards and KPI tiles do not lift on hover; focus is one crisp 2px line (owner rule: no glow); company names wrap to two lines; a list's filter bar is sticky; the palette scrim has no blur (performance rule in AGENTS.md §4).
+
+**Markup stays shared.** The only look-dependent markup is the sidebar's fold button (`useUiVersion()` in `shell/app-shell`). The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both.
+
+**Verify:** screenshot both looks, light + dark, at 1440 / 1080 / 960 / 700; the classic look must be pixel-identical to before.
+
 ### Lay out a responsive card grid
 
 **Where:** reuse the `.kpis` / `.ccards` breakpoints

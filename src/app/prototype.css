@@ -523,6 +523,39 @@ html, body { height: 100%; }
 .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s var(--spring); }
 .toggle.on::after { transform: translateX(16px); }
 
+/* Settings › Koʻrinish (views/appearance-settings.tsx). Unscoped: the picker must look right in BOTH looks. The
+   sketches are fixed drawings of each look (navy sidebar + tall rows / light sidebar + dense rows). */
+.look-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.look-opt { display: flex; align-items: center; gap: 14px; padding: 14px; text-align: left; border: 1px solid var(--border-default); border-radius: var(--r-md); background: var(--surface); transition: border-color .15s, background .15s; }
+.look-opt:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.look-opt.on { border-color: var(--brand); background: var(--accent-soft); }
+.look-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.look-txt b { font-size: 14px; color: var(--text-1); }
+.look-txt span { font-size: 12px; line-height: 1.4; color: var(--text-2); }
+.look-check { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border-strong); display: grid; place-items: center; color: #fff; }
+.look-opt.on .look-check { background: var(--brand); border-color: var(--brand); }
+.look-check svg { width: 13px; height: 13px; }
+.look-sketch { flex: 0 0 96px; width: 96px; height: 64px; display: flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-default); background: var(--bg-canvas); }
+.ls-side { flex: 0 0 26px; display: flex; flex-direction: column; gap: 4px; padding: 8px 5px; background: #1a2350; }
+.ls-side i { display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .28); }
+.ls-side i.on { background: #4c69e4; }
+.ls-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 7px; }
+.ls-top { height: 6px; width: 60%; border-radius: 3px; background: var(--border-strong); }
+.ls-row { flex: 1; border-radius: 3px; background: var(--surface); border: 1px solid var(--border-subtle); }
+.look-sketch.new .ls-side { flex-basis: 20px; background: var(--surface); border-right: 1px solid var(--border-default); }
+.look-sketch.new .ls-side i { background: var(--border-strong); }
+.look-sketch.new .ls-side i.on { background: var(--brand); }
+.look-sketch.new .ls-main { gap: 0; }
+.look-sketch.new .ls-top { margin-bottom: 4px; }
+.look-sketch.new .ls-row { border: 0; border-radius: 0; background: none; border-bottom: 1px solid var(--border-default); }
+.look-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.look-line + .look-line { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+.look-line-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.look-line-t b { font-size: 13.5px; color: var(--text-1); }
+.look-line-t span { font-size: 12px; color: var(--text-2); }
+/* the sidebar's fold button exists only in the new look (shell/app-shell.tsx renders it there) */
+.nav button .nl { min-width: 0; }
+
 /* ---------- command palette + notifications ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(10, 12, 15, .42); backdrop-filter: blur(3px); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding-top: 13vh; animation: p-fade .18s ease; }
 .cmdk { width: min(600px, 92vw); background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--elev-4); overflow: hidden; border: 1px solid var(--border-subtle); animation: p-pop .22s var(--ease-emph); }

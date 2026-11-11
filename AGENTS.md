@@ -21,6 +21,10 @@ published court orders and fills legal documents. This file is the *rules*; the 
 - **Uzbek UI.** Native phrasing; `oʻ`/`gʻ` use `ʻ`/`ʼ` (not straight apostrophes), guillemets `«»`, no em dash. Money/dates via the app's formatters, not `toLocaleString`.
 - **Two owner UI rules:** no «choosing glow» / inset glow (crisp focus only); «less info is useful info» — compact cards, match existing tile sizes.
 - **Tokens, not hex.** Colors are CSS variables (`globals.css`); theme via `data-theme` (`next-themes`, default light).
+- **Two looks, one switch.** Settings › Koʻrinish chooses the interface: «Yangi» (default) or «Klassik» (`html[data-ui]`, key `sud-ui`).
+  The classic look is `globals.css` + `prototype.css` exactly; the new one is `app/ui-new.css`, where EVERY selector starts with
+  `[data-ui='new']`. Restyling the new look = edit `ui-new.css` only; a change to `prototype.css` changes BOTH looks. Check a UI
+  change in both (and in dark). A component may differ by look only through `useUiVersion()` (`lib/ui-version`), never by forking markup.
 
 ## 2. Always verify before you finish
 

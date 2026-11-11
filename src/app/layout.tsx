@@ -8,6 +8,9 @@ import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
 import "./fonts.css";
 import "./globals.css";
 import "./prototype.css";
+// The new «Ixcham» look: every rule is scoped under html[data-ui='new'], so the classic look is untouched without it.
+import "./ui-new.css";
+import { DEFAULT_UI, UI_BOOT_SCRIPT } from "@/core/ui-version";
 
 export const metadata: Metadata = {
   title: "Sud tizimi",
@@ -31,7 +34,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" suppressHydrationWarning>
+    <html lang="uz" data-ui={DEFAULT_UI} suppressHydrationWarning>
+      <head>
+        {/* which look (Settings › Koʻrinish) is decided before the first paint: no flash of the other one */}
+        <script dangerouslySetInnerHTML={{ __html: UI_BOOT_SCRIPT }} />
+      </head>
       <body className="antialiased bg-background text-foreground">
         <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           {children}

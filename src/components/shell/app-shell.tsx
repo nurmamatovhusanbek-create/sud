@@ -28,6 +28,8 @@ import {
   Gavel,
   Menu,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   Settings,
   Sun,
@@ -42,6 +44,7 @@ import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
+import { setSideMini, useSideMini, useUiVersion } from '@/lib/ui-version'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -201,6 +204,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
   const [sideOpen, setSideOpen] = useState(false)
+  // New look only: the sidebar can fold to an icon rail (CSS reads html[data-side]); labels then live in tooltips.
+  const ui = useUiVersion()
+  const mini = useSideMini() && ui === 'new'
   // Escape closes the drawer (it covers its own hamburger; the scrim also closes it).
   useEffect(() => {
     if (!sideOpen) return
@@ -308,9 +314,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="nav-label">Ish maydoni</div>
         <nav className="nav" aria-label="Ish maydoni">
           {WORKSPACE_NAV.map((n) => (
-            <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)}>
+            <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)} title={mini ? n.label : undefined}>
               {NAV_ICONS[n.key]}
-              {n.label}
+              <span className="nl">{n.label}</span>
               {pipFor(n.key) !== undefined && <span className="pip">{pipFor(n.key)}</span>}
             </button>
           ))}
@@ -318,18 +324,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="nav-label">Tizim</div>
         <nav className="nav" aria-label="Tizim">
-          <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }}>
+          <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }} title={mini ? 'Hujjatlar' : undefined}>
             <FileText />
-            Hujjatlar
+            <span className="nl">Hujjatlar</span>
           </button>
-          <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }}>
+          <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }} title={mini ? 'Sozlamalar' : undefined}>
             <Settings />
-            Sozlamalar
+            <span className="nl">Sozlamalar</span>
           </button>
         </nav>
 
         <div className="side-spacer" />
-        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }}>
+        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }} title={mini && workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : undefined}>
           <span className="pulse" />
           <span>
             <b>{workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : 'Workerlar tekshirilmoqda'}</b>
@@ -346,6 +352,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Sun className="theme-icon-light" style={{ width: 18, height: 18 }} />
             <Moon className="theme-icon-dark" style={{ width: 18, height: 18 }} />
           </button>
+          {ui === 'new' && (
+            <button
+              className="rail-mini side-fold"
+              title={mini ? 'Menyuni yoyish' : 'Menyuni yigʻish'}
+              aria-label={mini ? 'Menyuni yoyish' : 'Menyuni yigʻish'}
+              aria-pressed={mini}
+              onClick={() => setSideMini(!mini)}
+            >
+              {mini ? <PanelLeftOpen style={{ width: 18, height: 18 }} /> : <PanelLeftClose style={{ width: 18, height: 18 }} />}
+            </button>
+          )}
         </div>
       </aside>
 

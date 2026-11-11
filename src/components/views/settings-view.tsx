@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Server,
   Shield,
+  Palette,
   ShieldCheck,
   Trash2,
   X,
@@ -36,6 +37,7 @@ import { toast } from 'sonner'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
+import { AppearanceSettings } from '@/components/views/appearance-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -851,7 +853,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
+type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security' | 'look'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -865,7 +867,7 @@ export function SettingsView() {
       <div className="hero" style={{ marginBottom: 14 }}>
         <div className="eyebrow">Tizim boshqaruvi</div>
         <h1>Sozlamalar</h1>
-        <p>Yangilanishlar, Cloudflare workerlar va tarmoq holatini boshqaring.</p>
+        <p>Yangilanishlar, Cloudflare workerlar, tarmoq holati va interfeys koʻrinishini boshqaring.</p>
       </div>
 
       <div className="set-tabs">
@@ -893,6 +895,10 @@ export function SettingsView() {
           <ShieldCheck />
           Xavfsizlik
         </button>
+        <button className={`set-tab ${tab === 'look' ? 'on' : ''}`} onClick={() => setTab('look')}>
+          <Palette />
+          Koʻrinish
+        </button>
       </div>
 
       {tab === 'updates' && <UpdatesTab />}
@@ -901,6 +907,7 @@ export function SettingsView() {
       {tab === 'orders' && <OrdersTab />}
       {tab === 'vlm' && <VlmTab />}
       {tab === 'security' && <SecurityTab />}
+      {tab === 'look' && <AppearanceSettings />}
     </div>
   )
 }
