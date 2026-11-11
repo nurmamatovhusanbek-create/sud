@@ -205,6 +205,20 @@ html[data-ui='green'][data-theme='dark'] .card-h .ico, html[data-ui='green'][dat
 [data-ui='green'] .hero .eyebrow { color: var(--brand); }
 [data-ui='green'] .section-head h2, [data-ui='green'] .card-h h2, [data-ui='green'] .card-h h3 { letter-spacing: -.01em; }
 
+/* stat tiles (proto/primitives › Kpi draws these in the green look): Toʻlovlar, Statistika */
+[data-ui='green'] .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+[data-ui='green'] .gx-stat { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px 18px; border-radius: 24px; background: var(--gr-card); border: 1px solid var(--border-subtle); box-shadow: var(--gr-shadow); }
+[data-ui='green'] .gx-stat-top { display: flex; align-items: center; gap: 10px; }
+[data-ui='green'] .gx-stat-ico { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--g-lime-soft); color: var(--g-ink-2); }
+html[data-ui='green'][data-theme='dark'] .gx-stat-ico { background: var(--brand-100); color: var(--g-lime); }
+[data-ui='green'] .gx-stat-ico svg { width: 16px; height: 16px; }
+[data-ui='green'] .gx-stat-lbl { font-size: 12.5px; font-weight: 600; color: var(--text-2); line-height: 1.25; }
+[data-ui='green'] .gx-stat-val { font-size: 30px; font-weight: 780; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+[data-ui='green'] .gx-stat-foot { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
+[data-ui='green'] .gx-stat.ink { background: var(--g-lime); border-color: transparent; color: var(--g-on-lime); }
+[data-ui='green'] .gx-stat.ink .gx-stat-lbl, [data-ui='green'] .gx-stat.ink .gx-stat-foot { color: rgba(8, 54, 42, .72); }
+[data-ui='green'] .gx-stat.ink .gx-stat-ico { background: rgba(8, 54, 42, .12); color: var(--g-on-lime); }
+
 /* ---------- buttons, segments, fields: pills ---------- */
 [data-ui='green'] .btn { height: 38px; padding: 0 18px; border-radius: 999px; font-weight: 650; transition: background .16s, border-color .16s, color .16s, transform .16s var(--gr-ease); }
 [data-ui='green'] .btn-sm { height: 32px; padding: 0 14px; }
