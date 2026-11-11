@@ -24,7 +24,9 @@ published court orders and fills legal documents. This file is the *rules*; the 
 - **Two looks, one switch.** Settings › Koʻrinish chooses the interface: «Yangi» (default) or «Klassik» (`html[data-ui]`, key `sud-ui`).
   The classic look is `globals.css` + `prototype.css` exactly; the new one is `app/ui-new.css`, where EVERY selector starts with
   `[data-ui='new']`. Restyling the new look = edit `ui-new.css` only; a change to `prototype.css` changes BOTH looks. Check a UI
-  change in both (and in dark). A component may differ by look only through `useUiVersion()` (`lib/ui-version`), never by forking markup.
+  change in both (and in dark). The new look is not a re-skin: where a classic screen's STRUCTURE was the problem it draws its own
+  (`components/newui/*`: hearings agenda, companies table, cases table), chosen with `useUiVersion()` at the view's `return`. The
+  data hooks above that `return` are shared, so both looks always read the same data; put ordering/grouping rules in `core/`.
 
 ## 2. Always verify before you finish
 

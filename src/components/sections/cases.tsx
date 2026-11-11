@@ -41,6 +41,8 @@ import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCas
 import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
+import { useUiVersion } from '@/lib/ui-version'
+import { CaseTable } from '@/components/newui/case-table'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },
@@ -693,6 +695,7 @@ export function CasesSection() {
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const ui = useUiVersion()
 
   if (!company) return null
 
@@ -803,6 +806,13 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
+          {ui === 'new' ? (
+            <CaseTable
+              rows={paged.map((m) => ({ c: m.c, courtType: m.courtType, role: roleOf(m) }))}
+              statusText={(raw) => statusEn(raw) || raw}
+              onOpen={({ c, courtType }) => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}
+            />
+          ) : (
           <div className="list">
             {paged.map(({ c, courtType }, i) => (
               <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
@@ -825,6 +835,7 @@ export function CasesSection() {
               </div>
             ))}
           </div>
+          )}
           <ListPagination
             page={safePage}
             pageSize={pageSize}

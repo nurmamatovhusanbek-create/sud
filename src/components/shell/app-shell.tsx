@@ -371,7 +371,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>
-          {surface !== 'documents' && surface !== 'settings' ? (
+          {ui === 'new' || (surface !== 'documents' && surface !== 'settings') ? (
             <button
               className="searchbox"
               onClick={() => {

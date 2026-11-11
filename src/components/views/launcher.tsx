@@ -18,6 +18,10 @@ import { enrichCompany } from '@/lib/enrich'
 import { toast } from 'sonner'
 import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
 import type { CompanyRecord } from '@/lib/registry'
+import { formatSumCompact } from '@/core/billing-format'
+import { useUiVersion } from '@/lib/ui-version'
+import { Agenda } from '@/components/newui/agenda'
+import { CompanyTable } from '@/components/newui/company-table'
 
 /** companies whose status the home already tried to read this page session (one light attempt each) */
 const statusTried = new Set<string>()
@@ -246,6 +250,164 @@ export function Launcher() {
     toast.success(`${searched.length} ta qidirilgan kompaniya tozalandi`)
   }
 
+  const ui = useUiVersion()
+  const searchBox = (
+    <div className="hero-search">
+      <label className="field">
+        <Search />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void resolve(query)
+          }}
+          inputMode="text"
+          placeholder="STIR raqamini kiriting…"
+          autoComplete="off"
+        />
+        {modeLabel && <span className="modehint">{modeLabel}</span>}
+      </label>
+      <button className="btn btn-primary" onClick={() => void resolve(query)} disabled={!query.trim() || searching}>
+        {searching ? <span className="spinner" /> : <BarChart3 />}
+        <span>{searching ? 'Qidirilmoqda…' : 'Ochish'}</span>
+      </button>
+    </div>
+  )
+  const recentChips = (
+    <div className="chips">
+      <span className="faint" style={{ fontSize: 12 }}>Soʻnggi:</span>
+      {recentList.length === 0 && <span className="faint" style={{ fontSize: 12 }}>· hali qidiruv yoʻq</span>}
+      {recentList.map((r) => (
+        <span key={r.stir} className="chip" onClick={() => openCompany(r.stir, { name: r.name })} role="button">
+          {grp(r.stir)}
+          <span
+            className="rm"
+            role="button"
+            aria-label="Olib tashlash"
+            onClick={(e) => {
+              e.stopPropagation()
+              removeRecent(r.stir)
+            }}
+          >
+            <X />
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+  const listTools = (
+    <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
+        {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
+      </button>
+      <button className="btn btn-outline btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
+        <Trash2 />Tozalash
+      </button>
+      <Seg
+        options={[
+          { key: 'all', label: 'Barchasi' },
+          { key: 'active', label: 'Faol' },
+          { key: 'risk', label: 'Xavfli' },
+        ]}
+        value={filter}
+        onChange={(k) => setFilter(k as typeof filter)}
+      />
+    </div>
+  )
+  const nearestLabel = nearest
+    ? (() => {
+        const [, m, d] = nearest.split('-').map(Number)
+        return `${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}`
+      })()
+    : null
+
+  // New look: search first, then the work — every company in one sortable table, and next to it the hearings of all
+  // of them as an agenda. No headline, no four tiles: the totals are one line.
+  if (ui === 'new') {
+    const agendaRows = companies.flatMap((c) =>
+      futureUpcoming(c.meta).map((h, i) => ({
+        id: `${c.stir}-${h.iso}-${h.caseNumber ?? ''}-${i}`,
+        iso: h.iso,
+        time: h.time,
+        title: c.name || `STIR ${grp(c.stir)}`,
+        sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
+        code: h.caseNumber,
+        onOpen: () => openCompany(c.stir, { name: c.name }, 'hearings'),
+      })),
+    )
+    return (
+      <div className="nx">
+        <div className="nx-search">
+          {searchBox}
+          {recentChips}
+        </div>
+        <dl className="nx-stats">
+          <div>
+            <dt>Kompaniyalar</dt>
+            <dd>
+              <b>{companies.length}</b>
+              <span>{statusCounts.active} faol{statusCounts.unknown > 0 ? ` · ${statusCounts.unknown} tasi oʻqilmagan` : ''}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Sud ishlari</dt>
+            <dd>
+              <b>{String(totCases).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</b>
+            </dd>
+          </div>
+          <div>
+            <dt>Majlislar</dt>
+            <dd>
+              <b>{nearHearings}</b>
+              <span>{nearestLabel ? `eng yaqini ${nearestLabel}` : 'rejalashtirilmagan'}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Muddati oʻtgan qarz</dt>
+            <dd>
+              <b className={overdueTotal > 0 ? 'neg' : ''}>{formatSumCompact(overdueTotal)}</b>
+              <span>soʻm · {overdueCompanies} kompaniyada</span>
+            </dd>
+          </div>
+        </dl>
+        <div className="nx-grid">
+          <section className="p-card nx-main" aria-label="Kompaniyalar">
+            <div className="nx-card-h">
+              <h2>Kompaniyalar</h2>
+              <span className="count">{filtered.length}</span>
+              <div className="sp" />
+              {listTools}
+            </div>
+            <CompanyTable
+              records={filtered}
+              onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
+              onRefresh={refreshOne}
+              onRemove={(rec) => deleteOne(rec.stir)}
+              removeTitle="Roʻyxatdan oʻchirish"
+              canRemove={(rec) => !rec.watched}
+              empty={
+                <div className="empty">
+                  <div className="ico">
+                    <Users />
+                  </div>
+                  <h3>Kompaniya topilmadi</h3>
+                  <p>STIR kiriting yoki kompaniya nomi boʻyicha qidiring. Natijalar shu yerda jamlanadi.</p>
+                </div>
+              }
+            />
+          </section>
+          <aside className="p-card nx-side" aria-label="Majlislar">
+            <div className="nx-card-h">
+              <h2>Majlislar</h2>
+              <span className="count">{agendaRows.length}</span>
+            </div>
+            <Agenda rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="hero">
@@ -257,46 +419,8 @@ export function Launcher() {
           STIR (9 xonali), kvitansiya (12 xonali) yoki ish raqamini kiriting. Toʻlovlar, sud ishlari, majlislar va
           reyting bitta ish maydoniga jamlanadi.
         </p>
-        <div className="hero-search">
-          <label className="field">
-            <Search />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void resolve(query)
-              }}
-              inputMode="text"
-              placeholder="STIR raqamini kiriting…"
-              autoComplete="off"
-            />
-            {modeLabel && <span className="modehint">{modeLabel}</span>}
-          </label>
-          <button className="btn btn-primary" onClick={() => void resolve(query)} disabled={!query.trim() || searching}>
-            {searching ? <span className="spinner" /> : <BarChart3 />}
-            <span>{searching ? 'Qidirilmoqda…' : 'Ochish'}</span>
-          </button>
-        </div>
-        <div className="chips">
-          <span className="faint" style={{ fontSize: 12 }}>Soʻnggi:</span>
-          {recentList.length === 0 && <span className="faint" style={{ fontSize: 12 }}>· hali qidiruv yoʻq</span>}
-          {recentList.map((r) => (
-            <span key={r.stir} className="chip" onClick={() => openCompany(r.stir, { name: r.name })} role="button">
-              {grp(r.stir)}
-              <span
-                className="rm"
-                role="button"
-                aria-label="Olib tashlash"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  removeRecent(r.stir)
-                }}
-              >
-                <X />
-              </span>
-            </span>
-          ))}
-        </div>
+        {searchBox}
+        {recentChips}
       </div>
 
       <div className="kpis" style={{ marginTop: 24 }}>
@@ -321,12 +445,7 @@ export function Launcher() {
           foot={
             <>
               <span className="p-dot d-warn" />
-              {nearest
-                ? `Eng yaqini · ${(() => {
-                    const [, m, d] = nearest.split('-').map(Number)
-                    return `${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}`
-                  })()}`
-                : 'Majlis topilmadi'}
+              {nearestLabel ? `Eng yaqini · ${nearestLabel}` : 'Majlis topilmadi'}
             </>
           }
         >
@@ -334,7 +453,8 @@ export function Launcher() {
         </Kpi>
         <Kpi label="Umumiy qarzdorlik" icon={<Wallet />} foot={`${overdueCompanies} kompaniyada`}>
           <span style={{ fontSize: 19 }}>
-            <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
+            {/* overdueTotal is in tiyins: 1 mln soʻm = 1e8 tiyin (it was divided by 1e6 and read 100× too large) */}
+            <CountUp value={Math.round(overdueTotal / 1e8)} suffix="" id="lnch-overdue" />
             <span style={{ fontSize: 13, color: 'var(--text-3)' }}> mln soʻm</span>
           </span>
         </Kpi>
@@ -344,23 +464,7 @@ export function Launcher() {
         <h2>Kompaniyalar</h2>
         <span className="count">{filtered.length}</span>
         <div className="sp" />
-        <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
-            {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
-          </button>
-          <button className="btn btn-outline btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
-            <Trash2 />Tozalash
-          </button>
-          <Seg
-            options={[
-              { key: 'all', label: 'Barchasi' },
-              { key: 'active', label: 'Faol' },
-              { key: 'risk', label: 'Xavfli' },
-            ]}
-            value={filter}
-            onChange={(k) => setFilter(k as typeof filter)}
-          />
-        </div>
+        {listTools}
       </div>
       <div className="ccards">
         {filtered.map((c, i) => (

@@ -21,6 +21,8 @@ import { useTabCounts } from '@/lib/tab-counts'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
+import { useUiVersion } from '@/lib/ui-version'
+import { Agenda } from '@/components/newui/agenda'
 
 const MONTHS_UZ = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba']
@@ -98,6 +100,8 @@ export function HearingsSection() {
     setPage(1)
   }, [company?.stir, sort])
 
+  const ui = useUiVersion()
+
   if (!company) return null
 
   const sorted = applySort(
@@ -152,8 +156,12 @@ export function HearingsSection() {
           </div>
           <h2>Kelgusi majlislar</h2>
           <div className="sp" />
-          <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
-          <SortMenu value={sort} onChange={setSort} />
+          {ui !== 'new' && (
+            <>
+              <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
+              <SortMenu value={sort} onChange={setSort} />
+            </>
+          )}
           <button
             className="btn btn-outline btn-sm"
             disabled={exporting || hearings.length === 0}
@@ -175,6 +183,21 @@ export function HearingsSection() {
             <span>Excel</span>
           </button>
         </div>
+        {ui === 'new' ? (
+          <Agenda
+            rows={hearings.filter((h) => typeof h.isoDate === 'string').map((h, i) => ({
+              id: `${(h.caseNumber as string) || 'h'}-${i}`,
+              iso: h.isoDate as string,
+              time: (h.hearingTime as string) || undefined,
+              title: (h.courtName as string) || (h.courtTypeLabel as string) || 'Sud',
+              sub: (h.judge as string) || undefined,
+              code: (h.caseNumber as string) || undefined,
+              onOpen: () => openCase((h.caseNumber as string) || '', (h.courtType as string) || 'economic'),
+            }))}
+            emptyHint="Kelgusi 90 kun ichida rejalashtirilgan majlis topilmadi."
+          />
+        ) : (
+        <>
         <div className="datecards" style={{ flexDirection: 'column' }}>
           {paged.map((h, i) => {
             const iso = h.isoDate as string
@@ -214,6 +237,8 @@ export function HearingsSection() {
             setPage(1)
           }}
         />
+        </>
+        )}
       </div>
     </div>
   )

@@ -18,6 +18,9 @@ import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { OrdersControl } from '@/components/views/orders-control'
+import { useUiVersion } from '@/lib/ui-version'
+import { Agenda } from '@/components/newui/agenda'
+import { CompanyTable } from '@/components/newui/company-table'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -243,6 +246,76 @@ export function WatchlistView() {
     return { d: String(d).padStart(2, '0'), m: MONTHS[m - 1] ?? '' }
   }
 
+  const ui = useUiVersion()
+  const addCompany = (
+    <button
+      className="btn btn-outline btn-sm"
+      onClick={() => {
+        setCommandPurpose('add')
+        setCommandOpen(true)
+      }}
+    >
+      <Plus />
+      <span>Kompaniya qoʻshish</span>
+    </button>
+  )
+
+  // New look: ONE table of the watched companies and ONE agenda of their hearings (grouped by day, ordered by time).
+  // It replaces the alert sentence, the date tiles and the cards, which showed the same hearings three times.
+  if (ui === 'new') {
+    const refreshNow = () => {
+      if (loadingAll || items.length === 0) return
+      setLoadingAll(true)
+      void refreshHearings().finally(() => setLoadingAll(false))
+    }
+    return (
+      <div className="nx">
+        <div className="nx-head">
+          <h1>Kuzatuv</h1>
+          <span className="count">{items.length}</span>
+          <div className="sp" />
+          <OrdersControl companies={items.length} registryVersion={rv} />
+          {addCompany}
+        </div>
+        <div className="nx-grid">
+          <section className="p-card nx-main" aria-label="Kuzatuvdagi kompaniyalar">
+            <CompanyTable
+              records={items}
+              onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
+              onRefresh={refreshCompany}
+              onRemove={(rec) => unwatch(rec.stir)}
+              removeTitle="Kuzatuvdan olib tashlash"
+              empty={<EmptyBlock icon={<Eye />} title="Kuzatuv roʻyxati boʻsh" hint="Kompaniya ish maydonida «Kuzatish» tugmasi orqali qoʻshiladi." />}
+            />
+          </section>
+          <aside className="p-card nx-side" aria-label="Majlislar">
+            <div className="nx-card-h">
+              <h2>Majlislar</h2>
+              <span className="count">{upcomingAll.length}</span>
+              <div className="sp" />
+              <button className="btn btn-ghost btn-xs" onClick={refreshNow} disabled={loadingAll || items.length === 0} title="Majlislarni sudlardan qayta oʻqish">
+                {loadingAll ? <span className="spinner" style={{ width: 12, height: 12 }} /> : <RefreshCw />}
+                Yangilash
+              </button>
+            </div>
+            <Agenda
+              rows={upcomingAll.map((h, i) => ({
+                id: `${h.stir}-${h.isoDate}-${h.caseNumber ?? ''}-${i}`,
+                iso: h.isoDate,
+                time: h.time,
+                title: h.name || `STIR ${grp(h.stir)}`,
+                sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
+                code: h.caseNumber,
+                onOpen: () => openCompany(h.stir, { name: h.name }, 'hearings'),
+              }))}
+              emptyHint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi."
+            />
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="hero" style={{ marginBottom: 0 }}>
@@ -326,16 +399,7 @@ export function WatchlistView() {
         <span className="count">{items.length}</span>
         <div className="sp" />
         <OrdersControl companies={items.length} registryVersion={rv} />
-        <button
-          className="btn btn-outline btn-sm"
-          onClick={() => {
-            setCommandPurpose('add')
-            setCommandOpen(true)
-          }}
-        >
-          <Plus />
-          <span>Kompaniya qoʻshish</span>
-        </button>
+        {addCompany}
       </div>
       <div className="ccards">
         {items.map((c) => (

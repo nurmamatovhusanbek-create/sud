@@ -100,7 +100,17 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 
 **Amber in the new look only.** Classic keeps «no orange» (warning = info = brand blue). In the new look `--status-warning-*` is amber, so blue means only «interactive / information» and every three-step scale (win rate, rating letter, worker health, hearing within 7 days, stale data) reads green / amber / rose instead of green / blue / rose. Use the `warn` band for «needs attention», `info` for neutral facts; never hardcode either colour.
 
-**Markup stays shared.** The only look-dependent markup is the sidebar's fold button (`useUiVersion()` in `shell/app-shell`). The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both.
+**Where the structure was the problem, the new look has its own screens** (`src/components/newui/*`). The view keeps ONE set of data hooks and branches at its `return` on `useUiVersion()`:
+
+| Classic | Problem | New look |
+|---|---|---|
+| Kuzatuv: alert sentence («NKMK · 12 Noy · NKMK · 12 Noy…») + date tiles + cards | the same hearings three times, no order, no time, not clickable | `Agenda`: 7-day strip with counts (click = that day), then hearings grouped by day and ordered by time; later than a week behind «Keyinroq» |
+| Bosh sahifa / Kuzatuv: company cards | 2 of the 6 facts the registry holds; no way to order | `CompanyTable`: status, rating, cases, win rate, next hearing, overdue debt; click a column to sort; unknown is «—» and sorts last |
+| Bosh sahifa: headline + 4 tiles | a slogan and tiles above the work | search first, totals in one line |
+| Sud ishlari: number, court, grey status | opponent, subject and outcome only in the drawer | `CaseTable`: opponent + the company's side, category, outcome in colour (an open case is plain text), amount, date; rows open with Enter |
+| Majlislar (company): date tiles, paged | no day grouping | the same `Agenda` |
+
+Rules live in `core/` (`agenda`, `company-sort`), tested. The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both looks. Toʻlovlar, Statistika, Kompaniya, Hujjatlar and Sozlamalar keep the shared markup (restyled only).
 
 **Verify:** screenshot both looks, light + dark, at 1440 / 1080 / 960 / 700; the classic look must be pixel-identical to before.
 
