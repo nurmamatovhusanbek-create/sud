@@ -749,7 +749,7 @@ export function CasesSection() {
 
   return (
     <div className="p-card rise-c">
-      <div className="filterbar">
+      <div className="filterbar fb-cases">
         <div className="f-search">
           <Search />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
@@ -764,6 +764,8 @@ export function CasesSection() {
           className="btn btn-outline btn-sm"
           disabled={printing || filtered.length === 0}
           onClick={printList}
+          title="Roʻyxatni PDF qilib chop etish"
+          aria-label="PDF"
         >
           {printing ? <span className="spinner" /> : <Download />}
           <span>PDF</span>
@@ -772,6 +774,8 @@ export function CasesSection() {
           className="btn btn-outline btn-sm"
           disabled={exporting || filtered.length === 0}
           onClick={exportExcel}
+          title="Roʻyxatni Excel faylga yuklash"
+          aria-label="Excel"
         >
           {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
           <span>Excel</span>
@@ -781,6 +785,7 @@ export function CasesSection() {
           disabled={filtered.length === 0}
           onClick={downloadOrders}
           title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
+          aria-label="Qarorlar"
         >
           <FileText />
           <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>

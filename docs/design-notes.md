@@ -110,6 +110,8 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 | Sud ishlari: number, court, grey status | opponent, subject and outcome only in the drawer | `CaseTable`: opponent + the company's side, category, outcome in colour (an open case is plain text), amount, date; rows open with Enter |
 | Majlislar (company): date tiles, paged | no day grouping | the same `Agenda` |
 
+**Narrow screens (new look).** Below 1280 px Bosh sahifa / Kuzatuv stack with the REGISTER first and the agenda under it (the agenda is as long as the week is busy: it used to lead and pushed the companies a long scroll down). Below 760 px a case in Sud ishlari is a two-line card (opponent + outcome, number + amount, date) instead of a table that runs off the edge, and the three export buttons shrink to icons (`.fb-cases`, `title` + `aria-label` carry the names). Amounts are grouped in threes (`groupDigits`).
+
 Rules live in `core/` (`agenda`, `company-sort`), tested. The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both looks. Toʻlovlar, Statistika, Kompaniya, Hujjatlar and Sozlamalar keep the shared markup (restyled only).
 
 **Verify:** screenshot both looks, light + dark, at 1440 / 1080 / 960 / 700; the classic look must be pixel-identical to before.

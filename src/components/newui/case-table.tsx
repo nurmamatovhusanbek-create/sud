@@ -9,6 +9,7 @@
 import { caseClassificationFamily } from '@/core/status'
 import { classifyOutcome, type PartyRole } from '@/core/classify'
 import { daysUntil } from '@/core/dates'
+import { groupDigits } from '@/core/billing-format'
 import { familyBadgeClass } from '@/components/proto/primitives'
 import type { CourtCase, CourtType } from '@/lib/court-case-types'
 
@@ -90,7 +91,7 @@ export function CaseTable({ rows, statusText, onOpen }: { rows: CaseTableRow[]; 
                     <span className="ct-none">—</span>
                   )}
                 </td>
-                <td className="num mono">{real(c.claimAmount) || <span className="ct-none">—</span>}</td>
+                <td className="num mono" title={real(c.claimAmount) ? `${groupDigits(c.claimAmount)} soʻm` : undefined}>{real(c.claimAmount) ? groupDigits(c.claimAmount) : <span className="ct-none">—</span>}</td>
                 <td>
                   <span className="ct-hear">
                     <b>{hearing || real(c.dateFiled) || '—'}</b>

@@ -52,7 +52,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
 | `agenda.ts` | components/newui/agenda.tsx, components/newui/company-table.tsx | core/__tests__/agenda.test.ts |
-| `billing-format.ts` | components/newui/company-table.tsx, components/sections/bills.tsx, components/sections/overview.tsx, components/views/launcher.tsx, lib/api-types.ts, lib/billing.ts | core/__tests__/sum-compact.test.ts |
+| `billing-format.ts` | components/newui/case-table.tsx, components/newui/company-table.tsx, components/sections/bills.tsx, components/sections/overview.tsx, components/views/launcher.tsx, lib/api-types.ts, lib/billing.ts | core/__tests__/sum-compact.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/newui/case-table.tsx, components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
 | `company-sort.ts` | components/newui/company-table.tsx | core/__tests__/company-sort.test.ts |

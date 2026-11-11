@@ -170,6 +170,17 @@ export function formatSumCompact(tiyins: number | null | undefined): string {
   return String(sum)
 }
 
+/**
+ * A claim amount as the court API writes it («554300000», «12500000.50») grouped for reading: «554 300 000». Text that
+ * is not a plain number (already grouped, a range, words) is returned as it came.
+ */
+export function groupDigits(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim()
+  const m = /^(-?)(\d+)([.,]\d+)?$/.exec(s)
+  if (!m) return s
+  return `${m[1]}${m[2].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${m[3] ?? ''}`
+}
+
 export function formatDate(ts: number | null | undefined): string {
   if (!ts) return '-'
   const d = new Date(ts)

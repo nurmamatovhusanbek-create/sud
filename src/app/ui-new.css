@@ -166,6 +166,16 @@ html[data-ui='new'][data-theme='dark'] {
 [data-ui='new'] .f-search { height: 34px; padding: 0 12px; min-width: 220px; max-width: 340px; border: 1px solid var(--border-subtle); border-radius: 9px; }
 [data-ui='new'] .filterbar { gap: 8px; margin-bottom: 8px; }
 
+/* Sud ishlari's bar has too much for one line (search, sort, three exports, two segments): row 1 = search + sort +
+   exports on the right, row 2 = the two segments. Without this the exports wrapped alone under the segments. */
+[data-ui='new'] .filterbar.fb-cases { row-gap: 8px; }
+[data-ui='new'] .filterbar.fb-cases > .f-search { order: 1; flex: 1 1 240px; max-width: 360px; }
+[data-ui='new'] .filterbar.fb-cases > .sortsel { order: 2; }
+[data-ui='new'] .filterbar.fb-cases > div:not(.f-search):not(.seg) { order: 3; }
+[data-ui='new'] .filterbar.fb-cases > .btn { order: 3; }
+[data-ui='new'] .filterbar.fb-cases::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
+[data-ui='new'] .filterbar.fb-cases > .seg { order: 5; }
+
 /* ---------- cards: a hairline at rest, no jump on hover ---------- */
 [data-ui='new'] .p-card { padding: 18px; }
 [data-ui='new'] .p-card.mini { padding: 13px 15px; }
@@ -267,10 +277,11 @@ html[data-ui='new'][data-theme='dark'] {
 [data-ui='new'] .nx-card-h h2 { margin: 0; font-size: 15px; font-weight: 700; }
 [data-ui='new'] .nx-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 344px); gap: 16px; align-items: start; }
 [data-ui='new'] .nx-main, [data-ui='new'] .nx-side { min-width: 0; }
-/* the agenda leads when the two cannot sit side by side: what is due comes before the register */
+/* When the two cannot sit side by side the REGISTER stays first and the agenda follows. The agenda used to lead, but it is as
+   long as the week is busy: at 1080 px Kuzatuv opened on 20 hearings and the companies, the page's subject, were a long
+   scroll below. */
 @media (max-width: 1280px) {
   [data-ui='new'] .nx-grid { grid-template-columns: minmax(0, 1fr); }
-  [data-ui='new'] .nx-side { order: -1; }
 }
 
 /* home: search, then one line of totals */
@@ -392,3 +403,32 @@ html[data-ui='new'][data-theme='dark'] {
 [data-ui='new'] .ct.cases th { position: static; }
 [data-ui='new'] .ct.cases tbody tr:last-child td { border-bottom: 1px solid var(--border-subtle); }
 [data-ui='new'] .ct-wrap + * { margin-top: 12px; }
+
+/* ---------- narrow screens: a case is a two-line card, not a table that runs off the edge ---------- */
+@media (max-width: 760px) {
+  /* Sud ishlari's bar: the three exports shrink to icons so search + sort + exports stay on one line */
+  [data-ui='new'] .filterbar.fb-cases > .btn { padding-inline: 9px; }
+  [data-ui='new'] .filterbar.fb-cases > .btn > span { display: none; }
+  [data-ui='new'] .filterbar.fb-cases > .seg { max-width: 100%; overflow-x: auto; }
+
+  [data-ui='new'] .ct.cases, [data-ui='new'] .ct.cases tbody { display: block; }
+  [data-ui='new'] .ct.cases thead { display: none; }
+  [data-ui='new'] .ct.cases tbody tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 3px;
+    grid-template-areas: 'party out' 'id amt' 'date date';
+    padding: 10px 18px; border-bottom: 1px solid var(--border-subtle);
+  }
+  [data-ui='new'] .ct.cases tbody tr:last-child { border-bottom: 0; }
+  [data-ui='new'] .ct.cases td { display: block; padding: 0 !important; border: 0; min-width: 0; }
+  [data-ui='new'] .ct.cases td:nth-child(1) { grid-area: id; }
+  [data-ui='new'] .ct.cases td:nth-child(2) { grid-area: party; width: auto; max-width: none; }
+  [data-ui='new'] .ct.cases td:nth-child(3), [data-ui='new'] .ct.cases td:nth-child(4) { display: none; }
+  [data-ui='new'] .ct.cases td:nth-child(5) { grid-area: out; justify-self: end; align-self: start; }
+  [data-ui='new'] .ct.cases td:nth-child(6) { grid-area: amt; justify-self: end; align-self: end; }
+  [data-ui='new'] .ct.cases td:nth-child(6)::after { content: ' soʻm'; color: var(--text-3); font-family: var(--font-sans, inherit); font-size: 11px; }
+  [data-ui='new'] .ct.cases td:nth-child(7) { grid-area: date; }
+  [data-ui='new'] .ct.cases td:nth-child(7) .ct-hear { flex-direction: row; gap: 8px; align-items: baseline; }
+  [data-ui='new'] .ct.cases .ct-id b { max-width: none; }
+  [data-ui='new'] .ct.cases td:nth-child(1) .ct-id span { display: none; } /* «Iqtisodiy»: the court type is in the filter above */
+  [data-ui='new'] .ct.cases .ct-party .ct-id b { white-space: normal; }
+}
