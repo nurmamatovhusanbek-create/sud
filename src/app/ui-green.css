@@ -248,20 +248,30 @@ html[data-ui='green'][data-theme='dark'] .drawer-title { background: linear-grad
 [data-ui='green'] .cmdk { border-radius: 24px; border-color: var(--border-default); }
 [data-ui='green'] .cmdk-item { border-radius: 14px; }
 [data-ui='green'] .dedit-form, [data-ui='green'] .dedit-doc { border-radius: 22px; }
-[data-ui='green'] .nx-head h1, [data-ui='green'] .section-head h2 { letter-spacing: -.02em; }
+[data-ui='green'] .section-head h2 { letter-spacing: -.02em; }
 
 /* ============================================================================
    REBUILT SCREENS — page heads and the lists of components/greenui/lists.tsx
    ============================================================================ */
-[data-ui='green'] .nx-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 14px; }
-[data-ui='green'] .nx-head h1 { margin: 0; font-size: 20px; font-weight: 750; }
-[data-ui='green'] .nx-head .sp, [data-ui='green'] .nx-card-h .sp, [data-ui='green'] .g-card-h .sp { flex: 1; }
-[data-ui='green'] .nx .count, [data-ui='green'] .g-count { font-size: 12px; font-weight: 700; color: var(--g-on-lime); background: var(--g-lime); border-radius: 999px; padding: 2px 10px; }
-[data-ui='green'] .nx-card-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; min-height: 34px; }
-[data-ui='green'] .nx-card-h h2 { margin: 0; font-size: 15px; font-weight: 750; }
-[data-ui='green'] .nx-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 350px); gap: 14px; align-items: start; }
-[data-ui='green'] .nx-main, [data-ui='green'] .nx-side { min-width: 0; }
-@media (max-width: 1280px) { [data-ui='green'] .nx-grid { grid-template-columns: minmax(0, 1fr); } }
+[data-ui='green'] .g-card-h .sp, [data-ui='green'] .gx-panel-h .sp { flex: 1; }
+[data-ui='green'] .g-count { font-size: 12px; font-weight: 700; color: var(--g-on-lime); background: var(--g-lime); border-radius: 999px; padding: 2px 10px; }
+
+/* Kuzatuv (greenui/watchlist.tsx): a head of three pills + tools, then two soft panels */
+[data-ui='green'] .gx-wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin: 4px 0 14px; }
+[data-ui='green'] .gx-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+[data-ui='green'] .gx-pill { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--border-subtle); box-shadow: var(--gr-shadow); }
+[data-ui='green'] .gx-pill svg { width: 16px; height: 16px; color: var(--brand); }
+[data-ui='green'] .gx-pill b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+[data-ui='green'] .gx-pill small { font-size: 12px; color: var(--text-2); }
+[data-ui='green'] .gx-pill.lime { background: var(--g-lime); border-color: transparent; }
+[data-ui='green'] .gx-pill.lime svg, [data-ui='green'] .gx-pill.lime b, [data-ui='green'] .gx-pill.lime small { color: var(--g-on-lime); }
+[data-ui='green'] .gx-pill.warn svg, [data-ui='green'] .gx-pill.warn b { color: var(--neg-text); }
+[data-ui='green'] .gx-wl-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+[data-ui='green'] .gx-wl-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 14px; align-items: start; }
+[data-ui='green'] .gx-panel { min-width: 0; padding: 20px; border-radius: 26px; background: var(--gr-card); border: 1px solid var(--border-subtle); box-shadow: var(--gr-shadow); }
+[data-ui='green'] .gx-panel-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; min-height: 30px; }
+[data-ui='green'] .gx-panel-h h2 { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
+@media (max-width: 1280px) { [data-ui='green'] .gx-wl-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- company monogram (shared by every list): a round tile in one of three greens, the status dot on its rim ---------- */
 [data-ui='green'] .gx-av { position: relative; flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-size: 12px; font-weight: 800; letter-spacing: .02em; }

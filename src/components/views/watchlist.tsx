@@ -21,6 +21,7 @@ import { OrdersControl } from '@/components/views/orders-control'
 import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
 import { AgendaList, CompanyList } from '@/components/screens'
+import { GreenWatchlist } from '@/components/greenui/watchlist'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -268,6 +269,45 @@ export function WatchlistView() {
       setLoadingAll(true)
       void refreshHearings().finally(() => setLoadingAll(false))
     }
+    const companyList = (
+      <CompanyList
+        records={items}
+        onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
+        onRefresh={refreshCompany}
+        onRemove={(rec) => unwatch(rec.stir)}
+        removeTitle="Kuzatuvdan olib tashlash"
+        empty={<EmptyBlock icon={<Eye />} title="Kuzatuv roʻyxati boʻsh" hint="Kompaniya ish maydonida «Kuzatish» tugmasi orqali qoʻshiladi." />}
+      />
+    )
+    const agendaList = (
+      <AgendaList
+        rows={upcomingAll.map((h, i) => ({
+          id: `${h.stir}-${h.isoDate}-${h.caseNumber ?? ''}-${i}`,
+          iso: h.isoDate,
+          time: h.time,
+          title: h.name || `STIR ${grp(h.stir)}`,
+          sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
+          code: h.caseNumber,
+          onOpen: () => openCompany(h.stir, { name: h.name }, 'hearings'),
+        }))}
+        emptyHint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi."
+      />
+    )
+    if (ui === 'green') {
+      return (
+        <GreenWatchlist
+          watching={items.length}
+          weekHearings={alerts.length}
+          overdueCompanies={items.filter((w) => (w.meta?.overdueTotal ?? 0) > 0).length}
+          tools={<><OrdersControl companies={items.length} registryVersion={rv} />{addCompany}</>}
+          companies={companyList}
+          agenda={agendaList}
+          agendaCount={upcomingAll.length}
+          refreshing={loadingAll}
+          onRefresh={refreshNow}
+        />
+      )
+    }
     return (
       <div className="nx">
         <div className="nx-head">
@@ -279,14 +319,7 @@ export function WatchlistView() {
         </div>
         <div className="nx-grid">
           <section className="p-card nx-main" aria-label="Kuzatuvdagi kompaniyalar">
-            <CompanyList
-              records={items}
-              onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
-              onRefresh={refreshCompany}
-              onRemove={(rec) => unwatch(rec.stir)}
-              removeTitle="Kuzatuvdan olib tashlash"
-              empty={<EmptyBlock icon={<Eye />} title="Kuzatuv roʻyxati boʻsh" hint="Kompaniya ish maydonida «Kuzatish» tugmasi orqali qoʻshiladi." />}
-            />
+            {companyList}
           </section>
           <aside className="p-card nx-side" aria-label="Majlislar">
             <div className="nx-card-h">
@@ -298,18 +331,7 @@ export function WatchlistView() {
                 Yangilash
               </button>
             </div>
-            <AgendaList
-              rows={upcomingAll.map((h, i) => ({
-                id: `${h.stir}-${h.isoDate}-${h.caseNumber ?? ''}-${i}`,
-                iso: h.isoDate,
-                time: h.time,
-                title: h.name || `STIR ${grp(h.stir)}`,
-                sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
-                code: h.caseNumber,
-                onOpen: () => openCompany(h.stir, { name: h.name }, 'hearings'),
-              }))}
-              emptyHint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi."
-            />
+            {agendaList}
           </aside>
         </div>
       </div>
