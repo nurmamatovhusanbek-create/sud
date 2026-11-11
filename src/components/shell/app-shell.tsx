@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
 import { setSideMini, useSideMini, useUiVersion } from '@/lib/ui-version'
+import { usesRebuiltScreens } from '@/core/ui-version'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -53,6 +54,19 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
   profile: <Building2 />,
   kuzatuv: <Eye />,
   overview: <BarChart3 />,
+}
+
+/** The green look's page title and its one-line tagline (the top bar names the page the way the sidebar does). */
+const PAGE_TAGLINES: Record<string, string> = {
+  home: 'Kompaniyalar, majlislar va qarzdorlik — bir qarashda.',
+  watchlist: 'Kuzatuvdagi kompaniyalar, ularning majlislari va qarzdorligi.',
+  documents: 'Viza, sud va boshqa hujjatlarni tayyor shablonlar asosida yarating.',
+  settings: 'Yangilanishlar, workerlar, captcha va koʻrinishni boshqaring.',
+  bills: 'Kvitansiyalar, toʻlovlar va muddati oʻtgan qarz.',
+  cases: 'Kompaniyaning barcha sud ishlari va ularning natijasi.',
+  hearings: 'Rejalashtirilgan sud majlislari kunma-kun.',
+  profile: 'Kompaniya haqida rasmiy maʼlumotlar va reyting.',
+  overview: 'Yutuq, reyting va sud ishlari statistikasi.',
 }
 
 interface Notif {
@@ -256,6 +270,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const inWorkspace = surface === 'main' && view === 'company' && !!company
+  const pageKey = surface === 'main' ? (inWorkspace ? section : 'home') : surface
+  const pageTitle = pageKey === 'home' ? 'Bosh sahifa' : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
 
   const goWorkspaceSection = (key: SectionKey) => {
     setSideOpen(false)
@@ -371,7 +387,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>
-          {ui === 'new' || (surface !== 'documents' && surface !== 'settings') ? (
+          {ui === 'green' && (
+            <div className="g-title">
+              <b>{pageTitle}</b>
+              <span>«{PAGE_TAGLINES[pageKey] ?? ''}»</span>
+            </div>
+          )}
+          {usesRebuiltScreens(ui) || (surface !== 'documents' && surface !== 'settings') ? (
             <button
               className="searchbox"
               onClick={() => {

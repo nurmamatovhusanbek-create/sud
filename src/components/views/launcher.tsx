@@ -22,6 +22,8 @@ import { formatSumCompact } from '@/core/billing-format'
 import { useUiVersion } from '@/lib/ui-version'
 import { Agenda } from '@/components/newui/agenda'
 import { CompanyTable } from '@/components/newui/company-table'
+import { GreenHome } from '@/components/greenui/home'
+import { usesRebuiltScreens } from '@/core/ui-version'
 
 /** companies whose status the home already tried to read this page session (one light attempt each) */
 const statusTried = new Set<string>()
@@ -323,7 +325,7 @@ export function Launcher() {
 
   // New look: search first, then the work — every company in one sortable table, and next to it the hearings of all
   // of them as an agenda. No headline, no four tiles: the totals are one line.
-  if (ui === 'new') {
+  if (usesRebuiltScreens(ui)) {
     const agendaRows = companies.flatMap((c) =>
       futureUpcoming(c.meta).map((h, i) => ({
         id: `${c.stir}-${h.iso}-${h.caseNumber ?? ''}-${i}`,
@@ -335,6 +337,41 @@ export function Launcher() {
         onOpen: () => openCompany(c.stir, { name: c.name }, 'hearings'),
       })),
     )
+    const companyTable = (
+      <CompanyTable
+        records={filtered}
+        onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
+        onRefresh={refreshOne}
+        onRemove={(rec) => deleteOne(rec.stir)}
+        removeTitle="Roʻyxatdan oʻchirish"
+        canRemove={(rec) => !rec.watched}
+        empty={
+          <div className="empty">
+            <div className="ico">
+              <Users />
+            </div>
+            <h3>Kompaniya topilmadi</h3>
+            <p>STIR kiriting yoki kompaniya nomi boʻyicha qidiring. Natijalar shu yerda jamlanadi.</p>
+          </div>
+        }
+      />
+    )
+    const agendaEl = <Agenda rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
+    // Green look: the same data, drawn as a bento dashboard (components/greenui)
+    if (ui === 'green') {
+      return (
+        <GreenHome
+          companies={companies}
+          totals={{ cases: totCases, active: statusCounts.active, unknown: statusCounts.unknown, nearHearings, nearestLabel, overdueTotal, overdueCompanies }}
+          searchBox={searchBox}
+          recentChips={recentChips}
+          listTools={listTools}
+          companyTable={companyTable}
+          agenda={agendaEl}
+          agendaCount={agendaRows.length}
+        />
+      )
+    }
     return (
       <div className="nx">
         <div className="nx-search">
@@ -378,30 +415,14 @@ export function Launcher() {
               <div className="sp" />
               {listTools}
             </div>
-            <CompanyTable
-              records={filtered}
-              onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
-              onRefresh={refreshOne}
-              onRemove={(rec) => deleteOne(rec.stir)}
-              removeTitle="Roʻyxatdan oʻchirish"
-              canRemove={(rec) => !rec.watched}
-              empty={
-                <div className="empty">
-                  <div className="ico">
-                    <Users />
-                  </div>
-                  <h3>Kompaniya topilmadi</h3>
-                  <p>STIR kiriting yoki kompaniya nomi boʻyicha qidiring. Natijalar shu yerda jamlanadi.</p>
-                </div>
-              }
-            />
+            {companyTable}
           </section>
           <aside className="p-card nx-side" aria-label="Majlislar">
             <div className="nx-card-h">
               <h2>Majlislar</h2>
               <span className="count">{agendaRows.length}</span>
             </div>
-            <Agenda rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
+            {agendaEl}
           </aside>
         </div>
       </div>

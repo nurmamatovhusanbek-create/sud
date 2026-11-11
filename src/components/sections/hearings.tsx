@@ -22,6 +22,7 @@ import type { UpcomingHearingsData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 import { useUiVersion } from '@/lib/ui-version'
+import { usesRebuiltScreens } from '@/core/ui-version'
 import { Agenda } from '@/components/newui/agenda'
 
 const MONTHS_UZ = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
@@ -156,7 +157,7 @@ export function HearingsSection() {
           </div>
           <h2>Kelgusi majlislar</h2>
           <div className="sp" />
-          {ui !== 'new' && (
+          {!usesRebuiltScreens(ui) && (
             <>
               <span className="faint" style={{ fontSize: 12 }}>3 sud turi · eng yaqini qora bilan</span>
               <SortMenu value={sort} onChange={setSort} />
@@ -183,7 +184,7 @@ export function HearingsSection() {
             <span>Excel</span>
           </button>
         </div>
-        {ui === 'new' ? (
+        {usesRebuiltScreens(ui) ? (
           <Agenda
             rows={hearings.filter((h) => typeof h.isoDate === 'string').map((h, i) => ({
               id: `${(h.caseNumber as string) || 'h'}-${i}`,

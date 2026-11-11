@@ -2,7 +2,7 @@
 
 /**
  * Settings › Koʻrinish — which interface the operator works in, the theme, and the new look's folded sidebar.
- * The two looks are complete and equal: «Yangi» (app/ui-new.css) and «Klassik» (the v18 look, unchanged).
+ * The three looks are complete and equal: «Yangi» (app/ui-new.css), «Yashil» (app/ui-green.css, built fresh) and «Klassik» (the v18 look, unchanged).
  * A click applies at once and is remembered in this browser (lib/ui-version.ts); nothing is sent to the server.
  */
 
@@ -15,6 +15,7 @@ import { setSideMini, setUiVersion, useSideMini, useUiVersion } from '@/lib/ui-v
 
 const LOOKS: { key: UiVersion; title: string; note: string }[] = [
   { key: 'new', title: 'Yangi', note: 'Zichroq roʻyxatlar, toʻq yon menyu, gradient urgʻu, jonli harakat, kompaniya monogrammalari' },
+  { key: 'green', title: 'Yashil', note: 'Ramkali panel, bento boshqaruv paneli, toʻq yashil va laym ranglar, yumshoq kartalar' },
   { key: 'classic', title: 'Klassik', note: 'Avvalgi koʻrinish, hech narsa oʻzgarmagan' },
 ]
 
@@ -22,7 +23,7 @@ const noopSubscribe = () => () => {}
 
 /** A sketch of the screen (sidebar + rows) in the look it stands for; drawn with fixed shapes, not live data. */
 function LookSketch({ look }: { look: UiVersion }) {
-  const rows = look === 'new' ? 5 : 3
+  const rows = look === 'new' ? 5 : look === 'green' ? 4 : 3
   return (
     <span className={`look-sketch ${look}`} aria-hidden>
       <span className="ls-side">
@@ -51,7 +52,7 @@ export function AppearanceSettings() {
   const pick = (next: UiVersion) => {
     if (next === ui) return
     setUiVersion(next)
-    toast.success(next === 'new' ? 'Yangi koʻrinish yoqildi' : 'Klassik koʻrinish qaytarildi')
+    toast.success(next === 'new' ? 'Yangi koʻrinish yoqildi' : next === 'green' ? 'Yashil koʻrinish yoqildi' : 'Klassik koʻrinish qaytarildi')
   }
 
   return (

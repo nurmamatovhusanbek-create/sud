@@ -19,6 +19,7 @@ import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { OrdersControl } from '@/components/views/orders-control'
 import { useUiVersion } from '@/lib/ui-version'
+import { usesRebuiltScreens } from '@/core/ui-version'
 import { Agenda } from '@/components/newui/agenda'
 import { CompanyTable } from '@/components/newui/company-table'
 
@@ -262,7 +263,7 @@ export function WatchlistView() {
 
   // New look: ONE table of the watched companies and ONE agenda of their hearings (grouped by day, ordered by time).
   // It replaces the alert sentence, the date tiles and the cards, which showed the same hearings three times.
-  if (ui === 'new') {
+  if (usesRebuiltScreens(ui)) {
     const refreshNow = () => {
       if (loadingAll || items.length === 0) return
       setLoadingAll(true)

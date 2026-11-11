@@ -42,6 +42,7 @@ import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
 import { useUiVersion } from '@/lib/ui-version'
+import { usesRebuiltScreens } from '@/core/ui-version'
 import { CaseTable } from '@/components/newui/case-table'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -811,7 +812,7 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
-          {ui === 'new' ? (
+          {usesRebuiltScreens(ui) ? (
             <CaseTable
               rows={paged.map((m) => ({ c: m.c, courtType: m.courtType, role: roleOf(m) }))}
               statusText={(raw) => statusEn(raw) || raw}

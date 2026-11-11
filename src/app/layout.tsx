@@ -10,6 +10,7 @@ import "./globals.css";
 import "./prototype.css";
 // The new «Ixcham» look: every rule is scoped under html[data-ui='new'], so the classic look is untouched without it.
 import "./ui-new.css";
+import "./ui-green.css";
 import { DEFAULT_UI, UI_BOOT_SCRIPT } from "@/core/ui-version";
 
 export const metadata: Metadata = {

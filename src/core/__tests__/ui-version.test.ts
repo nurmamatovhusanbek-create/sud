@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { DEFAULT_UI, SIDE_MINI_KEY, UI_BOOT_SCRIPT, UI_STORAGE_KEY, UI_VERSIONS, parseUiVersion } from '../ui-version'
+import { DEFAULT_UI, SIDE_MINI_KEY, usesRebuiltScreens, UI_BOOT_SCRIPT, UI_STORAGE_KEY, UI_VERSIONS, parseUiVersion } from '../ui-version'
 
 describe('ui version', () => {
   test('known values pass through', () => {
     expect(parseUiVersion('new')).toBe('new')
     expect(parseUiVersion('classic')).toBe('classic')
+    expect(parseUiVersion('green')).toBe('green')
   })
 
   test('anything else is the default', () => {
@@ -28,8 +29,15 @@ describe('ui version', () => {
     }
     expect(run({})).toEqual({ 'data-ui': DEFAULT_UI })
     expect(run({ [UI_STORAGE_KEY]: 'classic' })).toEqual({ 'data-ui': 'classic' })
+    expect(run({ [UI_STORAGE_KEY]: 'green' })).toEqual({ 'data-ui': 'green' })
     expect(run({ [UI_STORAGE_KEY]: 'garbage' })).toEqual({ 'data-ui': parseUiVersion('garbage') })
     expect(run({ [SIDE_MINI_KEY]: '1' })).toEqual({ 'data-ui': 'new', 'data-side': 'mini' })
+  })
+
+  test('the rebuilt screens belong to every look but the classic one', () => {
+    expect(usesRebuiltScreens('new')).toBe(true)
+    expect(usesRebuiltScreens('green')).toBe(true)
+    expect(usesRebuiltScreens('classic')).toBe(false)
   })
 
   test('boot script survives blocked storage', () => {

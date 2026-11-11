@@ -548,6 +548,16 @@ html, body { height: 100%; }
 .look-sketch.new .ls-main { gap: 0; }
 .look-sketch.new .ls-top { margin-bottom: 4px; }
 .look-sketch.new .ls-row { border: 0; border-radius: 0; background: none; border-bottom: 1px solid var(--border-default); }
+/* «Yashil»: a framed panel on grey, a white nav pill, a lime hero tile + two cards (fixed colours: it is a picture of that look) */
+.look-sketch.green { background: #e6e8e6; padding: 4px; }
+.look-sketch.green .ls-side { flex-basis: 20px; background: #f4f5f4; border-radius: 6px 0 0 6px; }
+.look-sketch.green .ls-side i { background: #d3d8d3; }
+.look-sketch.green .ls-side i.on { background: #fff; box-shadow: 0 0 0 1px #cfd6cf; }
+.look-sketch.green .ls-main { flex-direction: row; flex-wrap: wrap; align-content: stretch; gap: 3px; padding: 4px; background: #f4f5f4; border-radius: 0 6px 6px 0; }
+.look-sketch.green .ls-top { flex: 0 0 100%; height: 5px; background: #bfc8bf; }
+.look-sketch.green .ls-row { flex: 1 1 28%; border: 0; border-radius: 4px; background: #fff; }
+.look-sketch.green .ls-row:first-of-type { background: #a3e86f; }
+.look-sketch.green .ls-row:nth-of-type(2) { background: #08362a; }
 .look-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .look-line + .look-line { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
 .look-line-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
