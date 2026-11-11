@@ -98,6 +98,8 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 
 **What the new look is:** list rows ~50px with hairlines instead of 68px tiles; the sidebar in the theme's own surface, foldable to a 60px icon rail (`html[data-side='mini']`, key `sud-side-mini`, labels become tooltips, counts become corner badges); cards and KPI tiles do not lift on hover; focus is one crisp 2px line (owner rule: no glow); company names wrap to two lines; a list's filter bar is sticky; the palette scrim has no blur (performance rule in AGENTS.md §4).
 
+**Amber in the new look only.** Classic keeps «no orange» (warning = info = brand blue). In the new look `--status-warning-*` is amber, so blue means only «interactive / information» and every three-step scale (win rate, rating letter, worker health, hearing within 7 days, stale data) reads green / amber / rose instead of green / blue / rose. Use the `warn` band for «needs attention», `info` for neutral facts; never hardcode either colour.
+
 **Markup stays shared.** The only look-dependent markup is the sidebar's fold button (`useUiVersion()` in `shell/app-shell`). The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both.
 
 **Verify:** screenshot both looks, light + dark, at 1440 / 1080 / 960 / 700; the classic look must be pixel-identical to before.

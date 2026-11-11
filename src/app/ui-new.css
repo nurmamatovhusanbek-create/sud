@@ -15,6 +15,12 @@
      5. Reading      company names wrap to two lines instead of «UZAUTO MOTO…»; list filters stay on
                      screen while the list scrolls
      6. Speed        no backdrop blur behind the palette (AGENTS.md §4: blur over a running animation)
+     7. Colour       «attention» is amber, not the brand blue. In the classic palette warning = info = the
+                     same blue as the active nav item and every selected option, so the middle of each
+                     three-step scale (win rate 40–60%, rating B, worker health 60–90%, a hearing within
+                     7 days, stale data) looked like «selected», and scales read green / blue / rose. Here
+                     blue means only «interactive / information» and the scale is green / amber / rose.
+                     Contrast: text on its tint 5.7:1, white on the solid 5.4:1, marks on white 3.4:1 (dark: 8:1+).
    Tokens only, no new hex in components: colours below are token overrides.
    Desktop-only layout rules sit in (min-width: 1081px) so the 1080px sidebar-drawer rule in
    prototype.css keeps working untouched (AGENTS.md §4: column + drawer share ONE breakpoint).
@@ -36,6 +42,25 @@ html[data-ui='new']:not([data-theme='dark']) {
   --border-subtle: #e7e9f2;
   --border-default: #dcdfeb;
   --border-strong: #c5cadd;
+}
+
+/* attention = amber (see 7 above). Only the warning role moves; info stays the brand blue. prototype.css aliases
+   --warn-* onto these on the same element, so badges, dots, gauge zones, bars, alerts and toasts all follow. */
+html[data-ui='new']:not([data-theme='dark']) {
+  --status-warning-solid: #9a5c00;
+  --status-warning-on:    #ffffff;
+  --status-warning-soft:  #fcf1d9;
+  --status-warning-text:  #8a5200;
+  --status-warning-line:  #f0d9a3;
+  --status-warning-base:  #c27c00;
+}
+html[data-ui='new'][data-theme='dark'] {
+  --status-warning-solid: #e9ab3c;
+  --status-warning-on:    #1c1303;
+  --status-warning-soft:  rgba(233, 171, 60, .16);
+  --status-warning-text:  #f3c66f;
+  --status-warning-line:  rgba(233, 171, 60, .34);
+  --status-warning-base:  #e9ab3c;
 }
 
 /* ---------- focus: crisp line, no halo ---------- */
