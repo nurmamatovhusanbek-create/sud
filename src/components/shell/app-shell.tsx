@@ -16,7 +16,7 @@
  * users who never set it up.
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
 import {
   BarChart3,
@@ -36,14 +36,13 @@ import {
 } from 'lucide-react'
 import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { daysUntilIso, upcomingOf, watched } from '@/lib/registry'
-import { useRegistryVersion } from '@/lib/use-registry'
+import { watched } from '@/lib/registry'
 import { getHealth } from '@/lib/api-client'
-import { getCached } from '@/lib/cache'
-import type { CompanyStats } from '@/lib/api-types'
+import { ddmm, counterpartyFor, useAlerts, useHydrated } from './alerts'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
+import { GreenShell, type GxNavItem } from '@/components/greenui/shell'
 import { setSideMini, useSideMini, useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
 
@@ -69,57 +68,10 @@ const PAGE_TAGLINES: Record<string, string> = {
   overview: 'Yutuq, reyting va sud ishlari statistikasi.',
 }
 
-interface Notif {
-  stir: string
-  name?: string
-  isoDate: string
-  court?: string
-  caseNumber?: string
-  time?: string
-  judge?: string
-}
-
-/** Watched companies' hearings within the 7-day alert window — EVERY hearing, not one per company. */
-function computeAlerts(): Notif[] {
-  const out: Notif[] = []
-  const now = Date.now()
-  for (const w of watched()) {
-    for (const h of upcomingOf(w.meta)) {
-      const days = daysUntilIso(h.iso, now)
-      if (days === null || days < 0 || days > 7) continue
-      out.push({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })
-    }
-  }
-  return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
-}
-
-const noopSubscribe = () => () => {}
-/** Hydration probe — false on the server + first client render, true after. */
-function useHydrated(): boolean {
-  return useSyncExternalStore(noopSubscribe, () => true, () => false)
-}
-
-/**
- * v18: the alert title is the OTHER party of the case. We match the case
- * number inside the company's cached stats (10-min server memoization means
- * this is free); without a match we fall back to the watched company name.
- */
-function counterpartyFor(stir: string, caseNumber?: string, fallback?: string): string {
-  if (caseNumber) {
-    const stats = getCached<CompanyStats>(`stats:${stir}`)
-    const hit = stats?.cases?.find((c) => c.caseNumber === caseNumber)
-    if (hit?.counterparty) return hit.counterparty
-  }
-  return fallback || `STIR ${stir}`
-}
-
 function BellPopover() {
   const openCompany = useAppStore((s) => s.openCompany)
   const [open, setOpen] = useState(false)
-  const rv = useRegistryVersion()
-  // v206: hydration gate — computeAlerts() reads the localStorage registry.
-  const hydrated = useHydrated()
-  const alerts = useMemo(() => (hydrated ? computeAlerts() : []), [rv, hydrated])
+  const alerts = useAlerts()
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Outside click closes the popover
@@ -162,8 +114,6 @@ function BellPopover() {
               </div>
             ) : (
               alerts.map((a, i) => {
-                const [, m, d] = a.isoDate.split('-').map(Number)
-                const ddmm = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
                 const party = counterpartyFor(a.stir, a.caseNumber, a.name)
                 return (
                   <div
@@ -180,7 +130,7 @@ function BellPopover() {
                     <div className="nt">
                       <b>{party}</b>
                       <span>
-                        {ddmm} · {a.court || ''}
+                        {ddmm(a.isoDate)} · {a.court || ''}
                         {a.time ? ` · ${a.time}` : ''}
                       </span>
                     </div>
@@ -312,6 +262,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return undefined
   }
 
+  if (ui === 'green') {
+    const mk = (key: SectionKey | 'kuzatuv'): GxNavItem => {
+      const label = key === 'kuzatuv' ? 'Kuzatuv' : (WORKSPACE_NAV.find((n) => n.key === key)?.label ?? key)
+      return { key, label, icon: NAV_ICONS[key], active: navActive(key), pip: pipFor(key), onClick: () => navClick(key) }
+    }
+    const sys = (key: 'documents' | 'settings', label: string, icon: React.ReactNode): GxNavItem => ({
+      key, label, icon, active: surface === key, onClick: () => { setSideOpen(false); setSurface(key) },
+    })
+    return (
+      <GreenShell
+        workspace={{ name: inWorkspace && company ? company.name || `STIR ${company.stir}` : null, stir: inWorkspace && company ? company.stir : null, onClick: () => { setSideOpen(false); goLauncher() } }}
+        work={WORKSPACE_NAV.map((n) => mk(n.key))}
+        system={[sys('documents', 'Hujjatlar', <FileText />), sys('settings', 'Sozlamalar', <Settings />)]}
+        workerStat={workerStat}
+        onWorkers={() => { setSideOpen(false); setSurface('settings') }}
+        dark={theme === 'dark'}
+        onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        title={pageTitle}
+        tagline={PAGE_TAGLINES[pageKey] ?? ''}
+        showSearch
+        onSearch={() => { setCommandPurpose('search'); setCommandOpen(true) }}
+        sideOpen={sideOpen}
+        setSideOpen={setSideOpen}
+        onHome={() => { setSideOpen(false); goLauncher() }}
+      >
+        {children}
+      </GreenShell>
+    )
+  }
+
   return (
     <div className="app-frame">
       <a className="skip-link" href="#main">Asosiy qismga oʻtish</a>
@@ -387,12 +367,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>
-          {ui === 'green' && (
-            <div className="g-title">
-              <b>{pageTitle}</b>
-              <span>«{PAGE_TAGLINES[pageKey] ?? ''}»</span>
-            </div>
-          )}
           {usesRebuiltScreens(ui) || (surface !== 'documents' && surface !== 'settings') ? (
             <button
               className="searchbox"
