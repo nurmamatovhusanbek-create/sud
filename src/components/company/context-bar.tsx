@@ -21,6 +21,8 @@ import { hardRefreshWithToast, useRefreshing } from '@/lib/hard-refresh'
 import { refreshRating } from '@/lib/enrich'
 import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 import { bandFromFamily } from '@/components/proto/primitives'
+import { GreenCompanyHead } from '@/components/greenui/company-head'
+import { useUiVersion } from '@/lib/ui-version'
 
 const PART_LABEL: Record<string, string> = {
   stats: 'Statistika',
@@ -42,6 +44,7 @@ const statusLabel = (s?: string) => {
 
 export function ContextBar() {
   const company = useAppStore((s) => s.activeCompany)
+  const ui = useUiVersion()
   const [copied, setCopied] = useState(false)
   const rv = useRegistryVersion()
   const watching = company ? (rv >= 0 ? isWatched(company.stir) : false) : false
@@ -91,6 +94,29 @@ export function ContextBar() {
 
   const refresh = () => void hardRefreshWithToast(company.stir)
   const exportx = () => window.dispatchEvent(new CustomEvent('sud:export-active'))
+
+  if (ui === 'green') {
+    return (
+      <GreenCompanyHead
+        mono={company.name ? initials(company.name) : grp(company.stir).slice(0, 2)}
+        name={company.name || `STIR ${grp(company.stir)}`}
+        stir={grp(company.stir)}
+        status={company.status ? { label: statusLabel(company.status), dot: familyDotClass(statusFamily) } : undefined}
+        rating={company.rating?.category ? { label: company.rating.category, badge: familyBadgeClass(bandFromFamily(ratingFamily ?? 'neutral')) } : undefined}
+        copied={copied}
+        onCopy={() => void copyStir()}
+        age={age.oldest !== null && !refreshing
+          ? { label: `Yangilandi ${ageLabel(age.oldest, now)}${age.stale ? ' · eskirgan' : ''}`, stale: age.stale, title: Object.entries(age.parts).map(([k, t]) => `${PART_LABEL[k] ?? k}: ${ageLabel(t, now)}`).join('\n') }
+          : undefined}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        onExport={exportx}
+        onReport={() => void openCompanyReport(company.stir)}
+        watching={watching}
+        onWatch={toggleWatch}
+      />
+    )
+  }
 
   return (
     <div className="ctxbar">
