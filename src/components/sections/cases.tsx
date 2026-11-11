@@ -44,6 +44,7 @@ import { toast } from 'sonner'
 import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
 import { CaseList } from '@/components/screens'
+import { GreenCasesBar } from '@/components/greenui/cases-bar'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },
@@ -748,50 +749,49 @@ export function CasesSection() {
     })()
   }
 
+  const searchEl = (
+    <div className="f-search">
+      <Search />
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
+    </div>
+  )
+  const courtEl = <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+  const roleEl = roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
+    <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
+  ) : null
+  const sortEl = <SortMenu value={sort} onChange={setSort} />
+  const actionEls = (
+    <>
+      <button className="btn btn-outline btn-sm" disabled={printing || filtered.length === 0} onClick={printList} title="Roʻyxatni PDF qilib chop etish" aria-label="PDF">
+        {printing ? <span className="spinner" /> : <Download />}
+        <span>PDF</span>
+      </button>
+      <button className="btn btn-outline btn-sm" disabled={exporting || filtered.length === 0} onClick={exportExcel} title="Roʻyxatni Excel faylga yuklash" aria-label="Excel">
+        {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
+        <span>Excel</span>
+      </button>
+      <button className="btn btn-outline btn-sm" disabled={filtered.length === 0} onClick={downloadOrders} title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash" aria-label="Qarorlar">
+        <FileText />
+        <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
+      </button>
+    </>
+  )
+  const toolbar = ui === 'green' ? (
+    <GreenCasesBar search={searchEl} sort={sortEl} actions={actionEls} courts={courtEl} sides={roleEl} shown={filtered.length} total={merged.length} />
+  ) : (
+    <div className="filterbar fb-cases">
+      {searchEl}
+      {courtEl}
+      {roleEl}
+      {sortEl}
+      <div style={{ flex: 1 }} />
+      {actionEls}
+    </div>
+  )
+
   return (
-    <div className="p-card rise-c">
-      <div className="filterbar fb-cases">
-        <div className="f-search">
-          <Search />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
-        </div>
-        <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
-        {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
-          <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
-        ) : null}
-        <SortMenu value={sort} onChange={setSort} />
-        <div style={{ flex: 1 }} />
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={printing || filtered.length === 0}
-          onClick={printList}
-          title="Roʻyxatni PDF qilib chop etish"
-          aria-label="PDF"
-        >
-          {printing ? <span className="spinner" /> : <Download />}
-          <span>PDF</span>
-        </button>
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={exporting || filtered.length === 0}
-          onClick={exportExcel}
-          title="Roʻyxatni Excel faylga yuklash"
-          aria-label="Excel"
-        >
-          {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
-          <span>Excel</span>
-        </button>
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={filtered.length === 0}
-          onClick={downloadOrders}
-          title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
-          aria-label="Qarorlar"
-        >
-          <FileText />
-          <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
-        </button>
-      </div>
+    <div className={ui === 'green' ? 'gx-panel' : 'p-card rise-c'}>
+      {toolbar}
 
       {anyLoading ? (
         merged.length === 0 ? (

@@ -159,10 +159,10 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/greenui/home.tsx, components/greenui/shell.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, +8 |  |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
 | `tor.ts` | api/tor-status/route |  |
-| `ui-version.ts` | components/screens/index.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
+| `ui-version.ts` | components/company/context-bar.tsx, components/screens/index.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx, components/views/launcher.tsx, +1 |  |
 | `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/alerts.ts, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
-| `utils.ts` | components/greenui/lists.tsx, components/greenui/shell.tsx, components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
+| `utils.ts` | components/greenui/company-head.tsx, components/greenui/lists.tsx, components/greenui/shell.tsx, components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, +1 |  |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
 | `vlm-client.ts` | lib/billing.ts, lib/vlm-pool.ts, lib/vlm-test.ts | lib/__tests__/vlm-pool.test.ts, lib/__tests__/vlm.test.ts |
