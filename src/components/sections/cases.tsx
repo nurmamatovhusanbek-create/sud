@@ -43,7 +43,7 @@ import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
 import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
-import { CaseTable } from '@/components/newui/case-table'
+import { CaseList } from '@/components/screens'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },
@@ -813,7 +813,7 @@ export function CasesSection() {
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
           {usesRebuiltScreens(ui) ? (
-            <CaseTable
+            <CaseList
               rows={paged.map((m) => ({ c: m.c, courtType: m.courtType, role: roleOf(m) }))}
               statusText={(raw) => statusEn(raw) || raw}
               onOpen={({ c, courtType }) => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}

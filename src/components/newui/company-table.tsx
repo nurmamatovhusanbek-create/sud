@@ -15,7 +15,8 @@ import { formatSumCompact } from '@/core/billing-format'
 import { avatarHue, nextSort, sortCompanies, type CompanySortKey, type SortDir } from '@/core/company-sort'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
 import { bandOf, familyBadgeClass, familyDotClass, grp, initials } from '@/components/proto/primitives'
-import { futureUpcoming, type CompanyRecord } from '@/lib/registry'
+import type { CompanyRecord } from '@/lib/registry'
+import { companyRows } from '@/lib/company-rows'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -54,20 +55,7 @@ export function CompanyTable({
   const [busy, setBusy] = useState<Set<string>>(new Set())
 
   const rows = useMemo(() => {
-    const derived = records.map((rec) => {
-      const m = rec.meta
-      return {
-        rec,
-        stir: rec.stir,
-        name: rec.name,
-        score: m?.score,
-        cases: m?.cases,
-        winRate: m?.winRate,
-        hearingIso: futureUpcoming(m)[0]?.iso ?? null,
-        // bills never opened = unknown, not «no debt»
-        debt: m?.billsLoadedAt ? m.overdueTotal ?? 0 : null,
-      }
-    })
+    const derived = companyRows(records)
     return sortCompanies(derived, sort.key, sort.dir)
   }, [records, sort])
 

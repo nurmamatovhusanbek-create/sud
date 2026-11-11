@@ -23,7 +23,7 @@ import type { ResourceState } from '@/hooks/use-resource'
 import { toast } from 'sonner'
 import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
-import { Agenda } from '@/components/newui/agenda'
+import { AgendaList } from '@/components/screens'
 
 const MONTHS_UZ = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba']
@@ -185,7 +185,7 @@ export function HearingsSection() {
           </button>
         </div>
         {usesRebuiltScreens(ui) ? (
-          <Agenda
+          <AgendaList
             rows={hearings.filter((h) => typeof h.isoDate === 'string').map((h, i) => ({
               id: `${(h.caseNumber as string) || 'h'}-${i}`,
               iso: h.isoDate as string,

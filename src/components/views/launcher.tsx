@@ -20,8 +20,7 @@ import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/
 import type { CompanyRecord } from '@/lib/registry'
 import { formatSumCompact } from '@/core/billing-format'
 import { useUiVersion } from '@/lib/ui-version'
-import { Agenda } from '@/components/newui/agenda'
-import { CompanyTable } from '@/components/newui/company-table'
+import { AgendaList, CompanyList } from '@/components/screens'
 import { GreenHome } from '@/components/greenui/home'
 import { usesRebuiltScreens } from '@/core/ui-version'
 
@@ -338,7 +337,7 @@ export function Launcher() {
       })),
     )
     const companyTable = (
-      <CompanyTable
+      <CompanyList
         records={filtered}
         onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
         onRefresh={refreshOne}
@@ -356,7 +355,7 @@ export function Launcher() {
         }
       />
     )
-    const agendaEl = <Agenda rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
+    const agendaEl = <AgendaList rows={agendaRows} emptyHint="Roʻyxatdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
     // Green look: the same data, drawn as a bento dashboard (components/greenui)
     if (ui === 'green') {
       return (

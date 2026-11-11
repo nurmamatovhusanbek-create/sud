@@ -20,8 +20,7 @@ import { toast } from 'sonner'
 import { OrdersControl } from '@/components/views/orders-control'
 import { useUiVersion } from '@/lib/ui-version'
 import { usesRebuiltScreens } from '@/core/ui-version'
-import { Agenda } from '@/components/newui/agenda'
-import { CompanyTable } from '@/components/newui/company-table'
+import { AgendaList, CompanyList } from '@/components/screens'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -280,7 +279,7 @@ export function WatchlistView() {
         </div>
         <div className="nx-grid">
           <section className="p-card nx-main" aria-label="Kuzatuvdagi kompaniyalar">
-            <CompanyTable
+            <CompanyList
               records={items}
               onOpen={(rec) => openCompany(rec.stir, { name: rec.name })}
               onRefresh={refreshCompany}
@@ -299,7 +298,7 @@ export function WatchlistView() {
                 Yangilash
               </button>
             </div>
-            <Agenda
+            <AgendaList
               rows={upcomingAll.map((h, i) => ({
                 id: `${h.stir}-${h.isoDate}-${h.caseNumber ?? ''}-${i}`,
                 iso: h.isoDate,
