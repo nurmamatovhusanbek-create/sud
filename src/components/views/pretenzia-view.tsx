@@ -13,6 +13,7 @@
  * to its sample default at generate time.
  */
 
+import { PageHead } from '@/components/proto/page-head'
 import { useMemo, useRef, useState } from 'react'
 import { FileUp, FileDown, Loader2, X, AlertTriangle, ArrowLeft, ShieldCheck, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
@@ -189,11 +190,7 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
 
   return (
     <div>
-      <div className="hero" style={{ marginBottom: 18 }}>
-        <div className="eyebrow">Hujjat generatori</div>
-        <h1>Talabnoma (akt-sverka asosida)</h1>
-        <p>«Акт сверки» faylini yuklang — dastur qarzdor shartnomalarni aniqlaydi, asosiy qarz va penyani hisoblab, har biri uchun talabnoma (pretenziya) tayyorlaydi. Hujjat tilini tanlashingiz mumkin.</p>
-      </div>
+      <PageHead eyebrow="Hujjat generatori" title="Talabnoma (akt-sverka asosida)" desc="«Акт сверки» faylini yuklang — dastur qarzdor shartnomalarni aniqlaydi, asosiy qarz va penyani hisoblab, har biri uchun talabnoma (pretenziya) tayyorlaydi. Hujjat tilini tanlashingiz mumkin." own />
 
       <div className="doc-crumb">
         <button className="btn btn-ghost btn-sm" onClick={onBack}><ArrowLeft />Barcha toifalar</button>

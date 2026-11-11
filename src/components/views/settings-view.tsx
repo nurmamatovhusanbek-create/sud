@@ -8,6 +8,7 @@
  * per-worker request-history drawer. Auto-refresh toggle polls every 5s.
  */
 
+import { PageHead } from '@/components/proto/page-head'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
@@ -864,11 +865,7 @@ export function SettingsView() {
 
   return (
     <div>
-      <div className="hero" style={{ marginBottom: 14 }}>
-        <div className="eyebrow">Tizim boshqaruvi</div>
-        <h1>Sozlamalar</h1>
-        <p>Yangilanishlar, Cloudflare workerlar, tarmoq holati va interfeys koʻrinishini boshqaring.</p>
-      </div>
+      <PageHead eyebrow="Tizim boshqaruvi" title="Sozlamalar" desc="Yangilanishlar, Cloudflare workerlar, tarmoq holati va interfeys koʻrinishini boshqaring." gap={14} />
 
       <div className="set-tabs">
         <button className={`set-tab ${tab === 'updates' ? 'on' : ''}`} onClick={() => setTab('updates')}>

@@ -201,8 +201,6 @@ html[data-ui='green'][data-theme='dark'] .card-h .ico, html[data-ui='green'][dat
 [data-ui='green'] .kpi .val { font-family: var(--font-sans); font-weight: 650; letter-spacing: -.03em; }
 [data-ui='green'] .empty .ico { border-radius: 50%; background: var(--g-lime-soft); color: var(--g-ink-2); }
 [data-ui='green'] .alert { border-radius: 16px; }
-[data-ui='green'] .hero h1 { font-weight: 750; letter-spacing: -.035em; }
-[data-ui='green'] .hero .eyebrow { color: var(--brand); }
 [data-ui='green'] .section-head h2, [data-ui='green'] .card-h h2, [data-ui='green'] .card-h h3 { letter-spacing: -.01em; }
 
 /* stat tiles (proto/primitives › Kpi draws these in the green look): Toʻlovlar, Statistika */
@@ -218,6 +216,11 @@ html[data-ui='green'][data-theme='dark'] .gx-stat-ico { background: var(--brand-
 [data-ui='green'] .gx-stat.ink { background: var(--g-lime); border-color: transparent; color: var(--g-on-lime); }
 [data-ui='green'] .gx-stat.ink .gx-stat-lbl, [data-ui='green'] .gx-stat.ink .gx-stat-foot { color: rgba(8, 54, 42, .72); }
 [data-ui='green'] .gx-stat.ink .gx-stat-ico { background: rgba(8, 54, 42, .12); color: var(--g-on-lime); }
+
+/* a page's own title, when the top bar does not carry it (components/proto/page-head) */
+[data-ui='green'] .gx-lead { margin: 2px 0 14px; max-width: 70ch; }
+[data-ui='green'] .gx-lead h2 { margin: 0 0 4px; font-size: 19px; font-weight: 760; letter-spacing: -.02em; }
+[data-ui='green'] .gx-lead p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
 
 /* ---------- buttons, segments, fields: pills ---------- */
 [data-ui='green'] .btn { height: 38px; padding: 0 18px; border-radius: 999px; font-weight: 650; transition: background .16s, border-color .16s, color .16s, transform .16s var(--gr-ease); }
