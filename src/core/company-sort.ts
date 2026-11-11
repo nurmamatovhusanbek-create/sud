@@ -63,3 +63,10 @@ export function nextSort(cur: { key: CompanySortKey; dir: SortDir }, clicked: Co
   if (cur.key !== clicked) return { key: clicked, dir: FIRST_DIR[clicked] }
   return { key: clicked, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
 }
+
+/** One of six palette slots for a company's monogram: the same for a STIR every time (no randomness, a company keeps its colour). */
+export const avatarHue = (stir: string): number => {
+  let h = 0
+  for (const ch of stir) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return h % 6
+}

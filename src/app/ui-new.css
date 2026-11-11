@@ -21,6 +21,11 @@
                      7 days, stale data) looked like «selected», and scales read green / blue / rose. Here
                      blue means only «interactive / information» and the scale is green / amber / rose.
                      Contrast: text on its tint 5.7:1, white on the solid 5.4:1, marks on white 3.4:1 (dark: 8:1+).
+   8. Aurora       (last section of this file) the personality layer: an ink sidebar, an indigo → violet
+                     gradient identity, a soft mesh behind the page, and motion that plays ONCE on arrival
+                     (rows, bars, day plates) plus one tiny looping dot. Rules it keeps: no glow on a selected thing
+                     (crisp lines only), no blur anywhere, a looping animation moves only transform / opacity,
+                     everything stops under prefers-reduced-motion.
    Tokens only, no new hex in components: colours below are token overrides.
    Desktop-only layout rules sit in (min-width: 1081px) so the 1080px sidebar-drawer rule in
    prototype.css keeps working untouched (AGENTS.md §4: column + drawer share ONE breakpoint).
@@ -432,3 +437,202 @@ html[data-ui='new'][data-theme='dark'] {
   [data-ui='new'] .ct.cases td:nth-child(1) .ct-id span { display: none; } /* «Iqtisodiy»: the court type is in the filter above */
   [data-ui='new'] .ct.cases .ct-party .ct-id b { white-space: normal; }
 }
+
+
+/* ============================================================================
+   AURORA — the new look's personality layer (loaded last: it refines the rules above)
+   ----------------------------------------------------------------------------
+   Identity: an ink sidebar, ONE gradient (indigo → violet → magenta) for what is primary, a teal
+   counter-accent, a faint mesh behind the page. Colour still carries meaning: green / amber / rose stay
+   for outcomes; the gradient only ever means «this is the thing to press / this is where you are».
+   ============================================================================ */
+
+/* ---------- tokens: the brand moves from blue to indigo-violet ---------- */
+html[data-ui='new'] {
+  --nx-grad: linear-gradient(135deg, #4f46e5 0%, #7c3aed 58%, #c026d3 100%);
+  --nx-grad-h: linear-gradient(90deg, #4f46e5, #7c3aed 60%, #c026d3);
+  --nx-teal: #0ea5b7;
+  --nx-ease: cubic-bezier(.2, .7, .2, 1);
+  --brand-tile: linear-gradient(135deg, #4f46e5, #9333ea);
+}
+html[data-ui='new']:not([data-theme='dark']) {
+  --brand: #5b4bdb; --brand-ink: #4636b8; --brand-100: #ece9ff; --brand-50: #f4f2ff;
+  --accent-soft: #ece9ff; --accent-ring: rgba(91, 75, 219, .28);
+  --status-info-solid: #5b4bdb; --status-info-text: #4636b8; --status-info-soft: #ece9ff; --status-info-line: #d6d0fb; --status-info-base: #5b4bdb;
+  --bg-canvas: #f6f5fc;
+  --nx-mesh:
+    radial-gradient(900px 380px at 6% -10%, rgba(124, 58, 237, .10), transparent 62%),
+    radial-gradient(760px 340px at 98% -12%, rgba(14, 165, 183, .11), transparent 62%);
+  --nx-shadow: 0 1px 2px rgba(31, 24, 90, .04), 0 10px 28px -16px rgba(60, 40, 160, .18);
+  --nx-shadow-up: 0 2px 4px rgba(31, 24, 90, .05), 0 16px 34px -14px rgba(60, 40, 160, .28);
+}
+html[data-ui='new'][data-theme='dark'] {
+  --brand: #8b7cf6; --brand-ink: #c8bfff;
+  --accent-soft: rgba(139, 124, 246, .18); --accent-ring: rgba(139, 124, 246, .42);
+  --status-info-solid: #8b7cf6; --status-info-text: #c8bfff; --status-info-soft: rgba(139, 124, 246, .18); --status-info-line: rgba(139, 124, 246, .36); --status-info-base: #8b7cf6;
+  --bg-canvas: #090a1b;
+  --nx-mesh:
+    radial-gradient(900px 420px at 4% -14%, rgba(124, 58, 237, .26), transparent 62%),
+    radial-gradient(760px 380px at 100% -16%, rgba(14, 165, 183, .16), transparent 62%);
+  --nx-shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 12px 30px -18px rgba(0, 0, 0, .7);
+  --nx-shadow-up: 0 16px 36px -16px rgba(0, 0, 0, .8);
+}
+[data-ui='new'] ::selection { background: var(--accent-soft); color: var(--text-1); }
+[data-ui='new'] .scroll, [data-ui='new'] .ct-wrap, [data-ui='new'] .drawer-body { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* ---------- the page: a mesh behind it, bars that frost nothing (no blur) ---------- */
+[data-ui='new'] .main { background: var(--nx-mesh), var(--bg-canvas); }
+[data-ui='new'] .topbar { background: color-mix(in srgb, var(--surface) 78%, transparent); border-bottom-color: var(--border-subtle); }
+[data-ui='new'] .searchbox { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+[data-ui='new'] .hero h1, [data-ui='new'] .nx-head h1 { letter-spacing: -.03em; }
+
+/* ---------- the ink sidebar: its own dark palette, whatever the theme ---------- */
+[data-ui='new'] .side {
+  overflow: hidden; border-right: 0; /* (position stays prototype.css's: sticky column, fixed drawer under 1080px) */
+  background: linear-gradient(188deg, #181c48 0%, #0f1233 52%, #1b1049 100%); color: #c9cff5;
+  /* inside the sidebar the theme tokens flip, so every rule above that reads them just works */
+  --text-1: #f3f4ff; --text-2: #b6bde9; --text-3: #8289c0; --text-disabled: #5f668f;
+  --surface: rgba(255, 255, 255, .05); --surface-hover: rgba(255, 255, 255, .08); --surface-active: rgba(255, 255, 255, .14); --surface-inset: rgba(255, 255, 255, .06);
+  --border-subtle: rgba(255, 255, 255, .09); --border-default: rgba(255, 255, 255, .14); --border-strong: rgba(255, 255, 255, .22);
+  --accent-soft: rgba(255, 255, 255, .10); --brand-ink: #fff;
+}
+/* a soft aurora in the corner, painted once */
+[data-ui='new'] .side::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(260px 220px at 0% 0%, rgba(124, 58, 237, .38), transparent 70%), radial-gradient(240px 260px at 100% 100%, rgba(14, 165, 183, .22), transparent 70%); }
+[data-ui='new'] .side > * { position: relative; }
+[data-ui='new'] .brand .logo { background: var(--nx-grad); }
+[data-ui='new'] .brand:hover .logo { transform: rotate(-8deg) scale(1.06); }
+[data-ui='new'] .nav button { transition: background .18s var(--nx-ease), color .18s, transform .18s var(--nx-ease); }
+[data-ui='new'] .nav button:hover { transform: translateX(2px); }
+[data-ui='new'] .nav button:hover svg { transform: scale(1.1); }
+/* where you are: the gradient, flat and crisp (no shadow around it) */
+[data-ui='new'] .nav button.on { background: var(--nx-grad); color: #fff; transform: none; }
+[data-ui='new'] .nav button.on .pip { background: rgba(255, 255, 255, .24); color: #fff; }
+[data-ui='new'] .sysstat { border-color: var(--border-subtle); }
+[data-ui='new'] .side-foot .rail-mini { color: var(--text-2); }
+
+/* ---------- cards: lifted from the mesh by a soft shadow; clickable ones rise ---------- */
+[data-ui='new'] .p-card, [data-ui='new'] .kpi, [data-ui='new'] .nx-stats { box-shadow: var(--nx-shadow); border-color: var(--border-subtle); }
+[data-ui='new'] .ccard, [data-ui='new'] .wcard, [data-ui='new'] .doc-cat, [data-ui='new'] .doc-tile, [data-ui='new'] .fcard {
+  box-shadow: var(--nx-shadow); transition: transform .22s var(--nx-ease), box-shadow .22s var(--nx-ease), border-color .22s;
+}
+[data-ui='new'] .ccard:hover, [data-ui='new'] .wcard:hover, [data-ui='new'] .doc-cat:hover, [data-ui='new'] .doc-tile:hover { transform: translateY(-2px); box-shadow: var(--nx-shadow-up); border-color: var(--brand); }
+[data-ui='new'] .doc-cat-ico, [data-ui='new'] .doc-tile-ico, [data-ui='new'] .card-h .ico, [data-ui='new'] .kpi-ico { background: var(--accent-soft); color: var(--brand-ink); transition: background .2s, color .2s; }
+[data-ui='new'] .doc-cat:hover .doc-cat-ico, [data-ui='new'] .doc-tile:hover .doc-tile-ico { background: var(--nx-grad); color: #fff; }
+
+/* ---------- buttons ---------- */
+[data-ui='new'] .btn { transition: background .16s, border-color .16s, color .16s, transform .16s var(--nx-ease), filter .16s; }
+[data-ui='new'] .btn-primary { background: var(--nx-grad); color: #fff; border-color: transparent; }
+[data-ui='new'] .btn-primary:hover:not(:disabled) { background: var(--nx-grad); filter: brightness(1.1) saturate(1.05); transform: translateY(-1px); }
+[data-ui='new'] .btn-primary:active:not(:disabled) { transform: translateY(0) scale(.98); }
+[data-ui='new'] .btn-primary:disabled { background: var(--surface-active); color: var(--text-disabled); filter: none; }
+[data-ui='new'] .btn-outline:hover { border-color: var(--brand); color: var(--brand-ink); }
+[data-ui='new'] .seg button.on, [data-ui='new'] .set-tab.on { color: var(--brand-ink); }
+[data-ui='new'] .seg .thumb { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--status-info-line); }
+[data-ui='new'] .field, [data-ui='new'] .hero-search .field { transition: border-color .16s, box-shadow .16s; }
+/* the big search wears the gradient as a crisp 1px border */
+[data-ui='new'] .nx-search .field { border: 1px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--nx-grad) border-box; }
+[data-ui='new'] .nx-search .field:focus-within { box-shadow: none; outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ---------- numbers and titles ---------- */
+[data-ui='new'] .nx-stats dd b:not(.neg) { background: var(--nx-grad-h); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-ui='new'] .kpi .val { background: var(--nx-grad-h); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-ui='new'] .kpi .val.neg, [data-ui='new'] .kpi .val .neg { background: none; color: var(--neg-text); }
+[data-ui='new'] .drawer-title { background: linear-gradient(135deg, var(--accent-soft), transparent 65%); }
+
+/* ---------- tables: a gradient hairline under the header, a bar that grows on the hovered row ---------- */
+[data-ui='new'] .ct th { background: linear-gradient(90deg, var(--brand), var(--nx-teal)) bottom / 100% 1px no-repeat, var(--surface-inset); border-bottom-color: transparent; }
+[data-ui='new'] .ct tbody tr { background-image: linear-gradient(var(--brand), var(--brand)); background-repeat: no-repeat; background-position: left center; background-size: 3px 0; transition: background-color .14s, background-size .2s var(--nx-ease); }
+[data-ui='new'] .ct tbody tr:hover { background-color: var(--surface-hover); background-image: linear-gradient(var(--brand), var(--brand)); background-size: 3px 100%; }
+[data-ui='new'] .ct th button.on { color: var(--brand-ink); }
+[data-ui='new'] .ct-bar { background: var(--surface-active); }
+[data-ui='new'] .ct-bar i { transform-origin: left center; animation: nx-grow .8s var(--nx-ease) .2s both; }
+/* one-shot arrival: rows slide up in a quick cascade */
+[data-ui='new'] .ct tbody tr { animation: nx-row .38s var(--nx-ease) both; animation-delay: calc(var(--k, 12) * 24ms); }
+[data-ui='new'] .ct tbody tr:nth-child(1) { --k: 0; }
+[data-ui='new'] .ct tbody tr:nth-child(2) { --k: 1; }
+[data-ui='new'] .ct tbody tr:nth-child(3) { --k: 2; }
+[data-ui='new'] .ct tbody tr:nth-child(4) { --k: 3; }
+[data-ui='new'] .ct tbody tr:nth-child(5) { --k: 4; }
+[data-ui='new'] .ct tbody tr:nth-child(6) { --k: 5; }
+[data-ui='new'] .ct tbody tr:nth-child(7) { --k: 6; }
+[data-ui='new'] .ct tbody tr:nth-child(8) { --k: 7; }
+[data-ui='new'] .ct tbody tr:nth-child(9) { --k: 8; }
+[data-ui='new'] .ct tbody tr:nth-child(10) { --k: 9; }
+[data-ui='new'] .ct tbody tr:nth-child(11) { --k: 10; }
+[data-ui='new'] .ct tbody tr:nth-child(12) { --k: 11; }
+[data-ui='new'] .ct tbody tr:nth-child(13) { --k: 12; }
+[data-ui='new'] .ct tbody tr:nth-child(14) { --k: 13; }
+
+/* ---------- hearings: the chosen day is the gradient, the counts pop in, «today» breathes ---------- */
+[data-ui='new'] .ag-day { transition: transform .18s var(--nx-ease), background .15s, border-color .15s, color .15s; }
+[data-ui='new'] .ag-day.has:hover { transform: translateY(-2px); }
+[data-ui='new'] .ag-day.on { background: var(--nx-grad); border-color: transparent; color: #fff; }
+[data-ui='new'] .ag-day.on span, [data-ui='new'] .ag-day.on b { color: #fff; }
+[data-ui='new'] .ag-day.on i, [data-ui='new'] .ag-day.has.on i { background: #fff; color: var(--brand-ink); }
+[data-ui='new'] .ag-day i { animation: nx-pop .42s var(--nx-ease) .12s both; }
+[data-ui='new'] .ag-h.soon b::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 1px; border-radius: 50%; background: var(--status-warning-solid); animation: nx-live 1.9s ease-in-out infinite; }
+[data-ui='new'] .ag-row { transition: background .16s; }
+[data-ui='new'] .ag-row:hover { background: linear-gradient(90deg, var(--accent-soft), transparent 72%); }
+[data-ui='new'] .ag-grp { animation: nx-rise .4s var(--nx-ease) both; }
+
+/* ---------- arrival: the page's blocks rise in turn ---------- */
+/* (not the drawer and its scrim: they live in the page too, and an animation's end state would override their hidden state) */
+[data-ui='new'] .page > :not(.drawer):not(.drawer-scrim):not(.overlay) { animation: nx-rise .46s var(--nx-ease) both; }
+[data-ui='new'] .page > *:nth-child(2) { animation-delay: .05s; }
+[data-ui='new'] .page > *:nth-child(3) { animation-delay: .1s; }
+[data-ui='new'] .page > *:nth-child(4) { animation-delay: .15s; }
+[data-ui='new'] .page > *:nth-child(n + 5) { animation-delay: .2s; }
+[data-ui='new'] .drawer { animation-timing-function: var(--nx-ease); }
+
+@keyframes nx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes nx-row { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes nx-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes nx-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+/* the only looping animation here: a dot that breathes (transform + opacity only, never a shadow or a blur) */
+@keyframes nx-live { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.55); opacity: .45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui='new'] *, [data-ui='new'] *::before, [data-ui='new'] *::after { animation: none !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- company monograms: six gradients, one per STIR, the status dot on the corner ---------- */
+html[data-ui='new'] {
+  --av-0: linear-gradient(135deg, #4f46e5, #7c3aed); --av-1: linear-gradient(135deg, #0ea5b7, #2563eb); --av-2: linear-gradient(135deg, #d946ef, #7c3aed);
+  --av-3: linear-gradient(135deg, #0d9488, #16a34a); --av-4: linear-gradient(135deg, #f59e0b, #ea580c); --av-5: linear-gradient(135deg, #e11d48, #9333ea);
+}
+[data-ui='new'] .ct-av { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #fff; transition: transform .22s var(--nx-ease); }
+[data-ui='new'] .ct tbody tr:hover .ct-av { transform: scale(1.07) rotate(-3deg); }
+[data-ui='new'] .ct-av.av-0 { background: var(--av-0); } [data-ui='new'] .ct-av.av-1 { background: var(--av-1); } [data-ui='new'] .ct-av.av-2 { background: var(--av-2); }
+[data-ui='new'] .ct-av.av-3 { background: var(--av-3); } [data-ui='new'] .ct-av.av-4 { background: var(--av-4); } [data-ui='new'] .ct-av.av-5 { background: var(--av-5); }
+[data-ui='new'] .ct-av .p-dot { position: absolute; right: -3px; bottom: -3px; width: 11px; height: 11px; border: 2px solid var(--surface); box-sizing: border-box; }
+
+/* ---------- home: the search sits on a gradient panel; each total has its own colour ---------- */
+[data-ui='new'] .nx-search { position: relative; padding: 18px 20px 14px; border-radius: var(--r-lg); border: 1px solid var(--border-subtle); box-shadow: var(--nx-shadow);
+  background: radial-gradient(520px 200px at 0% 0%, rgba(124, 58, 237, .14), transparent 70%), radial-gradient(460px 220px at 100% 100%, rgba(14, 165, 183, .14), transparent 70%), var(--surface); }
+[data-ui='new'] .nx-stats { overflow: hidden; }
+[data-ui='new'] .nx-stats > div { position: relative; }
+[data-ui='new'] .nx-stats > div::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--nx-grad-h); }
+[data-ui='new'] .nx-stats > div:nth-child(2)::before { background: linear-gradient(90deg, #0ea5b7, #2563eb); }
+[data-ui='new'] .nx-stats > div:nth-child(3)::before { background: linear-gradient(90deg, #f59e0b, #ea580c); }
+[data-ui='new'] .nx-stats > div:nth-child(4)::before { background: linear-gradient(90deg, #e11d48, #9333ea); }
+
+/* ---------- ratings: the top letter shines */
+[data-ui='new'] .ct-rate .badge.b-pos, [data-ui='new'] .ct-rate .b-pos { background: linear-gradient(135deg, var(--status-positive-soft), color-mix(in srgb, var(--status-positive-soft) 55%, #7ee0c3)); }
+
+/* dark: the gradient text and tiles need lighter stops (the light stops are too dark on the dark page) */
+html[data-ui='new'][data-theme='dark'] .nx-stats dd b:not(.neg),
+html[data-ui='new'][data-theme='dark'] .kpi .val { background-image: linear-gradient(90deg, #a79bff, #d19bff 60%, #f5a8ff); }
+
+/* Hujjatlar: every category gets its own colour (the same six as the company monograms) */
+[data-ui='new'] .doc-cat-ico, [data-ui='new'] .doc-tile-ico { color: #fff; background: var(--av-0); }
+[data-ui='new'] .doc-cat:nth-child(2) .doc-cat-ico, [data-ui='new'] .doc-tile:nth-child(2) .doc-tile-ico { background: var(--av-1); }
+[data-ui='new'] .doc-cat:nth-child(3) .doc-cat-ico, [data-ui='new'] .doc-tile:nth-child(3) .doc-tile-ico { background: var(--av-2); }
+[data-ui='new'] .doc-cat:nth-child(4) .doc-cat-ico, [data-ui='new'] .doc-tile:nth-child(4) .doc-tile-ico { background: var(--av-3); }
+[data-ui='new'] .doc-cat:nth-child(5) .doc-cat-ico, [data-ui='new'] .doc-tile:nth-child(5) .doc-tile-ico { background: var(--av-4); }
+[data-ui='new'] .doc-cat:nth-child(6) .doc-cat-ico, [data-ui='new'] .doc-tile:nth-child(6) .doc-tile-ico { background: var(--av-5); }
+[data-ui='new'] .doc-cat:hover .doc-cat-ico, [data-ui='new'] .doc-tile:hover .doc-tile-ico { transform: scale(1.08) rotate(-4deg); }
+[data-ui='new'] .doc-cat-ico, [data-ui='new'] .doc-tile-ico { transition: transform .22s var(--nx-ease); }
+[data-ui='new'] .hero .eyebrow { color: var(--brand-ink); }
+[data-ui='new'] .hero h1 { background: var(--nx-grad-h); -webkit-background-clip: text; background-clip: text; color: transparent; width: fit-content; }
+html[data-ui='new'][data-theme='dark'] .hero h1 { background-image: linear-gradient(90deg, #c8bfff, #e0b8ff 60%, #ffc2f5); }

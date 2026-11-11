@@ -14,7 +14,7 @@ import type { UiVersion } from '@/core/ui-version'
 import { setSideMini, setUiVersion, useSideMini, useUiVersion } from '@/lib/ui-version'
 
 const LOOKS: { key: UiVersion; title: string; note: string }[] = [
-  { key: 'new', title: 'Yangi', note: 'Zichroq roʻyxatlar, yigʻiladigan yon menyu, aniq fokus chizigʻi' },
+  { key: 'new', title: 'Yangi', note: 'Zichroq roʻyxatlar, toʻq yon menyu, gradient urgʻu, jonli harakat, kompaniya monogrammalari' },
   { key: 'classic', title: 'Klassik', note: 'Avvalgi koʻrinish, hech narsa oʻzgarmagan' },
 ]
 

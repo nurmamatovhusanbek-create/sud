@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { FIRST_DIR, nextSort, sortCompanies, type CompanySortRow } from '../company-sort'
+import { avatarHue, FIRST_DIR, nextSort, sortCompanies, type CompanySortRow } from '../company-sort'
 
 const rows: CompanySortRow[] = [
   { stir: '3', name: '«UZAUTO MOTORS» AJ', score: 78, cases: 212, winRate: 64, hearingIso: '2026-11-15', debt: 0 },
@@ -38,5 +38,17 @@ describe('nextSort', () => {
   })
   test('the same column flips', () => {
     expect(nextSort({ key: 'debt', dir: 'desc' }, 'debt')).toEqual({ key: 'debt', dir: 'asc' })
+  })
+})
+
+describe('avatarHue', () => {
+  test('stable per STIR and always one of the six slots', () => {
+    expect(avatarHue('302678824')).toBe(avatarHue('302678824'))
+    for (const stir of ['200248856', '305111222', '306222333', '307333444', '308444555', '309555666', '', '1'])
+      expect([0, 1, 2, 3, 4, 5]).toContain(avatarHue(stir))
+  })
+  test('different companies are spread over the palette', () => {
+    const used = new Set(Array.from({ length: 60 }, (_, i) => avatarHue(String(300000000 + i * 7919))))
+    expect(used.size).toBeGreaterThanOrEqual(5)
   })
 })

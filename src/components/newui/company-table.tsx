@@ -12,9 +12,9 @@ import { ArrowDown, ArrowUp, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { calendarDaysUntil } from '@/core/agenda'
 import { formatSumCompact } from '@/core/billing-format'
-import { nextSort, sortCompanies, type CompanySortKey, type SortDir } from '@/core/company-sort'
+import { avatarHue, nextSort, sortCompanies, type CompanySortKey, type SortDir } from '@/core/company-sort'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
-import { bandOf, familyBadgeClass, familyDotClass, grp } from '@/components/proto/primitives'
+import { bandOf, familyBadgeClass, familyDotClass, grp, initials } from '@/components/proto/primitives'
 import { futureUpcoming, type CompanyRecord } from '@/lib/registry'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
@@ -120,7 +120,11 @@ export function CompanyTable({
               >
                 <td className="ct-name">
                   <div className="ct-co">
-                    <span className={`p-dot ${familyDotClass(companyStatusFamily(m?.status))}`} title={statusTitle(m?.status)} />
+                    {/* the monogram carries the company's identity (a stable colour per STIR); the status dot sits on its corner */}
+                    <span className={`ct-av av-${avatarHue(rec.stir)}`} aria-hidden>
+                      {initials(rec.name || '')}
+                      <i className={`p-dot ${familyDotClass(companyStatusFamily(m?.status))}`} title={statusTitle(m?.status)} />
+                    </span>
                     <span className="ct-id">
                       <b title={rec.name}>{rec.name || `STIR ${grp(rec.stir)}`}</b>
                       <span>{grp(rec.stir)}</span>
