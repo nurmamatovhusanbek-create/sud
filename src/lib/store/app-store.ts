@@ -15,9 +15,10 @@ import { create } from 'zustand'
 import type { Company } from '@/lib/domain/company'
 import { normalizeStir } from '@/lib/domain/company'
 import { upsertRegistry } from '@/lib/registry'
+import { getUiVersion } from '@/lib/ui-version'
 
 export type AppView = 'launcher' | 'company'
-export type SectionKey = 'overview' | 'bills' | 'cases' | 'hearings' | 'profile'
+export type SectionKey = 'overview' | 'bills' | 'cases' | 'hearings' | 'profile' | 'brief'
 /** v18: Statistika last (prototype nav order); keys are load-bearing — never rename. */
 export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'bills', label: 'Toʻlovlar' },
@@ -37,7 +38,20 @@ export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv'; label: string }[] = [
 ]
 export type CaseCourtFilter = 'all' | 'economic' | 'civil' | 'administrative'
 
-export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents'
+export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents' | 'prep'
+
+/** A hearing the operator is preparing for (the green look's «Majlisga tayyorgarlik» screen). */
+export interface PrepTarget {
+  stir: string
+  name?: string
+  caseNumber: string
+  /** unknown when it came from a hearing row; the screen resolves it */
+  courtType?: string
+  iso?: string
+  time?: string
+  court?: string
+  judge?: string
+}
 export type CommandPurpose = 'search' | 'add'
 
 interface AppState {
@@ -50,6 +64,7 @@ interface AppState {
   caseCourtFilter: CaseCourtFilter
   /** Values to prefill a court petition with (set from a case drawer; Hujjatlar consumes and clears it). */
   docPrefill: { docId: string; values: Record<string, string> } | null
+  prepTarget: PrepTarget | null
   /** 'add' mode: choosing a company in the palette adds it to the watchlist. */
   commandPurpose: CommandPurpose
   /** Section to land on once a company is chosen in the palette — set when a
@@ -65,6 +80,7 @@ interface AppState {
   goLauncher: () => void
   setSurface: (s: GlobalSurface) => void
   setDocPrefill: (p: AppState['docPrefill']) => void
+  openPrep: (t: PrepTarget) => void
   setCommandOpen: (open: boolean) => void
   setCommandPurpose: (p: CommandPurpose) => void
   setPendingSection: (s: SectionKey | null) => void
@@ -75,6 +91,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   section: 'overview',
   surface: 'main',
   docPrefill: null,
+  prepTarget: null,
   activeCompany: null,
   commandOpen: false,
   commandPurpose: 'search',
@@ -98,7 +115,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
       // Explicit target wins (e.g. "Majlislar" chosen from the launcher); else
       // reset to overview only when the company actually changes.
-      ...(section ? { section } : sameCompany ? {} : { section: 'overview' }),
+      ...(section ? { section } : sameCompany ? {} : { section: getUiVersion() === 'green' ? 'brief' : 'overview' }),
     })
     upsertRegistry(normalized, seed?.name)
     return true
@@ -116,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   goLauncher: () => set({ view: 'launcher', surface: 'main' }),
   setSurface: (surface) => set({ surface }),
   setDocPrefill: (docPrefill) => set({ docPrefill }),
+  openPrep: (prepTarget) => set({ prepTarget, surface: 'prep' }),
   // Closing the palette drops any pending section so it can't leak into an
   // unrelated later open (e.g. ⌘K search).
   setCommandOpen: (commandOpen) => set(commandOpen ? { commandOpen } : { commandOpen, pendingSection: null }),

@@ -335,7 +335,10 @@ export function Launcher() {
         title: c.name || `STIR ${grp(c.stir)}`,
         sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
         code: h.caseNumber,
-        onOpen: () => openCompany(c.stir, { name: c.name }, 'hearings'),
+        onOpen: () =>
+          ui === 'green' && h.caseNumber
+            ? useAppStore.getState().openPrep({ stir: c.stir, name: c.name, caseNumber: h.caseNumber, iso: h.iso, time: h.time, court: h.court, judge: h.judge })
+            : openCompany(c.stir, { name: c.name }, 'hearings'),
       })),
     )
     const companyTable = (
@@ -375,7 +378,11 @@ export function Launcher() {
       return (
         <GreenToday
           items={attention}
-          onOpenItem={(it) => openCompany(it.stir, { name: it.name }, it.target)}
+          onOpenItem={(it) =>
+            it.hearing?.caseNumber
+              ? useAppStore.getState().openPrep({ stir: it.stir, name: it.name, caseNumber: it.hearing.caseNumber, iso: it.hearing.iso, time: it.hearing.time, court: it.hearing.court, judge: it.hearing.judge })
+              : openCompany(it.stir, { name: it.name }, it.target)
+          }
           totals={{ companies: companies.length, cases: totCases, overdueTotal, overdueCompanies }}
           win={weightedWinRate(companies.map((c) => ({ cases: c.meta?.cases, winRate: c.meta?.winRate })))}
           searchBox={searchBox}

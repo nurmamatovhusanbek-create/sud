@@ -59,6 +59,8 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
 /** The green look's page title and its one-line tagline (the top bar names the page the way the sidebar does). */
 const PAGE_TAGLINES: Record<string, string> = {
   home: 'Bugun nimaga eʼtibor berish kerak.',
+  brief: 'Kompaniya haqida hozircha maʼlum boʻlgan hamma narsa, sabablari bilan.',
+  prep: 'Bitta majlisga tayyorgarlik: ish, qarshi tomon, hujjatlar.',
   watchlist: 'Kuzatuvdagi kompaniyalar, ularning majlislari va qarzdorligi.',
   documents: 'Viza, sud va boshqa hujjatlarni tayyor shablonlar asosida yarating.',
   settings: 'Yangilanishlar, workerlar, captcha va koʻrinishni boshqaring.',
@@ -222,7 +224,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const inWorkspace = surface === 'main' && view === 'company' && !!company
   const pageKey = surface === 'main' ? (inWorkspace ? section : 'home') : surface
-  const pageTitle = pageKey === 'home' ? (ui === 'green' ? 'Bugun' : 'Bosh sahifa') : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
+  const pageTitle = pageKey === 'home' ? (ui === 'green' ? 'Bugun' : 'Bosh sahifa') : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : pageKey === 'brief' ? 'Xulosa' : pageKey === 'prep' ? 'Majlisga tayyorgarlik' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
+
+  // «Xulosa» and the preparation screen exist only in the green look: leaving it must not strand the operator on them
+  useEffect(() => {
+    if (ui === 'green') return
+    if (surface === 'prep') setSurface('main')
+    if (section === 'brief') setSection('overview')
+  }, [ui, surface, section, setSurface, setSection])
 
   const goWorkspaceSection = (key: SectionKey) => {
     setSideOpen(false)

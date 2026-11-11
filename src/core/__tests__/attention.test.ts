@@ -36,6 +36,18 @@ describe('attentionItems', () => {
     )
     expect(items.map((i) => i.name)).toEqual(['Soon', 'Late', 'Debt'])
   })
+  test('a hearing item carries what the preparation screen needs; one without a case number says so', () => {
+    const [a, b] = attentionItems([co({ stir: '1', name: 'A', upcoming: [{ iso: iso(0), time: '10:30', court: 'Sud', caseNumber: '4-1/1', judge: 'J' }, { iso: iso(1) }] })], NOW)
+    expect(a.hearing).toEqual({ caseNumber: '4-1/1', iso: iso(0), time: '10:30', court: 'Sud', judge: 'J' })
+    expect(a.action).toBe('Majlisga tayyorlanish')
+    expect(b.action).toBe('Majlislarni ochish')
+  })
+  test('overdue invoices are described as the company\'s own payment discipline, never as a claim', () => {
+    const [d] = attentionItems([co({ stir: '1', overdueTotal: 100 })], NOW)
+    expect(d.title).toContain('kvitansiya')
+    expect(d.detail).not.toContain('talabnoma')
+    expect(d.action).toBe('Kvitansiyalarni koʻrish')
+  })
   test('a nameless company falls back to its STIR', () => {
     expect(attentionItems([co({ stir: '302678824', overdueTotal: 100 })], NOW)[0].name).toBe('STIR 302678824')
   })

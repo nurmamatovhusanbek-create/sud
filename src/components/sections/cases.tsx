@@ -296,7 +296,7 @@ function HearingHistory({ items }: { items: Hearing[] }) {
   )
 }
 
-function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
+export function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
   const EYEBROW = 'Ish tafsiloti'
   openProtoDrawer(
     caseNumber,

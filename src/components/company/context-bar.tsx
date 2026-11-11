@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { BarChart3, Building2, CalendarDays, Copy, Download, FileText, Gavel, Receipt, RefreshCw, Star } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, Copy, Download, FileText, Gavel, Receipt, RefreshCw, ShieldCheck, Star } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/lib/store/app-store'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
@@ -26,7 +26,7 @@ import { useUiVersion } from '@/lib/ui-version'
 import { useTabCounts } from '@/lib/tab-counts'
 import { SECTIONS } from '@/lib/store/app-store'
 
-const TAB_ICON: Record<string, React.ReactNode> = { bills: <Receipt />, cases: <Gavel />, hearings: <CalendarDays />, profile: <Building2 />, overview: <BarChart3 /> }
+const TAB_ICON: Record<string, React.ReactNode> = { brief: <ShieldCheck />, bills: <Receipt />, cases: <Gavel />, hearings: <CalendarDays />, profile: <Building2 />, overview: <BarChart3 /> }
 
 const PART_LABEL: Record<string, string> = {
   stats: 'Statistika',
@@ -105,7 +105,7 @@ export function ContextBar() {
   if (ui === 'green') {
     return (
       <GreenCompanyHead
-        tabs={SECTIONS.map((t) => ({
+        tabs={[{ key: 'brief' as const, label: 'Xulosa' }, ...SECTIONS].map((t) => ({
           key: t.key,
           label: t.label,
           icon: TAB_ICON[t.key],

@@ -288,7 +288,10 @@ export function WatchlistView() {
           title: h.name || `STIR ${grp(h.stir)}`,
           sub: [h.court, h.judge].filter(Boolean).join(' · ') || undefined,
           code: h.caseNumber,
-          onOpen: () => openCompany(h.stir, { name: h.name }, 'hearings'),
+          onOpen: () =>
+            ui === 'green' && h.caseNumber
+              ? useAppStore.getState().openPrep({ stir: h.stir, name: h.name, caseNumber: h.caseNumber, iso: h.isoDate, time: h.time, court: h.court, judge: h.judge })
+              : openCompany(h.stir, { name: h.name }, 'hearings'),
         }))}
         emptyHint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi."
       />

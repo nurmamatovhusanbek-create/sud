@@ -109,7 +109,7 @@ export function GreenToday({ items, onOpenItem, totals, win, searchBox, recentCh
         <div><dt>Kompaniyalar</dt><dd>{totals.companies}</dd></div>
         <div><dt>Sud ishlari</dt><dd>{String(totals.cases).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</dd></div>
         <div><dt>Yutuq</dt><dd>{win === null ? '—' : `${win}%`}<small>{winLabel(win)}</small></dd></div>
-        <div className={totals.overdueTotal > 0 ? 'neg' : ''}><dt>Muddati oʻtgan qarz</dt><dd>{formatSumCompact(totals.overdueTotal)}<small>{totals.overdueCompanies > 0 ? `${totals.overdueCompanies} ta kompaniyada` : 'yoʻq'}</small></dd></div>
+        <div className={totals.overdueTotal > 0 ? 'neg' : ''}><dt>Muddati oʻtgan kvitansiyalar</dt><dd>{formatSumCompact(totals.overdueTotal)}<small>{totals.overdueCompanies > 0 ? `${totals.overdueCompanies} ta kompaniyada` : 'yoʻq'}</small></dd></div>
       </dl>
 
       <section className="gx-all" aria-label="Kompaniyalar">

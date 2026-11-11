@@ -3,7 +3,7 @@
  *
  * The old home answered «how big is everything» (totals). This answers «what do I have to do»: a ranked queue where
  * every item names the company, says why, and says where to go next. Severity 3 = today/tomorrow or a closed company,
- * 2 = within three days or a debt, 1 = something to keep an eye on (a weak rating).
+ * 2 = within three days or overdue court invoices, 1 = something to keep an eye on (a weak rating).
  */
 
 import { calendarDaysUntil } from './agenda'
@@ -11,6 +11,14 @@ import { companyStatusFamily } from './status'
 
 export type AttentionKind = 'hearing' | 'debt' | 'status' | 'rating'
 export type AttentionTarget = 'hearings' | 'bills' | 'profile' | 'overview'
+
+export interface AttentionHearing {
+  caseNumber?: string
+  iso: string
+  time?: string
+  court?: string
+  judge?: string
+}
 
 export interface AttentionInput {
   stir: string
@@ -20,7 +28,7 @@ export interface AttentionInput {
   score?: number | null
   winRate?: number
   /** every hearing still ahead */
-  upcoming: { iso: string; court?: string; caseNumber?: string; time?: string }[]
+  upcoming: { iso: string; court?: string; caseNumber?: string; time?: string; judge?: string }[]
   /** overdue debt in tiyins; null/undefined = bills never opened (unknown, not zero) */
   overdueTotal?: number | null
 }
@@ -40,7 +48,9 @@ export interface AttentionItem {
   target: AttentionTarget
   /** label of the button */
   action: string
-  /** whole soʻm / tiyin amount the item is about (debt) */
+  /** the hearing a `hearing` item is about, so the screen can open its preparation */
+  hearing?: AttentionHearing
+  /** tiyin amount the item is about (overdue invoices) */
   amount?: number
 }
 
@@ -71,8 +81,9 @@ export function attentionItems(rows: readonly AttentionInput[], now: Date = new 
         title: `${when(days)}${h.time ? `, ${h.time}` : ''}: majlis`,
         detail: [h.court, h.caseNumber].filter(Boolean).join(' · ') || 'Majlis rejalashtirilgan',
         iso: h.iso,
+        hearing: { caseNumber: h.caseNumber, iso: h.iso, time: h.time, court: h.court, judge: h.judge },
         target: 'hearings',
-        action: 'Majlislarni ochish',
+        action: h.caseNumber ? 'Majlisga tayyorlanish' : 'Majlislarni ochish',
       })
     }
 
@@ -83,10 +94,11 @@ export function attentionItems(rows: readonly AttentionInput[], now: Date = new 
         severity: r.overdueTotal >= BIG_DEBT_TIYINS ? 3 : 2,
         stir: r.stir,
         name,
-        title: 'Muddati oʻtgan qarz',
-        detail: 'Toʻlovlar boʻlimida kvitansiyalar va talabnoma uchun asos',
+        title: 'Muddati oʻtgan sud kvitansiyalari',
+        // these are the company's OWN unpaid court invoices (billing.sud.uz): a payment-discipline signal, not a claim
+        detail: 'Sud toʻlovlari oʻz vaqtida toʻlanmagan: toʻlov intizomi belgisi',
         target: 'bills',
-        action: 'Toʻlovlarni ochish',
+        action: 'Kvitansiyalarni koʻrish',
         amount: r.overdueTotal,
       })
     }
