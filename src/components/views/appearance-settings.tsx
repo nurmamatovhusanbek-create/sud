@@ -7,7 +7,7 @@
  */
 
 import { useSyncExternalStore } from 'react'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/lib/theme'
 import { Check, Moon, PanelLeft, Sun } from 'lucide-react'
 import { toast } from 'sonner'
 import type { UiVersion } from '@/core/ui-version'

@@ -74,7 +74,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `status.ts` | components/company/context-bar.tsx, components/greenui/lists.tsx, components/newui/case-table.tsx, components/newui/company-table.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, +3 | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, lib/documents/derive.ts, lib/documents/from-case.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
-| `ui-version.ts` | app/layout.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, +1 | core/__tests__/ui-version.test.ts |
+| `ui-version.ts` | app/layout.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, +1 | core/__tests__/ui-version.test.ts, lib/__tests__/theme.test.ts |
 | `verdict.ts` | components/greenui/brief.tsx | core/__tests__/verdict.test.ts |
 | `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
 
@@ -165,6 +165,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/greenui/brief.tsx, components/greenui/prep.tsx, components/greenui/shell.tsx, components/sections/bills.tsx, components/sections/cases.tsx, +9 |  |
 | `tab-counts.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
+| `theme.ts` | components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
 | `ui-version.ts` | components/company/context-bar.tsx, components/proto/drawer.tsx, components/proto/page-head.tsx, components/proto/primitives.tsx, components/screens/index.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, +5 |  |
 | `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
@@ -342,6 +343,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
 | `sud:storage-full` | components/shell/app-shell.tsx, lib/registry.ts |
+| `sud:theme` | lib/theme.ts |
 | `sud:ui-changed` | lib/ui-version.ts |
 
 ## Custom window events
@@ -356,6 +358,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:orders-job` | lib/api-client.ts, lib/use-orders-job.ts |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
 | `sud:storage-full` | components/shell/app-shell.tsx, lib/registry.ts |
+| `sud:theme` | lib/theme.ts |
 | `sud:ui-changed` | lib/ui-version.ts |
 
 ## Server-side global holders (`globalThis.__x`, survive dev hot reloads)

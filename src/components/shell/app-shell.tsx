@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/lib/theme'
 import {
   BarChart3,
   Bell,

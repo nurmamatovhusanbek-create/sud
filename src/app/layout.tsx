@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { OrdersLoader } from "@/components/shell/orders-loader";
 import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
@@ -35,15 +34,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" data-ui={DEFAULT_UI} suppressHydrationWarning>
+    <html lang="uz" data-ui={DEFAULT_UI} data-theme="light" suppressHydrationWarning>
       <head>
-        {/* which look (Settings › Koʻrinish) is decided before the first paint: no flash of the other one */}
+        {/* the look (Settings › Koʻrinish) and the theme are decided before the first paint: no flash of the other one */}
         <script dangerouslySetInnerHTML={{ __html: UI_BOOT_SCRIPT }} />
       </head>
       <body className="antialiased bg-background text-foreground">
-        <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-          {children}
-        </ThemeProvider>
+        {children}
         <OrdersLoader />
         <OrdersAutoCheck />
         <Toaster position="bottom-right" closeButton />

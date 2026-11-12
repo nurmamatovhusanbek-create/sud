@@ -86,7 +86,7 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 
 **Where:** `src/app/globals.css` + `src/app/prototype.css`
 
-**Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (via `next-themes`, `defaultTheme=light`, `enableSystem=false`). Don't hardcode hex in components.
+**Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (own `lib/theme`, set before first paint by the boot script in `core/ui-version`; light by default, no system mode). Don't hardcode hex in components.
 
 ### Two looks: «Yangi» and «Klassik» (Settings › Koʻrinish)
 

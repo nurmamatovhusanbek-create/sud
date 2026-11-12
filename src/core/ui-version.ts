@@ -31,4 +31,5 @@ export const usesRebuiltScreens = (ui: UiVersion): boolean => ui !== 'classic'
  */
 export const UI_BOOT_SCRIPT =
   "try{var d=document.documentElement,u=localStorage.getItem('sud-ui');d.setAttribute('data-ui',u==='classic'||u==='green'?u:'new');" +
+  "var t=localStorage.getItem('theme')==='dark'?'dark':'light';d.setAttribute('data-theme',t);d.style.colorScheme=t;" +
   "if(localStorage.getItem('sud-side-mini')==='1')d.setAttribute('data-side','mini')}catch(e){}"

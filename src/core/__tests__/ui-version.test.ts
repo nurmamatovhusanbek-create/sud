@@ -22,16 +22,19 @@ describe('ui version', () => {
     expect(UI_BOOT_SCRIPT).toContain(`'${SIDE_MINI_KEY}'`)
     const run = (store: Record<string, string>) => {
       const attrs: Record<string, string> = {}
-      const document = { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v } } }
+      const document = { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v }, style: {} } }
       const localStorage = { getItem: (k: string) => store[k] ?? null }
       new Function('document', 'localStorage', UI_BOOT_SCRIPT)(document, localStorage)
       return attrs
     }
-    expect(run({})).toEqual({ 'data-ui': DEFAULT_UI })
-    expect(run({ [UI_STORAGE_KEY]: 'classic' })).toEqual({ 'data-ui': 'classic' })
-    expect(run({ [UI_STORAGE_KEY]: 'green' })).toEqual({ 'data-ui': 'green' })
-    expect(run({ [UI_STORAGE_KEY]: 'garbage' })).toEqual({ 'data-ui': parseUiVersion('garbage') })
-    expect(run({ [SIDE_MINI_KEY]: '1' })).toEqual({ 'data-ui': 'new', 'data-side': 'mini' })
+    // the same script also sets the theme (lib/theme owns the key): light unless it says dark
+    const light = { 'data-theme': 'light' }
+    expect(run({})).toEqual({ 'data-ui': DEFAULT_UI, ...light })
+    expect(run({ [UI_STORAGE_KEY]: 'classic' })).toEqual({ 'data-ui': 'classic', ...light })
+    expect(run({ [UI_STORAGE_KEY]: 'green' })).toEqual({ 'data-ui': 'green', ...light })
+    expect(run({ [UI_STORAGE_KEY]: 'garbage' })).toEqual({ 'data-ui': parseUiVersion('garbage'), ...light })
+    expect(run({ [SIDE_MINI_KEY]: '1' })).toEqual({ 'data-ui': 'new', ...light, 'data-side': 'mini' })
+    expect(run({ theme: 'dark' })).toEqual({ 'data-ui': 'new', 'data-theme': 'dark' })
   })
 
   test('the rebuilt screens belong to every look but the classic one', () => {
@@ -41,7 +44,7 @@ describe('ui version', () => {
   })
 
   test('boot script survives blocked storage', () => {
-    const document = { documentElement: { setAttribute: () => {} } }
+    const document = { documentElement: { setAttribute: () => {}, style: {} } }
     const localStorage = { getItem: () => { throw new Error('denied') } }
     expect(() => new Function('document', 'localStorage', UI_BOOT_SCRIPT)(document, localStorage)).not.toThrow()
   })
