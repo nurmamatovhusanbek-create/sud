@@ -127,6 +127,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `documents/validate.ts` | components/views/doc-bulk.tsx, components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/company/context-bar.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, lib/hard-refresh.ts |  |
+| `git-failure.ts` | lib/version-server.ts | lib/__tests__/git-failure.test.ts |
 | `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/greenui/brief.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |  |
 | `health-registry.ts` | api/settings/health/route, api/settings/workers/route, lib/cf-worker-pool.ts |  |
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |

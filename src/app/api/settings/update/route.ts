@@ -40,7 +40,7 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
+import { diagnoseGit, getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
 
 export const dynamic = 'force-dynamic'
@@ -99,8 +99,10 @@ async function runUpdate() {
   // Check git is available
   const currentSha = getLocalGitSha()
   if (!currentSha) {
+    // say WHY (missing, dubious ownership, timeout…): «not found» for all of them sent people to reinstall a working git
+    const why = diagnoseGit()
     return NextResponse.json(
-      { ok: false, error: 'git_unavailable', detail: 'Git is not available in this environment' },
+      { ok: false, error: 'git_unavailable', detail: why?.detail ?? 'Git javob bermadi. Birozdan keyin qayta urinib koʻring.', reason: why?.kind ?? 'other' },
       { status: 400 },
     )
   }

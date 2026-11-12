@@ -4,6 +4,10 @@
  */
 
 import { execSync } from 'child_process'
+import { classifyGitFailure, type GitFailure } from './git-failure'
+
+// a slow disk (OneDrive, antivirus scanning .git) can take seconds for a call that normally takes milliseconds
+const GIT_TIMEOUT_MS = 15_000
 
 /**
  * Get the current local git commit SHA (short, 7 chars).
@@ -18,12 +22,25 @@ export function getLocalGitSha(): string | null {
   try {
     const sha = execSync('git rev-parse HEAD', {
       encoding: 'utf-8',
-      timeout: 3000,
+      timeout: GIT_TIMEOUT_MS,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim()
     return sha.slice(0, 7)
   } catch {
     return null
+  }
+}
+
+/**
+ * WHY git is unusable here, or null when it works. The probes above return null for every failure (the callers only
+ * need «is there a value»); the update route calls this once to tell the operator what is actually wrong.
+ */
+export function diagnoseGit(): GitFailure | null {
+  try {
+    execSync('git rev-parse HEAD', { encoding: 'utf-8', timeout: GIT_TIMEOUT_MS, stdio: ['pipe', 'pipe', 'pipe'] })
+    return null
+  } catch (err) {
+    return classifyGitFailure(err, process.cwd())
   }
 }
 
@@ -35,7 +52,7 @@ export function getLocalGitBranch(): string | null {
   try {
     const branch = execSync('git rev-parse --abbrev-ref HEAD', {
       encoding: 'utf-8',
-      timeout: 3000,
+      timeout: GIT_TIMEOUT_MS,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim()
     return branch
@@ -54,7 +71,7 @@ export function isWorkingTreeClean(): boolean | null {
   try {
     const status = execSync('git status --porcelain', {
       encoding: 'utf-8',
-      timeout: 3000,
+      timeout: GIT_TIMEOUT_MS,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim()
     if (status.length === 0) return true

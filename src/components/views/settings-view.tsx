@@ -155,7 +155,7 @@ async function runWorkerTest(url: string, label: string): Promise<TestResult | n
 const UPDATE_ERROR_LABELS: Record<string, string> = {
   dirty_tree: "Ish daraxtida oʻzgarishlar bor va ularni vaqtincha yashirib boʻlmadi",
   wrong_branch: "Server 'main' branchida emas — avtomatik yangilash faqat 'main'da ishlaydi",
-  git_unavailable: 'Git topilmadi — bu muhitda mavjud emas',
+  git_unavailable: 'Git ishlamayapti',
   pull_failed: "git pull amalga oshmadi (faqat oldinga siljitish mumkin: mahalliy commitlar boʻlsa toʻxtaydi)",
   busy: 'Yangilash allaqachon davom etmoqda',
   not_supervised: "Server nazoratchisiz ishga tushirilgan — avtomatik qayta ishga tushirib boʻlmaydi",
@@ -221,7 +221,10 @@ function UpdatesTab() {
     if (!body?.ok) {
       setUpdateState('idle')
       const code = body?.error as string | undefined
-      toast.error((code && UPDATE_ERROR_LABELS[code]) || body?.detail || 'Yangilash amalga oshmadi')
+      const label = (code && UPDATE_ERROR_LABELS[code]) || body?.detail || 'Yangilash amalga oshmadi'
+      // git_unavailable carries the actual reason and the command that fixes it: keep the toast up long enough to copy it
+      if (code === 'git_unavailable' && typeof body?.detail === 'string') toast.error(label, { description: body.detail, duration: 30_000 })
+      else toast.error(label)
       return
     }
     if (!body.restarting) {
