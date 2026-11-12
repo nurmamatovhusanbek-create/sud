@@ -9,7 +9,6 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
-import { useUiVersion } from '@/lib/ui-version'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 import { bandFor, clampPct, dialAngle, dialGeom, tickLook, type DialZones } from './dial-geometry'
@@ -282,19 +281,6 @@ export function Kpi({
   foot?: React.ReactNode
   valueSize?: number
 }) {
-  // the green look draws its own tile: a round icon badge beside the label, the number big, the foot as a quiet line
-  if (useUiVersion() === 'green') {
-    return (
-      <div className={`gx-stat${ink ? ' ink' : ''}`}>
-        <div className="gx-stat-top">
-          {icon ? <span className="gx-stat-ico" aria-hidden>{icon}</span> : null}
-          <span className="gx-stat-lbl">{label}</span>
-        </div>
-        <div className="gx-stat-val" style={valueSize ? { fontSize: Math.round(valueSize * 1.3) } : undefined}>{children}</div>
-        {foot ? <div className="gx-stat-foot">{foot}</div> : null}
-      </div>
-    )
-  }
   return (
     <div className={`kpi ${ink ? 'ink' : ''}`}>
       <div className="kpi-top">

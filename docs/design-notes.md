@@ -86,51 +86,7 @@ One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title bl
 
 **Where:** `src/app/globals.css` + `src/app/prototype.css`
 
-**Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (own `lib/theme`, set before first paint by the boot script in `core/ui-version`; light by default, no system mode). Don't hardcode hex in components.
-
-### Two looks: «Yangi» and «Klassik» (Settings › Koʻrinish)
-
-**Where:** `src/core/ui-version.ts` (keys, parser, boot script) · `src/lib/ui-version.ts` (hooks) · `src/app/ui-new.css` · `src/components/views/appearance-settings.tsx`
-
-**One attribute.** `<html data-ui="new|classic">`, stored per browser in `sud-ui` (default `new`). `UI_BOOT_SCRIPT` is inlined in `<head>` by `app/layout.tsx` and sets the attribute before the first paint, so the other look never flashes; other tabs follow through the `storage` event.
-
-**Classic is untouched by construction.** Every selector in `ui-new.css` starts with `[data-ui='new']`; with `classic` nothing in that file matches. A change to `prototype.css` therefore changes BOTH looks: restyle the new one in `ui-new.css` only. Desktop-only layout rules there sit in `(min-width: 1081px)` so the 1080px sidebar-drawer rule keeps working.
-
-**What the new look is:** list rows ~50px with hairlines instead of 68px tiles; the sidebar in the theme's own surface, foldable to a 60px icon rail (`html[data-side='mini']`, key `sud-side-mini`, labels become tooltips, counts become corner badges); cards and KPI tiles do not lift on hover; focus is one crisp 2px line (owner rule: no glow); company names wrap to two lines; a list's filter bar is sticky; the palette scrim has no blur (performance rule in AGENTS.md §4).
-
-**Amber in the new look only.** Classic keeps «no orange» (warning = info = brand blue). In the new look `--status-warning-*` is amber, so blue means only «interactive / information» and every three-step scale (win rate, rating letter, worker health, hearing within 7 days, stale data) reads green / amber / rose instead of green / blue / rose. Use the `warn` band for «needs attention», `info` for neutral facts; never hardcode either colour.
-
-**Where the structure was the problem, the new look has its own screens** (`src/components/newui/*`). The view keeps ONE set of data hooks and branches at its `return` on `useUiVersion()`:
-
-| Classic | Problem | New look |
-|---|---|---|
-| Kuzatuv: alert sentence («NKMK · 12 Noy · NKMK · 12 Noy…») + date tiles + cards | the same hearings three times, no order, no time, not clickable | `Agenda`: 7-day strip with counts (click = that day), then hearings grouped by day and ordered by time; later than a week behind «Keyinroq» |
-| Bosh sahifa / Kuzatuv: company cards | 2 of the 6 facts the registry holds; no way to order | `CompanyTable`: status, rating, cases, win rate, next hearing, overdue debt; click a column to sort; unknown is «—» and sorts last |
-| Bosh sahifa: headline + 4 tiles | a slogan and tiles above the work | search first, totals in one line |
-| Sud ishlari: number, court, grey status | opponent, subject and outcome only in the drawer | `CaseTable`: opponent + the company's side, category, outcome in colour (an open case is plain text), amount, date; rows open with Enter |
-| Majlislar (company): date tiles, paged | no day grouping | the same `Agenda` |
-
-### «Yashil» (the green look, `html[data-ui='green']`)
-
-**Structure (the green look is not a re-skin):** the side column holds PLACES only (Bugun, Kuzatuv, Hujjatlar, Sozlamalar); a company's SECTIONS are tabs on its dossier header (`greenui/company-head`, built in `company/context-bar`). Home is a queue, not totals. Before restyling anything here ask «does this change what the operator sees or does», not «does it look different».
-
-**Flows (green look only; entry points are in green, the other looks never link to them and `AppShell` sends a stranded `prep`/`brief` back):**
-- **«Xulosa»** (first tab of a company dossier, `greenui/brief` + `core/verdict`): the registry's facts as SIGNALS WITH REASONS (status, rating, court record, overdue court invoices, hearings), the level is the worst signal, a company with several unread sources is never «ok» (unread ≠ clean), and the page says it is a pointer, not a legal assessment. «Muddati oʻtgan» there and in Bugun means the company's OWN unpaid billing.sud.uz invoices (a payment-discipline signal; statuses include «MIBga yuborilgan»), **never a claimable debt**, and nothing links it to the talabnoma (that comes from an «акт сверки»).
-- **«Majlisga tayyorgarlik»** (surface `prep`, `greenui/prep`): one click from a Bugun item, an agenda row or Xulosa. It reads the case (court type from the target, else the cached statistics, else the three are tried in turn), says which side the company is on (`partyRole`), shows a checklist (`core/prep`: what the app can tell by itself is ticked and locked, the rest is the lawyer's, kept per case in `sud-prep-v1`), how the company fared against THIS counterparty before (`core/counterparty` → `samePartyName`, the same matcher that decides sides; do not write another), and prepares the four petition forms from the case.
-
-**Where:** `src/app/ui-green.css` (fresh; every rule scoped, nothing relies on `ui-new.css`) · `components/greenui/shell.tsx` (its OWN shell markup `gx-*`: framed panel, side column with workspace card + status card, top bar, bell; `AppShell` branches at `return`, state stays there and goes in as props; bell data in `shell/alerts.ts`) · `components/greenui/lists.tsx` (companies as row cards under sort pills, cases as row cards led by an outcome orb, hearings as a week of pills over a timeline; views reach them through `components/screens` — `CompanyList`/`CaseList`/`AgendaList` pick the look, props identical to `newui`; sortable facts in `lib/company-rows`) · `components/greenui/{company-head,cases-bar}.tsx` (the open company's header card; Sud ishlari's two-row toolbar) · `proto/page-head` (no second title where the top bar names the page) · `proto/primitives › Kpi` and `proto/drawer` (`ProtoDrawer`, `DwSection/DwKv/DwFig`) branch on the look and draw `gx-stat` / the floating `gx-sheet` (the drawer's caller-specific inner pieces, e.g. order tickets, are still the shared `dw-*` markup) · `components/greenui/watchlist.tsx` (Kuzatuv: three stat pills + two panels) · `components/greenui/today.tsx` + `core/attention.ts` («Bugun»: a ranked queue of what needs the operator, computed from the registry alone; the week agenda beside it; hearings further than `HEARING_WINDOW_DAYS` are the agenda's job) · `greenui/case-timeline.tsx` + `core/case-timeline.ts` (Sud ishlari opens with cases laid out by month, a dot per case coloured by outcome) · `core/green-home.ts` (weighted win rate + its word: pure, tested) · the page title + tagline map `PAGE_TAGLINES` in `shell/app-shell`.
-
-**Built from a finance-dashboard reference:** the whole app is one rounded panel with a pale-lime rim on a grey backdrop; the sidebar has no fill, the current page is a white pill; forest green (`--g-ink`) for text and primary fills and ONE lime (`--g-lime`) for «the highlight» (the hero card, today's bar, the count plates, the chosen day); big radii, pill buttons and segments, hairline cards with a faint vertical gradient; company monograms are round tiles in three greens. Tokens (`--surface`, `--text-*`, `--brand`, `--accent`, `--status-*`) are overridden per theme, so every shared component follows without its own rule; dark inverts ink and lime (the lime becomes the fill).
-The home is a 12-column bento (hero «muddati oʻtgan qarz» · totals · win rate · 14-day hearings bars · the search as a calm card with an orb · companies table · rating donut · agenda); it folds at 1280 / 860 px.
-**Traps:** the off-canvas sidebar (≤1080px) must get an opaque background again (the look makes `.side` transparent on desktop); never set `position`/`transform` on `.side`; `.page > *` must exclude `.drawer`/`.drawer-scrim` (an animation's end state overrides their hidden state); the picker's sketch (`.look-sketch.green`) lives in `prototype.css` because the picker shows in every look.
-
-**Aurora (the new look's personality, last section of `ui-new.css`).** An ink sidebar in both themes (its own flipped tokens, so every rule inside it still reads `--text-*`), ONE gradient (indigo → violet → magenta, `--nx-grad`) for «primary / where you are» (primary button, active nav pill, chosen day, big numbers, the home search's 1px border), a teal counter-accent, a static mesh behind the page, six monogram gradients per STIR (`avatarHue`). Motion plays once on arrival (page blocks rise, table rows cascade, win-rate bars grow, day counts pop) and on hover (rows get a growing left bar, clickable cards rise, monograms tilt); the only loop is a 7px dot that breathes (transform + opacity). Rules it keeps: no glow around anything selected, no blur anywhere, `prefers-reduced-motion` stops all of it. **Trap:** an animation's end state overrides normal declarations, so `.page > *` must exclude `.drawer` and `.drawer-scrim` (they live in the page and hide themselves with `opacity`/`transform`); and never set `position` on `.side` here (the 1080px drawer needs prototype.css's).
-
-**Narrow screens (new look).** Below 1280 px Bosh sahifa / Kuzatuv stack with the REGISTER first and the agenda under it (the agenda is as long as the week is busy: it used to lead and pushed the companies a long scroll down). Below 760 px a case in Sud ishlari is a two-line card (opponent + outcome, number + amount, date) instead of a table that runs off the edge, and the three export buttons shrink to icons (`.fb-cases`, `title` + `aria-label` carry the names). Amounts are grouped in threes (`groupDigits`).
-
-Rules live in `core/` (`agenda`, `company-sort`), tested. The picker's own styles (`.look-*`) are in `prototype.css` because the picker must look right in both looks. Toʻlovlar, Statistika, Kompaniya, Hujjatlar and Sozlamalar keep the shared markup (restyled only).
-
-**Verify:** screenshot both looks, light + dark, at 1440 / 1080 / 960 / 700; the classic look must be pixel-identical to before.
+**Token-driven.** Define colors as CSS variables; the theme switches on `data-theme` on `<html>` (own `lib/theme`, set before first paint by the inline script in `lib/theme-boot`; light by default, no system mode). Don't hardcode hex in components.
 
 ### Lay out a responsive card grid
 

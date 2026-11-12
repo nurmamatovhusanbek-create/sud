@@ -16,36 +16,32 @@
  * users who never set it up.
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from '@/lib/theme'
 import {
   BarChart3,
   Bell,
   Building2,
-  CalendarCheck,
   CalendarDays,
   Eye,
   FileText,
   Gavel,
   Menu,
   Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
   Receipt,
   Settings,
   Sun,
 } from 'lucide-react'
 import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
-import { watched } from '@/lib/registry'
+import { daysUntilIso, upcomingOf, watched } from '@/lib/registry'
+import { useRegistryVersion } from '@/lib/use-registry'
 import { getHealth } from '@/lib/api-client'
-import { ddmm, counterpartyFor, useAlerts, useHydrated } from './alerts'
+import { getCached } from '@/lib/cache'
+import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
-import { GreenShell, type GxNavItem } from '@/components/greenui/shell'
-import { setSideMini, useSideMini, useUiVersion } from '@/lib/ui-version'
-import { usesRebuiltScreens } from '@/core/ui-version'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -56,25 +52,57 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
   overview: <BarChart3 />,
 }
 
-/** The green look's page title and its one-line tagline (the top bar names the page the way the sidebar does). */
-const PAGE_TAGLINES: Record<string, string> = {
-  home: 'Bugun nimaga eʼtibor berish kerak.',
-  brief: 'Kompaniya haqida hozircha maʼlum boʻlgan hamma narsa, sabablari bilan.',
-  prep: 'Bitta majlisga tayyorgarlik: ish, qarshi tomon, hujjatlar.',
-  watchlist: 'Kuzatuvdagi kompaniyalar, ularning majlislari va qarzdorligi.',
-  documents: 'Viza, sud va boshqa hujjatlarni tayyor shablonlar asosida yarating.',
-  settings: 'Yangilanishlar, workerlar, captcha va koʻrinishni boshqaring.',
-  bills: 'Kvitansiyalar, toʻlovlar va muddati oʻtgan qarz.',
-  cases: 'Kompaniyaning barcha sud ishlari va ularning natijasi.',
-  hearings: 'Rejalashtirilgan sud majlislari kunma-kun.',
-  profile: 'Kompaniya haqida rasmiy maʼlumotlar va reyting.',
-  overview: 'Yutuq, reyting va sud ishlari statistikasi.',
+interface Notif {
+  stir: string
+  name?: string
+  isoDate: string
+  court?: string
+  caseNumber?: string
+  time?: string
+  judge?: string
+}
+
+/** Watched companies' hearings within the 7-day alert window — EVERY hearing, not one per company. */
+function computeAlerts(): Notif[] {
+  const out: Notif[] = []
+  const now = Date.now()
+  for (const w of watched()) {
+    for (const h of upcomingOf(w.meta)) {
+      const days = daysUntilIso(h.iso, now)
+      if (days === null || days < 0 || days > 7) continue
+      out.push({ stir: w.stir, name: w.name, isoDate: h.iso, court: h.court, caseNumber: h.caseNumber, time: h.time, judge: h.judge })
+    }
+  }
+  return out.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (a.time || '').localeCompare(b.time || ''))
+}
+
+const noopSubscribe = () => () => {}
+/** Hydration probe — false on the server + first client render, true after. */
+function useHydrated(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false)
+}
+
+/**
+ * v18: the alert title is the OTHER party of the case. We match the case
+ * number inside the company's cached stats (10-min server memoization means
+ * this is free); without a match we fall back to the watched company name.
+ */
+function counterpartyFor(stir: string, caseNumber?: string, fallback?: string): string {
+  if (caseNumber) {
+    const stats = getCached<CompanyStats>(`stats:${stir}`)
+    const hit = stats?.cases?.find((c) => c.caseNumber === caseNumber)
+    if (hit?.counterparty) return hit.counterparty
+  }
+  return fallback || `STIR ${stir}`
 }
 
 function BellPopover() {
   const openCompany = useAppStore((s) => s.openCompany)
   const [open, setOpen] = useState(false)
-  const alerts = useAlerts()
+  const rv = useRegistryVersion()
+  // v206: hydration gate — computeAlerts() reads the localStorage registry.
+  const hydrated = useHydrated()
+  const alerts = useMemo(() => (hydrated ? computeAlerts() : []), [rv, hydrated])
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Outside click closes the popover
@@ -117,6 +145,8 @@ function BellPopover() {
               </div>
             ) : (
               alerts.map((a, i) => {
+                const [, m, d] = a.isoDate.split('-').map(Number)
+                const ddmm = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
                 const party = counterpartyFor(a.stir, a.caseNumber, a.name)
                 return (
                   <div
@@ -133,7 +163,7 @@ function BellPopover() {
                     <div className="nt">
                       <b>{party}</b>
                       <span>
-                        {ddmm(a.isoDate)} · {a.court || ''}
+                        {ddmm} · {a.court || ''}
                         {a.time ? ` · ${a.time}` : ''}
                       </span>
                     </div>
@@ -171,9 +201,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
   const [sideOpen, setSideOpen] = useState(false)
-  // New look only: the sidebar can fold to an icon rail (CSS reads html[data-side]); labels then live in tooltips.
-  const ui = useUiVersion()
-  const mini = useSideMini() && ui === 'new'
   // Escape closes the drawer (it covers its own hamburger; the scrim also closes it).
   useEffect(() => {
     if (!sideOpen) return
@@ -223,15 +250,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   const inWorkspace = surface === 'main' && view === 'company' && !!company
-  const pageKey = surface === 'main' ? (inWorkspace ? section : 'home') : surface
-  const pageTitle = pageKey === 'home' ? (ui === 'green' ? 'Bugun' : 'Bosh sahifa') : pageKey === 'watchlist' ? 'Kuzatuv' : pageKey === 'documents' ? 'Hujjatlar' : pageKey === 'settings' ? 'Sozlamalar' : pageKey === 'brief' ? 'Xulosa' : pageKey === 'prep' ? 'Majlisga tayyorgarlik' : (WORKSPACE_NAV.find((n) => n.key === pageKey)?.label ?? 'Sud tizimi')
-
-  // «Xulosa» and the preparation screen exist only in the green look: leaving it must not strand the operator on them
-  useEffect(() => {
-    if (ui === 'green') return
-    if (surface === 'prep') setSurface('main')
-    if (section === 'brief') setSection('overview')
-  }, [ui, surface, section, setSurface, setSection])
 
   const goWorkspaceSection = (key: SectionKey) => {
     setSideOpen(false)
@@ -272,39 +290,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return undefined
   }
 
-  if (ui === 'green') {
-    // The green look separates PLACES from a company's SECTIONS: the side column holds only places (Bugun, Kuzatuv,
-    // Hujjatlar, Sozlamalar); the sections of an open company (Toʻlovlar, Sud ishlari, …) are tabs on its own header.
-    const place = (key: string, label: string, icon: React.ReactNode, active: boolean, onClick: () => void, pip?: number): GxNavItem => ({ key, label, icon, active, pip, onClick })
-    const work: GxNavItem[] = [
-      place('today', 'Bugun', <CalendarCheck />, surface === 'main' && !inWorkspace, () => { setSideOpen(false); goLauncher() }),
-      place('kuzatuv', 'Kuzatuv', <Eye />, surface === 'watchlist', () => navClick('kuzatuv'), pipFor('kuzatuv')),
-    ]
-    const sys = (key: 'documents' | 'settings', label: string, icon: React.ReactNode): GxNavItem => ({
-      key, label, icon, active: surface === key, onClick: () => { setSideOpen(false); setSurface(key) },
-    })
-    return (
-      <GreenShell
-        workspace={{ name: inWorkspace && company ? company.name || `STIR ${company.stir}` : null, stir: inWorkspace && company ? company.stir : null, onClick: () => { setSideOpen(false); if (inWorkspace) goLauncher(); else { setCommandPurpose('search'); setCommandOpen(true) } } }}
-        work={work}
-        system={[sys('documents', 'Hujjatlar', <FileText />), sys('settings', 'Sozlamalar', <Settings />)]}
-        workerStat={workerStat}
-        onWorkers={() => { setSideOpen(false); setSurface('settings') }}
-        dark={theme === 'dark'}
-        onTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title={pageTitle}
-        tagline={PAGE_TAGLINES[pageKey] ?? ''}
-        showSearch
-        onSearch={() => { setCommandPurpose('search'); setCommandOpen(true) }}
-        sideOpen={sideOpen}
-        setSideOpen={setSideOpen}
-        onHome={() => { setSideOpen(false); goLauncher() }}
-      >
-        {children}
-      </GreenShell>
-    )
-  }
-
   return (
     <div className="app-frame">
       <a className="skip-link" href="#main">Asosiy qismga oʻtish</a>
@@ -323,9 +308,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="nav-label">Ish maydoni</div>
         <nav className="nav" aria-label="Ish maydoni">
           {WORKSPACE_NAV.map((n) => (
-            <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)} title={mini ? n.label : undefined}>
+            <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)}>
               {NAV_ICONS[n.key]}
-              <span className="nl">{n.label}</span>
+              {n.label}
               {pipFor(n.key) !== undefined && <span className="pip">{pipFor(n.key)}</span>}
             </button>
           ))}
@@ -333,18 +318,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="nav-label">Tizim</div>
         <nav className="nav" aria-label="Tizim">
-          <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }} title={mini ? 'Hujjatlar' : undefined}>
+          <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }}>
             <FileText />
-            <span className="nl">Hujjatlar</span>
+            Hujjatlar
           </button>
-          <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }} title={mini ? 'Sozlamalar' : undefined}>
+          <button className={surface === 'settings' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('settings') }}>
             <Settings />
-            <span className="nl">Sozlamalar</span>
+            Sozlamalar
           </button>
         </nav>
 
         <div className="side-spacer" />
-        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }} title={mini && workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : undefined}>
+        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }}>
           <span className="pulse" />
           <span>
             <b>{workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : 'Workerlar tekshirilmoqda'}</b>
@@ -361,17 +346,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Sun className="theme-icon-light" style={{ width: 18, height: 18 }} />
             <Moon className="theme-icon-dark" style={{ width: 18, height: 18 }} />
           </button>
-          {ui === 'new' && (
-            <button
-              className="rail-mini side-fold"
-              title={mini ? 'Menyuni yoyish' : 'Menyuni yigʻish'}
-              aria-label={mini ? 'Menyuni yoyish' : 'Menyuni yigʻish'}
-              aria-pressed={mini}
-              onClick={() => setSideMini(!mini)}
-            >
-              {mini ? <PanelLeftOpen style={{ width: 18, height: 18 }} /> : <PanelLeftClose style={{ width: 18, height: 18 }} />}
-            </button>
-          )}
         </div>
       </aside>
 
@@ -380,7 +354,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>
-          {usesRebuiltScreens(ui) || (surface !== 'documents' && surface !== 'settings') ? (
+          {surface !== 'documents' && surface !== 'settings' ? (
             <button
               className="searchbox"
               onClick={() => {

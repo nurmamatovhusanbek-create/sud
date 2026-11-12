@@ -41,12 +41,6 @@ import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCas
 import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
-import { useUiVersion } from '@/lib/ui-version'
-import { usesRebuiltScreens } from '@/core/ui-version'
-import { CaseList } from '@/components/screens'
-import { GreenCasesBar } from '@/components/greenui/cases-bar'
-import { GreenCaseTimeline } from '@/components/greenui/case-timeline'
-import { classifyOutcome } from '@/core/classify'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },
@@ -296,7 +290,7 @@ function HearingHistory({ items }: { items: Hearing[] }) {
   )
 }
 
-export function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
+function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
   const EYEBROW = 'Ish tafsiloti'
   openProtoDrawer(
     caseNumber,
@@ -699,7 +693,6 @@ export function CasesSection() {
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
-  const ui = useUiVersion()
 
   if (!company) return null
 
@@ -751,49 +744,45 @@ export function CasesSection() {
     })()
   }
 
-  const searchEl = (
-    <div className="f-search">
-      <Search />
-      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
-    </div>
-  )
-  const courtEl = <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
-  const roleEl = roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
-    <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
-  ) : null
-  const sortEl = <SortMenu value={sort} onChange={setSort} />
-  const actionEls = (
-    <>
-      <button className="btn btn-outline btn-sm" disabled={printing || filtered.length === 0} onClick={printList} title="Roʻyxatni PDF qilib chop etish" aria-label="PDF">
-        {printing ? <span className="spinner" /> : <Download />}
-        <span>PDF</span>
-      </button>
-      <button className="btn btn-outline btn-sm" disabled={exporting || filtered.length === 0} onClick={exportExcel} title="Roʻyxatni Excel faylga yuklash" aria-label="Excel">
-        {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
-        <span>Excel</span>
-      </button>
-      <button className="btn btn-outline btn-sm" disabled={filtered.length === 0} onClick={downloadOrders} title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash" aria-label="Qarorlar">
-        <FileText />
-        <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
-      </button>
-    </>
-  )
-  const toolbar = ui === 'green' ? (
-    <GreenCasesBar search={searchEl} sort={sortEl} actions={actionEls} courts={courtEl} sides={roleEl} shown={filtered.length} total={merged.length} />
-  ) : (
-    <div className="filterbar fb-cases">
-      {searchEl}
-      {courtEl}
-      {roleEl}
-      {sortEl}
-      <div style={{ flex: 1 }} />
-      {actionEls}
-    </div>
-  )
-
   return (
-    <div className={ui === 'green' ? 'gx-panel' : 'p-card rise-c'}>
-      {toolbar}
+    <div className="p-card rise-c">
+      <div className="filterbar">
+        <div className="f-search">
+          <Search />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
+        </div>
+        <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+        {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
+          <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
+        ) : null}
+        <SortMenu value={sort} onChange={setSort} />
+        <div style={{ flex: 1 }} />
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={printing || filtered.length === 0}
+          onClick={printList}
+        >
+          {printing ? <span className="spinner" /> : <Download />}
+          <span>PDF</span>
+        </button>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={exporting || filtered.length === 0}
+          onClick={exportExcel}
+        >
+          {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
+          <span>Excel</span>
+        </button>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={filtered.length === 0}
+          onClick={downloadOrders}
+          title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
+        >
+          <FileText />
+          <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
+        </button>
+      </div>
 
       {anyLoading ? (
         merged.length === 0 ? (
@@ -814,19 +803,6 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
-          {ui === 'green' && (
-            <GreenCaseTimeline
-              rows={filtered.map((m) => { const r = roleOf(m); return { id: `${m.courtType}|${m.c.caseNumber}`, filed: m.c.dateFiled, outcome: r ? classifyOutcome(r, m.c.result) : null } })}
-              onOpen={(id) => { const [courtType, caseNumber] = id.split('|'); openCaseDetail(caseNumber, courtType as CourtType, company ?? undefined) }}
-            />
-          )}
-          {usesRebuiltScreens(ui) ? (
-            <CaseList
-              rows={paged.map((m) => ({ c: m.c, courtType: m.courtType, role: roleOf(m) }))}
-              statusText={(raw) => statusEn(raw) || raw}
-              onOpen={({ c, courtType }) => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}
-            />
-          ) : (
           <div className="list">
             {paged.map(({ c, courtType }, i) => (
               <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
@@ -849,7 +825,6 @@ export function CasesSection() {
               </div>
             ))}
           </div>
-          )}
           <ListPagination
             page={safePage}
             pageSize={pageSize}

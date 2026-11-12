@@ -156,31 +156,6 @@ export function formatSum(tiyins: number | null | undefined): string {
   }).format(sum)
 }
 
-/**
- * A sum short enough for a table cell: «37,2 mln», «1,4 mlrd», «850 ming», «900» (soʻm; the caller adds the unit).
- * One decimal for mln/mlrd, dropped when it is zero.
- */
-export function formatSumCompact(tiyins: number | null | undefined): string {
-  const sum = Math.round(tiyinsToSum(tiyins))
-  const abs = Math.abs(sum)
-  const one = (n: number) => (Math.round(n * 10) / 10).toString().replace('.', ',')
-  if (abs >= 1e9) return `${one(sum / 1e9)} mlrd`
-  if (abs >= 1e6) return `${one(sum / 1e6)} mln`
-  if (abs >= 1e3) return `${Math.round(sum / 1e3)} ming`
-  return String(sum)
-}
-
-/**
- * A claim amount as the court API writes it («554300000», «12500000.50») grouped for reading: «554 300 000». Text that
- * is not a plain number (already grouped, a range, words) is returned as it came.
- */
-export function groupDigits(raw: string | null | undefined): string {
-  const s = (raw ?? '').trim()
-  const m = /^(-?)(\d+)([.,]\d+)?$/.exec(s)
-  if (!m) return s
-  return `${m[1]}${m[2].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${m[3] ?? ''}`
-}
-
 export function formatDate(ts: number | null | undefined): string {
   if (!ts) return '-'
   const d = new Date(ts)

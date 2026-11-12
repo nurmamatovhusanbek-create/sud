@@ -47,15 +47,12 @@ core/                 PURE functions (no I/O, no React): classify · rates · st
 | **Published court orders (Qarorlar)** | `proto/case-orders`, `shell/orders-loader`, `shell/orders-auto-check`, `views/orders-control`, `views/orders-settings` | `orders-watchlist`, `use-orders-job`, `api-client` | `public-orders/{fetch,status,orders,file,cache}` | `lib/public-orders/*`, `core/public-orders` | `core/__tests__/public-orders`, `lib/public-orders/__tests__/*` — **details: [orders.md](./orders.md)** |
 | **Documents (visa/IIO/court .docx)** | `views/documents-view`, `views/doc-editor`, `proto/doc-preview`, `proto/letterhead` | `api-client` | `documents/{generate,template}` | `lib/documents/{registry,fill.shared,fill.server,banner,derive,from-case}`, `core/translit` | `lib/documents/__tests__` |
 | **Talabnoma (demand letters)** | `views/pretenzia-view` | `lib/pretenzia/{parse,render}` | `pretenzia/generate` | `lib/pretenzia/fill.server`, `core/pretenzia` | `core/__tests__/pretenzia` |
-| **Interface switch (new / green / classic look), folded sidebar** | `views/appearance-settings` (Settings › Koʻrinish), `shell/app-shell` (fold button) | `lib/ui-version` (`useUiVersion`, `useSideMini`) | – | `core/ui-version` (keys, `UI_BOOT_SCRIPT` inlined by `app/layout.tsx`); CSS `app/ui-new.css` | `core/__tests__/ui-version` |
-| **Green look «Yashil» (bento home, framed panel)** | `greenui/{shell,today,lists,case-timeline,company-head,brief,prep}`, `screens/index`, `shell/{app-shell,alerts}` (page title + tagline, bell data), `views/launcher` (branch), `views/appearance-settings` | `registry` | – | `core/{attention,case-timeline,verdict,counterparty,prep,green-home}` (today's queue, case timeline, Xulosa signals, history against one counterparty, hearing checklist, win rate), `lib/prep-store`, `core/ui-version`; CSS `app/ui-green.css` | `core/__tests__/{attention,case-timeline,verdict,counterparty,prep,green-home,ui-version}`, `lib/__tests__/prep-store` |
-| **New-look screens (Bosh sahifa, Kuzatuv, Majlislar, Sud ishlari)** | `newui/agenda` (7-day strip + hearings by day), `newui/company-table` (sortable), `newui/case-table`; branches in `views/{launcher,watchlist}`, `sections/{hearings,cases}` | `registry` (`futureUpcoming`) | same as classic | `core/agenda` (grouping, labels), `core/company-sort` (unknown sorts last), `core/billing-format` (`formatSumCompact`), `core/classify` | `core/__tests__/{agenda,company-sort,sum-compact}` |
 | **Settings (update, workers, health, orders panel)** | `views/settings-view`, `views/orders-settings` | `api-client` (`privilegedHeaders`) | `settings/*`, `tor-status` | `workers-config`, `health-registry`, `tor`, `version-server` | `server/__tests__/security` |
 | **Themed PDF export** | – | `print` (`buildPrintDoc`) | – | – | – |
 | **Security (host/CSRF/privileged)** | – | `api-client` headers | all | `server/{security,middleware,config}` | `server/__tests__/{security,routes}` — **[SECURITY.md](./SECURITY.md)** |
 
-Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all component CSS, BOTH looks) + `app/ui-new.css` (the new look only, every rule under `[data-ui='new']`). In `prototype.css`: `.drawer*/.dw-*`, `.ccard`, `.kpis`,
-`.orders-loader`, `.dedit*/.dprev*`, `.cband/.cnum`…. Never hardcode hex in components.
+Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all component CSS: `.drawer*/.dw-*`, `.ccard`, `.kpis`,
+`.orders-loader`, `.dedit*/.dprev*`, `.cband/.cnum`…). Never hardcode hex in components.
 
 ## 3. One concept, several places — change ALL of them
 
@@ -80,7 +77,7 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 
 | Store | Lifetime | Key / holder | Who writes |
 |---|---|---|---|
-| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sud-ui` (interface: `new`/`classic`), `sud-side-mini` (new look: sidebar folded), `sb-cache-v169:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource / ui-version |
+| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sb-cache-v169:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource |
 | Browser `sessionStorage` | tab session | `sud-orders-pill-hidden` (run id whose pill was hidden) | orders-loader |
 | Zustand `app-store` | page | active company, section, surface, `docPrefill` | components |
 | Server memory (`globalThis`) | process | `__publicOrdersJob` (queue), health pools (`__sudHealthPools`, live cooldowns only), `__sudHealthStore` (request history, mirrored to disk), metrics | company-job / cf-worker-pool / health-store |

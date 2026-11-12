@@ -2,15 +2,12 @@ import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import { OrdersLoader } from "@/components/shell/orders-loader";
 import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 // v18 faces (Plus Jakarta Sans for the UI, IBM Plex Mono for figures) are self-hosted: fonts.css + ./fonts/*.woff2.
 // Not next/font/google: that downloads from Google at dev/build time and fails offline or behind a firewall.
 import "./fonts.css";
 import "./globals.css";
 import "./prototype.css";
-// The new «Ixcham» look: every rule is scoped under html[data-ui='new'], so the classic look is untouched without it.
-import "./ui-new.css";
-import "./ui-green.css";
-import { DEFAULT_UI, UI_BOOT_SCRIPT } from "@/core/ui-version";
 
 export const metadata: Metadata = {
   title: "Sud tizimi",
@@ -34,10 +31,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" data-ui={DEFAULT_UI} data-theme="light" suppressHydrationWarning>
+    <html lang="uz" data-theme="light" suppressHydrationWarning>
       <head>
-        {/* the look (Settings › Koʻrinish) and the theme are decided before the first paint: no flash of the other one */}
-        <script dangerouslySetInnerHTML={{ __html: UI_BOOT_SCRIPT }} />
+        {/* the saved theme is put on <html> before the first paint: no flash of the other one */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="antialiased bg-background text-foreground">
         {children}

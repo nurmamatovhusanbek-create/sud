@@ -20,13 +20,7 @@ published court orders and fills legal documents. This file is the *rules*; the 
 - **Types are enforced** (`ignoreBuildErrors: false`). Red `bun run typecheck` = broken build; fix the file, don't suppress.
 - **Uzbek UI.** Native phrasing; `oʻ`/`gʻ` use `ʻ`/`ʼ` (not straight apostrophes), guillemets `«»`, no em dash. Money/dates via the app's formatters, not `toLocaleString`.
 - **Two owner UI rules:** no «choosing glow» / inset glow (crisp focus only); «less info is useful info» — compact cards, match existing tile sizes.
-- **Tokens, not hex.** Colors are CSS variables (`globals.css`); theme via `data-theme` (own `lib/theme`, applied before first paint by the boot script in `core/ui-version`; default light; do not bring back next-themes: its inline <script> makes React 19 log an error on every load).
-- **Three looks, one switch.** Settings › Koʻrinish chooses the interface: «Yangi» (default), «Yashil» (a bento dashboard in forest green + lime, built fresh from a reference) or «Klassik» (`html[data-ui]` = `new|green|classic`, key `sud-ui`). Yashil = `app/ui-green.css` (+ `components/greenui/*`: its OWN shell, «Bugun» queue, lists, company dossier — different structure, not a re-skin); it shares the REBUILT SCREEN STRUCTURE with «Yangi» (`usesRebuiltScreens(ui)` in `core/ui-version`) but none of its CSS, and `ui-new.css` rules never match it.
-  The classic look is `globals.css` + `prototype.css` exactly; the new one is `app/ui-new.css`, where EVERY selector starts with
-  `[data-ui='new']`. Restyling the new look = edit `ui-new.css` only; a change to `prototype.css` changes BOTH looks. Check a UI
-  change in both (and in dark). The new look is not a re-skin: where a classic screen's STRUCTURE was the problem it draws its own
-  (`components/newui/*`: hearings agenda, companies table, cases table), chosen with `useUiVersion()` at the view's `return`. The
-  data hooks above that `return` are shared, so both looks always read the same data; put ordering/grouping rules in `core/`.
+- **Tokens, not hex.** Colors are CSS variables (`globals.css`); theme via `data-theme` (own `lib/theme`, set before first paint by the inline script in `lib/theme-boot`; default light; do not bring back next-themes: its inline <script> makes React 19 log an error on every load).
 
 ## 2. Always verify before you finish
 

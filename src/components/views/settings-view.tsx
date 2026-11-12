@@ -8,7 +8,6 @@
  * per-worker request-history drawer. Auto-refresh toggle polls every 5s.
  */
 
-import { PageHead } from '@/components/proto/page-head'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
@@ -23,7 +22,6 @@ import {
   RefreshCw,
   Server,
   Shield,
-  Palette,
   ShieldCheck,
   Trash2,
   X,
@@ -38,7 +36,6 @@ import { toast } from 'sonner'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
-import { AppearanceSettings } from '@/components/views/appearance-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -857,7 +854,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security' | 'look'
+type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -868,7 +865,11 @@ export function SettingsView() {
 
   return (
     <div>
-      <PageHead eyebrow="Tizim boshqaruvi" title="Sozlamalar" desc="Yangilanishlar, Cloudflare workerlar, tarmoq holati va interfeys koʻrinishini boshqaring." gap={14} />
+      <div className="hero" style={{ marginBottom: 14 }}>
+        <div className="eyebrow">Tizim boshqaruvi</div>
+        <h1>Sozlamalar</h1>
+        <p>Yangilanishlar, Cloudflare workerlar va tarmoq holatini boshqaring.</p>
+      </div>
 
       <div className="set-tabs">
         <button className={`set-tab ${tab === 'updates' ? 'on' : ''}`} onClick={() => setTab('updates')}>
@@ -895,10 +896,6 @@ export function SettingsView() {
           <ShieldCheck />
           Xavfsizlik
         </button>
-        <button className={`set-tab ${tab === 'look' ? 'on' : ''}`} onClick={() => setTab('look')}>
-          <Palette />
-          Koʻrinish
-        </button>
       </div>
 
       {tab === 'updates' && <UpdatesTab />}
@@ -907,7 +904,6 @@ export function SettingsView() {
       {tab === 'orders' && <OrdersTab />}
       {tab === 'vlm' && <VlmTab />}
       {tab === 'security' && <SecurityTab />}
-      {tab === 'look' && <AppearanceSettings />}
     </div>
   )
 }

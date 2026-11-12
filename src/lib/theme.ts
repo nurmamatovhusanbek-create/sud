@@ -4,13 +4,14 @@
  * Light / dark, without next-themes. That library renders a <script> inside a client component, which React 19.2
  * reports as «Encountered a script tag while rendering React component» on every load. The app only ever needed two
  * themes stored under one key, so this is that: the choice lives in localStorage['theme'], is put on <html data-theme>
- * by the inline boot script (core/ui-version › UI_BOOT_SCRIPT) before the first paint, and is changed here.
+ * by the inline boot script (lib/theme-boot) before the first paint, and is changed here.
  */
 
 import { useCallback, useSyncExternalStore } from 'react'
+import { THEME_KEY } from './theme-boot'
 
 export type Theme = 'light' | 'dark'
-export const THEME_KEY = 'theme'
+export { THEME_KEY }
 export const DEFAULT_THEME: Theme = 'light'
 const EVENT = 'sud:theme'
 

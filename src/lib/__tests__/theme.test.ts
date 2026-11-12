@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { parseTheme } from '../theme'
-import { UI_BOOT_SCRIPT } from '@/core/ui-version'
+import { THEME_BOOT_SCRIPT, THEME_KEY } from '../theme-boot'
 
 describe('parseTheme', () => {
   test('only «dark» is dark: junk, «system» (next-themes) and nothing are light', () => {
@@ -13,24 +13,24 @@ describe('boot script', () => {
   const run = (stored: Record<string, string>) => {
     const attrs: Record<string, string> = {}
     const html = { setAttribute: (k: string, v: string) => (attrs[k] = v), style: {} as Record<string, string> }
-    new Function('document', 'localStorage', UI_BOOT_SCRIPT)({ documentElement: html }, { getItem: (k: string) => stored[k] ?? null })
+    new Function('document', 'localStorage', THEME_BOOT_SCRIPT)({ documentElement: html }, { getItem: (k: string) => stored[k] ?? null })
     return { attrs, style: html.style }
   }
-  test('puts the saved theme and look on <html> before the first paint', () => {
-    const r = run({ theme: 'dark', 'sud-ui': 'green' })
-    expect(r.attrs['data-theme']).toBe('dark')
+  test('reads the same key lib/theme writes', () => {
+    expect(THEME_BOOT_SCRIPT).toContain(`'${THEME_KEY}'`)
+  })
+  test('puts the saved theme on <html> before the first paint', () => {
+    const r = run({ [THEME_KEY]: 'dark' })
+    expect(r.attrs).toEqual({ 'data-theme': 'dark' })
     expect(r.style.colorScheme).toBe('dark')
-    expect(r.attrs['data-ui']).toBe('green')
   })
-  test('nothing saved: light and the default look', () => {
-    const r = run({})
-    expect(r.attrs['data-theme']).toBe('light')
-    expect(r.attrs['data-ui']).toBe('new')
+  test('nothing saved, or something unknown: light', () => {
+    expect(run({}).attrs['data-theme']).toBe('light')
+    expect(run({ [THEME_KEY]: 'system' }).attrs['data-theme']).toBe('light')
   })
-  test('blocked storage (private mode) is swallowed, not thrown', () => {
+  test('blocked storage (private mode) is swallowed, not thrown; the server-rendered default stays', () => {
     const attrs: Record<string, string> = {}
-    new Function('document', 'localStorage', UI_BOOT_SCRIPT)({ documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v), style: {} } }, { getItem: () => { throw new Error('blocked') } })
-    // storage blocked: no throw, and the server-rendered defaults on <html> stay as they are
+    expect(() => new Function('document', 'localStorage', THEME_BOOT_SCRIPT)({ documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v), style: {} } }, { getItem: () => { throw new Error('blocked') } })).not.toThrow()
     expect(attrs).toEqual({})
   })
 })

@@ -31,8 +31,6 @@ import { exportStatsXlsx, getStats } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { keepIdentityWarm } from '@/lib/identity'
 import { hardRefreshWithToast } from '@/lib/hard-refresh'
-import { GreenPrep } from '@/components/greenui/prep'
-import { BriefSection } from '@/components/greenui/brief'
 
 /** Workspace: the v18 sidebar IS the nav — this mounts the active section. */
 function CompanyWorkspace() {
@@ -130,11 +128,6 @@ function CompanyWorkspace() {
             <HearingsSection />
           </div>
         )}
-        {visited.has('brief') && (
-          <div style={{ display: section === 'brief' ? 'block' : 'none' }}>
-            <BriefSection />
-          </div>
-        )}
         {visited.has('profile') && (
           <div style={{ display: section === 'profile' ? 'block' : 'none' }}>
             <ProfileSection />
@@ -162,8 +155,6 @@ export default function Home() {
         <SettingsView />
       ) : surface === 'documents' ? (
         <DocumentsView />
-      ) : surface === 'prep' ? (
-        <GreenPrep />
       ) : view === 'company' ? (
         <CompanyWorkspace />
       ) : (

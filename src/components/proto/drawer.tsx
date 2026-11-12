@@ -20,7 +20,6 @@ import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import { X } from 'lucide-react'
 import { BrandMark } from './brand-mark'
-import { useUiVersion } from '@/lib/ui-version'
 
 export interface DrawerOpts {
   /** small uppercase label in the masthead, e.g. «Ish tafsiloti» */
@@ -72,7 +71,6 @@ export function ProtoDrawer() {
   const footer = useDrawer((s) => s.footer)
   const hide = useDrawer((s) => s.hide)
   const closeRef = useRef<HTMLButtonElement>(null)
-  const green = useUiVersion() === 'green'
 
   // Esc closes; focus moves into the dialog on open (it is aria-modal).
   useEffect(() => {
@@ -84,31 +82,6 @@ export function ProtoDrawer() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, hide])
-
-  // the green look draws its own sheet: a rounded panel floating off the edge, a lime close button, the title block on
-  // the card itself (no coloured masthead)
-  if (green) {
-    return (
-      <>
-        <div className={`gx-sheet-scrim ${open ? 'open' : ''}`} onClick={hide} />
-        <aside className={`gx-sheet ${open ? 'open' : ''}`} role="dialog" aria-modal="true" aria-hidden={!open}>
-          <header className="gx-sheet-h">
-            <div className="gx-sheet-t">
-              <span className="gx-sheet-eb">{eyebrow || 'Sud tizimi'}</span>
-              <h2>{title}</h2>
-              {sub ? <div className="gx-sheet-sub">{sub}</div> : null}
-              {badges ? <div className="gx-sheet-badges">{badges}</div> : null}
-            </div>
-            <button ref={closeRef} className="gx-sheet-x" onClick={hide} aria-label="Yopish">
-              <X />
-            </button>
-          </header>
-          <div className="gx-sheet-body">{content}</div>
-          {footer ? <div className="gx-sheet-foot">{footer}</div> : null}
-        </aside>
-      </>
-    )
-  }
 
   return (
     <>
@@ -137,18 +110,6 @@ export function ProtoDrawer() {
 
 /** Uppercase accent label + hairline rule, with an optional count. */
 export function DwSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
-  if (useUiVersion() === 'green') {
-    return (
-      <section className="gx-sec">
-        <h3 className="gx-sec-h">
-          <i aria-hidden />
-          {title}
-          {count !== undefined ? <span>{count}</span> : null}
-        </h3>
-        {children}
-      </section>
-    )
-  }
   return (
     <section className="dw-sec">
       <div className="dw-sec-h">
@@ -168,20 +129,7 @@ const isBlank = (v: React.ReactNode) =>
 /** Zebra key/value list. Rows with no value are dropped — a «-» row is noise. */
 export function DwKv({ rows }: { rows: DwRow[] }) {
   const shown = rows.filter(([, v]) => !isBlank(v))
-  const green = useUiVersion() === 'green'
   if (!shown.length) return null
-  if (green) {
-    return (
-      <dl className="gx-kv">
-        {shown.map(([k, v, o]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd className={`${o?.mono ? 'mono' : ''}${o?.tone ? ` ${o.tone}` : ''}`}>{v}</dd>
-          </div>
-        ))}
-      </dl>
-    )
-  }
   return (
     <div className="dw-kv">
       {shown.map(([k, v, o]) => (
@@ -196,14 +144,6 @@ export function DwKv({ rows }: { rows: DwRow[] }) {
 
 /** The one number that matters, on an accent-soft block (the PDF's total). */
 export function DwFig({ label, value, unit }: { label: string; value: React.ReactNode; unit?: string }) {
-  if (useUiVersion() === 'green') {
-    return (
-      <div className="gx-fig">
-        <span>{label}</span>
-        <b>{value}{unit ? <small>{unit}</small> : null}</b>
-      </div>
-    )
-  }
   return (
     <div className="dw-fig">
       <span className="k">{label}</span>

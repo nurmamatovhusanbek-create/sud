@@ -16,7 +16,6 @@
  * filled server side at /api/documents/generate (same fill function).
  */
 
-import { PageHead } from '@/components/proto/page-head'
 import { useEffect, useMemo, useState } from 'react'
 import {
   X, Plane, Landmark, Scale, Lock, ChevronRight, ArrowLeft, Search, FileSpreadsheet, FilePlus, Trash2,
@@ -313,6 +312,10 @@ export function DocumentsView() {
 
 function Hero() {
   return (
-    <PageHead eyebrow="Hujjat generatori" title="Hujjatlar" desc="Viza, ichki ishlar va sud hujjatlarini tayyor shablonlar asosida yarating. Toifani tanlang yoki qidiring." />
+    <div className="hero" style={{ marginBottom: 18 }}>
+      <div className="eyebrow">Hujjat generatori</div>
+      <h1>Hujjatlar</h1>
+      <p>Viza, ichki ishlar va sud hujjatlarini tayyor shablonlar asosida yarating. Toifani tanlang yoki qidiring.</p>
+    </div>
   )
 }

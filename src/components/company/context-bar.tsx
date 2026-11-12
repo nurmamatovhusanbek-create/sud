@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { BarChart3, Building2, CalendarDays, Copy, Download, FileText, Gavel, Receipt, RefreshCw, ShieldCheck, Star } from 'lucide-react'
+import { Copy, Download, FileText, RefreshCw, Star } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/lib/store/app-store'
 import { companyStatusFamily, ratingBandFamily } from '@/core/status'
@@ -21,12 +21,6 @@ import { hardRefreshWithToast, useRefreshing } from '@/lib/hard-refresh'
 import { refreshRating } from '@/lib/enrich'
 import { familyDotClass, familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 import { bandFromFamily } from '@/components/proto/primitives'
-import { GreenCompanyHead } from '@/components/greenui/company-head'
-import { useUiVersion } from '@/lib/ui-version'
-import { useTabCounts } from '@/lib/tab-counts'
-import { SECTIONS } from '@/lib/store/app-store'
-
-const TAB_ICON: Record<string, React.ReactNode> = { brief: <ShieldCheck />, bills: <Receipt />, cases: <Gavel />, hearings: <CalendarDays />, profile: <Building2 />, overview: <BarChart3 /> }
 
 const PART_LABEL: Record<string, string> = {
   stats: 'Statistika',
@@ -48,10 +42,6 @@ const statusLabel = (s?: string) => {
 
 export function ContextBar() {
   const company = useAppStore((s) => s.activeCompany)
-  const ui = useUiVersion()
-  const section = useAppStore((s) => s.section)
-  const setSection = useAppStore((s) => s.setSection)
-  const tabCounts = useTabCounts()
   const [copied, setCopied] = useState(false)
   const rv = useRegistryVersion()
   const watching = company ? (rv >= 0 ? isWatched(company.stir) : false) : false
@@ -101,37 +91,6 @@ export function ContextBar() {
 
   const refresh = () => void hardRefreshWithToast(company.stir)
   const exportx = () => window.dispatchEvent(new CustomEvent('sud:export-active'))
-
-  if (ui === 'green') {
-    return (
-      <GreenCompanyHead
-        tabs={[{ key: 'brief' as const, label: 'Xulosa' }, ...SECTIONS].map((t) => ({
-          key: t.key,
-          label: t.label,
-          icon: TAB_ICON[t.key],
-          active: section === t.key,
-          count: t.key === 'bills' ? tabCounts.bills : t.key === 'cases' ? tabCounts.cases : t.key === 'hearings' ? tabCounts.hearings : undefined,
-          onClick: () => setSection(t.key),
-        }))}
-        mono={company.name ? initials(company.name) : grp(company.stir).slice(0, 2)}
-        name={company.name || `STIR ${grp(company.stir)}`}
-        stir={grp(company.stir)}
-        status={company.status ? { label: statusLabel(company.status), dot: familyDotClass(statusFamily) } : undefined}
-        rating={company.rating?.category ? { label: company.rating.category, badge: familyBadgeClass(bandFromFamily(ratingFamily ?? 'neutral')) } : undefined}
-        copied={copied}
-        onCopy={() => void copyStir()}
-        age={age.oldest !== null && !refreshing
-          ? { label: `Yangilandi ${ageLabel(age.oldest, now)}${age.stale ? ' · eskirgan' : ''}`, stale: age.stale, title: Object.entries(age.parts).map(([k, t]) => `${PART_LABEL[k] ?? k}: ${ageLabel(t, now)}`).join('\n') }
-          : undefined}
-        refreshing={refreshing}
-        onRefresh={refresh}
-        onExport={exportx}
-        onReport={() => void openCompanyReport(company.stir)}
-        watching={watching}
-        onWatch={toggleWatch}
-      />
-    )
-  }
 
   return (
     <div className="ctxbar">
