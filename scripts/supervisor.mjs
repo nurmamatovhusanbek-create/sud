@@ -26,6 +26,7 @@ import { spawn } from 'node:child_process'
 import { createWriteStream, existsSync, unlinkSync } from 'node:fs'
 import { platform } from 'node:os'
 import { join } from 'node:path'
+import { cleanDevCache, isNextDirConflict, nextDirHelp } from './next-cache.mjs'
 
 const mode = process.argv[2]
 if (mode !== 'dev' && mode !== 'start') {
@@ -45,6 +46,7 @@ let attempt = 0
 let restarting = false
 let deliberate = false // true = a sentinel-driven update restart (force reinstall)
 let portStreak = 0     // consecutive quick exits caused by port 3000 being busy
+let cacheStreak = 0    // consecutive quick exits caused by Next being unable to create .next/dev (EEXIST)
 
 const PORT = process.env.PORT || '3000'
 
@@ -142,7 +144,11 @@ async function cycle(doInstall = true) {
   // instead of blindly respawning into the same wall.
   let portConflict = false
   const portRe = new RegExp(`EADDRINUSE|port ${PORT} is in use|Is port ${PORT} in use`, 'i')
-  const scan = (d) => { if (portRe.test(String(d))) portConflict = true }
+  let cacheConflict = false
+  const scan = (d) => {
+    if (portRe.test(String(d))) portConflict = true
+    if (isNextDirConflict(d)) cacheConflict = true
+  }
   child.stdout?.on('data', scan)
   child.stderr?.on('data', scan)
   current = child
@@ -153,7 +159,27 @@ async function cycle(doInstall = true) {
     const shortLived = Date.now() - sinceLastStart < 15_000
     // Reset the backoff/streak once a run stayed up a while — this only guards
     // genuine crash loops, not the deliberate one-shot updater restart.
-    if (!shortLived) { attempt = 1; portStreak = 0 }
+    if (!shortLived) { attempt = 1; portStreak = 0; cacheStreak = 0 }
+
+    // `.next/dev` cannot be created (EEXIST, typically a OneDrive-synced folder on Windows). It is only Next's dev cache:
+    // delete it and retry. Dev mode only (in production mode `.next/standalone` IS the app). If it keeps happening the
+    // cause is the folder, not the cache, so stop and say so instead of respawning forever.
+    if (cacheConflict && shortLived && mode === 'dev') {
+      cacheStreak++
+      if (cacheStreak > 2) {
+        console.error(nextDirHelp(process.cwd()))
+        process.exit(1)
+      }
+      const r = cleanDevCache(process.cwd())
+      if (r.error) {
+        console.error(nextDirHelp(process.cwd(), r.error))
+        process.exit(1)
+      }
+      console.error(`[supervisor] .next/dev yaratilmadi (EEXIST) — kesh tozalandi, qayta urinamiz (${cacheStreak}/2)…`)
+      deliberate = false
+      setTimeout(() => cycle(false), 1_000)
+      return
+    }
 
     // Port 3000 held by another process (often an orphaned prior dev server).
     // Retry a couple of times to ride out a restart race, then stop looping and

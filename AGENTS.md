@@ -134,6 +134,7 @@ Both document APIs need their templates traced into the standalone build (`outpu
   `next dev` with the **same Node that runs it** (`process.execPath`), not `bun x next`: under Bun's
   runtime on Windows Next's HMR WebSocket fails with «Error handling upgrade request … upgrade requires
   a Request object» (spammed by every open tab after an update restart). `bun` still does install/build.
+  If Next dies at once with `EEXIST … mkdir …\.next\dev` (Windows, usually a OneDrive-synced folder), the supervisor deletes `.next/dev` (dev cache only) and retries twice, then stops and says to move the project out of OneDrive (`scripts/next-cache.mjs`); never loop on it.
 
 ---
 
