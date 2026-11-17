@@ -20,6 +20,7 @@ import { X509Certificate } from 'node:crypto'
 import http from 'node:http'
 import https from 'node:https'
 import tls from 'node:tls'
+import zlib from 'node:zlib'
 import { checkPublicHost, isPrivateAddress } from '@/lib/net/public-host'
 import net from 'node:net'
 
@@ -171,7 +172,9 @@ function toBuffer(body: unknown): Buffer | undefined {
 
 /** The same request over node:https with the repaired trust list; answers like fetch (the body is buffered). */
 async function httpsRequest(url: URL, init: RequestInit, ca: string[], hops = 0): Promise<Response> {
-  const headers: Record<string, string> = {}
+  // the SAME header set Node's own fetch sends (plus whatever the caller gave): a firewall in front of the site judges the
+  // request by it, and a bare https.request lacks accept-encoding / accept-language / sec-fetch-mode, which looks like a bot
+  const headers: Record<string, string> = { 'accept-encoding': 'gzip, deflate', 'accept-language': '*', 'sec-fetch-mode': 'cors', connection: 'keep-alive' }
   new Headers(init.headers).forEach((v, k) => (headers[k] = v))
   const body = toBuffer(init.body)
   if (body && !headers['content-length']) headers['content-length'] = String(body.length)
@@ -193,7 +196,27 @@ async function httpsRequest(url: URL, init: RequestInit, ca: string[], hops = 0)
     return httpsRequest(new URL(loc, url), status === 303 ? { ...init, method: 'GET', body: undefined } : init, ca, hops + 1)
   }
   const noBody = status === 204 || status === 205 || status === 304 || (status >= 100 && status < 200)
-  return new Response(noBody ? null : Buffer.concat(chunks), { status, statusText: res.statusMessage ?? '', headers: outHeaders })
+  let payload = Buffer.concat(chunks)
+  const enc = (outHeaders.get('content-encoding') ?? '').toLowerCase().trim()
+  if (!noBody && payload.length && enc) {
+    const limit = { maxOutputLength: 64 * 1024 * 1024 }
+    try {
+      if (enc === 'gzip' || enc === 'x-gzip') payload = zlib.gunzipSync(payload, limit)
+      else if (enc === 'br') payload = zlib.brotliDecompressSync(payload, limit)
+      else if (enc === 'deflate') {
+        try {
+          payload = zlib.inflateSync(payload, limit)
+        } catch {
+          payload = zlib.inflateRawSync(payload, limit)
+        }
+      }
+      outHeaders.delete('content-encoding') // the body below is already decoded, like fetch's
+      outHeaders.delete('content-length')
+    } catch {
+      /* not actually compressed (a lying header): hand the bytes over untouched */
+    }
+  }
+  return new Response(noBody ? null : payload, { status, statusText: res.statusMessage ?? '', headers: outHeaders })
 }
 
 /** Drop-in for `fetch(url, init)` for DIRECT requests to a host that may not send its intermediate certificate. */

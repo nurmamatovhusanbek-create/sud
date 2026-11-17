@@ -153,6 +153,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/library/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
+| `public-orders/waf.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/waf.test.ts |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
 | `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +8 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
 | `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
@@ -381,3 +382,4 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__sudSecurity` | server/audit.ts |
 | `__sudSnapshots` | lib/snapshot-store.ts |
 | `__sudUpdating` | app/api/settings/update/route.ts |
+| `__sudWaf` | lib/public-orders/waf.ts |

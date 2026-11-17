@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
+import zlib from 'node:zlib'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -60,6 +61,8 @@ describe.skipIf(!hasOpenssl)('chainFetch (server without its intermediate)', () 
     // the leaf ONLY: exactly what the broken host sends
     srv = https.createServer({ key: readFileSync(join(dir, 'leaf.key')), cert: readFileSync(join(dir, 'leaf.pem')) }, (req, res) => {
       if (req.url === '/redir') return void res.writeHead(302, { location: '/ok' }).end()
+      if (req.url === '/headers') return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(req.headers))
+      if (req.url === '/gz') return void res.writeHead(200, { 'content-type': 'application/json', 'content-encoding': 'gzip' }).end(zlib.gzipSync('{"gz":true}'))
       res.writeHead(200, { 'content-type': 'text/plain', 'x-seen': req.headers['x-test'] ?? '' }).end(`ok ${req.method} ${req.url}`)
     })
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r))
@@ -118,6 +121,23 @@ describe.skipIf(!hasOpenssl)('chainFetch (server without its intermediate)', () 
   test('the AIA URL may not point at this machine unless explicitly allowed', async () => {
     clearChainCache()
     await expect(chainFetch(url(), {}, { roots })).rejects.toThrow() // loopback AIA refused → original error
+  })
+
+  test('the repaired request carries the header set Node fetch sends, and a caller header wins', async () => {
+    clearChainCache()
+    const h = await (await chainFetch(url('/headers'), { headers: { Accept: 'application/json', 'User-Agent': 'UA-test' } }, opts())).json()
+    expect(h['accept-encoding']).toBe('gzip, deflate')
+    expect(h['accept-language']).toBe('*')
+    expect(h['sec-fetch-mode']).toBe('cors')
+    expect(h['user-agent']).toBe('UA-test')
+    expect(h.accept).toBe('application/json')
+  })
+
+  test('a gzip answer is decoded like fetch does', async () => {
+    clearChainCache()
+    const res = await chainFetch(url('/gz'), {}, opts())
+    expect(await res.json()).toEqual({ gz: true })
+    expect(res.headers.get('content-encoding')).toBeNull()
   })
 
   test('a POST body goes through the repaired request', async () => {

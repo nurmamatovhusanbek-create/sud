@@ -1,5 +1,6 @@
 import 'server-only'
 import { chainFetch } from '@/lib/net/chain-fetch'
+import { assertNotWafBlocked, noteWafBlock, parseWafBlock, throwUpstreamFailure, wafMessage } from '@/lib/public-orders/waf'
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
 import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
@@ -25,6 +26,7 @@ const HEADERS = {
 
 async function fetchUpstream(path: string, opts: { timeoutMs: number; background: boolean }): Promise<Response> {
   const url = BASE + path
+  if (DIRECT_LIST) assertNotWafBlocked() // the firewall already refused us: do not make it worse
   if (DIRECT_LIST) return chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
   return fetchViaWorkers(url, {
     originKey: 'adolatapi1.sud.uz',
@@ -41,6 +43,7 @@ const realDeps: OrderFileDeps = {
   download: async (pdfId, token, route) => {
     const path = orderFilePath(pdfId) // uuid → the library file, `old-…` → the pre-2024 file; nothing else is ever built
     if (!path) throw new Error('Fayl identifikatori notoʻgʻri')
+    if (route === DIRECT) assertNotWafBlocked()
     const url = `${BASE}${path}?recaptcha_token=${encodeURIComponent(token)}`
     // never race a duplicate: the first request spends the token
     const res =
@@ -48,6 +51,13 @@ const realDeps: OrderFileDeps = {
         ? await chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
         : await fetchViaWorkers(url, { originKey: 'adolatapi1.sud.uz', headers: HEADERS, timeoutMs: 45_000, maxAttempts: 1, hedgeMs: 45_000, priority: 'interactive', worker: route })
     const body = new Uint8Array(await res.arrayBuffer())
+    if (!res.ok && route === DIRECT) {
+      const waf = parseWafBlock(Buffer.from(body.subarray(0, 2000)).toString('utf8'))
+      if (waf) {
+        noteWafBlock(waf)
+        throw new Error(wafMessage(waf))
+      }
+    }
     if (!res.ok) console.error(`[orders-file] ${route === DIRECT ? 'direct' : 'worker'} HTTP ${res.status}: ${Buffer.from(body.subarray(0, 200)).toString('utf8').replace(/\s+/g, ' ')}`)
     return { status: res.status, body }
   },
@@ -66,12 +76,8 @@ export async function fetchOrderFile(pdfId: string): Promise<Uint8Array> {
 export async function searchCase(caseNumber: string, courtType: PublicCourtType, instance: string): Promise<RawPublication[]> {
   const qs = new URLSearchParams({ court_type: courtType, case_number: caseNumber, instance, size: '30', page: '0' })
   const res = await fetchUpstream(`/publications/list?${qs}`, { timeoutMs: 150_000, background: true })
-  if (!res.ok) {
-    // keep what the site said: a bare «HTTP 500» cannot be told apart from our own mistake (and is lost when the window closes)
-    const said = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240)
-    console.error(`[orders-search] ${caseNumber} ${courtType}/${instance}: HTTP ${res.status} ${said}`)
-    throw new Error(`public.sud.uz search (${instance}): HTTP ${res.status}${said ? ` — ${said.slice(0, 100)}` : ''}`)
-  }
+  // a failure keeps what the site said (and the firewall's block page is told apart from a real error): lib/public-orders/waf
+  if (!res.ok) await throwUpstreamFailure(res, `public.sud.uz search (${instance})`, `${caseNumber} ${courtType}/${instance}`, DIRECT_LIST)
   const json = (await res.json()) as { content?: RawPublication[] }
   if (!json || !Array.isArray(json.content)) throw new Error('public.sud.uz search: unexpected response shape')
   return json.content
@@ -83,11 +89,7 @@ export async function searchCase(caseNumber: string, courtType: PublicCourtType,
  */
 export async function searchLegacyCase(caseNumber: string, courtType: PublicCourtType): Promise<StoredOrder[]> {
   const res = await fetchUpstream(legacySearchPath(courtType, caseNumber), { timeoutMs: 60_000, background: true })
-  if (!res.ok) {
-    const said = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240)
-    console.error(`[orders-search] ${caseNumber} ${courtType}/2024 gacha: HTTP ${res.status} ${said}`)
-    throw new Error(`public.sud.uz (2024 gacha) search: HTTP ${res.status}${said ? ` — ${said.slice(0, 100)}` : ''}`)
-  }
+  if (!res.ok) await throwUpstreamFailure(res, 'public.sud.uz (2024 gacha) search', `${caseNumber} ${courtType}/2024 gacha`, DIRECT_LIST)
   const json = await res.json().catch(() => null)
   if (!json || typeof json !== 'object') throw new Error('public.sud.uz (2024 gacha) search: unexpected response shape')
   return legacyRows(json).map((r) => compactLegacy(r, courtType)).filter((o): o is StoredOrder => !!o)
