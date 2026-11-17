@@ -8,7 +8,7 @@ Since it can now work in the background (queued scraping, `git pull` + restart, 
 | Threat | Defence | Where |
 |---|---|---|
 | **Another machine on the LAN** reaches the app | Listens on `127.0.0.1` only (`dev`, `dev:once`, `start`, `start:once`, supervisor). `SUD_HOST=0.0.0.0` is refused unless `APP_API_TOKEN` is set | `scripts/supervisor.mjs`, `package.json` |
-| **DNS rebinding** (hostile domain resolving to 127.0.0.1) | `Host` header must be `localhost` / `127.0.0.1` / `[::1]` (+ `APP_ALLOWED_HOSTS`) on **every** API request → 403 `bad_host` | `server/security.ts` `hostAllowed`, `guard` |
+| **DNS rebinding** (hostile domain resolving to 127.0.0.1) | `Host` header must be `localhost` / `127.0.0.1` / `[::1]` (+ `APP_ALLOWED_HOSTS`) on **every** request: `src/proxy.ts` for pages, `_next/*` and files, `guard()` for `/api` (→ 403 `bad_host`) | `server/security.ts` `hostAllowed`, `guard` |
 | **CSRF**: a web page open in the browser fires requests at `http://localhost:3000` (start/cancel scraping, update, change workers) | **Every** request, GET included (a stats or bills GET starts a real scrape and a captcha, so an `<img src=…/api/bills?…>` on a hostile page would burn worker quota even though it can never read the answer): `Sec-Fetch-Site` ∈ {same-origin, none} and, when `Origin` is sent, `Origin` = `Host` → 403 `cross_site`. `same-site` (another port on localhost) is refused too | `crossSiteReason`, `guard` |
 | Forged request to a **dangerous door** even so | `privileged` routes also need the header `x-sud-action: 1` (a custom header cannot cross sites without a preflight the app never grants) and a 10-calls/min budget: `settings/update` (git pull + restart), `settings/workers` POST/DELETE, `settings/workers/test`, `settings/vlm` POST/DELETE and `settings/vlm/test` (they hold or spend the operator's VLM key), `documents/custom` POST/DELETE (they write the operator's own templates to disk), `tor-status` POST | `guard(…, {privileged:true})`, `api-client.privilegedHeaders()` |
 | **SSRF** through «add worker» / «test worker» | Worker URLs must be `https://` public DNS names: no IPs, `localhost`, single-label/internal names, credentials, query; **and the name must RESOLVE to public addresses only** (a name can point at `127.0.0.1`, `10.x`, `169.254.169.254`: `127.0.0.1.nip.io`); the test fetch does not follow redirects | `workers-config.ts` `isPublicDnsName` / `normalizeWorkerUrl`, `net/public-host.ts` `checkPublicHost` |
@@ -47,6 +47,39 @@ Since it can now work in the background (queued scraping, `git pull` + restart, 
 - `bun audit --prod` must say «No vulnerabilities found». `package.json` `overrides` pin `postcss`, `nanoid` and `baseline-browser-mapping` to patched versions (they came in through `next` / `@tailwindcss/postcss`). The rest of `bun audit` (eslint / babel build tooling: ReDoS in `minimatch`, `braces`…) never runs on request data and is left alone: forcing those majors apart breaks the toolchain. `bun.lock` uses `registry.npmjs.org` URLs.
 - Keep `next` on the latest patched 16.x (`bun update next eslint-config-next`); the audit of 2026-09 found critical Next.js advisories (RCE on Windows hosts, image-optimizer RCE) below 16.2.5. `next.config.ts` sets `agentRules: false` so `next dev` does not append its own block to AGENTS.md.
 - Removing a dependency: grep imports first (`from '<pkg>`), then `bun remove`.
+
+## Penetration test, Nov 2026 (what was attacked, found and fixed)
+
+Method: dependency audit; read of every process launcher, URL-taking route, upload and HTML builder; then live attacks on the running app
+(42 routes × methods × 6 forged-request variants, privileged routes without the header, path traversal / injection in every id, SSRF
+tables, hostile zips, XSS payloads in every field of the report). No backdoor was found: no hard-coded secret, no hidden route or
+bypass flag, no install scripts (`package.json` has none and no `trustedDependencies`, so Bun runs no dependency lifecycle script), no
+obfuscated code, no network call to an unknown host from the app's own code.
+
+| # | Severity | Finding | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | **Critical** | Next.js 16.3.8: unauthenticated RCE in the image optimizer (SVG) and in `use cache` typed arrays, DoS in server actions (GHSA-2464-fhr4-w9xw, -673q-mjm6-r5xr, -p3m5-59mp-jv5r, -mfr8-8qww-v76h) | `next` / `eslint-config-next` 16.4.6; image optimizer off (`images.unoptimized`, 404 in `proxy.ts`) | `server/__tests__/proxy.test.ts` |
+| 2 | High | 41 more advisories in transitive packages (minimatch, brace-expansion, js-yaml, picomatch, flatted, source-map-js, browserslist, …) and `zod` (memory DoS) | `bun audit fix`, `zod` 4.6.7: `bun run audit` reports none | `bun run audit` in the checklist |
+| 3 | Medium | The Host check (DNS rebinding) covered only `/api`: pages, `_next/*` and `public/` could be read by a rebinding page | `src/proxy.ts`: the check runs on EVERY request | `server/__tests__/proxy.test.ts` |
+| 4 | Medium | A `.docx` upload was a **decompression bomb**: sizes in a zip header are the uploader's word, so 612 KB inflated to 600 MB (RSS 33 → 875 MB; 5 MB would be ~5 GB) before JSZip noticed | `lib/zip-guard.ts` counts the bytes that really come out and stops at the limit (139 ms, 69 MB); used for uploads and the Excel reader | `lib/__tests__/zip-guard.test.ts` |
+| 5 | Medium | The Excel reader built a `RegExp` from the file's `r:id` (ReDoS / crash from a crafted spreadsheet) | the id is escaped: only ever a literal | same |
+| 6 | High (if run) | `mini-services/ihamkor-scraper` (unused by the app) listened on **all interfaces**, answered `Access-Control-Allow-Origin: *` and launched Chrome with `--no-sandbox` | loopback only, Host check, no CORS, sandbox on (`IHAMKOR_NO_SANDBOX=1` to opt out) | (service is not part of the test suite; checked by reading) |
+| 7 | Low | A worker URL could carry any port (`:6379`): the «test worker» fetch would probe any port of a public host | a worker is https on 443 only | `lib/__tests__/workers-url.test.ts` |
+| 8 | Low | Control characters in scraped text were forwarded upstream (`/api/company?q=%00`) or written into Word / Excel XML (XML 1.0 forbids them: the whole file is rejected) | cleaned before use | `zip-guard.test.ts` (XML), route cleans `q` |
+| 9 | Info | `X-Powered-By: Next.js` | `poweredByHeader: false` | – |
+
+Checked and found sound (do not «fix»): every API route refuses a forged Host / Origin / `Sec-Fetch-Site` (42 × 6 matrix); the privileged
+routes refuse a call without `x-sud-action` and are rate-limited (10/min); ids are validated before any path or URL is built (uuid,
+`old-<type>-<n>`, 9-digit STIR, generated template ids); every URL the server fetches for the operator is https + public name + resolved
+address checked + `redirect: 'manual'`; the report / print builders escape every field (every string of a full fixture was poisoned with
+five XSS payloads: `report/__tests__/xss.test.ts`); Excel cells are shared strings, never formulas; the supervisor and `git` are called
+without a shell and with fixed arguments.
+
+Residual risks the design accepts (owner decisions): the Content-Security-Policy needs `script-src 'unsafe-inline'` (Next's inline
+bootstrap), so the defence against script injection is escaping, not CSP; any LOCAL process can call a privileged route by adding the
+`x-sud-action` header (a browser cannot; a program on the same machine could already do anything as the same user); the in-app update
+trusts `origin/main` of the repository; a VLM / worker host is checked when it is saved, not pinned at connection time (DNS TOCTOU);
+the scraping workers see every request in plaintext, so only workers the operator controls belong in the pool.
 
 ## Checklist before merging
 

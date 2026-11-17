@@ -80,7 +80,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +4 |  |
 | `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, +11 |  |
 | `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/custom/route, +27 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
-| `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
+| `security.ts` | proxy.ts, server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
 
@@ -112,7 +112,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `documents/derive.ts` | components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, lib/documents/script.ts, lib/documents/validate.ts | lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/script.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
 | `documents/drafts.ts` | components/views/doc-editor.tsx, components/views/documents-view.tsx, lib/documents/profiles.ts | lib/documents/__tests__/drafts.test.ts, lib/documents/__tests__/profiles.test.ts |
 | `documents/fill.server.ts` | api/documents/generate/route, api/documents/template/route, lib/documents/bulk.server.ts | lib/documents/__tests__/banner.test.ts, lib/documents/__tests__/custom-server.test.ts, lib/documents/__tests__/script.test.ts, lib/documents/__tests__/secret.test.ts, lib/documents/__tests__/templates.test.ts |
-| `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts, lib/documents/print-render.ts | lib/documents/__tests__/custom.test.ts, lib/documents/__tests__/secret.test.ts |
+| `documents/fill.shared.ts` | components/proto/doc-preview.tsx, lib/documents/banner.ts, lib/documents/fill.server.ts, lib/documents/print-render.ts | lib/__tests__/zip-guard.test.ts, lib/documents/__tests__/custom.test.ts, lib/documents/__tests__/secret.test.ts |
 | `documents/from-case.ts` | components/sections/cases.tsx, lib/documents/bulk.ts | lib/documents/__tests__/from-case.test.ts |
 | `documents/print-render.ts` | components/views/doc-editor.tsx | lib/documents/__tests__/print-render.test.ts |
 | `documents/profiles.ts` | components/views/doc-profiles.tsx | lib/documents/__tests__/profiles.test.ts |
@@ -137,7 +137,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
-| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
+| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/xss.test.ts |
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
@@ -154,8 +154,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/fonts.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/generate.ts` | components/company/context-bar.tsx |  |
-| `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts |
-| `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts |
+| `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
+| `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
 | `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
@@ -177,9 +177,10 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `vlm-test-image.ts` | lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
 | `vlm-test.ts` | api/settings/vlm/test/route, lib/billing.ts | lib/__tests__/vlm.test.ts |
 | `worker-defaults.ts` | lib/cf-worker-pool.ts, lib/workers-config.ts |  |
-| `workers-config.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/cf-worker-pool.ts | server/__tests__/security.test.ts |
-| `xlsx-grid.ts` | components/views/doc-bulk.tsx, lib/documents/bulk.ts, lib/pretenzia/parse.ts |  |
+| `workers-config.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/cf-worker-pool.ts | lib/__tests__/workers-url.test.ts, server/__tests__/security.test.ts |
+| `xlsx-grid.ts` | components/views/doc-bulk.tsx, lib/documents/bulk.ts, lib/pretenzia/parse.ts | lib/__tests__/zip-guard.test.ts |
 | `xlsx.ts` | api/bills/export/route, api/court-cases/export/route, api/stats/export/route, api/upcoming-hearings/export/route | server/__tests__/security.test.ts |
+| `zip-guard.ts` | lib/documents/custom.server.ts, lib/xlsx-grid.ts | lib/__tests__/zip-guard.test.ts |
 
 ### Hooks
 
@@ -267,7 +268,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | Variable | Read in |
 |---|---|
 | `ALERT_WINDOW_DAYS` | server/config.ts |
-| `APP_ALLOWED_HOSTS` | server/config.ts |
+| `APP_ALLOWED_HOSTS` | proxy.ts, server/config.ts |
 | `APP_API_TOKEN` | server/config.ts |
 | `APP_GIT_SHA` | lib/version-server.ts, server/config.ts |
 | `APP_TRUST_PROXY` | server/config.ts |

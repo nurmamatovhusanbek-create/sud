@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import JSZip from 'jszip'
+import { assertZipBounded, ZipTooLargeError } from '@/lib/zip-guard'
 import { MAX_CUSTOM_FIELDS, isCustomId, metaFor, registerCustomDocs, scanTemplate, slugify, type CustomMeta } from './custom'
 
 /**
@@ -48,6 +49,13 @@ export async function saveCustom(buffer: Buffer, title: string): Promise<SavedTe
   const names = Object.keys(zip.files)
   if (names.length > MAX_ENTRIES) throw new TemplateError('Faylda juda koʻp boʻlak bor')
   if (names.reduce((n, k) => n + unpacked(zip, k), 0) > MAX_UNPACKED) throw new TemplateError('Fayl ochilganda juda katta')
+  // the header sizes are the uploader's word: count what really comes out, stopping at the limit (a zip bomb lies about them)
+  try {
+    await assertZipBounded(zip, { maxEntries: MAX_ENTRIES, maxTotal: MAX_UNPACKED })
+  } catch (e) {
+    if (e instanceof ZipTooLargeError) throw new TemplateError(e.message)
+    throw new TemplateError('Bu .docx fayl emas (yoki buzilgan)')
+  }
   if (!zip.file('word/document.xml') || !zip.file('[Content_Types].xml')) throw new TemplateError('Bu Word (.docx) hujjati emas')
   const types = await zip.file('[Content_Types].xml')!.async('string')
   if (names.some((n) => /vbaProject\.bin$/i.test(n)) || /macroEnabled/i.test(types)) throw new TemplateError('Makroli fayl qabul qilinmaydi: «Word hujjati (.docx)» sifatida saqlang')

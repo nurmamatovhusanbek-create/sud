@@ -5,6 +5,7 @@
  */
 
 import JSZip from 'jszip'
+import { assertZipBounded } from '@/lib/zip-guard'
 
 function textOfTags(xml: string, tag: string): string {
   // concatenate all <t>…</t> inside a fragment (handles rich-text runs)
@@ -90,6 +91,8 @@ export const cellText = (v: string | number | undefined): string => (typeof v ==
 /** The first worksheet (workbook order, falling back to sheet1.xml) as a grid keyed by 1-based row / column. */
 export async function readFirstSheet(data: ArrayBuffer | Uint8Array): Promise<Grid> {
   const zip = await JSZip.loadAsync(data)
+  // a spreadsheet may come from anyone: count what really inflates, never trust the sizes in its headers
+  await assertZipBounded(zip, { maxEntries: 2000, maxTotal: 150 * 1024 * 1024 })
 
   const ssFile = zip.file('xl/sharedStrings.xml')
   const shared = ssFile ? parseSharedStrings(await ssFile.async('string')) : []
@@ -102,7 +105,10 @@ export async function readFirstSheet(data: ArrayBuffer | Uint8Array): Promise<Gr
     const relsXml = await wbRels.async('string')
     const firstSheet = /<sheet[^>]*r:id="([^"]+)"/.exec(wbXml)
     if (firstSheet) {
-      const relRe = new RegExp(`Id="${firstSheet[1]}"[^>]*Target="([^"]+)"`)
+      // the id comes from the file: it is only ever a literal to look for, never a pattern (regex characters in it would
+      // hang the page or throw)
+      const idLit = firstSheet[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const relRe = new RegExp(`Id="${idLit}"[^>]*Target="([^"]+)"`)
       const tM = relRe.exec(relsXml)
       if (tM) sheetPath = tM[1].startsWith('/') ? tM[1].slice(1) : `xl/${tM[1].replace(/^\.\//, '')}`
     }

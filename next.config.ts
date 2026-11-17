@@ -44,6 +44,9 @@ const securityHeaders = [
 // This repo maintains AGENTS.md itself; the option is typed only in the newer Next, hence the widening.
 const nextConfig: NextConfig & { agentRules?: boolean } = {
   output: "standalone",
+  // the app uses no next/image: nothing to optimise, nothing to expose (src/proxy.ts also answers 404 for /_next/image)
+  images: { unoptimized: true },
+  poweredByHeader: false,
   agentRules: false,
   // Security headers on all routes; API responses additionally never cache
   // (they carry sensitive scraped data that must not sit in a shared cache).

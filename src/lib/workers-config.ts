@@ -63,7 +63,9 @@ export function normalizeWorkerUrl(url: string): string | null {
   try {
     const parsed = new URL(u)
     if (parsed.pathname !== '/' && parsed.pathname !== '') return null
-    if (parsed.username || parsed.password || parsed.search) return null
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) return null
+    // a Cloudflare worker is always on 443: a custom port would let a worker URL probe any port of a public host
+    if (parsed.port && parsed.port !== '443') return null
     if (!isPublicDnsName(parsed.hostname)) return null
     // Ensure trailing slash
     u = parsed.origin + '/'

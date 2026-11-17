@@ -53,8 +53,9 @@ async function getBrowser(): Promise<any> {
     browser = await puppeteer.default.launch({
       headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
+        // Chrome's sandbox is what stands between a hostile page and this machine: it stays ON. Only a container that cannot
+        // run it (root, no user namespaces) may switch it off, explicitly: IHAMKOR_NO_SANDBOX=1
+        ...(process.env.IHAMKOR_NO_SANDBOX === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--window-size=1920,1080',
@@ -285,14 +286,17 @@ async function scrapeIhamkor(tin: string): Promise<IhamkorCompany | null> {
 // ---- HTTP server ----
 
 const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', '*')
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200)
-    res.end()
+  // Only the app on THIS machine calls this service (server to server), so: no CORS grant at all (a web page must never be
+  // able to drive a headless browser from here) and the Host header must name this machine (DNS rebinding).
+  const host = (req.headers.host ?? '').toLowerCase().split(':')[0]
+  if (host !== '127.0.0.1' && host !== 'localhost' && host !== '[::1]') {
+    res.writeHead(403, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: false, error: 'forbidden' }))
+    return
+  }
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'GET' })
+    res.end(JSON.stringify({ ok: false, error: 'method not allowed' }))
     return
   }
 
@@ -354,8 +358,10 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   res.end(JSON.stringify({ ok: false, error: 'Not found. Use /api/scrape?tin=XXXXXXXXX' }))
 })
 
-server.listen(PORT, () => {
-  console.log(`[ihamkor] scraper service running on port ${PORT}`)
+// loopback ONLY: without a host Node listens on every network interface, which would offer an unauthenticated headless
+// browser to the whole LAN
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`[ihamkor] scraper service running on 127.0.0.1:${PORT}`)
   console.log(`[ihamkor] API: GET /api/scrape?tin=302678824`)
   console.log(`[ihamkor] Health: GET /health`)
 })

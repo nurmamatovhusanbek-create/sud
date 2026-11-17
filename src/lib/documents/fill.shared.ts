@@ -12,8 +12,12 @@
 export const BLANK_PNG_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
+/** Characters XML 1.0 forbids (most control codes, U+FFFE / U+FFFF): one of them inside a value makes Word reject the whole document. */
+const XML_FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g
+
 export function escapeXml(s: string): string {
   return s
+    .replace(XML_FORBIDDEN, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

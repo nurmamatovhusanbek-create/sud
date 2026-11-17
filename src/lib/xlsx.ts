@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 /** XML-escape a cell value. */
 function esc(s: string): string {
   return String(s ?? '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '') // forbidden in XML 1.0: would corrupt the workbook
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

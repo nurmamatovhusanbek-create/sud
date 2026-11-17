@@ -25,7 +25,8 @@ async function GET_impl(req: NextRequest) {
   const name = searchParams.get('name')?.trim()
   // `q` is the param the client (searchCompanies in api-client.ts) actually
   // sends; `search` is kept as an alias for the documented contract above.
-  const search = (searchParams.get('search') || searchParams.get('q'))?.trim()
+  // text that goes to another site: no control characters (NUL, CR/LF …), bounded length
+  const search = (searchParams.get('search') || searchParams.get('q'))?.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 200)
   const tinOnly = searchParams.get('tinOnly') === 'true'
 
   // Search mode — return list of results
