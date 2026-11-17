@@ -1,9 +1,12 @@
 @echo off
-rem Sud tizimi - stops the server that Sud.bat started (and anything still holding port 3000).
+rem Sud tizimi - stops the server that Sud.bat started, with everything it started.
 setlocal
 title Sud tizimi - to'xtatish
 
-rem the supervisor window first (otherwise it would restart the server), with everything it started
+rem the supervisor first (otherwise it would start the server again), found by its command line, with its whole tree
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*supervisor.mjs*' -and $_.ProcessId -ne $PID } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }" >nul 2>nul
+
+rem the server window, if it is still there
 taskkill /FI "WINDOWTITLE eq Sud tizimi server*" /T /F >nul 2>nul
 
 rem then whatever still listens on port 3000 (an old run left behind)
