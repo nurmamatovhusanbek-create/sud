@@ -162,7 +162,9 @@ async function cycle(doInstall = true) {
 
   // Compile the first page now, so the browser does not wait on it (the first request used to take 30+ s on Windows).
   void warmUp({ port: PORT, alive: () => current === child }).then((secs) => {
-    if (secs !== null) console.log(`[supervisor] tayyor: http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT} (birinchi sahifa ${secs} s da tayyorlandi)`)
+    if (secs !== null) // say «localhost»: that is the address to open (the browser keeps the watchlist per address). The server itself stays bound
+    // to 127.0.0.1 — the name «localhost» can resolve to IPv6 only on Windows, and then 127.0.0.1 would not answer.
+    console.log(`[supervisor] tayyor: http://${LOOPBACK.includes(HOST) ? 'localhost' : HOST}:${PORT} (birinchi sahifa ${secs} s da tayyorlandi)`)
   })
 
   child.on('exit', (code, signal) => {
