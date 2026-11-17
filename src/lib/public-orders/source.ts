@@ -66,7 +66,12 @@ export async function fetchOrderFile(pdfId: string): Promise<Uint8Array> {
 export async function searchCase(caseNumber: string, courtType: PublicCourtType, instance: string): Promise<RawPublication[]> {
   const qs = new URLSearchParams({ court_type: courtType, case_number: caseNumber, instance, size: '30', page: '0' })
   const res = await fetchUpstream(`/publications/list?${qs}`, { timeoutMs: 150_000, background: true })
-  if (!res.ok) throw new Error(`public.sud.uz search: HTTP ${res.status}`)
+  if (!res.ok) {
+    // keep what the site said: a bare «HTTP 500» cannot be told apart from our own mistake (and is lost when the window closes)
+    const said = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240)
+    console.error(`[orders-search] ${caseNumber} ${courtType}/${instance}: HTTP ${res.status} ${said}`)
+    throw new Error(`public.sud.uz search (${instance}): HTTP ${res.status}${said ? ` — ${said.slice(0, 100)}` : ''}`)
+  }
   const json = (await res.json()) as { content?: RawPublication[] }
   if (!json || !Array.isArray(json.content)) throw new Error('public.sud.uz search: unexpected response shape')
   return json.content
@@ -78,7 +83,11 @@ export async function searchCase(caseNumber: string, courtType: PublicCourtType,
  */
 export async function searchLegacyCase(caseNumber: string, courtType: PublicCourtType): Promise<StoredOrder[]> {
   const res = await fetchUpstream(legacySearchPath(courtType, caseNumber), { timeoutMs: 60_000, background: true })
-  if (!res.ok) throw new Error(`public.sud.uz (2024 gacha) search: HTTP ${res.status}`)
+  if (!res.ok) {
+    const said = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240)
+    console.error(`[orders-search] ${caseNumber} ${courtType}/2024 gacha: HTTP ${res.status} ${said}`)
+    throw new Error(`public.sud.uz (2024 gacha) search: HTTP ${res.status}${said ? ` — ${said.slice(0, 100)}` : ''}`)
+  }
   const json = await res.json().catch(() => null)
   if (!json || typeof json !== 'object') throw new Error('public.sud.uz (2024 gacha) search: unexpected response shape')
   return legacyRows(json).map((r) => compactLegacy(r, courtType)).filter((o): o is StoredOrder => !!o)
