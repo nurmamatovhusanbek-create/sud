@@ -32,10 +32,10 @@ Maps 1:1 onto `core/classify.ts` (granted / rad etilgan / qaytarilgan / ko'rmasd
 
 ## What we built on it
 Only the orders of the cases the owner cares about are fetched (no library copy: the full day-by-day crawl was measured at ~40–90 MB
-per court type and was dropped). `lib/public-orders/engine.ts` (`lookupCase`) asks `case_number` + `instance` (~10 s) for FIRST, APPEAL
-and CASSATION in parallel, in the background, and keeps only rows whose case number equals the case's (the search is a «contains»).
+per court type and was dropped). `lib/public-orders/engine.ts` (`lookupCase`) asks `case_number` + `instance` (~10 s) for FIRST, APPEAL,
+CASSATION and INSPECTION (the site's «Taftish», added Nov 2026: a supervisory order was never found before) in parallel, in the background, and keeps only rows whose case number equals the case's (the search is a «contains»).
 The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
-- **A published order is permanent.** Once an instance has one it is never asked about again; when all three are stored the case is done for good.
+- **A published order is permanent.** Once an instance has one it is never asked about again; when all four are stored the case is done for good.
 - A case is re-checked only when its **signature** (status + result + hearing date) changes, e.g. it was appealed, or by a
   publication-lag back-off (3 d, 14 d, 45 d after the last fruitless check, then it waits for a change).
 - A failed search is an error retried after 10 minutes, never a false «no orders».
@@ -46,3 +46,18 @@ The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
 - Order PDFs: `files/<pdf id>.pdf` next to the shards, written after the first download (only a real `%PDF-`, temp file + rename, 0600), never deleted. A published order never changes, so each file costs ONE captcha, ever; `GET /api/public-orders/file` serves it from disk. Fresh downloads go through one queue (one captcha session at a time, 2 s gap) and a second request for the same order joins the running one (`lib/public-orders/order-pdf.ts`, `pdf-store.ts`). The Settings › Qarorlar numbers count the shards only, not these files.
 - The API is called directly from the machine (`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
 - The date filter's meaning (publication vs decision date) is **unverified**; nothing depends on it now.
+
+## Two systems: «2024 dan keyingi» (what we use) and «2024 dan avval» (legacy, not supported yet)
+public.sud.uz serves cases decided before 2024 and after it from DIFFERENT back ends (seen in browser captures, Nov 2026; response bodies were not
+in the captures, so row shapes are still to be probed with `probe-legacy`):
+
+| | after 2024 («new») | before 2024 («old») |
+|---|---|---|
+| list | `GET /publications/list?court_type=ECONOMIC|CIVIL|ADMINISTRATIVE` (`case_number`, `instance`) | civil: `GET /publication-proxy/api/civil/publication/page?size&page&court_type=CIVIL` · administrative: `GET /publication-proxy/unauthorized/administrative/conflict?type=17&size&page&court_type=ADMINISTRATIVE` · economic: (capture pending) · criminal: `GET /publication-proxy/criminal/findAll?size&page&court_type=CRIMINAL` (the `data` field is a JSON string) |
+| file | `GET /public/onStream/<uuid>?recaptcha_token=` (octet-stream, multipart-wrapped PDF) | `GET /publication-proxy/api/file/civil/<claimId>/?recaptcha_token=` · `…/api/file/administrative/<claimId>/<type>?…` · `…/api/file/criminal/<claimId>/?…` (plain `application/pdf`) |
+| ids | uuid | numeric `claimId` (NOT `id`/`alteredId`) |
+| captcha | pow → analyze (action `download`) → solve → token | the same recaptcha.sud.uz service |
+
+The page route `/report/ECONOMIC_NEW` is only the page's address: `court_type=ECONOMIC_NEW` is HTTP 500 on `/publications/list`, and `SUPERVISION` is HTTP 400 as an
+`instance`; valid `instance` filters are FIRST, APPEAL, CASSATION, CASSATION_REPEATED, INSPECTION (the site's «Taftish»). A 2025 case
+(`4-1102-2502/3291`, a supervisory order) is in the NEW system and is found through `instance=INSPECTION`, which our lookup did not ask for before.

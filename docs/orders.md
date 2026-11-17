@@ -27,7 +27,7 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 ## Rules (each one was a bug or an owner decision)
 
 1. **Only cases the owner cares about** (Kuzatuv companies, a Sud ishlari list, one drawer). No full-library crawl (laptop/disk).
-2. **A published order is permanent.** An instance with a stored order is never asked again; all three stored = done for good.
+2. **A published order is permanent.** An instance with a stored order is never asked again; all four (first, appeal, cassation, taftish) stored = done for good.
 3. **Re-check only when it can matter:** the case signature changed (status/result — e.g. appealed), or a publication-lag back-off elapsed (3 d, 14 d, 45 d, then wait). A failed search is retried after 10 min and is **never** recorded as «none».
 4. **Still heard in the first instance (no result, «ish yurituvda» / «koʻrib chiqilmoqda») ⇒ no decision ⇒ not queued.** Appeal / cassation / supervision ⇒ checked (its first-instance order exists). Unrecognised wording ⇒ checked. A hand «Tekshirish» overrides.
 5. **Nothing starts by itself and nothing nags.** Opening/refreshing/switching pages or tabs never queues or scrapes. DETECT (`plan`) is free and only shows a count («Qarorlar · N», «N ta ish tekshirilishi kerak»). SCRAPE runs from a click or the opt-in idle check.

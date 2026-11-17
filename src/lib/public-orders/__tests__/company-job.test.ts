@@ -91,7 +91,7 @@ describe('company job queue', () => {
     expect(caseJobStatus().state).toBe('running')
     await finishCurrentCase()
     await finishCurrentCase()
-    expect(searched.filter((c) => c.endsWith('/21')).length).toBe(3) // 3 instance searches, once
+    expect(searched.filter((c) => c.endsWith('/21')).length).toBe(4) // 4 instance searches (first, appeal, cassation, taftish), once
     expect(caseJobStatus().done).toBe(2)
   })
 
@@ -129,7 +129,7 @@ describe('company job queue', () => {
     const { markChecked } = await import('../store')
     await tick(50)
     await markChecked({ caseNumber: '4-1001-2601/51', at: new Date().toISOString(), sig: 's', seen: [], misses: 0 }) // checked just now, unchanged
-    await markChecked({ caseNumber: '4-1001-2601/52', at: new Date().toISOString(), sig: 's', seen: ['FIRST', 'APPEAL', 'CASSATION'], misses: 0 })
+    await markChecked({ caseNumber: '4-1001-2601/52', at: new Date().toISOString(), sig: 's', seen: ['FIRST', 'APPEAL', 'CASSATION', 'INSPECTION'], misses: 0 })
     const cases = [job(51), job(52), job(53)]
     const p = await planCases(cases)
     expect(p.need).toHaveLength(1)

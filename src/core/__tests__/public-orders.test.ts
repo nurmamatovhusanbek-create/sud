@@ -150,15 +150,15 @@ describe('planCheck — published orders are permanent; only a changed case or a
   const prev = (over: Partial<CaseCheck> = {}): CaseCheck => ({ caseNumber: 'x', at: new Date(T0).toISOString(), sig: 'a|b|c', seen: [], misses: 0, ...over })
 
   test('never checked → check all three instances', () => {
-    expect(planCheck(null, 's', T0)).toEqual({ run: true, instances: ['FIRST', 'APPEAL', 'CASSATION'], reason: 'new' })
+    expect(planCheck(null, 's', T0)).toEqual({ run: true, instances: ['FIRST', 'APPEAL', 'CASSATION', 'INSPECTION'], reason: 'new' })
   })
   test('instances that already have an order are never asked again', () => {
     const p = planCheck(prev({ seen: ['FIRST'], sig: 'old' }), 'new', T0 + 1)
     expect(p).toMatchObject({ run: true, reason: 'sig-changed' })
-    expect(p.instances).toEqual(['APPEAL', 'CASSATION'])
+    expect(p.instances).toEqual(['APPEAL', 'CASSATION', 'INSPECTION'])
   })
   test('all instances published → done for good, even if the case changes', () => {
-    expect(planCheck(prev({ seen: ['FIRST', 'APPEAL', 'CASSATION'] }), 'changed', T0 + 99 * D)).toMatchObject({ run: false, reason: 'done' })
+    expect(planCheck(prev({ seen: ['FIRST', 'APPEAL', 'CASSATION', 'INSPECTION'] }), 'changed', T0 + 99 * D)).toMatchObject({ run: false, reason: 'done' })
   })
   test('unchanged case, nothing found: wait out the publication lag (3 d, then 14 d, then 45 d, then stop)', () => {
     const at = (misses: number, age: number) => planCheck(prev({ misses }), 'a|b|c', T0 + age)

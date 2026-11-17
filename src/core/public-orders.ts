@@ -93,7 +93,7 @@ export const PUBLIC_INSTANCE_LABEL: Record<string, string> = {
   APPEAL: 'Apellyatsiya',
   CASSATION: 'Kassatsiya',
   CASSATION_REPEATED: 'Takroriy kassatsiya',
-  INSPECTION: 'Nazorat tartibida',
+  INSPECTION: 'Taftish',
 }
 
 /** Oldest instance first, the way a case proceeds. */
@@ -216,7 +216,7 @@ export function splitDecisions(known: KnownDecision[], published: StoredOrder[])
 // (the publication lag: 3 days, then 14, then 45; after that it waits for the case to change).
 
 /** The instances a case can have orders in; searched separately because the filtered search is far faster. */
-export const LOOKUP_INSTANCES = ['FIRST', 'APPEAL', 'CASSATION'] as const
+export const LOOKUP_INSTANCES = ['FIRST', 'APPEAL', 'CASSATION', 'INSPECTION'] as const
 
 export const CHECK_BACKOFF_MS = [3, 14, 45].map((d) => d * 86_400_000)
 export const RETRY_ERROR_AFTER_MS = 10 * 60_000

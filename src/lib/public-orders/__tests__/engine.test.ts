@@ -39,7 +39,7 @@ describe('lookupCase', () => {
     const out = await lookupCase(r.deps, job)
     expect(out.skipped).toBe(false)
     expect(out.found).toBe(1)
-    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION', 'FIRST'])
+    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION', 'FIRST', 'INSPECTION'])
     expect(r.stored.map((o) => o.id)).toEqual(['o1'])
     expect(r.checks.get(CN)?.seen).toEqual(['FIRST'])
   })
@@ -50,7 +50,7 @@ describe('lookupCase', () => {
     r.calls.length = 0
     r.advance(4 * DAY)
     await lookupCase(r.deps, { ...job, sig: 'b' })
-    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION'])
+    expect(r.calls.sort()).toEqual(['APPEAL', 'CASSATION', 'INSPECTION'])
   })
 
   test('all instances published: permanently done, no request even when forced', async () => {
@@ -127,6 +127,6 @@ describe('lookupCase', () => {
     r.calls.length = 0
     const out = await lookupCase(r.deps, job, { force: true })
     expect(out.reason).toBe('forced')
-    expect(r.calls).toHaveLength(3)
+    expect(r.calls).toHaveLength(4)
   })
 })
