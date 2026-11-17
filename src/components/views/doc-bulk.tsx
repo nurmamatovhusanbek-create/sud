@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { FIELDS, type DocDef } from '@/lib/documents/registry'
 import { MAX_BULK_ROWS, gridToRows, matchColumns, parseCsv, rowsToValues, templateCsv } from '@/lib/documents/bulk'
 import { withDerived } from '@/lib/documents/derive'
+import type { LatinScript } from '@/core/uz-alphabet'
 import { checkDoc } from '@/lib/documents/validate'
 import { generateDocumentsBulk } from '@/lib/api-client'
 import { readFirstSheet } from '@/lib/xlsx-grid'
@@ -22,7 +23,8 @@ export function BulkPanel({ doc, base, defaults, letterhead }: {
   /** the form's current values: the same for every row */
   base: Record<string, string>
   defaults: Record<string, string>
-  letterhead?: { letterhead?: string; blank?: boolean }
+  /** the letterhead choice and the alphabet, passed straight to the generator */
+  letterhead?: { letterhead?: string; blank?: boolean; script?: LatinScript }
 }) {
   const [name, setName] = useState('')
   const [grid, setGrid] = useState<string[][] | null>(null)

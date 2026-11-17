@@ -8,6 +8,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
 import { applyLetterhead } from '@/lib/documents/banner'
+import { applyScriptToZip, convertValues } from '@/lib/documents/script'
+import type { LatinScript } from '@/core/uz-alphabet'
 import { renderClaimValues, type ClaimConstants, type ClaimContractInput } from './render'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
@@ -19,6 +21,8 @@ export interface LetterheadOpts {
   letterhead?: string
   /** When no letterhead is given, blank the embedded banner (keep the space). */
   blankIfNone?: boolean
+  /** The Uzbek Latin alphabet to write in; only the Uzbek talabnoma uses it (the Russian one is never converted). */
+  script?: LatinScript
 }
 
 function escapeXml(s: string): string {
@@ -67,8 +71,15 @@ async function fillOne(
   prefix: string,
   opts: LetterheadOpts,
 ): Promise<{ buffer: Buffer; name: string }> {
-  const values = renderClaimValues(c, k)
-  base.file('word/document.xml', fillXml(templateXml, values))
+  const rendered = renderClaimValues(c, k)
+  // the Uzbek talabnoma can be written in the new alphabet: the template's own words, then the values (core/uz-alphabet)
+  const script = (k.lang ?? 'ru') === 'uz' ? opts.script : undefined
+  let xml = templateXml
+  if (script) {
+    await applyScriptToZip(base, script)
+    xml = await base.file('word/document.xml')!.async('string')
+  }
+  base.file('word/document.xml', fillXml(xml, script ? convertValues(rendered, script) : rendered))
   // Swap the embedded letterhead banner (the template ships with the real one), fitted to the page width.
   await applyLetterhead(base, opts.letterhead, !!opts.blankIfNone)
   const buffer = await base.generateAsync({

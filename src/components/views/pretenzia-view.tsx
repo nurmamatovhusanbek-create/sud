@@ -16,6 +16,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { FileUp, FileDown, Loader2, X, AlertTriangle, ArrowLeft, ShieldCheck, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
+import { useLatinScript } from '@/lib/documents/script-pref'
+import { LATIN_SCRIPTS, SCRIPT_LABEL } from '@/core/uz-alphabet'
 import { parseSverka, type SverkaParseResult } from '@/lib/pretenzia/parse'
 import { computeClaim, addBankingDays, formatSum, formatDate } from '@/core/pretenzia'
 import { generatePretenzia } from '@/lib/api-client'
@@ -83,6 +85,8 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
   const [claimDate, setClaimDate] = useState(toInput(new Date()))
   const [consts, setConsts] = useState<Record<string, string>>({})
   const [lang, setLang] = useState<Lang>('ru')
+  // the Uzbek talabnoma can be written in either Latin alphabet (the Russian one is never converted)
+  const [script, setScript] = useLatinScript()
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -164,6 +168,7 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
       await generatePretenzia({
         claimDate: claim.toISOString(),
         lang,
+        script: lang === 'uz' ? script : undefined,
         letterhead: letterhead || undefined,
         blankLetterhead: !letterhead,
         constants: resolvedConstants(),
@@ -320,6 +325,13 @@ export function PretenziyaFlow({ onBack, letterhead, onLetterhead }: {
               <span className="faint">Til:</span>
               <button className={`pz-lang-btn${lang === 'ru' ? ' on' : ''}`} onClick={() => setLang('ru')}>Ruscha</button>
               <button className={`pz-lang-btn${lang === 'uz' ? ' on' : ''}`} onClick={() => setLang('uz')}>Oʻzbekcha</button>
+              {lang === 'uz' && (
+                <span className="seg dedit-script" role="group" aria-label="Yozuv (alifbo)" title="Gʻ Oʻ Sh Ch → Ğ Ö Ş Ç (yangi alifbo); boshqa harflar oʻzgarmaydi">
+                  {LATIN_SCRIPTS.map((k) => (
+                    <button key={k} type="button" className={script === k ? 'on' : ''} aria-pressed={script === k} onClick={() => setScript(k)}>{SCRIPT_LABEL[k]}</button>
+                  ))}
+                </span>
+              )}
             </div>
             <button className="btn btn-primary" onClick={() => void generate()} disabled={busy || selectedCount === 0}>
               {busy ? <Loader2 className="spin" /> : <FileDown />}

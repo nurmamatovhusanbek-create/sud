@@ -36,6 +36,8 @@ import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 import { SectionProfiles } from '@/components/views/doc-profiles'
 import { BulkPanel } from '@/components/views/doc-bulk'
+import { useLatinScript } from '@/lib/documents/script-pref'
+import { SCRIPT_LABEL, LATIN_SCRIPTS, parseLatinScript } from '@/core/uz-alphabet'
 import { clearDraft, draftKeyFor, loadDraft, saveDraft } from '@/lib/documents/drafts'
 import { checkDoc, validateField, type DocCheck, type Issue } from '@/lib/documents/validate'
 
@@ -126,6 +128,8 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   // the check shown before a download, with what to do when it is confirmed
   // «Jadvaldan»: one document for many spreadsheet rows (replaces the preview while open)
   const [bulk, setBulk] = useState(false)
+  // which Uzbek Latin alphabet the document is written in (an English document ignores it)
+  const [script, setScript] = useLatinScript()
   const [review, setReview] = useState<{ report: DocCheck; go: () => void } | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -177,8 +181,11 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     el.focus({ preventScroll: true })
   }
 
+  // what every generation path (Word, ZIP, PDF, spreadsheet) is asked for: the letterhead choice and the alphabet
+  const genOpts = { ...(tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}), script }
+
   const download = async (d: DocDef) => {
-    await generateDocument(d.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
+    await generateDocument(d.id, values, genOpts)
   }
 
   // What the download would contain, checked: filled values that look wrong, and fields left empty.
@@ -226,7 +233,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   const doAll = async () => {
     setBusy('all')
     try {
-      await generateDocumentsZip(docs.map((d) => d.id), values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}, tab.id === 'visa' ? 'viza-hujjatlari' : tab.id === 'iio' ? 'ichki-ishlar-hujjatlari' : `${tab.id}-hujjatlari`)
+      await generateDocumentsZip(docs.map((d) => d.id), values, genOpts, tab.id === 'visa' ? 'viza-hujjatlari' : tab.id === 'iio' ? 'ichki-ishlar-hujjatlari' : `${tab.id}-hujjatlari`)
       toast.success(`${docs.length} ta hujjat bitta ZIP faylda yuklab olindi`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Hujjatlarni yaratib boʻlmadi')
@@ -252,7 +259,7 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     w.document.body.textContent = 'Hujjat tayyorlanmoqda…'
     setBusy(`pdf:${cur.id}`)
     try {
-      const pages = await renderPrintHtml(cur.id, values, tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {})
+      const pages = await renderPrintHtml(cur.id, values, genOpts)
       printIntoWindow(w, printSheet(cur.title, pages))
     } catch (e) {
       try { w.close() } catch { /* already closed */ }
@@ -326,6 +333,17 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
               <div className="dedit-bar-title"><b>{cur.title}</b><span>{cur.subtitle}</span></div>
             )}
             <div className="sp" />
+            {cur.lang === 'en' ? (
+              <span className="faint" style={{ fontSize: 12 }} title="Ingliz tilidagi hujjatda lotin alifbosi almashtirilmaydi">Ingliz tili</span>
+            ) : (
+              <div className="seg dedit-script" role="group" aria-label="Yozuv (alifbo)" title="Oʻzbekcha matn qaysi lotin alifbosida yoziladi. Yangi alifboda Gʻ Oʻ Sh Ch → Ğ Ö Ş Ç; boshqa harflar va tutuq belgisi (ʼ) oʻzgarmaydi.">
+                {LATIN_SCRIPTS.map((k) => (
+                  <button key={k} type="button" className={script === k ? 'on' : ''} aria-pressed={script === k} onClick={() => setScript(parseLatinScript(k))}>
+                    {SCRIPT_LABEL[k]}
+                  </button>
+                ))}
+              </div>
+            )}
             <span className="badge b-neu" style={{ textTransform: 'uppercase' }}>{cur.lang}</span>
             {docs.length > 1 && (
               <button className="btn btn-outline btn-sm" onClick={runAll} disabled={busy !== null || !!blockedAll} title={blockedAll ? hintFor(blockedAll) : `${docs.length} ta hujjatni bitta ZIP faylda yuklab olish`}>
@@ -367,13 +385,14 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             </div>
           )}
           {bulk ? (
-            <BulkPanel doc={cur} base={values} defaults={defaults} letterhead={tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}} />
+            <BulkPanel doc={cur} base={values} defaults={defaults} letterhead={genOpts} />
           ) : (
           <DocPreview
             docId={cur.id}
             values={values}
             letterhead={tab.letterhead ? letterhead : ''}
             blank={!!tab.letterhead && !letterhead}
+            script={script}
             activeKey={activeKey}
             onPick={pick}
           />

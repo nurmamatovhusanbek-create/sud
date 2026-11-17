@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
+import { parseLatinScript } from '@/core/uz-alphabet'
 import { generateDocx } from '@/lib/documents/fill.server'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,7 @@ export const maxDuration = 30
  * See src/lib/documents/registry.ts for the doc/field definitions.
  */
 async function POST_impl(req: NextRequest) {
-  let body: { docId?: string; values?: Record<string, unknown>; letterhead?: unknown; blankLetterhead?: unknown }
+  let body: { docId?: string; values?: Record<string, unknown>; letterhead?: unknown; blankLetterhead?: unknown; script?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -38,7 +39,7 @@ async function POST_impl(req: NextRequest) {
 
   let out
   try {
-    out = await generateDocx(docId, values, { letterhead, blankIfNone })
+    out = await generateDocx(docId, values, { letterhead, blankIfNone, script: parseLatinScript(body.script) })
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi' },

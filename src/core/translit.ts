@@ -10,6 +10,8 @@ const MAP: Record<string, string> = {
   ў: 'oʻ', қ: 'q', ғ: 'gʻ', ҳ: 'h', ё: 'yo', ю: 'yu', я: 'ya', ц: 'ts', ъ: 'ʼ', ь: '',
 }
 
+import { toOldLatin } from './uz-alphabet'
+
 const CYR = /[Ѐ-ӿ]/
 
 export function uzCyrToLat(text: string): string {
@@ -31,7 +33,12 @@ function transliterate(text: string): string {
     if (low === 'е') {
       const prev = text[i - 1]?.toLowerCase() ?? ''
       lat = !prev || !/[Ѐ-ӿa-z]/i.test(prev) || /[аеёиоуэюяъь]/.test(prev) ? 'ye' : 'e'
-    } else lat = MAP[low]
+    } else {
+      lat = MAP[low]
+      // «с»+«ҳ» are two letters (Исҳоқ → Isʼhoq): without the tutuq belgisi «sh» would read as the digraph «ш», and the
+      // new alphabet («ş») would turn it into the wrong letter
+      if (low === 'с' && text[i + 1]?.toLowerCase() === 'ҳ') lat += 'ʼ'
+    }
     // keep capitalisation: «Ш» → «Sh», a fully upper-case word → «SH»
     if (ch !== low) {
       const next = text[i + 1]
@@ -57,7 +64,8 @@ const LAT_SINGLE: Record<string, string> = {
 const TUTUQ = /[ʻʼ‘’'`´]/
 
 export function uzLatToRu(text: string): string {
-  const src = text
+  // a name typed in the new alphabet (Ş Ç Ö Ğ) is read as the old one: this converter only knows sh / ch / oʻ / gʻ
+  const src = toOldLatin(text)
   const lower = src.toLowerCase()
   let out = ''
   let i = 0

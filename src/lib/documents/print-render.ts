@@ -2,7 +2,9 @@ import JSZip from 'jszip'
 import { fetchDocTemplate } from '@/lib/api-client'
 import { fillXml } from './fill.shared'
 import { applyLetterhead } from './banner'
-import { withDerived } from './derive'
+import { applyScriptToZip, resolveScript, valuesFor } from './script'
+import { docById } from './registry'
+import type { LatinScript } from '@/core/uz-alphabet'
 
 /**
  * A finished document as printable HTML (for «PDF»: the browser's own print → «Save as PDF»).
@@ -25,12 +27,15 @@ html, body { margin: 0; padding: 0; background: #fff; }
 </style></head><body>${pagesHtml}</body></html>`
 }
 
-export async function renderPrintHtml(docId: string, values: Record<string, string>, opts: { letterhead?: string; blank?: boolean } = {}): Promise<string> {
+export async function renderPrintHtml(docId: string, values: Record<string, string>, opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {}): Promise<string> {
   const buf = await fetchDocTemplate(docId)
   const zip = await JSZip.loadAsync(buf)
   const f = zip.file('word/document.xml')
   if (!f) throw new Error('Shablon buzilgan')
-  zip.file('word/document.xml', fillXml(await f.async('string'), withDerived(values)))
+  // the same alphabet step as the download (documents/fill.server), so the PDF reads like the Word file
+  const script = resolveScript(await f.async('string'), docById(docId)?.lang, opts.script ?? 'old')
+  if (script) await applyScriptToZip(zip, script)
+  zip.file('word/document.xml', fillXml(await zip.file('word/document.xml')!.async('string'), valuesFor(values, script)))
   if (zip.file('word/media/image1.png')) await applyLetterhead(zip, opts.letterhead, !!opts.blank)
   const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'STORE' })
 

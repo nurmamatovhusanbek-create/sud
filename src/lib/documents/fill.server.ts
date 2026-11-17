@@ -14,7 +14,8 @@ import JSZip from 'jszip'
 import { docById } from './registry'
 import { fillXml } from './fill.shared'
 import { applyLetterhead } from './banner'
-import { withDerived } from './derive'
+import { applyScriptToZip, resolveScript, valuesFor } from './script'
+import type { LatinScript } from '@/core/uz-alphabet'
 import { isCustomId } from './custom'
 import { ensureCustomRegistered, readCustomTemplate } from './custom.server'
 
@@ -32,6 +33,8 @@ export interface GenerateOpts {
    *  used by categories that offer the uploader (visa/iio). Categories with no
    *  uploader (court petitions) omit it so an embedded letterhead is kept. */
   blankIfNone?: boolean
+  /** Which Uzbek Latin alphabet to write in (default: the old one, the templates' own). English documents ignore it. */
+  script?: LatinScript
 }
 
 /** Raw bytes of a document's .docx template (also served to the live preview). */
@@ -64,8 +67,11 @@ export async function generateDocx(
   const docXmlFile = zip.file('word/document.xml')
   if (!docXmlFile) throw new Error('Shablon buzilgan')
 
-  const xml = await docXmlFile.async('string')
-  zip.file('word/document.xml', fillXml(xml, withDerived(values)))
+  // the alphabet: the template's own words first (every text part, {{placeholders}} skipped), then the values
+  const script = resolveScript(await docXmlFile.async('string'), def.lang, opts.script ?? 'old')
+  if (script) await applyScriptToZip(zip, script)
+  const xml = await zip.file('word/document.xml')!.async('string')
+  zip.file('word/document.xml', fillXml(xml, valuesFor(values, script)))
 
   // uploaded PNG → used, fitted to the page width; none + blank → transparent; none → the embedded banner stays
   await applyLetterhead(zip, opts.letterhead, !!opts.blankIfNone)

@@ -19,7 +19,10 @@ import { Loader2, TriangleAlert } from 'lucide-react'
 import { fetchDocTemplate } from '@/lib/api-client'
 import { MARK_OPEN, MARK_RE, markXml } from '@/lib/documents/fill.shared'
 import { applyLetterhead } from '@/lib/documents/banner'
-import { sourceKey, withDerived } from '@/lib/documents/derive'
+import { sourceKey } from '@/lib/documents/derive'
+import { applyScriptToZip, resolveScript, valuesFor } from '@/lib/documents/script'
+import { docById } from '@/lib/documents/registry'
+import { toLatinScript, type LatinScript } from '@/core/uz-alphabet'
 import { FIELDS } from '@/lib/documents/registry'
 
 interface Tpl {
@@ -77,7 +80,7 @@ function decorate(root: HTMLElement, activeKey: string | null): void {
 }
 
 export function DocPreview({
-  docId, values, letterhead, blank, activeKey, onPick,
+  docId, values, letterhead, blank, script = 'old', activeKey, onPick,
 }: {
   docId: string
   values: Record<string, string>
@@ -85,6 +88,8 @@ export function DocPreview({
   letterhead: string
   /** when no banner is uploaded, blank the template's embedded one (as the download does) */
   blank: boolean
+  /** the Uzbek Latin alphabet; an English document ignores it (documents/script › resolveScript) */
+  script?: LatinScript
   activeKey: string | null
   onPick: (key: string) => void
 }) {
@@ -135,7 +140,13 @@ export function DocPreview({
     const t = setTimeout(async () => {
       try {
         const z = await JSZip.loadAsync(tpl.buf)
-        z.file('word/document.xml', markXml(tpl.xml, withDerived(values), hintOf, sourceKey))
+        // the same alphabet step as the download: the template's own words first, then the values (markers go in last)
+        const eff = resolveScript(tpl.xml, docById(tpl.docId)?.lang, script)
+        if (eff) await applyScriptToZip(z, eff)
+        const xml = eff ? await z.file('word/document.xml')!.async('string') : tpl.xml
+        // the hint shown in an empty spot is a label from the form (old spelling): written in the same alphabet as the page
+        const hint = eff ? (k: string) => toLatinScript(hintOf(k), eff) : hintOf
+        z.file('word/document.xml', markXml(xml, valuesFor(values, eff), hint, sourceKey))
         if (tpl.hasBanner) await applyLetterhead(z, letterhead, blank)
         const bytes = await z.generateAsync({ type: 'uint8array', compression: 'STORE' })
         if (id !== seq.current) return
@@ -169,7 +180,7 @@ export function DocPreview({
       }
     }, ready ? 110 : 0)
     return () => clearTimeout(t)
-  }, [tpl, values, letterhead, blank])
+  }, [tpl, values, letterhead, blank, script])
 
   // ---- highlight + reveal the focused field's spots
   useEffect(() => {

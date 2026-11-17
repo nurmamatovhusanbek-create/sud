@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
+import { parseLatinScript } from '@/core/uz-alphabet'
 import { generateBulkZip } from '@/lib/documents/bulk.server'
 import { MAX_BULK_ROWS } from '@/lib/documents/bulk'
 
@@ -8,12 +9,12 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /**
- * POST /api/documents/generate-bulk   body: { docId, rows: Record<string,string>[], letterhead?, blankLetterhead? }
+ * POST /api/documents/generate-bulk   body: { docId, rows: Record<string,string>[], letterhead?, blankLetterhead?, script?: "old" | "new" }
  * One .docx per row (each row = the form's values with that row's cells over them), returned as one .zip.
  * The rows are read from the spreadsheet in the browser; the server only fills the template, as for one document.
  */
 async function POST_impl(req: NextRequest) {
-  let body: { docId?: unknown; rows?: unknown; letterhead?: unknown; blankLetterhead?: unknown }
+  let body: { docId?: unknown; rows?: unknown; letterhead?: unknown; blankLetterhead?: unknown; script?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -39,6 +40,7 @@ async function POST_impl(req: NextRequest) {
     const out = await generateBulkZip(docId, rows, {
       letterhead: typeof body.letterhead === 'string' ? body.letterhead : undefined,
       blankIfNone: body.blankLetterhead === true,
+      script: parseLatinScript(body.script),
     })
     return new NextResponse(new Uint8Array(out.buffer), {
       status: 200,

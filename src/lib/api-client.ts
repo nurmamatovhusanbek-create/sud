@@ -7,6 +7,7 @@
 
 import type { StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
+import type { LatinScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
@@ -216,14 +217,14 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
 async function fetchDocumentBlob(
   docId: string,
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean },
+  opts: { letterhead?: string; blank?: boolean; script?: LatinScript },
 ): Promise<{ blob: Blob; filename: string }> {
   let res: Response
   try {
     res = await fetch('/api/documents/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ docId, values, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank }),
+      body: JSON.stringify({ docId, values, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank, script: opts.script }),
     })
   } catch {
     throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
@@ -253,7 +254,7 @@ function saveFile(blob: Blob, filename: string): void {
 export async function generateDocument(
   docId: string,
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
 ): Promise<void> {
   const { blob, filename } = await fetchDocumentBlob(docId, values, opts)
   saveFile(blob, filename)
@@ -263,14 +264,14 @@ export async function generateDocument(
 export async function generateDocumentsBulk(
   docId: string,
   rows: Record<string, string>[],
-  opts: { letterhead?: string; blank?: boolean } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
 ): Promise<void> {
   let res: Response
   try {
     res = await fetch('/api/documents/generate-bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ docId, rows, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank }),
+      body: JSON.stringify({ docId, rows, letterhead: opts.letterhead || undefined, blankLetterhead: !!opts.blank, script: opts.script }),
     })
   } catch {
     throw new Error('Tarmoq xatosi — serverga ulanib boʻlmadi')
@@ -291,7 +292,7 @@ export async function generateDocumentsBulk(
 export async function generateDocumentsZip(
   docIds: string[],
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
   zipName = 'hujjatlar',
 ): Promise<void> {
   const { default: JSZip } = await import('jszip')
@@ -351,6 +352,8 @@ export async function generatePretenzia(payload: {
   lang: 'ru' | 'uz'
   letterhead?: string
   blankLetterhead?: boolean
+  /** the Uzbek Latin alphabet (Uzbek talabnoma only) */
+  script?: LatinScript
   constants: Record<string, string>
   contracts: { no: string; date: string; mainDebtTiyin: number; paymentTiyin: number; delayStart: string }[]
   terms?: { ratePerDay: number; capFraction: number }
