@@ -37,7 +37,8 @@ export interface WaitOptions {
 }
 
 export async function waitForUpdate(deps: WaitDeps, before: VersionSnap | null, opts: WaitOptions = {}): Promise<WaitOutcome> {
-  const { budgetMs = 180_000, intervalMs = 1500, stableAnswers = 4, unchangedAfterMs = 9_000 } = opts
+  // 10 minutes: `bun install` alone took 2 min on Windows once Next itself was upgraded (antivirus scans every file), then the server boots and compiles
+  const { budgetMs = 600_000, intervalMs = 1500, stableAnswers = 4, unchangedAfterMs = 9_000 } = opts
   const start = deps.now()
   let streak = 0
   let lastBoot: number | null = null

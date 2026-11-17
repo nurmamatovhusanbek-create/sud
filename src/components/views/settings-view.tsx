@@ -344,7 +344,7 @@ function UpdatesTab() {
             <p style={{ margin: 0 }}>
               {updateState === 'pulling'
                 ? 'git pull ishlamoqda.'
-                : `Bu bir necha soniyadan bir necha daqiqagacha davom etishi mumkin (production rejimida qayta build qilinadi). ${Math.round(elapsed / 1000)}s`}
+                : `Paketlar oʻrnatiladi (Windowsʼda, ayniqsa yirik yangilanishda, 2–5 daqiqagacha), keyin server qayta ishga tushadi va sahifa birinchi marta kompilyatsiya qilinadi. Oyna oʻzi yangilanadi. ${Math.round(elapsed / 1000)}s`}
             </p>
           </div>
         ) : updateState === 'timeout' ? (
@@ -352,7 +352,7 @@ function UpdatesTab() {
             <AlertTriangle />
             <div className="at">
               <b>Server hali javob bermayapti</b>
-              <p>Qayta ishga tushirish odatdagidan uzoqroq davom etmoqda. Terminaldagi loglarni tekshiring yoki sahifani qoʻlda yangilang.</p>
+              <p>Qayta ishga tushirish 10 daqiqadan uzoqroq davom etmoqda. Terminalda «Ready» yozuvi chiqqan boʻlsa, sahifani qoʻlda yangilang; chiqmagan boʻlsa, loglarni tekshiring.</p>
             </div>
             <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={() => window.location.reload()}>
               Sahifani yangilash
