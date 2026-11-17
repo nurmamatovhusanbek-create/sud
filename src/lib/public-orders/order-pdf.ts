@@ -31,7 +31,7 @@ export class ManualDownloadRequired extends Error {
 
 export interface OrderPdfDeps {
   read: (id: string) => Promise<Uint8Array | null>
-  write: (id: string, bytes: Uint8Array) => Promise<void>
+  write: (id: string, bytes: Uint8Array, meta?: { name?: string | null; via?: 'download' | 'import' }) => Promise<void>
   /** the raw (multipart-wrapped) file from public.sud.uz, captcha included */
   fetch: (id: string) => Promise<Uint8Array>
   sleep: (ms: number) => Promise<void>
@@ -84,7 +84,7 @@ export function createOrderPdfLoader(deps: OrderPdfDeps, gapMs = 2000, autoPause
       throw e
     }
     const { bytes, filename } = pdfFromUpload(raw) // some files may already be plain
-    await deps.write(id, bytes).catch(() => {}) // a full disk must not lose the file the user just waited for
+    await deps.write(id, bytes, { name: filename, via: 'download' }).catch(() => {}) // a full disk must not lose the file the user just waited for
     return { bytes, filename, cached: false }
   }
 

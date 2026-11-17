@@ -24,13 +24,80 @@ export async function readPdf(id: string): Promise<Uint8Array | null> {
   }
 }
 
-export async function writePdf(id: string, bytes: Uint8Array): Promise<void> {
+export async function writePdf(id: string, bytes: Uint8Array, meta: { name?: string | null; via?: 'download' | 'import' } = {}): Promise<void> {
   const f = fileOf(id)
   if (!f) throw new Error('bad id')
   await fs.mkdir(dir(), { recursive: true, mode: 0o700 })
   const tmp = `${f}.${process.pid}.${Date.now()}.tmp`
   await fs.writeFile(tmp, bytes, { mode: 0o600 })
   await fs.rename(tmp, f)
+  // remember that it was saved: if the file is deleted later, the Qarorlar page still knows it was here (and when, how big)
+  await appendDownload({ pdfId: id.toLowerCase(), size: bytes.length, savedAt: Date.now(), name: meta.name ?? '', via: meta.via ?? 'download' }).catch(() => {})
+}
+
+// ---- the download log ---------------------------------------------------------------------------------------------
+// `<data dir>/downloads.jsonl`: one line each time a PDF is stored (append-only, newest line per pdf id wins, never deleted by
+// the app, like the rest of the orders cache). It is what tells «yuklangan» (file there) from «mavjud emas» (was saved, file
+// gone): the file's presence alone cannot say whether it ever existed. A re-download appends a fresh line.
+
+export interface DownloadRecord {
+  pdfId: string
+  size: number
+  savedAt: number
+  /** the court's own file name, when known */
+  name: string
+  /** `seen`: the file was already on disk when the log started (or was added by hand); the time is its modification time */
+  via: 'download' | 'import' | 'seen'
+}
+
+const logFile = () => path.join(dataDir(), 'downloads.jsonl')
+let chain: Promise<unknown> = Promise.resolve()
+const serial = <T,>(job: () => Promise<T>): Promise<T> => {
+  const run = chain.then(job, job)
+  chain = run.catch(() => undefined)
+  return run
+}
+
+function appendDownload(r: DownloadRecord): Promise<void> {
+  return serial(async () => {
+    await fs.mkdir(dir(), { recursive: true, mode: 0o700 })
+    await fs.appendFile(logFile(), JSON.stringify(r) + '\n', { encoding: 'utf8', mode: 0o600 })
+  })
+}
+
+export async function readDownloads(): Promise<Map<string, DownloadRecord>> {
+  const m = new Map<string, DownloadRecord>()
+  let text = ''
+  try {
+    text = await fs.readFile(logFile(), 'utf8')
+  } catch {
+    return m // nothing downloaded yet
+  }
+  for (const line of text.split('\n')) {
+    if (!line) continue
+    try {
+      const r = JSON.parse(line) as Partial<DownloadRecord>
+      if (r && typeof r.pdfId === 'string' && isOrderFileId(r.pdfId) && typeof r.size === 'number' && typeof r.savedAt === 'number') {
+        m.set(r.pdfId.toLowerCase(), { pdfId: r.pdfId.toLowerCase(), size: r.size, savedAt: r.savedAt, name: typeof r.name === 'string' ? r.name : '', via: r.via === 'import' || r.via === 'seen' ? r.via : 'download' })
+      }
+    } catch { /* a torn last line */ }
+  }
+  return m
+}
+
+/**
+ * The history for the page: the log, plus a `seen` line for every PDF on disk the log does not know yet (files saved before
+ * the log existed, or dropped into the folder by hand), so deleting THOSE later is recognised too.
+ */
+export async function syncDownloads(onDisk: Map<string, { size: number; savedAt: number }>): Promise<Map<string, DownloadRecord>> {
+  const history = await readDownloads()
+  for (const [id, f] of onDisk) {
+    if (history.has(id)) continue
+    const rec: DownloadRecord = { pdfId: id, size: f.size, savedAt: f.savedAt, name: '', via: 'seen' }
+    history.set(id, rec)
+    await appendDownload(rec).catch(() => {})
+  }
+  return history
 }
 
 /** Every PDF on disk: order id → size and when it was saved (the Qarorlar search shows «Yuklangan» from this). */

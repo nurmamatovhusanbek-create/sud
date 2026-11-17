@@ -314,15 +314,20 @@ export function planCheck(prev: CaseCheck | null, sig: string, now: number, forc
 
 // ---- searching the stored orders (the Qarorlar page) --------------------------------------------
 
+/** `saved`: the PDF is on this computer · `gone`: it was saved once and the file is no longer there («Mavjud emas») · `never`: never downloaded. */
+export type LibraryState = 'saved' | 'gone' | 'never'
+
 export interface LibraryItem extends StoredOrder {
-  /** the PDF is on this computer (opens at once, no captcha) */
+  state: LibraryState
+  /** the PDF is on this computer now (opens at once, no captcha) — `state === 'saved'` */
   downloaded: boolean
+  /** the file's size: now for `saved`, when it was last saved for `gone`, 0 for `never` */
   size: number
-  /** when the PDF was saved (ms), 0 when not downloaded */
+  /** when the PDF was (last) saved (ms), 0 for `never` */
   savedAt: number
 }
 
-export type LibraryStatus = 'all' | 'saved' | 'missing'
+export type LibraryStatus = 'all' | LibraryState
 
 export interface LibraryQuery {
   /** a case number or a part of it («2615»), or words from the court / judge / category (Latin or Cyrillic) */
@@ -344,16 +349,18 @@ const haystack = (o: StoredOrder): string => {
 }
 
 /**
- * Orders matching the page's filters. A query that looks like a case number («4-1001-2615/40333», «2615», «40333», «4-1001»)
+ * Orders matching the page's filters (`history` = what the download log remembers, for telling «gone» from «never»). A query that looks like a case number («4-1001-2615/40333», «2615», «40333», «4-1001»)
  * matches any case number containing it; words match the court, judge, category or file name. Downloaded orders come first,
  * newest first, then by case number. `total` counts the matches, `items` is the requested window, `counts` how the
- * matches split by download state (so the switch can show them) before the status filter is applied.
+ * matches split by download state (so the switch can show them) before the status filter is applied. Downloaded first (newest
+ * first), then the ones whose file is gone, then the never-downloaded, by case number.
  */
 export function searchLibrary(
   orders: StoredOrder[],
   saved: Map<string, { size: number; savedAt: number }>,
+  history: Map<string, { size: number; savedAt: number }>,
   opts: LibraryQuery,
-): { total: number; items: LibraryItem[]; counts: { all: number; saved: number; missing: number } } {
+): { total: number; items: LibraryItem[]; counts: { all: number; saved: number; gone: number; never: number } } {
   const qn = normalizeCaseNumber(opts.q)
   const ql = fold(opts.q)
   const matched: LibraryItem[] = []
@@ -361,13 +368,17 @@ export function searchLibrary(
     if (opts.courtType && o.courtType !== opts.courtType) continue
     if (opts.instance && o.instance !== opts.instance) continue
     if (qn && !o.caseNumber.includes(qn) && !(ql && haystack(o).includes(ql))) continue
-    const f = o.pdfId ? saved.get(o.pdfId.toLowerCase()) : undefined
-    matched.push({ ...o, downloaded: !!f, size: f?.size ?? 0, savedAt: f?.savedAt ?? 0 })
+    const key = o.pdfId.toLowerCase()
+    const f = o.pdfId ? saved.get(key) : undefined
+    const h = o.pdfId && !f ? history.get(key) : undefined
+    const state: LibraryState = f ? 'saved' : h ? 'gone' : 'never'
+    matched.push({ ...o, state, downloaded: !!f, size: (f ?? h)?.size ?? 0, savedAt: (f ?? h)?.savedAt ?? 0 })
   }
-  const nSaved = matched.filter((o) => o.downloaded).length
-  const counts = { all: matched.length, saved: nSaved, missing: matched.length - nSaved }
-  const out = opts.status === 'all' ? matched : matched.filter((o) => o.downloaded === (opts.status === 'saved'))
-  out.sort((a, b) => Number(b.downloaded) - Number(a.downloaded) || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
+  const n = (st: LibraryState) => matched.filter((o) => o.state === st).length
+  const counts = { all: matched.length, saved: n('saved'), gone: n('gone'), never: n('never') }
+  const out = opts.status === 'all' ? matched : matched.filter((o) => o.state === opts.status)
+  const rank: Record<LibraryState, number> = { saved: 0, gone: 1, never: 2 }
+  out.sort((a, b) => rank[a.state] - rank[b.state] || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
   const start = Math.max(0, opts.offset)
   return { total: out.length, items: out.slice(start, start + Math.max(1, opts.limit)), counts }
 }

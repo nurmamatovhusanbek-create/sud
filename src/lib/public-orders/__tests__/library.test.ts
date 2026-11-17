@@ -19,55 +19,62 @@ const orders = [ord('1', '4-1001-2615/40333', A), ord('2', '4-1001-2529/43957', 
 
 describe('searchLibrary', () => {
   const saved = new Map([[A, { size: 115_409, savedAt: 200 }], [B, { size: 5_000, savedAt: 300 }]])
+  const none = new Map<string, { size: number; savedAt: number }>()
   const q = (o: Partial<LibraryQuery> = {}): LibraryQuery => ({ q: '', status: 'all', offset: 0, limit: 50, ...o })
+  const run = (o: Partial<LibraryQuery> = {}, orderList = orders, onDisk = saved, history = none) => searchLibrary(orderList, onDisk, history, q(o))
 
   test('a full number finds that case; a fragment finds every case containing it', () => {
-    expect(searchLibrary(orders, saved, q({ q: '4-1001-2615/40333' })).total).toBe(2)
-    expect(searchLibrary(orders, saved, q({ q: '2615' })).total).toBe(2)
-    expect(searchLibrary(orders, saved, q({ q: ' 4-1001 ' })).total).toBe(3)
-    expect(searchLibrary(orders, saved, q({ q: '999' })).total).toBe(0)
+    expect(run({ q: '4-1001-2615/40333' }).total).toBe(2)
+    expect(run({ q: '2615' }).total).toBe(2)
+    expect(run({ q: ' 4-1001 ' }).total).toBe(3)
+    expect(run({ q: '999' }).total).toBe(0)
   })
-  test('«downloaded» comes from the PDFs on disk; downloaded rows first, newest first', () => {
-    const r = searchLibrary(orders, saved, q())
-    expect(r.items.map((o) => [o.id, o.downloaded])).toEqual([['2', true], ['1', true], ['3', false], ['4', false]])
-    expect(r.items[1].size).toBe(115_409)
+  test('«saved» comes from the PDFs on disk; saved rows first, newest first', () => {
+    const r = run()
+    expect(r.items.map((o) => [o.id, o.state])).toEqual([['2', 'saved'], ['1', 'saved'], ['3', 'never'], ['4', 'never']])
+    expect(r.items[1]).toMatchObject({ size: 115_409, downloaded: true })
+  })
+  test('a file that was saved once and is gone is «gone», not «never»: it keeps its old size and date', () => {
+    const history = new Map([[C, { size: 77_000, savedAt: 150 }], [A, { size: 1, savedAt: 1 }]]) // A is also on disk: the disk wins
+    const r = run({}, orders, saved, history)
+    expect(r.items.map((o) => [o.id, o.state])).toEqual([['2', 'saved'], ['1', 'saved'], ['3', 'gone'], ['4', 'never']])
+    expect(r.items[2]).toMatchObject({ size: 77_000, savedAt: 150, downloaded: false })
+    expect(r.counts).toEqual({ all: 4, saved: 2, gone: 1, never: 1 })
+    expect(run({ status: 'gone' }, orders, saved, history).items.map((o) => o.id)).toEqual(['3'])
+    expect(r.items[1].size).toBe(115_409) // saved ones show the real file, not the log
   })
   test('status filter, and the counts show how the matches split BEFORE that filter', () => {
-    const r = searchLibrary(orders, saved, q({ status: 'saved' }))
-    expect(r.items.map((o) => o.id)).toEqual(['2', '1'])
-    expect(r.counts).toEqual({ all: 4, saved: 2, missing: 2 })
-    expect(searchLibrary(orders, saved, q({ status: 'missing' })).items.map((o) => o.id)).toEqual(['3', '4'])
-    expect(searchLibrary(orders, saved, q({ status: 'missing', q: '2605' })).counts).toEqual({ all: 1, saved: 0, missing: 1 })
+    expect(run({ status: 'saved' }).items.map((o) => o.id)).toEqual(['2', '1'])
+    expect(run({ status: 'saved' }).counts).toEqual({ all: 4, saved: 2, gone: 0, never: 2 })
+    expect(run({ status: 'never' }).items.map((o) => o.id)).toEqual(['3', '4'])
+    expect(run({ status: 'never', q: '2605' }).counts).toEqual({ all: 1, saved: 0, gone: 0, never: 1 })
   })
   test('court type and instance filters', () => {
     const mixed = [...orders, { ...ord('5', '3-2001-2102/901', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'), courtType: 'ADMINISTRATIVE' as const }]
-    expect(searchLibrary(mixed, saved, q({ courtType: 'ADMINISTRATIVE' })).items.map((o) => o.id)).toEqual(['5'])
-    expect(searchLibrary(mixed, saved, q({ courtType: 'ECONOMIC' })).total).toBe(4)
-    expect(searchLibrary(mixed, saved, q({ instance: '2' })).items.map((o) => o.id)).toEqual(['4'])
+    expect(run({ courtType: 'ADMINISTRATIVE' }, mixed).items.map((o) => o.id)).toEqual(['5'])
+    expect(run({ courtType: 'ECONOMIC' }, mixed).total).toBe(4)
+    expect(run({ instance: '2' }, mixed).items.map((o) => o.id)).toEqual(['4'])
   })
   test('pages: a window of the sorted list; total stays the whole match count', () => {
-    const p1 = searchLibrary(orders, saved, q({ offset: 0, limit: 3 }))
-    const p2 = searchLibrary(orders, saved, q({ offset: 3, limit: 3 }))
-    expect(p1.items.map((o) => o.id)).toEqual(['2', '1', '3'])
-    expect(p2.items.map((o) => o.id)).toEqual(['4'])
-    expect(p1.total).toBe(4)
-    expect(searchLibrary(orders, saved, q({ offset: 99, limit: 3 })).items).toEqual([])
+    expect(run({ offset: 0, limit: 3 }).items.map((o) => o.id)).toEqual(['2', '1', '3'])
+    expect(run({ offset: 3, limit: 3 }).items.map((o) => o.id)).toEqual(['4'])
+    expect(run({ offset: 0, limit: 3 }).total).toBe(4)
+    expect(run({ offset: 99, limit: 3 }).items).toEqual([])
   })
   test('words match the court / judge / category, Latin typed against Cyrillic stored; apostrophes are one kind', () => {
     const cy = [{ ...ord('7', '4-1-1/1', 'ffffffff-ffff-4fff-8fff-ffffffffffff'), court: 'Тошкент туманлараро иқтисодий суди', judge: 'Ғуломов Ҳ.', category: 'Қарз' }]
-    expect(searchLibrary(cy, saved, q({ q: 'toshkent' })).total).toBe(1)
-    expect(searchLibrary(cy, saved, q({ q: 'Тошкент' })).total).toBe(1)
-    expect(searchLibrary(cy, saved, q({ q: 'iqtisodiy suddi' })).total).toBe(0)
-    expect(searchLibrary(cy, saved, q({ q: "g'ulomov" })).total).toBe(1)
-    expect(searchLibrary(cy, saved, q({ q: 'gʻulomov' })).total).toBe(1)
+    expect(run({ q: 'toshkent' }, cy).total).toBe(1)
+    expect(run({ q: 'Тошкент' }, cy).total).toBe(1)
+    expect(run({ q: 'iqtisodiy suddi' }, cy).total).toBe(0)
+    expect(run({ q: "g'ulomov" }, cy).total).toBe(1)
+    expect(run({ q: 'gʻulomov' }, cy).total).toBe(1)
   })
   test('the pdf id is matched case-insensitively (files are stored lower-case)', () => {
-    const up = [ord('9', '1-1/1', A.toUpperCase())]
-    expect(searchLibrary(up, saved, q({ status: 'saved' })).total).toBe(1)
+    expect(run({ status: 'saved' }, [ord('9', '1-1/1', A.toUpperCase())]).total).toBe(1)
   })
 })
 
-describe('disk side: allOrders + listPdfs', () => {
+describe('disk side: order index, saved PDFs and the download log', () => {
   test('lists real PDFs only (not temp files or strangers) and the order index with the last copy of each id', async () => {
     const { appendOrders, allOrders } = await import('../store')
     const { writePdf, listPdfs } = await import('../pdf-store')
@@ -87,5 +94,51 @@ describe('disk side: allOrders + listPdfs', () => {
     // a shard that grew is noticed (the memo is keyed on name + size + mtime)
     await appendOrders([ord('3', '3-3-3/3', C)])
     expect((await allOrders()).length).toBe(3)
+  })
+
+  test('delete a saved PDF → the page says «gone» (not «never») with its old size; opening it again saves it and updates the state', async () => {
+    const { writePdf, listPdfs, syncDownloads, readDownloads } = await import('../pdf-store')
+    const { allOrders } = await import('../store')
+    const D = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const { appendOrders } = await import('../store')
+    await appendOrders([ord('d1', '4-1001-2700/7', D)])
+    const view = async () => {
+      const onDisk = await listPdfs()
+      return searchLibrary(await allOrders(), onDisk, await syncDownloads(onDisk), { q: '4-1001-2700/7', status: 'all', offset: 0, limit: 5 }).items[0]
+    }
+    expect((await view()).state).toBe('never')
+
+    await writePdf(D, new TextEncoder().encode('%PDF-1.4 first'), { name: 'qaror.pdf', via: 'download' })
+    expect(await view()).toMatchObject({ state: 'saved', downloaded: true, size: 14 })
+    const rec = (await readDownloads()).get(D)!
+    expect(rec).toMatchObject({ size: 14, name: 'qaror.pdf', via: 'download' })
+
+    fs.rmSync(path.join(dir, 'files', `${D}.pdf`)) // the person deletes the file
+    const gone = await view()
+    expect(gone).toMatchObject({ state: 'gone', downloaded: false, size: 14, pdfId: D }) // the stored order still has the id to download again
+    expect(gone.savedAt).toBe(rec.savedAt)
+
+    await writePdf(D, new TextEncoder().encode('%PDF-1.4 second copy'), { via: 'download' }) // the click re-downloads it
+    expect(await view()).toMatchObject({ state: 'saved', size: 20 })
+  })
+
+  test('a PDF that was on disk before the log existed is noticed (a «seen» line), so deleting it later is recognised', async () => {
+    const { listPdfs, syncDownloads, readDownloads } = await import('../pdf-store')
+    const E = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+    fs.writeFileSync(path.join(dir, 'files', `${E}.pdf`), '%PDF-1.4 old file')
+    const h1 = await syncDownloads(await listPdfs())
+    expect(h1.get(E)).toMatchObject({ via: 'seen', size: 17 })
+    fs.rmSync(path.join(dir, 'files', `${E}.pdf`))
+    expect((await readDownloads()).has(E)).toBe(true) // remembered after the delete
+    const lines = fs.readFileSync(path.join(dir, 'downloads.jsonl'), 'utf8').split('\n').filter((l) => l.includes(E))
+    expect(lines.length).toBe(1) // seen once, not on every page load
+  })
+
+  test('the log ignores garbage lines and ids that are not order ids', async () => {
+    const { readDownloads } = await import('../pdf-store')
+    fs.appendFileSync(path.join(dir, 'downloads.jsonl'), 'not json\n{"pdfId":"../x","size":1,"savedAt":1}\n{"pdfId":"old-civil-5","size":9,"savedAt":3}\n{"pdfI')
+    const m = await readDownloads()
+    expect(m.has('../x')).toBe(false)
+    expect(m.get('old-civil-5')).toMatchObject({ size: 9, savedAt: 3 })
   })
 })

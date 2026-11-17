@@ -24,7 +24,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/import` | POST | POST /api/public-orders/import?id=<pdf id> body: the PDF itself (application/pdf or application/octet-stream) | `public-orders/import/route.ts` |
-| `/api/public-orders/library` | GET | GET /api/public-orders/library?q=&status=saved/missing/all&court=ECONOMIC/CIVIL/ADMINISTRATIVE/CRIMINAL&instan | `public-orders/library/route.ts` |
+| `/api/public-orders/library` | GET | GET /api/public-orders/library?q=&status=saved/gone/never/all&court=ECONOMIC/CIVIL/ADMINISTRATIVE/CRIMINAL&ins | `public-orders/library/route.ts` |
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
 | `/api/rating` | GET | GET /api/rating?tin=XXXXXXXXX[&force=1] | `rating/route.ts` |

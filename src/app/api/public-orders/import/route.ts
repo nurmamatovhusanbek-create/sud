@@ -27,7 +27,7 @@ export const POST = guard(
     if (raw.length > MAX_ORDER_BYTES) return jsonFail('Fayl juda katta', 'too_large', 413)
     try {
       const { bytes, filename } = pdfFromUpload(raw)
-      await writePdf(id, bytes)
+      await writePdf(id, bytes, { name: filename, via: 'import' })
       return jsonOk({ id, size: bytes.length, filename })
     } catch (e) {
       if (e instanceof NotPdfError) return jsonFail('Bu PDF fayl emas — public.sud.uz dan saqlangan qaror faylini tanlang', 'not_pdf', 422)

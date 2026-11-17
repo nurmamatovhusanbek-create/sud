@@ -512,7 +512,7 @@ export interface LibraryPage {
   total: number
   items: LibraryItem[]
   /** how the matches split by download state, before the status filter */
-  counts: { all: number; saved: number; missing: number }
+  counts: { all: number; saved: number; gone: number; never: number }
   page: number
   size: number
   /** PDFs on this computer / orders in the local index */

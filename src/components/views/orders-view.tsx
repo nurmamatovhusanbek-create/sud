@@ -5,8 +5,9 @@
  * Sud ishlari window: a filter bar (search + court type + instance + download state), a dense list and the shared pager,
  * all filtered and paged on the SERVER (`GET /api/public-orders/library`), so a library of thousands of orders stays fast.
  *
- * Every row says whether its PDF is already on this computer («Yuklangan · size · date»); a click opens it. An order that
- * is not downloaded yet is fetched on click, with the same hand-over as the case drawer when public.sud.uz wants a person.
+ * Every row says whether its PDF is on this computer: «Yuklangan» (file there), «Mavjud emas» (saved once, the file has since been
+ * deleted: the download log remembers its size and date) or «Yuklanmagan» (never). A click opens it; a missing one is fetched again
+ * from the stored order data (same hand-over as the case drawer when public.sud.uz wants a person) and its state updates.
  * A typed full case number can also be looked up on public.sud.uz (both back ends, criminal included) and stored here.
  * Settings › Qarorlar keeps only the queue / cache control panel.
  */
@@ -126,6 +127,7 @@ export function OrdersView() {
     try {
       await openPublicOrderPdf(o.pdfId, o.pdfName, { retryAuto })
       setManual(null)
+      if (o.state === 'gone') toast.success('Qaror qayta yuklab olindi') // its file had been deleted: the stored order data fetched it again
       setTick((n) => n + 1) // it is on disk now: the badge changes
     } catch (e) {
       if (e instanceof ManualOrderError) setManual(o)
@@ -154,7 +156,9 @@ export function OrdersView() {
   const statusOptions = useMemo(
     () => [
       { key: 'saved', label: `Yuklangan${counts ? ` · ${counts.saved}` : ''}` },
-      { key: 'missing', label: `Yuklanmagan${counts ? ` · ${counts.missing}` : ''}` },
+      { key: 'never', label: `Yuklanmagan${counts ? ` · ${counts.never}` : ''}` },
+      // saved once, the file has been deleted since: shown only when there is such an order (it is the exception)
+      ...(counts && counts.gone > 0 ? [{ key: 'gone', label: `Mavjud emas · ${counts.gone}` }] : status === 'gone' ? [{ key: 'gone', label: 'Mavjud emas' }] : []),
       { key: 'all', label: `Hammasi${counts ? ` · ${counts.all}` : ''}` },
     ],
     [counts],
@@ -234,8 +238,8 @@ export function OrdersView() {
             title={filtered ? 'Filtr boʻyicha qaror topilmadi' : status === 'saved' ? 'Hali birorta qaror PDF si yuklanmagan' : 'Hali saqlangan qaror yoʻq'}
             hint={
               filtered
-                ? status === 'saved' && counts && counts.missing > 0
-                  ? `Yuklanmagan ${counts.missing} ta mos qaror bor — “Yuklanmagan” yoki “Hammasi” ni tanlang.`
+                ? status === 'saved' && counts && counts.never + counts.gone > 0
+                  ? `Yuklanmagan yoki fayli oʻchirilgan ${counts.never + counts.gone} ta mos qaror bor — “Hammasi” ni tanlang.`
                   : fullNumber
                     ? 'Bu raqamni “public.sud.uz dan qidirish” bilan qidirib koʻring.'
                     : 'Boshqa soʻz yoki filtr bilan urinib koʻring.'
@@ -256,17 +260,21 @@ export function OrdersView() {
                     </div>
                   </div>
                   {o.result ? <span className="badge b-neu">{PUBLIC_RESULT_LABEL[o.result] || o.result}</span> : null}
-                  {o.downloaded ? (
+                  {o.state === 'saved' ? (
                     <span className="badge b-pos">
                       <CheckCircle2 style={{ width: 12, height: 12, marginRight: 4, verticalAlign: '-2px' }} />
                       Yuklangan
+                    </span>
+                  ) : o.state === 'gone' ? (
+                    <span className="badge b-warn" title={`${dmy(o.savedAt)} da yuklangan, keyin fayl oʻchirilgan. PDF ni bossangiz qaytadan yuklab olinadi.`}>
+                      Mavjud emas
                     </span>
                   ) : (
                     <span className="badge b-neu">Yuklanmagan</span>
                   )}
                   <div className="amt">
-                    {o.downloaded ? size(o.size) : o.pdfSize ? size(o.pdfSize) : '-'}
-                    <small>{o.downloaded ? dmy(o.savedAt) : ''}</small>
+                    {o.state !== 'never' ? size(o.size) : o.pdfSize ? size(o.pdfSize) : '-'}
+                    <small>{o.state === 'saved' ? dmy(o.savedAt) : o.state === 'gone' ? `${dmy(o.savedAt)} · oʻchirilgan` : ''}</small>
                   </div>
                   <span className="chev">›</span>
                 </div>
