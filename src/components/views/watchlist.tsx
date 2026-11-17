@@ -87,9 +87,9 @@ export function WatchlistView() {
 
   const items = useMemo(() => (hydrated ? watched() : []), [hydrated, rv, tick])
 
-  // Staggered enrichment — mirrors the shipped watchlist optimization; results
+  // Enrichment (clicked, never automatic) — results
   // land in registry meta so every surface (home, bell) benefits. Each company
-  // is enriched once per mount (no fetch loop from registry-change bumps).
+  // is enriched when asked (no fetch loop from registry-change bumps).
   // v204 (P-E): extracted into enrichCompany() so the per-card refresh button
   // can re-run it for ONE company; also stores the chamber rating (score +
   // category) that getStats already fetches.
@@ -146,15 +146,28 @@ export function WatchlistView() {
     }
   }).current
 
-  useEffect(() => {
-    if (!hydrated) return
+  // Nothing is fetched on load: the cards show what the registry already holds. Work starts from a click —
+  // the per-card refresh or the «Yangilash» button in the section head (AGENTS.md: loading never scrapes).
+  const [refreshingAll, setRefreshingAll] = useState(false)
+  const refreshAll = async (): Promise<void> => {
+    if (refreshingAll) return
     const list = watched()
-    const timers: ReturnType<typeof setTimeout>[] = []
-    list.forEach((w, idx) => {
-      timers.push(setTimeout(() => void enrichCompany(w.stir), idx * 350))
-    })
-    return () => timers.forEach(clearTimeout)
-  }, [hydrated, items.length, enrichCompany])
+    if (list.length === 0) return
+    setRefreshingAll(true)
+    let ok = 0
+    for (const w of list) {
+      enrichedRef.current.delete(w.stir)
+      try {
+        await enrichCompany(w.stir, true)
+        ok++
+      } catch {
+        /* counted below */
+      }
+    }
+    setRefreshingAll(false)
+    if (ok === list.length) toast.success(`${ok} ta kompaniya yangilandi`)
+    else toast.warning(`${ok}/${list.length} kompaniya yangilandi`, { description: 'Qolganlarining manbalari javob bermadi.' })
+  }
 
   /** Per-card refresh: forget the one-shot guard and re-enrich with fresh data. */
   const refreshCompany = (stir: string): Promise<void> => {
@@ -326,6 +339,10 @@ export function WatchlistView() {
         <span className="count">{items.length}</span>
         <div className="sp" />
         <OrdersControl companies={items.length} registryVersion={rv} />
+        <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
+          {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
+          <span>Yangilash</span>
+        </button>
         <button
           className="btn btn-outline btn-sm"
           onClick={() => {
