@@ -8,7 +8,7 @@
  * per-worker request-history drawer. Auto-refresh toggle polls every 5s.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -178,31 +178,71 @@ async function pollForRestart(onTick: (elapsedMs: number) => void): Promise<bool
   return false
 }
 
-function UpdatesTab() {
-  const [info, setInfo] = useState<{
-    local: { version: string; sha: string | null; branch: string | null; dirty: boolean; gitAvailable: boolean }
+interface UpdateInfo {
+  local: { version: string; sha: string | null; branch: string | null; dirty: boolean; gitAvailable: boolean }
+  check?: {
+    source: 'git' | 'github' | null
     remote: { sha: string; message: string; author: string; date: string; commitUrl: string } | null
+    relation: 'same' | 'behind' | 'ahead' | 'diverged' | 'unknown'
+    ahead: number
+    behind: number
     updateAvailable: boolean
-  } | null>(null)
+    error: { code: string; detail: string } | null
+    checkedAt: string
+  }
+}
+
+/** Re-check when the operator comes back to the tab after this long (a push made meanwhile shows up without a click). */
+const RECHECK_AFTER_MS = 30_000
+
+function UpdatesTab() {
+  const [info, setInfo] = useState<UpdateInfo | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [updateState, setUpdateState] = useState<'idle' | 'pulling' | 'restarting' | 'timeout'>('idle')
   const [elapsed, setElapsed] = useState(0)
+  const seq = useRef(0)
+  const lastAt = useRef(0)
 
+  // Every check asks git for the truth right now (server: `git fetch`, no cache). The previous answer stays on screen
+  // while a new one is on its way; only the newest answer is kept.
   const load = useCallback(async () => {
+    const mine = ++seq.current
     setChecking(true)
     try {
-      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { headers: authHeaders() })
-      setInfo(await res.json())
+      const res = await fetch(`/api/settings/version?check=1&_=${Date.now()}`, { cache: 'no-store', headers: authHeaders() })
+      const json = await res.json().catch(() => null)
+      if (mine !== seq.current) return
+      // an error body (401 with APP_API_TOKEN set, 429, 500) is JSON without the fields we read: never store it as data
+      if (!res.ok || !json?.local || !json?.check) {
+        setFailed(typeof json?.error === 'string' ? json.error : `Server javobi notoʻgʻri (${res.status})`)
+        return
+      }
+      setFailed(null)
+      setInfo(json as UpdateInfo)
+      lastAt.current = Date.now()
     } catch {
-      setInfo(null)
+      if (mine === seq.current) setFailed('Serverga ulanib boʻlmadi')
     } finally {
-      setChecking(false)
+      if (mine === seq.current) setChecking(false)
     }
   }, [])
 
   useEffect(() => {
     void load()
+    const onShow = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastAt.current > RECHECK_AFTER_MS) void load()
+    }
+    document.addEventListener('visibilitychange', onShow)
+    window.addEventListener('focus', onShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onShow)
+      window.removeEventListener('focus', onShow)
+    }
   }, [load])
+
+  const check = info?.check
+  const problem = failed ?? check?.error?.detail ?? null
 
   const runUpdate = useCallback(async () => {
     setUpdateState('pulling')
@@ -259,8 +299,11 @@ function UpdatesTab() {
           <div className="ico"><GitBranch /></div>
           <h2>Joriy versiya</h2>
           <div className="sp" />
-          {info && !info.updateAvailable && <span className="badge b-pos"><Check />Eng soʻnggi</span>}
-          {info?.updateAvailable && <span className="badge b-warn">Yangilanish bor</span>}
+          {check?.updateAvailable && !problem && <span className="badge b-warn">Yangilanish bor</span>}
+          {check && !check.updateAvailable && !problem && check.relation === 'same' && <span className="badge b-pos"><Check />Eng soʻnggi</span>}
+          {check && !check.updateAvailable && !problem && check.relation === 'ahead' && <span className="badge b-neu">GitHubʼdan oldinda</span>}
+          {check && !check.updateAvailable && !problem && check.relation === 'diverged' && <span className="badge b-warn">Ajralib ketgan</span>}
+          {problem && <span className="badge b-warn">Tekshirilmadi</span>}
         </div>
         {kv('Versiya', <span className="badge b-neu">{info?.local.version || APP_VERSION}</span>)}
         {kv('Git SHA', <span className="mono">{info?.local.sha || '-'}</span>)}
@@ -272,10 +315,10 @@ function UpdatesTab() {
           <div className="ico"><Download /></div>
           <h2>GitHubʼdagi soʻnggi</h2>
         </div>
-        {kv('SHA', <span className="mono">{info?.remote?.sha?.slice(0, 7) || '-'}</span>)}
-        {kv('Commit', <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: '60%' }}>{info?.remote?.message || '-'}</span>)}
-        {kv('Muallif', <span>{info?.remote?.author || '-'}</span>)}
-        {kv('Sana', <span className="mono faint">{info?.remote?.date || '-'}</span>)}
+        {kv('SHA', <span className="mono">{check?.remote?.sha?.slice(0, 7) || '-'}</span>)}
+        {kv('Commit', <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: '60%' }}>{check?.remote?.message || '-'}</span>)}
+        {kv('Muallif', <span>{check?.remote?.author || '-'}</span>)}
+        {kv('Sana', <span className="mono faint">{check?.remote?.date || '-'}</span>)}
         <button className="btn btn-outline" style={{ width: '100%', marginTop: 14 }} onClick={() => void load()} disabled={checking || busy}>
           {checking ? <span className="spinner" /> : <RefreshCw />}
           <span>Qayta tekshirish</span>
@@ -307,28 +350,70 @@ function UpdatesTab() {
           </div>
         ) : (
           <div className="empty" style={{ padding: 0 }}>
-            <div className="ico" style={{ background: 'var(--pos-soft)', color: 'var(--pos-text)' }}>
-              <Check />
-            </div>
-            <h3>{info?.updateAvailable ? 'Yangilanish mavjud' : "Eng soʻnggi versiyada"}</h3>
-            <p style={{ margin: '0 0 14px' }}>
-              {info?.updateAvailable ? (
-                'GitHubʼda yangi commit bor. Yangilash tugmasi orqali oling — server avtomatik qayta ishga tushadi.'
-              ) : info ? (
+            {(() => {
+              const tone = problem ? 'warn' : check?.updateAvailable || check?.relation === 'diverged' ? 'warn' : 'pos'
+              const title = problem
+                ? 'Tekshirib boʻlmadi'
+                : !info
+                  ? 'Tekshirilmoqda…'
+                  : check?.updateAvailable
+                    ? 'Yangilanish mavjud'
+                    : check?.relation === 'ahead'
+                      ? 'Lokal kod GitHubʼdan oldinda'
+                      : check?.relation === 'diverged'
+                        ? 'Lokal kod va GitHub ajralib ketgan'
+                        : 'Eng soʻnggi versiyada'
+              return (
                 <>
-                  Lokal kod GitHubʼdagi <span className="mono">{info.local.branch || 'main'}</span> bilan bir xil.{' '}
-                  <span className="mono">git pull</span> talab etilmaydi.
+                  <div className="ico" style={{ background: `var(--${tone}-soft)`, color: `var(--${tone}-text)` }}>
+                    {problem || tone === 'warn' ? <AlertTriangle /> : <Check />}
+                  </div>
+                  <h3>{title}</h3>
+                  <p style={{ margin: '0 0 14px' }}>
+                    {problem ? (
+                      <>
+                        {problem}
+                        {failed && info ? ' Yuqoridagi maʼlumot oxirgi muvaffaqiyatli tekshiruvdan.' : ''}
+                      </>
+                    ) : check?.updateAvailable ? (
+                      <>
+                        GitHubʼda {check.source === 'git' ? <b>{check.behind} ta</b> : 'yangi'} commit bor. Yangilash tugmasi orqali oling, server avtomatik qayta ishga tushadi.
+                      </>
+                    ) : check?.relation === 'ahead' ? (
+                      <>GitHubʼga yuborilmagan <b>{check.ahead} ta</b> lokal commit bor. Yangilanadigan narsa yoʻq.</>
+                    ) : check?.relation === 'diverged' ? (
+                      <>
+                        Lokal <b>{check.ahead}</b> ta, GitHubʼda <b>{check.behind}</b> ta boshqa commit bor, shuning uchun avtomatik yangilab boʻlmaydi. Qoʻlda: <span className="mono">git pull origin main</span>.
+                      </>
+                    ) : check ? (
+                      <>
+                        Lokal kod GitHubʼdagi <span className="mono">main</span> bilan bir xil. <span className="mono">git pull</span> talab etilmaydi.
+                      </>
+                    ) : (
+                      'GitHub bilan solishtirilmoqda…'
+                    )}
+                    {check && !problem && (
+                      <span className="faint" style={{ display: 'block', fontSize: 11.5, marginTop: 6 }}>
+                        Tekshirildi: {new Date(check.checkedAt).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {check.source === 'github' ? ' · git emas, GitHub API orqali (taxminiy)' : ''}
+                      </span>
+                    )}
+                  </p>
+                  {check?.updateAvailable && !problem && (
+                    <button className="btn btn-outline btn-sm" onClick={() => void runUpdate()} disabled={busy}>
+                      <Download />
+                      <span>Yangilash</span>
+                    </button>
+                  )}
+                  {problem && (
+                    <button className="btn btn-outline btn-sm" onClick={() => void load()} disabled={checking || busy}>
+                      <RefreshCw />
+                      <span>Qayta urinish</span>
+                    </button>
+                  )}
                 </>
-              ) : (
-                'Versiya ma’lumotlari yuklanmoqda…'
-              )}
-            </p>
-            {info?.updateAvailable && (
-              <button className="btn btn-outline btn-sm" onClick={() => void runUpdate()} disabled={busy}>
-                <Download />
-                <span>Yangilash</span>
-              </button>
-            )}
+              )
+            })()}
           </div>
         )}
       </div>

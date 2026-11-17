@@ -120,7 +120,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `documents/validate.ts` | components/views/doc-bulk.tsx, components/views/doc-editor.tsx | lib/documents/__tests__/validate.test.ts |
 | `domain/company.ts` | lib/store/app-store.ts |  |
 | `enrich.ts` | components/company/context-bar.tsx, components/views/launcher.tsx, components/views/watchlist.tsx, lib/hard-refresh.ts |  |
-| `git-failure.ts` | lib/version-server.ts | lib/__tests__/git-failure.test.ts |
+| `git-failure.ts` | lib/update-check.ts, lib/version-server.ts | lib/__tests__/git-failure.test.ts |
 | `hard-refresh.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 | `health-registry.ts` | api/settings/health/route, api/settings/workers/route, lib/cf-worker-pool.ts |  |
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
@@ -160,6 +160,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `theme-boot.ts` | app/layout.tsx, lib/theme.ts | lib/__tests__/theme.test.ts |
 | `theme.ts` | components/shell/app-shell.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
+| `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
 | `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
@@ -311,7 +312,6 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sb-cache-swept:` | lib/cache.ts |
 | `sb-cache-swept:${CACHE_VERSION}` | lib/cache.ts |
 | `sb-cache-v138:` | lib/cache.ts |
-| `sud-billing-lookup` | app/api/settings/version/route.ts |
 | `sud-buyrugini-bekor-qilish` | lib/documents/registry.ts |
 | `sud-doc-letterhead-v1` | components/proto/letterhead.tsx |
 | `sud-doc-script` | lib/documents/script-pref.ts |
@@ -321,6 +321,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-orders-pill-hidden` | components/shell/orders-loader.tsx |
 | `sud-registry-v1` | lib/registry.ts |
 | `sud-saved-companies` | lib/registry.ts |
+| `sud-tizimi` | lib/update-check.ts |
 | `sud-watchlist` | lib/registry.ts |
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
 | `sud:company-refreshed` | lib/hard-refresh.ts |
