@@ -76,7 +76,8 @@ export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }
   const open = async (pdfId: string, name: string, retryAuto = false) => {
     setOpening(pdfId)
     try {
-      await openPublicOrderPdf(pdfId, name, { retryAuto })
+      const r = await openPublicOrderPdf(pdfId, name, { retryAuto })
+      if (!r.saved) toast.error(`PDF ochildi, lekin kompyuterga saqlanmadi${r.saveError ? `: ${r.saveError}` : ''}`, { duration: 15000 })
       setManual(null)
     } catch (e) {
       if (e instanceof ManualOrderError) setManual({ id: pdfId, name })

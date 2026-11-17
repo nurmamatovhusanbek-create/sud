@@ -25,13 +25,50 @@ export async function readPdf(id: string): Promise<Uint8Array | null> {
   }
 }
 
+/**
+ * `rename` that survives a moment of interference. On Windows a freshly written file is often held for a split second by an
+ * antivirus scan or the indexer, and `rename` then fails with EPERM / EBUSY / EACCES although a retry works. Anything else (a
+ * missing folder, a full disk) fails at once. Pure over injected `rename` / `sleep`, so it is tested without a disk.
+ */
+export async function renameWithRetry(
+  from: string,
+  to: string,
+  io: { rename: (a: string, b: string) => Promise<void>; sleep: (ms: number) => Promise<void> } = { rename: fs.rename, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) },
+  tries = 6,
+): Promise<void> {
+  for (let i = 0; ; i++) {
+    try {
+      await io.rename(from, to)
+      return
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException)?.code
+      if (i >= tries - 1 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw e
+      await io.sleep(80 * (i + 1)) // 80, 160, 240 … ms
+    }
+  }
+}
+
 export async function writePdf(id: string, bytes: Uint8Array, meta: { name?: string | null; via?: 'download' | 'import' } = {}): Promise<void> {
   const f = fileOf(id)
   if (!f) throw new Error('bad id')
   await fs.mkdir(dir(), { recursive: true, mode: 0o700 })
   const tmp = `${f}.${process.pid}.${Date.now()}.tmp`
   await fs.writeFile(tmp, bytes, { mode: 0o600 })
-  await fs.rename(tmp, f)
+  try {
+    await renameWithRetry(tmp, f)
+  } catch (e) {
+    // last resort: copy over (works where a rename is refused), then drop the temp file; if even that fails, say why
+    try {
+      await fs.copyFile(tmp, f)
+    } catch {
+      await fs.rm(tmp, { force: true }).catch(() => {})
+      throw e
+    }
+    await fs.rm(tmp, { force: true }).catch(() => {})
+  }
+  // trust, but verify: the file the page will count as «Yuklangan» must really be there, whole
+  const st = await fs.stat(f).catch(() => null)
+  if (!st || st.size !== bytes.length) throw new Error('fayl diskka toʻliq yozilmadi')
   // remember that it was saved: if the file is deleted later, the Qarorlar page still knows it was here (and when, how big)
   await appendDownload({ pdfId: id.toLowerCase(), size: bytes.length, savedAt: Date.now(), name: meta.name ?? '', via: meta.via ?? 'download' }).catch(() => {})
 }

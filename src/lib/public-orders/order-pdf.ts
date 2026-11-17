@@ -39,6 +39,9 @@ export interface OrderPdfDeps {
 }
 
 export interface OrderPdf {
+  /** false = the PDF reached the person but could NOT be kept on disk (`saveError` says why): the page must not count it as downloaded */
+  saved: boolean
+  saveError?: string
   bytes: Uint8Array
   /** the upstream's own file name (only on a fresh download) */
   filename: string | null
@@ -67,7 +70,7 @@ export function createOrderPdfLoader(deps: OrderPdfDeps, gapMs = 2000, autoPause
   async function download(id: string): Promise<OrderPdf> {
     // another request may have stored it while this one waited in the queue
     const hit = await deps.read(id)
-    if (hit) return { bytes: hit, filename: null, cached: true }
+    if (hit) return { bytes: hit, filename: null, cached: true, saved: true }
     if (deps.now() < pausedUntil) throw new ManualDownloadRequired(pausedWhy) // refused while this one waited in the queue
     const wait = lastStart + gapMs - deps.now()
     if (lastStart && wait > 0) await deps.sleep(wait)
@@ -84,13 +87,17 @@ export function createOrderPdfLoader(deps: OrderPdfDeps, gapMs = 2000, autoPause
       throw e
     }
     const { bytes, filename } = pdfFromUpload(raw) // some files may already be plain
-    await deps.write(id, bytes, { name: filename, via: 'download' }).catch(() => {}) // a full disk must not lose the file the user just waited for
-    return { bytes, filename, cached: false }
+    // a full disk must not lose the file the person just waited for: it is returned either way, but whether it was KEPT is reported
+    let saveError: string | undefined
+    await deps.write(id, bytes, { name: filename, via: 'download' }).catch((e) => {
+      saveError = e instanceof Error ? e.message : String(e)
+    })
+    return { bytes, filename, cached: false, saved: !saveError, saveError }
   }
 
   return async function load(id: string, opts: { retryAuto?: boolean } = {}): Promise<OrderPdf> {
     const hit = await deps.read(id)
-    if (hit) return { bytes: hit, filename: null, cached: true }
+    if (hit) return { bytes: hit, filename: null, cached: true, saved: true }
     if (opts.retryAuto) pausedUntil = 0
     else if (deps.now() < pausedUntil) throw new ManualDownloadRequired(pausedWhy)
     const running = inflight.get(id)

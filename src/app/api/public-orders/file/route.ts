@@ -34,14 +34,20 @@ export const GET = guard(async (req) => {
   const id = url.searchParams.get('id') ?? ''
   if (!isOrderFileId(id)) return jsonFail('Fayl identifikatori notoʻgʻri', 'bad_request', 400)
   try {
-    const { bytes, filename } = await loadPdf(id, { retryAuto: url.searchParams.get('retry') === '1' })
+    const { bytes, filename, saved, saveError } = await loadPdf(id, { retryAuto: url.searchParams.get('retry') === '1' })
+    if (!saved) console.error(`[orders-file] ${id}: PDF diskka saqlanmadi: ${saveError}`)
     const name = pdfFileName(filename ?? url.searchParams.get('name') ?? '', 'qaror')
     return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Length': String(bytes.length),
         'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(name)}`,
-        'Cache-Control': 'private, max-age=86400',
+        // never kept by the browser: a cached copy would answer a later click without the server ever seeing it, so the file would
+        // not be (re)saved and the Qarorlar page could not move the order to «Yuklangan». The server serves it from disk anyway.
+        'Cache-Control': 'private, no-store',
+        // did the server KEEP the file? (the Qarorlar page only counts a kept file as «Yuklangan»)
+        'X-Order-Saved': saved ? '1' : '0',
+        ...(saved ? {} : { 'X-Order-Save-Error': encodeURIComponent((saveError ?? '').slice(0, 160)) }),
       },
     })
   } catch (e) {

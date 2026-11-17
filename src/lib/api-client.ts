@@ -36,7 +36,8 @@ export function privilegedHeaders(extra: Record<string, string> = {}): HeadersIn
 
 async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(url, { signal, headers: authHeaders() })
+    // cache: 'no-store': every answer is live data (the Qarorlar counts change when a file is saved); the browser must not reuse one
+    const res = await fetch(url, { signal, headers: authHeaders(), cache: 'no-store' })
     const json = await res.json().catch(() => null)
     if (!json) {
       return { ok: false, error: `Server javob bermadi (${res.status})`, status: res.status }
@@ -460,10 +461,20 @@ export class ManualOrderError extends Error {
   }
 }
 
+/** What the app's server did with an order's PDF. */
+export interface OrderPdfResult {
+  blob: Blob
+  /** false = it could not be kept on disk (`saveError` says why): the order is NOT «Yuklangan» */
+  saved: boolean
+  saveError?: string
+}
+
 /** The order's PDF bytes from the app's own server (which keeps a copy on disk). Throws `ManualOrderError` when the site wants a person. */
-async function fetchOrderPdf(pdfId: string, name: string | undefined, retryAuto: boolean): Promise<Blob> {
+async function fetchOrderPdf(pdfId: string, name: string | undefined, retryAuto: boolean): Promise<OrderPdfResult> {
   const qs = `id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}${retryAuto ? '&retry=1' : ''}`
-  const res = await fetch(`/api/public-orders/file?${qs}`, { headers: authHeaders() })
+  // 'no-store': the request must REACH the server every time. An answer from the browser's cache would never make the server
+  // save the file, so the order could not become «Yuklangan» (this is what «Qayta yuklash» silently did before).
+  const res = await fetch(`/api/public-orders/file?${qs}&_=${Date.now()}`, { headers: authHeaders(), cache: 'no-store' })
   if (!res.ok) {
     let msg = 'Qarorni olib boʻlmadi'
     let code = ''
@@ -474,21 +485,29 @@ async function fetchOrderPdf(pdfId: string, name: string | undefined, retryAuto:
     } catch { /* not JSON */ }
     throw code === 'manual_required' ? new ManualOrderError(msg) : new Error(msg)
   }
-  return res.blob()
+  const saved = res.headers.get('X-Order-Saved') !== '0' // an older server sends no header: assume kept
+  let saveError: string | undefined
+  try {
+    saveError = saved ? undefined : decodeURIComponent(res.headers.get('X-Order-Save-Error') ?? '')
+  } catch { /* undecodable */ }
+  return { blob: await res.blob(), saved, saveError }
 }
 
 /**
  * Open an order's PDF. The window is opened FIRST (inside the click, or popup blockers reject it),
  * then pointed at the file once it has arrived — the same trick the company report uses.
  * Throws `ManualOrderError` when the site refuses the automatic download (the card then offers the hand-over).
+ * Returns whether the server also KEPT the file (false: it opened, but is not «Yuklangan»).
  */
-export async function openPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<void> {
+export async function openPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<{ saved: boolean; saveError?: string }> {
   const win = window.open('', '_blank')
   if (!win) throw new Error('Brauzer oynani blokladi — pop-up ruxsatini bering')
   win.document.title = 'Qaror yuklanmoqda…'
   win.document.body.textContent = 'Qaror yuklanmoqda…'
   try {
-    win.location.href = URL.createObjectURL(await fetchOrderPdf(pdfId, name, opts.retryAuto === true))
+    const r = await fetchOrderPdf(pdfId, name, opts.retryAuto === true)
+    win.location.href = URL.createObjectURL(r.blob)
+    return { saved: r.saved, saveError: r.saveError }
   } catch (e) {
     try { win.close() } catch { /* already closed */ }
     throw e
@@ -496,8 +515,9 @@ export async function openPublicOrderPdf(pdfId: string, name?: string, opts: { r
 }
 
 /** Save an order's PDF on this computer WITHOUT opening it (the server stores it; «Yuklangan» then shows on the Qarorlar page). */
-export async function downloadPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<void> {
-  await fetchOrderPdf(pdfId, name, opts.retryAuto === true)
+export async function downloadPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<{ saved: boolean; saveError?: string }> {
+  const r = await fetchOrderPdf(pdfId, name, opts.retryAuto === true)
+  return { saved: r.saved, saveError: r.saveError }
 }
 
 /** Hand an order's PDF, saved by the person from public.sud.uz, to the app (stored like an automatic download). */
@@ -533,7 +553,7 @@ export function getPublicOrdersLibrary(
   signal?: AbortSignal,
 ) {
   const qs = new URLSearchParams({ q: f.q, status: f.status, court: f.court, instance: f.instance, page: String(f.page), size: String(f.size) })
-  return request<LibraryPage>(`/api/public-orders/library?${qs}`, signal)
+  return request<LibraryPage>(`/api/public-orders/library?${qs}&_=${Date.now()}`, signal)
 }
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */

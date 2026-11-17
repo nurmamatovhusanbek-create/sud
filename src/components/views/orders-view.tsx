@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search } from 'lucide-react'
+import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { OrderHandover } from '@/components/proto/order-handover'
@@ -69,6 +69,7 @@ export function OrdersView() {
   const [looking, setLooking] = useState(false)
   const [searched, setSearched] = useState<string | null>(null) // the case number whose search just finished
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
+  const stopRef = useRef(false) // «Toʻxtatish»: the running bulk download stops after the order in flight
   const { job } = useOrdersJob()
   const newNorm = normalizeCaseNumber(newNumber)
   const newValid = CASE_RE.test(newNorm)
@@ -141,10 +142,11 @@ export function OrdersView() {
     }
     setBusy(o.id)
     try {
-      await openPublicOrderPdf(o.pdfId, o.pdfName, { retryAuto })
+      const r = await openPublicOrderPdf(o.pdfId, o.pdfName, { retryAuto })
       setManual(null)
-      if (o.state === 'gone') toast.success('Qaror qayta yuklab olindi') // its file had been deleted: the stored order data fetched it again
-      setTick((n) => n + 1) // it is on disk now: the badge changes
+      if (!r.saved) toast.error(`PDF ochildi, lekin kompyuterga saqlanmadi${r.saveError ? `: ${r.saveError}` : ''}. Shuning uchun u “Yuklangan” boʻlmaydi`, { duration: 15000 })
+      else if (o.state === 'gone') toast.success('Qaror qayta yuklab olindi') // its file had been deleted: the stored order data fetched it again
+      setTick((n) => n + 1) // it is on disk now: the badge, the lists and the counts change
     } catch (e) {
       if (e instanceof ManualOrderError) setManual(o)
       else toast.error(e instanceof Error ? e.message : 'Qarorni ochib boʻlmadi')
@@ -171,29 +173,83 @@ export function OrdersView() {
   const items = data?.items ?? []
   const todo = items.filter((o) => o.state !== 'saved' && o.pdfId)
 
-  /** Save every not-yet-downloaded order on this page, one after another (the server spaces the captchas); stops at the first one that needs a person. */
-  const downloadAll = async () => {
-    const list = todo
+  /**
+   * Save a list of orders one after another (the server spaces the captchas). The list and the counts are re-read after EACH order,
+   * so they move while it works. Stops at the first order that needs a person, at the first file the server could not keep (that
+   * is systematic: say why instead of failing 80 times), or when «Toʻxtatish» is pressed; any other failure is counted and skipped.
+   */
+  const runBulk = async (list: LibraryItem[]) => {
+    stopRef.current = false
     setBulk({ done: 0, total: list.length })
     let ok = 0
+    let failed = 0
+    let lastErr = ''
+    let notSaved = ''
+    let needsPerson: LibraryItem | null = null
     for (const o of list) {
+      if (stopRef.current) break
       try {
-        await downloadPublicOrderPdf(o.pdfId, o.pdfName)
-        ok++
+        const r = await downloadPublicOrderPdf(o.pdfId, o.pdfName)
+        if (r.saved) ok++
+        else {
+          notSaved = r.saveError || 'sababi nomaʼlum'
+          break
+        }
       } catch (e) {
         if (e instanceof ManualOrderError) {
-          setManual(o)
-          toast.error('public.sud.uz bu qarorni qoʻlda yuklashni talab qildi — pastdagi yoʻriqnomaga qarang')
-        } else toast.error(`${o.caseNumber}: ${e instanceof Error ? e.message : 'yuklab boʻlmadi'}`)
-        break
+          needsPerson = o
+          break
+        }
+        failed++
+        lastErr = `${o.caseNumber}: ${e instanceof Error ? e.message : 'yuklab boʻlmadi'}`
       } finally {
         setBulk((b) => (b ? { ...b, done: b.done + 1 } : b))
+        setTick((n) => n + 1) // the order that just landed leaves «Yuklanmagan» now, not at the end
       }
     }
     setBulk(null)
     setTick((n) => n + 1)
-    if (ok) toast.success(`${ok} ta qaror yuklab olindi`)
+    if (needsPerson) {
+      setManual(needsPerson)
+      toast.error('public.sud.uz bu qarorni qoʻlda yuklashni talab qildi — pastdagi yoʻriqnomaga qarang')
+    }
+    if (notSaved) toast.error(`PDF olindi, lekin kompyuterga saqlanmadi: ${notSaved}. Yuklash toʻxtatildi.`, { duration: 20000 })
+    else if (failed) toast.error(`${failed} ta qaror yuklanmadi (${lastErr})`, { duration: 12000 })
+    if (ok) toast.success(`${ok} ta qaror yuklab olindi${stopRef.current ? ' (toʻxtatildi)' : ''}`)
+    else if (stopRef.current) toast.info('Yuklash toʻxtatildi')
   }
+
+  /** Every order in `state` that matches the current filters, across ALL pages (not only the one on screen). */
+  const collect = async (state: 'never' | 'gone'): Promise<LibraryItem[]> => {
+    const all: LibraryItem[] = []
+    for (let pg = 1; pg <= 40; pg++) {
+      const r = await getPublicOrdersLibrary({ q: q.trim(), status: state, court, instance, page: pg, size: 100 })
+      if (!r.ok) throw new Error(r.error)
+      all.push(...r.data.items.filter((i) => i.pdfId))
+      if (!r.data.items.length || all.length >= r.data.total) break
+    }
+    return all
+  }
+
+  /** «Barchasini yuklash» in the Yuklanmagan / Mavjud emas view. */
+  const downloadView = async (state: 'never' | 'gone') => {
+    let list: LibraryItem[]
+    try {
+      list = await collect(state)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Roʻyxatni olib boʻlmadi')
+      return
+    }
+    if (!list.length) {
+      toast.info('Yuklanadigan qaror yoʻq')
+      return
+    }
+    // each one costs a captcha and a few seconds: a long list is a decision, not a click
+    if (list.length > 20 && !window.confirm(`${list.length} ta qaror birin-ketin yuklanadi (har biri bir necha soniya, jami taxminan ${Math.ceil((list.length * 4) / 60)} daqiqa). Davom etamizmi?`)) return
+    await runBulk(list)
+  }
+
+  const downloadAll = () => runBulk(todo) // the search result banner: what is on screen
 
   const counts = data?.counts
   const statusOptions = useMemo(
@@ -332,6 +388,27 @@ export function OrdersView() {
           />
         ) : (
           <>
+            {(status === 'never' || status === 'gone') && counts && (status === 'never' ? counts.never : counts.gone) > 0 && (
+              <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
+                <span>
+                  {status === 'never' ? 'Yuklanmagan' : 'Fayli oʻchirilgan'} qarorlar: <b>{status === 'never' ? counts.never : counts.gone} ta</b>
+                  {filtered ? ' (filtr boʻyicha)' : ''}
+                  {bulk ? ` · yuklanmoqda ${bulk.done}/${bulk.total}` : ''}
+                </span>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  {bulk && (
+                    <button className="btn btn-outline btn-sm" onClick={() => { stopRef.current = true }} title="Hozirgi qarordan keyin toʻxtaydi">
+                      <X />
+                      <span>Toʻxtatish</span>
+                    </button>
+                  )}
+                  <button className="btn btn-primary btn-sm" disabled={!!bulk} onClick={() => void downloadView(status)} title="Roʻyxatdagi barcha qarorlarni (hamma sahifalardan) birin-ketin yuklab olish">
+                    {bulk ? <Loader2 className="spin" /> : <Download />}
+                    <span>{bulk ? `Yuklanmoqda ${bulk.done}/${bulk.total}…` : status === 'never' ? `Barchasini yuklash (${counts.never})` : `Barchasini qayta yuklash (${counts.gone})`}</span>
+                  </button>
+                </span>
+              </div>
+            )}
             <div className="list">
               {items.map((o) => (
                 <div className="lrow" key={o.id} data-order={o.caseNumber} style={{ cursor: 'default' }}>

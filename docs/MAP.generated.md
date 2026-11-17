@@ -145,8 +145,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
 | `public-orders/meta-backup.ts` | lib/public-orders/data-dir.ts, lib/public-orders/meta-backup-runner.ts | lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
-| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route | lib/public-orders/__tests__/order-pdf.test.ts |
-| `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route | lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
+| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route | lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route | lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
 | `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/library/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
