@@ -130,3 +130,32 @@ describe('lookupCase', () => {
     expect(r.calls).toHaveLength(4)
   })
 })
+
+describe('lookupCase: the pre-2024 system', () => {
+  const legacyOrder = (instance: string, id = 'old-economic-1'): StoredOrder => ({ id, caseNumber: CN, instance, result: 'FULFILLED', court: 'c', judge: 'j', category: '', pdfId: 'old-economic-9', pdfName: '', pdfSize: 0, courtType: 'ECONOMIC' })
+
+  test('both systems are asked; orders from either are stored; the legacy instance counts as seen', async () => {
+    const r = rig(async (_c, _t, i) => (i === 'APPEAL' ? [row('n1', 'APPEAL')] : []))
+    r.deps.searchLegacy = async () => [legacyOrder('FIRST'), { ...legacyOrder('FIRST', 'old-economic-2'), caseNumber: '4-1001-2619/99999' }]
+    const out = await lookupCase(r.deps, job)
+    expect(out.found).toBe(2) // the other case's row is dropped (the search is a «contains»)
+    expect(r.stored.map((o) => o.id).sort()).toEqual(['n1', 'old-economic-1'])
+    expect(r.checks.get(CN)!.seen.sort()).toEqual(['APPEAL', 'FIRST'])
+  })
+  test('a failing legacy search is a partial error, never a false «none published»', async () => {
+    const r = rig(async () => [])
+    r.deps.searchLegacy = async () => { throw new Error('HTTP 502') }
+    const out = await lookupCase(r.deps, job)
+    expect(out.found).toBe(0)
+    expect(out.error).toContain('HTTP 502')
+    expect(r.checks.get(CN)!.error).toBeDefined()
+  })
+  test('criminal has no library rows: only the pre-2024 endpoint is asked', async () => {
+    const r = rig(async () => { throw new Error('the library must not be asked for criminal') })
+    r.deps.searchLegacy = async () => [{ ...legacyOrder('FIRST'), courtType: 'CRIMINAL' }]
+    const out = await lookupCase(r.deps, { ...job, courtType: 'CRIMINAL' })
+    expect(r.calls).toEqual([])
+    expect(out.found).toBe(1)
+    expect(out.error).toBeUndefined()
+  })
+})

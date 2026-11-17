@@ -3,7 +3,7 @@ import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
 import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
 import { DIRECT, fetchOrderFileWith, type OrderFileDeps } from './order-file'
-import type { PublicCourtType, RawPublication } from '@/core/public-orders'
+import { compactLegacy, legacyRows, legacySearchPath, orderFilePath, type PublicCourtType, type RawPublication, type StoredOrder } from '@/core/public-orders'
 
 /**
  * The public library's anonymous JSON API. By the owner's choice it is called DIRECTLY from this machine
@@ -38,7 +38,9 @@ async function fetchUpstream(path: string, opts: { timeoutMs: number; background
 const realDeps: OrderFileDeps = {
   getToken: (route) => getCaptchaToken(3, undefined, route === DIRECT ? directRoute(PUBLIC_ORIGIN) : route, PUBLIC_DOWNLOAD_CAPTCHA),
   download: async (pdfId, token, route) => {
-    const url = `${BASE}/public/onStream/${pdfId}?recaptcha_token=${encodeURIComponent(token)}`
+    const path = orderFilePath(pdfId) // uuid → the library file, `old-…` → the pre-2024 file; nothing else is ever built
+    if (!path) throw new Error('Fayl identifikatori notoʻgʻri')
+    const url = `${BASE}${path}?recaptcha_token=${encodeURIComponent(token)}`
     // never race a duplicate: the first request spends the token
     const res =
       route === DIRECT
@@ -67,4 +69,16 @@ export async function searchCase(caseNumber: string, courtType: PublicCourtType,
   const json = (await res.json()) as { content?: RawPublication[] }
   if (!json || !Array.isArray(json.content)) throw new Error('public.sud.uz search: unexpected response shape')
   return json.content
+}
+
+/**
+ * The same case in the PRE-2024 system («2024 dan avval»: a separate back end with numeric ids). One quick call, filtered by
+ * `caseNumber` (an exact match, verified live), already compacted. Criminal cases live only here.
+ */
+export async function searchLegacyCase(caseNumber: string, courtType: PublicCourtType): Promise<StoredOrder[]> {
+  const res = await fetchUpstream(legacySearchPath(courtType, caseNumber), { timeoutMs: 60_000, background: true })
+  if (!res.ok) throw new Error(`public.sud.uz (2024 gacha) search: HTTP ${res.status}`)
+  const json = await res.json().catch(() => null)
+  if (!json || typeof json !== 'object') throw new Error('public.sud.uz (2024 gacha) search: unexpected response shape')
+  return legacyRows(json).map((r) => compactLegacy(r, courtType)).filter((o): o is StoredOrder => !!o)
 }

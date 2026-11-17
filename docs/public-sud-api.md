@@ -47,9 +47,9 @@ The policy lives in `core/public-orders.ts` (`planCheck`, unit-tested):
 - The API is called directly from the machine (`PUBLIC_ORDERS_VIA_WORKERS=1` to use the workers).
 - The date filter's meaning (publication vs decision date) is **unverified**; nothing depends on it now.
 
-## Two systems: «2024 dan keyingi» (what we use) and «2024 dan avval» (legacy, not supported yet)
+## Two systems: «2024 dan keyingi» and «2024 dan avval» (both supported since Nov 2026)
 public.sud.uz serves cases decided before 2024 and after it from DIFFERENT back ends (seen in browser captures, Nov 2026; response bodies were not
-in the captures, so row shapes are still to be probed with `probe-legacy`):
+in the captures; the row shapes below were probed live with a throw-away script):
 
 | | after 2024 («new») | before 2024 («old») |
 |---|---|---|
@@ -61,3 +61,12 @@ in the captures, so row shapes are still to be probed with `probe-legacy`):
 The page route `/report/ECONOMIC_NEW` is only the page's address: `court_type=ECONOMIC_NEW` is HTTP 500 on `/publications/list`, and `SUPERVISION` is HTTP 400 as an
 `instance`; valid `instance` filters are FIRST, APPEAL, CASSATION, CASSATION_REPEATED, INSPECTION (the site's «Taftish»). A 2025 case
 (`4-1102-2502/3291`, a supervisory order) is in the NEW system and is found through `instance=INSPECTION`, which our lookup did not ask for before.
+
+**Pre-2024 adapter (built from the probed rows).** All four lists accept `caseNumber=<exact>` (verified live: 1 row for a single case). Rows: `claimId`
+(numeric), `caseNumber`, `dbName` (court), `judge`, `category`/`claimCategory`, `instance` (int 1..4 = first, appeal, cassation, taftish: 1 and 3 seen, the rest by analogy),
+`result` (an enum such as `PARTIALLY_FULFILLED`, `CASSATION_REJECTED`); civil adds `fileData{id,name,size}`; **economic keeps the file id inside
+`attachmentsList[].fileData.id`** (NOT the claimId); criminal's `data` is a JSON string. File keys → ids `old-<type>-<key>`: economic = that attachment's file id,
+civil / criminal = `claimId`, administrative = `claimId-17` (`core/public-orders` `orderFilePath` is the ONE place that maps an id to a path). The pre-2024 file answers a plain
+`application/pdf`; the economic one needed a second picture attempt in the capture, which `getCaptchaToken`'s retry loop covers. **Criminal**: the list + `caseNumber` filter were
+verified live; the file path `/api/file/criminal/<claimId>/` comes from the owner's own client (it was not in the browser captures), so the first criminal download is the real test.
+Criminal has no library rows, so only the pre-2024 endpoint is asked for it. `lookupCase` asks both systems for every case (a case can have its first instance before 2024 and its appeal after).

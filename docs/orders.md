@@ -8,7 +8,7 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 | Layer | File | Job |
 |---|---|---|
 | Pure | `src/core/public-orders.ts` | row compaction, labels, multipart PDF parser, `splitDecisions`, **`planCheck`** (when to look again), **`isOngoingFirstInstance`**, `orderJobCase` + `caseSignature` |
-| Server | `src/lib/public-orders/source.ts` | upstream calls (`searchCase`, `fetchOrderFile`); direct by default, `PUBLIC_ORDERS_VIA_WORKERS=1` → workers |
+| Server | `src/lib/public-orders/source.ts` | upstream calls (`searchCase`, `searchLegacyCase`, `fetchOrderFile`); direct by default, `PUBLIC_ORDERS_VIA_WORKERS=1` → workers |
 | | `engine.ts` | `lookupCase(deps, job)` — I/O injected; 3 instances in parallel; keeps only rows whose case number equals the job's |
 | | `company-job.ts` | the queue: `planCases` (DETECT, free), `enqueueCases` (SCRAPE), pause/resume/cancel/`retryFailed`; `globalThis.__publicOrdersJob`; `MAX_QUEUE` |
 | | `store.ts`, `data-dir.ts` | shard files + `checked.jsonl` in `~/.sud-tizimi/public-orders` (`PUBLIC_ORDERS_DIR`); `cacheStats` |
@@ -39,7 +39,8 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 11. **Searches are slow** (≈10 s per `case_number`+`instance`, a minute+ without instance) ⇒ background only, one case at a time, 3 instance searches in parallel. Never hedge/duplicate them.
 12. **A PDF may need a person («Qoʻlda yuklash»).** public.sud.uz now accepts a download only with a token from a SOLVED human challenge (`public-sud-api.md`). When every automatic route is refused, `GET /file` answers `409 manual_required` and the automatic route rests for 30 min (`ManualDownloadRequired`, no more captchas burned; `&retry=1` = the card's «Avtomatik qayta urinish»). The order card then offers: open public.sud.uz, save the PDF there, pick it → `POST /api/public-orders/import?id=<pdf id>` (raw body, up to 100 MB: `guard({maxBodyBytes})`; only a real `%PDF-` is kept, a site-wrapped multipart file is unwrapped) → stored in `files/` exactly like an automatic download, so every later click is served from disk. The id comes from the card the person picked, never from the file. Listing/search and the case database are unaffected.
 13. **Every PDF the person opens is kept, forever** (`files/<pdf id>.pdf`; the file route writes it on the first download, the import route on a hand-over), and the Qarorlar search shows exactly which ones are on disk. The background check stores only the small order rows, never PDFs (one captcha per PDF would turn a check into a crawl). Searching is a local read: typing never reaches public.sud.uz.
-14. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
+14. **Two back ends.** Every check asks the library (after 2024, 4 instance searches) AND the pre-2024 back end (one `caseNumber` search; `searchLegacyCase`), because one case may have orders in both. Pre-2024 orders get ids `old-<type>-<n>` (stored like any order; `isOrderFileId`/`orderFilePath` accept only that shape). **Criminal** is never crawled and has no company link: the person types a case number in Settings › Qarorlar (the «public.sud.uz dan qidirish» box, court picked from the number's first digit) and only that case is looked up. Criminal PDFs are scans (no text layer) and name defendants: keep it lookup-by-number.
+15. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
 
 ## Flow
 

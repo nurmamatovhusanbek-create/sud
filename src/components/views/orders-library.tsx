@@ -10,8 +10,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, FileText, Loader2, Search } from 'lucide-react'
 import { toast } from 'sonner'
-import { getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf } from '@/lib/api-client'
-import { PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem } from '@/core/public-orders'
+import { fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf } from '@/lib/api-client'
+import { courtTypeOfCase, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type PublicCourtType } from '@/core/public-orders'
+import { useOrdersJob } from '@/lib/use-orders-job'
 import { OrderHandover } from '@/components/proto/order-handover'
 
 type Data = { total: number; items: LibraryItem[]; savedPdfs: number; stored: number }
@@ -33,6 +34,12 @@ export function OrdersLibrary() {
   const [importing, setImporting] = useState(false)
   const [tick, setTick] = useState(0)
   const first = useRef(true)
+  // «public.sud.uz dan qidirish»: look ONE typed case number up (both the library and the 2024-gacha system) and store what is found
+  const [court, setCourt] = useState<PublicCourtType | ''>('')
+  const [looking, setLooking] = useState(false)
+  const { job } = useOrdersJob()
+  const fullNumber = /^\d+-[\d-]+\/\d+$/.test(normalizeCaseNumber(q))
+  const courtShown = court || courtTypeOfCase(q) || 'ECONOMIC'
 
   // local read; typing is debounced and a newer search cancels the older one
   useEffect(() => {
@@ -51,6 +58,32 @@ export function OrdersLibrary() {
       ac.abort()
     }
   }, [q, savedOnly, tick])
+
+  // while the queued lookup runs, re-read the list every 3 s; one more read when it ends, then stop
+  const running = job?.state === 'running'
+  useEffect(() => {
+    if (!looking) return
+    if (!running) {
+      const t = setTimeout(() => {
+        setTick((n) => n + 1)
+        setLooking(false)
+      }, 1500) // the queue may not have picked the case up yet: give it a moment before calling it finished
+      return () => clearTimeout(t)
+    }
+    const t = setInterval(() => setTick((n) => n + 1), 3000)
+    return () => clearInterval(t)
+  }, [looking, running])
+
+  const lookUp = async () => {
+    setLooking(true)
+    const r = await fetchPublicOrders([{ caseNumber: normalizeCaseNumber(q), courtType: courtShown }], { force: true })
+    if (!r.ok) {
+      setLooking(false)
+      toast.error(r.error)
+      return
+    }
+    toast.success('Qidirilmoqda — public.sud.uz dan olinmoqda (orqa fonda)')
+  }
 
   const open = async (o: LibraryItem, retryAuto = false) => {
     setOpening(o.id)
@@ -108,6 +141,27 @@ export function OrdersLibrary() {
           Faqat yuklanganlar
         </label>
       </div>
+
+      {fullNumber && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px' }}>
+          <select
+            value={courtShown}
+            onChange={(e) => setCourt(e.target.value as PublicCourtType)}
+            aria-label="Sud turi"
+            style={{ height: 32, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line, rgba(0,0,0,.15))', background: 'var(--surface-inset)', color: 'var(--text-1)', padding: '0 8px', fontSize: 13 }}
+          >
+            <option value="ECONOMIC">Iqtisodiy</option>
+            <option value="CIVIL">Fuqarolik</option>
+            <option value="ADMINISTRATIVE">Maʼmuriy</option>
+            <option value="CRIMINAL">Jinoyat</option>
+          </select>
+          <button className="btn btn-outline btn-sm" disabled={looking} onClick={() => void lookUp()} title="Bu ish raqamini public.sud.uz dan qidirib, topilgan qarorlarni shu yerga saqlaydi">
+            {looking ? <Loader2 className="spin" /> : <Search />}
+            <span>{looking ? 'Qidirilmoqda…' : 'public.sud.uz dan qidirish'}</span>
+          </button>
+          <span className="faint" style={{ fontSize: 12 }}>2024 dan oldingi va keyingi qarorlar ikkalasi ham qidiriladi</span>
+        </div>
+      )}
 
       {failed && !data && <p className="faint" style={{ fontSize: 12.5, margin: 0 }}>Qidiruvni bajarib boʻlmadi.</p>}
       {!data && !failed && <p className="faint" style={{ fontSize: 12.5, margin: 0 }}>Yuklanmoqda…</p>}

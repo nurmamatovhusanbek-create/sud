@@ -1,6 +1,6 @@
 import 'server-only'
 import { lookupCase, type JobCase } from './engine'
-import { searchCase } from './source'
+import { searchCase, searchLegacyCase } from './source'
 import { appendOrders, getChecked, markChecked } from './store'
 import type { CaseJobStatus } from './types'
 import { isOngoingFirstInstance, normalizeCaseNumber, planCheck } from '@/core/public-orders'
@@ -182,6 +182,10 @@ async function loop() {
             search: (cn, ct, inst) => {
               h.status.current = cn
               return searchCase(cn, ct, inst)
+            },
+            searchLegacy: (cn, ct) => {
+              h.status.current = cn
+              return searchLegacyCase(cn, ct)
             },
             append: appendOrders,
             getChecked,

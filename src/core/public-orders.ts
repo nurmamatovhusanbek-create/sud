@@ -10,14 +10,15 @@
 
 import { classifyOutcome, type Classification, type PartyRole } from './classify'
 
-export type PublicCourtType = 'ECONOMIC' | 'CIVIL' | 'ADMINISTRATIVE'
-export const PUBLIC_COURT_TYPES: PublicCourtType[] = ['ECONOMIC', 'CIVIL', 'ADMINISTRATIVE']
+export type PublicCourtType = 'ECONOMIC' | 'CIVIL' | 'ADMINISTRATIVE' | 'CRIMINAL'
+export const PUBLIC_COURT_TYPES: PublicCourtType[] = ['ECONOMIC', 'CIVIL', 'ADMINISTRATIVE', 'CRIMINAL']
 
 /** App court type → the library's `court_type`. */
-export const PUBLIC_COURT_OF: Record<'economic' | 'civil' | 'administrative', PublicCourtType> = {
+export const PUBLIC_COURT_OF: Record<'economic' | 'civil' | 'administrative' | 'criminal', PublicCourtType> = {
   economic: 'ECONOMIC',
   civil: 'CIVIL',
   administrative: 'ADMINISTRATIVE',
+  criminal: 'CRIMINAL',
 }
 
 /** The row as the API returns it (only what we read; everything is optional on purpose). */
@@ -174,8 +175,23 @@ export function pdfFileName(name: string, fallback: string): string {
   return /\.pdf$/i.test(base) ? base : base + '.pdf'
 }
 
-/** The order ids we accept from a client (uuid v4-ish) — nothing else reaches the upstream URL. */
-export const isOrderFileId = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const LEGACY_ID_RE = /^old-(economic|civil|administrative|criminal)-(\d{1,12})(?:-(\d{1,4}))?$/
+
+/** The order ids we accept from a client (a uuid, or `old-<type>-<numeric id>` of the pre-2024 system) — nothing else reaches an upstream URL or a file name. */
+export const isOrderFileId = (s: string): boolean => UUID_RE.test(s) || LEGACY_ID_RE.test(s)
+
+/** The file's path on adolatapi1.sud.uz for an accepted id (null for anything else). Pure: the id fully decides the path. */
+export function orderFilePath(pdfId: string): string | null {
+  if (UUID_RE.test(pdfId)) return `/public/onStream/${pdfId}`
+  const m = LEGACY_ID_RE.exec(pdfId)
+  if (!m) return null
+  const [, kind, n, t] = m
+  if (kind === 'economic') return `/publication-proxy/api/file/download/${n}/`
+  if (kind === 'civil') return `/publication-proxy/api/file/civil/${n}/`
+  if (kind === 'criminal') return `/publication-proxy/api/file/criminal/${n}/`
+  return `/publication-proxy/api/file/administrative/${n}/${t ?? ADMIN_DOC_TYPE}`
+}
 
 // ---- published vs unpublished decisions of one case ---------------------------------------
 
@@ -325,4 +341,99 @@ export function searchLibrary(
   }
   out.sort((a, b) => Number(b.downloaded) - Number(a.downloaded) || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
   return { total: out.length, items: out.slice(0, Math.max(1, opts.limit)) }
+}
+
+// ---- the pre-2024 system («2024 dan avval»): a different back end, numeric ids, plain PDFs ----------------
+
+/** The administrative list is asked for this document type (the site's own filter); the file path repeats it. */
+export const ADMIN_DOC_TYPE = 17
+
+/** Pre-2024 lists, filtered by `caseNumber` (verified live: each returns only that case). Path + query, no host. */
+export function legacySearchPath(courtType: PublicCourtType, caseNumber: string): string {
+  const cn = `caseNumber=${encodeURIComponent(normalizeCaseNumber(caseNumber))}&size=30&page=0`
+  switch (courtType) {
+    case 'ECONOMIC':
+      return `/publication-proxy/unauthorized/publications?${cn}&court_type=ECONOMIC`
+    case 'CIVIL':
+      return `/publication-proxy/api/civil/publication/page?${cn}&court_type=CIVIL`
+    case 'ADMINISTRATIVE':
+      return `/publication-proxy/unauthorized/administrative/conflict?type=${ADMIN_DOC_TYPE}&${cn}&court_type=ADMINISTRATIVE`
+    case 'CRIMINAL':
+      return `/publication-proxy/criminal/findAll?${cn}&court_type=CRIMINAL`
+  }
+}
+
+/** Rows of a pre-2024 list answer: `{data: [...]}`, or `data` as a JSON string (criminal), or `{data: {content: [...]}}`. */
+export function legacyRows(json: unknown): Record<string, unknown>[] {
+  let d: unknown = (json as { data?: unknown } | null)?.data ?? json
+  if (typeof d === 'string') {
+    try {
+      d = JSON.parse(d)
+    } catch {
+      return []
+    }
+  }
+  const arr = Array.isArray(d) ? d : Array.isArray((d as { content?: unknown } | null)?.content) ? (d as { content: unknown[] }).content : []
+  return arr.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+}
+
+/** The pre-2024 system numbers instances 1..4 (first, appeal, cassation, taftish). Anything else stays blank. */
+const LEGACY_INSTANCE: Record<number, string> = { 1: 'FIRST', 2: 'APPEAL', 3: 'CASSATION', 4: 'INSPECTION' }
+
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.trunc(v) : null)
+const txt = (v: unknown): string => clean(v)
+
+/**
+ * Compact one pre-2024 row into the same shape as a new-system order. The PDF id is `old-<type>-<file key>`:
+ * economic → the attachment's file id; civil / criminal → the claimId; administrative → claimId + document type.
+ * A row with no case number or no way to a file is unusable → null.
+ */
+export function compactLegacy(raw: Record<string, unknown>, courtType: PublicCourtType): StoredOrder | null {
+  const caseNumber = normalizeCaseNumber(txt(raw.caseNumber))
+  const rowId = num(raw.id) ?? (txt(raw.id) || null)
+  const claimId = num(raw.claimId)
+  if (!caseNumber || rowId === null) return null
+  const kind = courtType.toLowerCase()
+  let fileKey: string | null = null
+  let fileName = ''
+  let fileSize = 0
+  let category = txt(raw.category) || txt(raw.claimCategory)
+  if (courtType === 'ECONOMIC') {
+    const att = (Array.isArray(raw.attachmentsList) ? raw.attachmentsList : []) as { fileData?: { id?: unknown; name?: unknown; size?: unknown } }[]
+    const f = att.map((a) => a?.fileData).find((d) => num(d?.id) !== null)
+    if (f) {
+      fileKey = String(num(f.id))
+      fileName = txt(f.name)
+      fileSize = num(f.size) ?? 0
+    }
+    category = txt((raw.publicationType as { name?: unknown } | null)?.name) || category
+  } else if (claimId !== null) {
+    fileKey = courtType === 'ADMINISTRATIVE' ? `${claimId}-${ADMIN_DOC_TYPE}` : String(claimId)
+    const fd = raw.fileData as { name?: unknown; size?: unknown } | null | undefined
+    fileName = txt(fd?.name)
+    fileSize = num(fd?.size) ?? 0
+    if (courtType === 'CRIMINAL') category = Array.isArray(raw.claimDocumentType) ? raw.claimDocumentType.map(txt).filter(Boolean).join(', ') : category
+  }
+  return {
+    id: `old-${kind}-${rowId}`,
+    caseNumber,
+    instance: typeof raw.instance === 'number' ? (LEGACY_INSTANCE[raw.instance] ?? '') : '',
+    result: txt(raw.result),
+    court: txt(raw.dbName),
+    judge: txt(raw.judge),
+    category,
+    pdfId: fileKey ? `old-${kind}-${fileKey}` : '',
+    pdfName: fileName,
+    pdfSize: fileSize,
+    courtType,
+  }
+}
+
+/**
+ * Which court a case number belongs to, from its first digit (seen in the library: 1 criminal, 2 civil, 3 and 5
+ * administrative, 4 economic). Only a default for the manual lookup box; the person can change it.
+ */
+export function courtTypeOfCase(caseNumber: string): PublicCourtType | null {
+  const d = normalizeCaseNumber(caseNumber).charAt(0)
+  return d === '1' ? 'CRIMINAL' : d === '2' ? 'CIVIL' : d === '3' || d === '5' ? 'ADMINISTRATIVE' : d === '4' ? 'ECONOMIC' : null
 }

@@ -31,6 +31,8 @@ export interface JobCase {
 
 export interface CaseLookupDeps {
   search(caseNumber: string, courtType: PublicCourtType, instance: string): Promise<RawPublication[]>
+  /** the pre-2024 system's orders of the case, already compacted (optional: tests and older callers omit it) */
+  searchLegacy?(caseNumber: string, courtType: PublicCourtType): Promise<StoredOrder[]>
   append(orders: StoredOrder[]): Promise<void>
   getChecked(caseNumber: string): Promise<CaseCheck | null>
   markChecked(c: CaseCheck): Promise<void>
@@ -54,7 +56,16 @@ export async function lookupCase(deps: CaseLookupDeps, job: JobCase, opts: { for
   const plan = planCheck(prev, job.sig, now.getTime(), opts.force)
   if (!plan.run) return { caseNumber: cn, skipped: true, reason: plan.reason, found: 0 }
 
-  const settled = await Promise.allSettled(plan.instances.map((i) => deps.search(cn, job.courtType, i)))
+  // two systems: the library (after 2024: one search per instance, none for criminal, which has no library rows) and the
+  // pre-2024 back end (one search). A case's instances may sit in either, so both are asked.
+  const tasks: Promise<StoredOrder[]>[] = []
+  if (job.courtType !== 'CRIMINAL') {
+    for (const i of plan.instances) {
+      tasks.push(deps.search(cn, job.courtType, i).then((rows) => rows.map((r) => compactPublication(r, job.courtType)).filter((o): o is StoredOrder => !!o)))
+    }
+  }
+  if (deps.searchLegacy) tasks.push(deps.searchLegacy(cn, job.courtType))
+  const settled = await Promise.allSettled(tasks)
   const orders: StoredOrder[] = []
   const gotInstance = new Set<string>()
   let failed = 0
@@ -65,18 +76,17 @@ export async function lookupCase(deps: CaseLookupDeps, job: JobCase, opts: { for
       firstError ||= s.reason instanceof Error ? s.reason.message : String(s.reason)
       continue
     }
-    for (const raw of s.value) {
-      const o = compactPublication(raw, job.courtType)
-      if (o && o.caseNumber === cn) {
+    for (const o of s.value) {
+      if (o.caseNumber === cn) {
         // the search is a «contains»: keep only THIS case
         orders.push(o)
-        gotInstance.add(o.instance)
+        if (o.instance) gotInstance.add(o.instance)
       }
     }
   }
   if (orders.length) await deps.append(orders)
 
-  const error = failed ? (orders.length ? `${failed}/${plan.instances.length} so‘rov bajarilmadi` : firstError || 'so‘rov bajarilmadi') : undefined
+  const error = failed ? (orders.length ? `${failed}/${settled.length} so‘rov bajarilmadi` : firstError || 'so‘rov bajarilmadi') : undefined
   const seen = [...new Set([...(prev?.seen ?? []), ...gotInstance])]
   // misses = fruitless back-off re-checks so far: the first check (or a changed case) starts the ladder at 0;
   // a failed check must not eat a step

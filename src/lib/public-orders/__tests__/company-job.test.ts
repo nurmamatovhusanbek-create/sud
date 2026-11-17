@@ -15,6 +15,7 @@ mock.module('../source', () => ({
       searched.push(cn)
       gates.push(() => (failNext ? reject(new Error('worker 502')) : resolve([])))
     }),
+  searchLegacyCase: async () => [],
   fetchOrderFile: async () => new Uint8Array(),
 }))
 
