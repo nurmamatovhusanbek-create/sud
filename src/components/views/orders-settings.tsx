@@ -2,8 +2,8 @@
 
 /**
  * Settings › Qarorlar — the control panel of the published-orders feature (there is no library copy any more:
- * orders are fetched only for the cases the owner cares about, once, and kept). Four cards:
- *  0. Search of the stored orders by case number, with «Yuklangan» (PDF on this computer) and the PDF button (orders-library.tsx)
+ * orders are fetched only for the cases the owner cares about, once, and kept). Three cards (the search of the stored
+ * orders lives on its own page, views/orders-view.tsx):
  *  1. Automatic check of the Kuzatuv companies (idle switch, run now, pause/resume)
  *  2. The queue that is (or was) working: progress, pause / resume / cancel
  *  3. What the local cache holds and where it lives (it is never deleted: only added to and updated)
@@ -21,7 +21,6 @@ import {
 import { autoEnabled, checkWatchlistOrders, lastAutoRun, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
 import type { CaseJobStatus, OrdersCacheStats } from '@/lib/public-orders/types'
 import { useOrdersJob } from '@/lib/use-orders-job'
-import { OrdersLibrary } from '@/components/views/orders-library'
 
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 const p2 = (n: number) => String(n).padStart(2, '0')
@@ -78,7 +77,6 @@ export function OrdersTab() {
 
   return (
     <div className="dash" style={{ gridTemplateColumns: '1fr' }}>
-      <OrdersLibrary />
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><RefreshCw /></div>
@@ -185,7 +183,7 @@ export function OrdersTab() {
           <p className="faint" style={{ fontSize: 12.5, margin: '2px 0 0' }}>Yuklanmoqda…</p>
         )}
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '10px 0 10px' }}>
-          Faqat qaror haqidagi kichik yozuvlar saqlanadi (ish raqami, instansiya, sud, sudya, natija, PDF havolasi). Qaror matni faqat PDF ni bosganingizda olinadi va shundan keyin diskda saqlanadi (yuqoridagi qidiruvda “Yuklangan” deb koʻrinadi).
+          Faqat qaror haqidagi kichik yozuvlar saqlanadi (ish raqami, instansiya, sud, sudya, natija, PDF havolasi). Qaror matni faqat PDF ni bosganingizda olinadi va shundan keyin diskda saqlanadi (sidebar dagi “Qarorlar” sahifasida “Yuklangan” deb koʻrinadi).
           Kesh hech qachon oʻchirilmaydi: faqat yangi yozuvlar qoʻshiladi va oʻzgargan ishlar yangilanadi, chunki uni qayta yigʻish uzoq davom etadi.
         </p>
         {cache && <div className="kv"><span className="k">Saqlanadigan joy</span><span className="mono" style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{cache.dir}</span></div>}

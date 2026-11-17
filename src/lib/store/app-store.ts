@@ -27,17 +27,18 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'overview', label: 'Statistika' },
 ]
 /** v18: the sidebar workspace group — SECTIONS with Kuzatuv slotted before Statistika. */
-export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv'; label: string }[] = [
+export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv' | 'orders'; label: string }[] = [
   { key: 'bills', label: 'Toʻlovlar' },
   { key: 'cases', label: 'Sud ishlari' },
   { key: 'hearings', label: 'Majlislar' },
   { key: 'profile', label: 'Kompaniya' },
   { key: 'kuzatuv', label: 'Kuzatuv' },
   { key: 'overview', label: 'Statistika' },
+  { key: 'orders', label: 'Qarorlar' },
 ]
 export type CaseCourtFilter = 'all' | 'economic' | 'civil' | 'administrative'
 
-export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents'
+export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents' | 'orders'
 export type CommandPurpose = 'search' | 'add'
 
 interface AppState {

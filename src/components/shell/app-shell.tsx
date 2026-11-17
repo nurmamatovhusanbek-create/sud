@@ -26,6 +26,7 @@ import {
   Eye,
   FileText,
   Gavel,
+  ScrollText,
   Menu,
   Moon,
   Receipt,
@@ -50,6 +51,7 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
   profile: <Building2 />,
   kuzatuv: <Eye />,
   overview: <BarChart3 />,
+  orders: <ScrollText />,
 }
 
 interface Notif {
@@ -267,7 +269,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setCommandOpen(true)
   }
 
-  const navClick = (key: SectionKey | 'kuzatuv') => {
+  const navClick = (key: SectionKey | 'kuzatuv' | 'orders') => {
+    if (key === 'orders') {
+      setSideOpen(false)
+      setSurface('orders')
+      return
+    }
     if (key === 'kuzatuv') {
       setSideOpen(false)
       setSurface('watchlist')
@@ -276,12 +283,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     goWorkspaceSection(key)
   }
 
-  const navActive = (key: SectionKey | 'kuzatuv') => {
+  const navActive = (key: SectionKey | 'kuzatuv' | 'orders') => {
+    if (key === 'orders') return surface === 'orders'
     if (key === 'kuzatuv') return surface === 'watchlist'
     return inWorkspace && section === key
   }
 
-  const pipFor = (key: SectionKey | 'kuzatuv'): number | undefined => {
+  const pipFor = (key: SectionKey | 'kuzatuv' | 'orders'): number | undefined => {
     if (!hydrated) return undefined
     if (key === 'kuzatuv') return watchCount || undefined
     if (key === 'bills') return counts.bills

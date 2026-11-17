@@ -24,7 +24,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/import` | POST | POST /api/public-orders/import?id=<pdf id> body: the PDF itself (application/pdf or application/octet-stream) | `public-orders/import/route.ts` |
-| `/api/public-orders/library` | GET | GET /api/public-orders/library?q=<case number or part>&saved=1&limit=50 | `public-orders/library/route.ts` |
+| `/api/public-orders/library` | GET | GET /api/public-orders/library?q=&status=saved/missing/all&court=ECONOMIC/CIVIL/ADMINISTRATIVE/CRIMINAL&instan | `public-orders/library/route.ts` |
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
 | `/api/rating` | GET | GET /api/rating?tin=XXXXXXXXX[&force=1] | `rating/route.ts` |
@@ -67,7 +67,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
-| `translit.ts` | core/classify.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
+| `translit.ts` | core/classify.ts, core/public-orders.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
@@ -163,7 +163,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `theme.ts` | components/shell/app-shell.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
 | `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
-| `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-library.tsx, components/views/orders-settings.tsx |  |
+| `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx, components/views/orders-view.tsx |  |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
@@ -212,9 +212,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |
 | `letterhead.tsx` | components/views/doc-editor.tsx, components/views/documents-view.tsx, components/views/pretenzia-view.tsx |  |
-| `order-handover.tsx` | components/proto/case-orders.tsx, components/views/orders-library.tsx |  |
+| `order-handover.tsx` | components/proto/case-orders.tsx, components/views/orders-view.tsx |  |
 | `pizza-geometry.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, lib/report/model.ts, lib/report/render.ts | core/__tests__/pizza.test.ts |
-| `primitives.tsx` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/command-palette.tsx, +4 |  |
+| `primitives.tsx` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/command-palette.tsx, +5 |  |
 | `scrape-progress.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 
 ### Company header
@@ -245,8 +245,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `documents-view.tsx` | app/page.tsx |  |
 | `launcher.tsx` | app/page.tsx |  |
 | `orders-control.tsx` | components/views/watchlist.tsx |  |
-| `orders-library.tsx` | components/views/orders-settings.tsx |  |
 | `orders-settings.tsx` | components/views/settings-view.tsx |  |
+| `orders-view.tsx` | app/page.tsx |  |
 | `pretenzia-view.tsx` | components/views/documents-view.tsx |  |
 | `security-settings.tsx` | components/views/settings-view.tsx |  |
 | `settings-view.tsx` | app/page.tsx |  |
@@ -257,7 +257,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `list-pagination.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx |  |
+| `list-pagination.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/views/orders-view.tsx |  |
 | `states.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 
 ## Environment variables

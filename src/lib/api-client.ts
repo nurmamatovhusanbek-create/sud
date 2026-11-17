@@ -5,7 +5,7 @@
  * legacy shapes) into ApiResult<T>.
  */
 
-import type { LibraryItem, StoredOrder } from '@/core/public-orders'
+import type { LibraryItem, LibraryStatus, StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
 import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
@@ -507,12 +507,24 @@ export async function importPublicOrderPdf(pdfId: string, file: File): Promise<A
   }
 }
 
-/** Settings › Qarorlar search: stored orders matching a case number (or a part of it), marked downloaded or not. Local, instant. */
-export function getPublicOrdersLibrary(q: string, savedOnly: boolean, signal?: AbortSignal) {
-  return request<{ total: number; items: LibraryItem[]; savedPdfs: number; stored: number }>(
-    `/api/public-orders/library?q=${encodeURIComponent(q)}&saved=${savedOnly ? 1 : 0}&limit=50`,
-    signal,
-  )
+/** One page of the Qarorlar archive (`GET /api/public-orders/library`): filtered and paged on the server, local disk only. */
+export interface LibraryPage {
+  total: number
+  items: LibraryItem[]
+  /** how the matches split by download state, before the status filter */
+  counts: { all: number; saved: number; missing: number }
+  page: number
+  size: number
+  /** PDFs on this computer / orders in the local index */
+  savedPdfs: number
+  stored: number
+}
+export function getPublicOrdersLibrary(
+  f: { q: string; status: LibraryStatus; court: string; instance: string; page: number; size: number },
+  signal?: AbortSignal,
+) {
+  const qs = new URLSearchParams({ q: f.q, status: f.status, court: f.court, instance: f.instance, page: String(f.page), size: String(f.size) })
+  return request<LibraryPage>(`/api/public-orders/library?${qs}`, signal)
 }
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */

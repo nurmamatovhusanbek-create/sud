@@ -9,6 +9,7 @@
  */
 
 import { classifyOutcome, type Classification, type PartyRole } from './classify'
+import { uzCyrToLat } from './translit'
 
 export type PublicCourtType = 'ECONOMIC' | 'CIVIL' | 'ADMINISTRATIVE' | 'CRIMINAL'
 export const PUBLIC_COURT_TYPES: PublicCourtType[] = ['ECONOMIC', 'CIVIL', 'ADMINISTRATIVE', 'CRIMINAL']
@@ -311,7 +312,7 @@ export function planCheck(prev: CaseCheck | null, sig: string, now: number, forc
   return { run: false, instances, reason: 'waiting' }
 }
 
-// ---- searching the stored orders by case number (Settings › Qarorlar) --------------------------
+// ---- searching the stored orders (the Qarorlar page) --------------------------------------------
 
 export interface LibraryItem extends StoredOrder {
   /** the PDF is on this computer (opens at once, no captcha) */
@@ -321,26 +322,54 @@ export interface LibraryItem extends StoredOrder {
   savedAt: number
 }
 
+export type LibraryStatus = 'all' | 'saved' | 'missing'
+
+export interface LibraryQuery {
+  /** a case number or a part of it («2615»), or words from the court / judge / category (Latin or Cyrillic) */
+  q: string
+  status: LibraryStatus
+  courtType?: PublicCourtType | ''
+  instance?: string
+  offset: number
+  limit: number
+}
+
+/** Cyrillic court names and Latin queries meet in one folded form: Latin, lower case, one kind of apostrophe. */
+const fold = (s: string): string => uzCyrToLat(s).toLowerCase().replace(/[ʻʼ’‘`´]/g, "'").replace(/\s+/g, ' ').trim()
+const hayOf = new WeakMap<StoredOrder, string>()
+const haystack = (o: StoredOrder): string => {
+  let h = hayOf.get(o)
+  if (h === undefined) hayOf.set(o, (h = fold([o.court, o.judge, o.category, o.pdfName].join(' '))))
+  return h
+}
+
 /**
- * Orders matching what the person typed. «4-1001-2615/40333» matches exactly that case; a fragment («2615», «40333»,
- * «4-1001») matches any case number containing it. Empty query = everything. Downloaded ones come first, newest first;
- * the rest by case number. `total` counts all matches, `items` only the first `limit`.
+ * Orders matching the page's filters. A query that looks like a case number («4-1001-2615/40333», «2615», «40333», «4-1001»)
+ * matches any case number containing it; words match the court, judge, category or file name. Downloaded orders come first,
+ * newest first, then by case number. `total` counts the matches, `items` is the requested window, `counts` how the
+ * matches split by download state (so the switch can show them) before the status filter is applied.
  */
 export function searchLibrary(
   orders: StoredOrder[],
   saved: Map<string, { size: number; savedAt: number }>,
-  opts: { q: string; savedOnly: boolean; limit: number },
-): { total: number; items: LibraryItem[] } {
-  const q = normalizeCaseNumber(opts.q)
-  const out: LibraryItem[] = []
+  opts: LibraryQuery,
+): { total: number; items: LibraryItem[]; counts: { all: number; saved: number; missing: number } } {
+  const qn = normalizeCaseNumber(opts.q)
+  const ql = fold(opts.q)
+  const matched: LibraryItem[] = []
   for (const o of orders) {
-    if (q && !o.caseNumber.includes(q)) continue
+    if (opts.courtType && o.courtType !== opts.courtType) continue
+    if (opts.instance && o.instance !== opts.instance) continue
+    if (qn && !o.caseNumber.includes(qn) && !(ql && haystack(o).includes(ql))) continue
     const f = o.pdfId ? saved.get(o.pdfId.toLowerCase()) : undefined
-    if (opts.savedOnly && !f) continue
-    out.push({ ...o, downloaded: !!f, size: f?.size ?? 0, savedAt: f?.savedAt ?? 0 })
+    matched.push({ ...o, downloaded: !!f, size: f?.size ?? 0, savedAt: f?.savedAt ?? 0 })
   }
+  const nSaved = matched.filter((o) => o.downloaded).length
+  const counts = { all: matched.length, saved: nSaved, missing: matched.length - nSaved }
+  const out = opts.status === 'all' ? matched : matched.filter((o) => o.downloaded === (opts.status === 'saved'))
   out.sort((a, b) => Number(b.downloaded) - Number(a.downloaded) || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
-  return { total: out.length, items: out.slice(0, Math.max(1, opts.limit)) }
+  const start = Math.max(0, opts.offset)
+  return { total: out.length, items: out.slice(start, start + Math.max(1, opts.limit)), counts }
 }
 
 // ---- the pre-2024 system («2024 dan avval»): a different back end, numeric ids, plain PDFs ----------------

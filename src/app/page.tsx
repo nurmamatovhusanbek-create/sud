@@ -20,6 +20,7 @@ import { Launcher } from '@/components/views/launcher'
 import { WatchlistView } from '@/components/views/watchlist'
 import { SettingsView } from '@/components/views/settings-view'
 import { DocumentsView } from '@/components/views/documents-view'
+import { OrdersView } from '@/components/views/orders-view'
 import { ContextBar } from '@/components/company/context-bar'
 import { OverviewSection } from '@/components/sections/overview'
 import { BillsSection } from '@/components/sections/bills'
@@ -60,6 +61,7 @@ function CompanyWorkspace() {
       if (idx >= 1 && idx <= WORKSPACE_NAV.length) {
         const key = WORKSPACE_NAV[idx - 1].key
         if (key === 'kuzatuv') useAppStore.getState().setSurface('watchlist')
+        else if (key === 'orders') useAppStore.getState().setSurface('orders')
         else {
           useAppStore.getState().setSurface('main')
           setSection(key)
@@ -155,6 +157,8 @@ export default function Home() {
         <SettingsView />
       ) : surface === 'documents' ? (
         <DocumentsView />
+      ) : surface === 'orders' ? (
+        <OrdersView />
       ) : view === 'company' ? (
         <CompanyWorkspace />
       ) : (
