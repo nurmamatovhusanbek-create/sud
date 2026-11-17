@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 /** The Windows launchers cannot run here, so guard the things that silently break them on Windows. */
 const root = join(import.meta.dir, '..', '..', '..')
-const files = ['Sud.bat', 'Sud-toxtat.bat', 'Sud-yorliq.bat']
+const files = ['Sud.bat']
 
 describe('Windows launchers', () => {
   for (const f of files) {
@@ -28,15 +28,21 @@ describe('Windows launchers', () => {
     expect(t).toContain('start "" "%URL%"')
     expect(t).toContain('127.0.0.1') // never a LAN address
   })
-  test('Sud-toxtat.bat kills the supervisor before the window and the port listener', () => {
-    const t = readFileSync(join(root, 'Sud-toxtat.bat'), 'utf8')
-    const sup = t.indexOf('supervisor.mjs')
+  test('stop kills the supervisor before the window and the port listener, and never itself', () => {
+    const t = readFileSync(join(root, 'Sud.bat'), 'utf8')
+    const stop = t.slice(t.indexOf(':stop\r\n'))
+    const sup = stop.indexOf('supervisor.mjs')
     expect(sup).toBeGreaterThan(-1)
-    expect(sup).toBeLessThan(t.indexOf('LISTENING'))
-    expect(t).toContain('$PID') // the PowerShell line must not kill itself (its own command line names supervisor.mjs)
+    expect(sup).toBeLessThan(stop.indexOf('LISTENING'))
+    expect(stop).toContain('$PID') // the PowerShell line's own command line names supervisor.mjs
   })
-  test('Sud-yorliq.bat makes a shortcut that runs Sud.bat with an icon that exists', () => {
-    const t = readFileSync(join(root, 'Sud-yorliq.bat'), 'utf8')
+  test('one file: arguments and the menu reach stop and shortcut, and the shortcut re-runs Sud.bat with an icon that exists', () => {
+    const t = readFileSync(join(root, 'Sud.bat'), 'utf8')
+    expect(t).toContain('if /i "%~1"=="stop" goto stop')
+    expect(t).toContain('if /i "%~1"=="shortcut" goto shortcut')
+    expect(t).toContain('choice /c OSY')
+    // choice sets errorlevel to the 1-based key position and `if errorlevel N` means >= N: test the highest first
+    expect(t.indexOf('if errorlevel 3 goto shortcut')).toBeLessThan(t.indexOf('if errorlevel 2 goto stop'))
     expect(t).toContain('/c Sud.bat')
     expect(t).toContain('scripts\\sud.ico')
     expect(readFileSync(join(root, 'scripts', 'sud.ico')).subarray(0, 4)).toEqual(Buffer.from([0, 0, 1, 0]))
