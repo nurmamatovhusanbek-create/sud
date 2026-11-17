@@ -133,6 +133,41 @@ export function resetCheckedCache(): void {
   checkedCache = null
 }
 
+// ---- every stored order, for the Qarorlar search ------------------------------------------------
+
+let allMemo: { sig: string; orders: StoredOrder[] } | null = null
+
+/** All stored orders (the last copy of each id). Re-read only when a shard changed (name + size + mtime signature). */
+export async function allOrders(): Promise<StoredOrder[]> {
+  const shards = path.join(dataDir(), 'shards')
+  let names: string[]
+  try {
+    names = (await fs.readdir(shards)).filter((n) => n.endsWith('.jsonl')).sort()
+  } catch {
+    return []
+  }
+  const stats = await Promise.all(names.map((n) => fs.stat(path.join(shards, n)).catch(() => null)))
+  const sig = names.map((n, i) => `${n}:${stats[i]?.size}:${stats[i]?.mtimeMs}`).join('|')
+  if (allMemo?.sig === sig) return allMemo.orders
+  const byId = new Map<string, StoredOrder>()
+  for (const n of names) {
+    let text = ''
+    try {
+      text = await fs.readFile(path.join(shards, n), 'utf8')
+    } catch { continue }
+    for (const line of text.split('\n')) {
+      if (!line) continue
+      try {
+        const o = JSON.parse(line) as StoredOrder
+        if (o && typeof o.id === 'string' && typeof o.caseNumber === 'string') byId.set(o.id, o)
+      } catch { /* torn last line */ }
+    }
+  }
+  const orders = [...byId.values()]
+  allMemo = { sig, orders }
+  return orders
+}
+
 // ---- the cache as a whole (Settings › Qarorlar) ---------------------------------------------------
 
 export async function cacheStats(): Promise<OrdersCacheStats> {

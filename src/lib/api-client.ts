@@ -5,7 +5,7 @@
  * legacy shapes) into ApiResult<T>.
  */
 
-import type { StoredOrder } from '@/core/public-orders'
+import type { LibraryItem, StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
 import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
@@ -505,6 +505,14 @@ export async function importPublicOrderPdf(pdfId: string, file: File): Promise<A
   } catch {
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
   }
+}
+
+/** Settings › Qarorlar search: stored orders matching a case number (or a part of it), marked downloaded or not. Local, instant. */
+export function getPublicOrdersLibrary(q: string, savedOnly: boolean, signal?: AbortSignal) {
+  return request<{ total: number; items: LibraryItem[]; savedPdfs: number; stored: number }>(
+    `/api/public-orders/library?q=${encodeURIComponent(q)}&saved=${savedOnly ? 1 : 0}&limit=50`,
+    signal,
+  )
 }
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */

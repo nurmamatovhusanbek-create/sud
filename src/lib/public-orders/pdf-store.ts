@@ -32,3 +32,25 @@ export async function writePdf(id: string, bytes: Uint8Array): Promise<void> {
   await fs.writeFile(tmp, bytes, { mode: 0o600 })
   await fs.rename(tmp, f)
 }
+
+/** Every PDF on disk: order id → size and when it was saved (the Qarorlar search shows «Yuklangan» from this). */
+export async function listPdfs(): Promise<Map<string, { size: number; savedAt: number }>> {
+  const out = new Map<string, { size: number; savedAt: number }>()
+  let names: string[]
+  try {
+    names = await fs.readdir(dir())
+  } catch {
+    return out // nothing downloaded yet
+  }
+  await Promise.all(
+    names.map(async (n) => {
+      const id = n.slice(0, -4)
+      if (!n.endsWith('.pdf') || !isOrderFileId(id)) return // temp files and strangers are not orders
+      try {
+        const st = await fs.stat(path.join(dir(), n))
+        if (st.size > 5) out.set(id.toLowerCase(), { size: st.size, savedAt: st.mtimeMs })
+      } catch { /* vanished while listing */ }
+    }),
+  )
+  return out
+}

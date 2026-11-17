@@ -24,6 +24,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/import` | POST | POST /api/public-orders/import?id=<pdf id> body: the PDF itself (application/pdf or application/octet-stream) | `public-orders/import/route.ts` |
+| `/api/public-orders/library` | GET | GET /api/public-orders/library?q=<case number or part>&saved=1&limit=50 | `public-orders/library/route.ts` |
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
 | `/api/rating` | GET | GET /api/rating?tin=XXXXXXXXX[&force=1] | `rating/route.ts` |
@@ -60,7 +61,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
-| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, lib/api-client.ts, +7 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +9 | core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/rating/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
@@ -77,8 +78,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +4 |  |
-| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, +10 |  |
-| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/custom/route, +26 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, +11 |  |
+| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/custom/route, +27 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `security.ts` | server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
@@ -92,7 +93,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +23 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +24 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -142,9 +143,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route | lib/public-orders/__tests__/order-pdf.test.ts |
-| `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import/route | lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
+| `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route | lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
-| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/library/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
 | `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +8 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
@@ -211,6 +212,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |
 | `letterhead.tsx` | components/views/doc-editor.tsx, components/views/documents-view.tsx, components/views/pretenzia-view.tsx |  |
+| `order-handover.tsx` | components/proto/case-orders.tsx, components/views/orders-library.tsx |  |
 | `pizza-geometry.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, lib/report/model.ts, lib/report/render.ts | core/__tests__/pizza.test.ts |
 | `primitives.tsx` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/command-palette.tsx, +4 |  |
 | `scrape-progress.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
@@ -243,6 +245,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `documents-view.tsx` | app/page.tsx |  |
 | `launcher.tsx` | app/page.tsx |  |
 | `orders-control.tsx` | components/views/watchlist.tsx |  |
+| `orders-library.tsx` | components/views/orders-settings.tsx |  |
 | `orders-settings.tsx` | components/views/settings-view.tsx |  |
 | `pretenzia-view.tsx` | components/views/documents-view.tsx |  |
 | `security-settings.tsx` | components/views/settings-view.tsx |  |

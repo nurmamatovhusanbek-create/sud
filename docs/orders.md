@@ -12,14 +12,15 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 | | `engine.ts` | `lookupCase(deps, job)` — I/O injected; 3 instances in parallel; keeps only rows whose case number equals the job's |
 | | `company-job.ts` | the queue: `planCases` (DETECT, free), `enqueueCases` (SCRAPE), pause/resume/cancel/`retryFailed`; `globalThis.__publicOrdersJob`; `MAX_QUEUE` |
 | | `store.ts`, `data-dir.ts` | shard files + `checked.jsonl` in `~/.sud-tizimi/public-orders` (`PUBLIC_ORDERS_DIR`); `cacheStats` |
-| API | `app/api/public-orders/{fetch,status,orders,file,cache,import}` | `fetch`: `{action: start|plan|pause|resume|cancel|retry}`; `import`: the hand-over of a PDF (below) |
+| API | `app/api/public-orders/{fetch,status,orders,file,cache,import,library}` | `fetch`: `{action: start|plan|pause|resume|cancel|retry}`; `import`: the hand-over of a PDF (below) |
 | Client | `lib/orders-watchlist.ts` | Kuzatuv run (`checkWatchlistOrders`), `planWatchlistOrders`, pause/resume, opt-in switch (`sud-orders-auto`, default OFF) |
 | | `lib/use-orders-job.ts` | ONE shared status poll for every consumer |
 | | `lib/registry.ts` | `meta.orderCases` (compact case list) written whenever stats are read → Kuzatuv can DETECT without scraping |
 | UI | `shell/orders-loader.tsx` | the pill: only while scraping; announces the end with a toast |
 | | `shell/orders-auto-check.tsx` | opt-in idle watcher (3 min without input, ≤ once / 6 h) |
 | | `views/orders-control.tsx` | Kuzatuv button + status line + switch |
-| | `views/orders-settings.tsx` | Settings › Qarorlar control panel (queue, cache numbers) |
+| | `views/orders-settings.tsx` | Settings › Qarorlar control panel (search card, queue, cache numbers) |
+| | `views/orders-library.tsx`, `proto/order-handover.tsx` | Settings › Qarorlar search by case number (`core/public-orders` `searchLibrary`; `GET /library` = `store.allOrders` + `pdf-store.listPdfs`): «Yuklangan · size» when the PDF is on disk, PDF button, same hand-over as the drawer |
 | | `proto/case-orders.tsx` | drawer cards «Eʼlon qilingan / qilinmagan» |
 | | `sections/cases.tsx` | «Qarorlar · N» button, drawer wiring, `orderJobCase` |
 
@@ -37,7 +38,8 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 10. **One status poll** (`use-orders-job.ts`); local reads (`status`, `cache`, `orders`) are exempt from the scrape rate limit, `plan/start/...` are not.
 11. **Searches are slow** (≈10 s per `case_number`+`instance`, a minute+ without instance) ⇒ background only, one case at a time, 3 instance searches in parallel. Never hedge/duplicate them.
 12. **A PDF may need a person («Qoʻlda yuklash»).** public.sud.uz now accepts a download only with a token from a SOLVED human challenge (`public-sud-api.md`). When every automatic route is refused, `GET /file` answers `409 manual_required` and the automatic route rests for 30 min (`ManualDownloadRequired`, no more captchas burned; `&retry=1` = the card's «Avtomatik qayta urinish»). The order card then offers: open public.sud.uz, save the PDF there, pick it → `POST /api/public-orders/import?id=<pdf id>` (raw body, up to 100 MB: `guard({maxBodyBytes})`; only a real `%PDF-` is kept, a site-wrapped multipart file is unwrapped) → stored in `files/` exactly like an automatic download, so every later click is served from disk. The id comes from the card the person picked, never from the file. Listing/search and the case database are unaffected.
-13. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
+13. **Every PDF the person opens is kept, forever** (`files/<pdf id>.pdf`; the file route writes it on the first download, the import route on a hand-over), and the Qarorlar search shows exactly which ones are on disk. The background check stores only the small order rows, never PDFs (one captcha per PDF would turn a check into a crawl). Searching is a local read: typing never reaches public.sud.uz.
+14. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
 
 ## Flow
 
@@ -51,6 +53,6 @@ end of run (running→done/error) ─► toast (+ «Qayta urinish» → POST /fe
 ```
 
 ## Tests
-`core/__tests__/public-orders.test.ts` (policy) · `lib/public-orders/__tests__/{engine,company-job,store,data-dir,order-file,order-pdf,import-route}.test.ts`.
+`core/__tests__/public-orders.test.ts` (policy) · `lib/public-orders/__tests__/{engine,company-job,store,data-dir,order-file,order-pdf,import-route,library}.test.ts`.
 Live scraping does not work in the sandbox: e2e uses a mock upstream (`PUBLIC_ORDERS_API=http://localhost:PORT`) and
 mocked `/api/stats` (see AGENTS §1).

@@ -13,11 +13,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, FileText, Loader2, RefreshCw, Upload } from 'lucide-react'
+import { FileText, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchPublicOrders, getPublicOrders, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type PublicOrdersData } from '@/lib/api-client'
 import { PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, splitDecisions, type KnownDecision } from '@/core/public-orders'
 import { DwSection } from '@/components/proto/drawer'
+import { OrderHandover } from '@/components/proto/order-handover'
 
 type State = { status: 'loading' } | { status: 'ok'; data: PublicOrdersData } | { status: 'error' }
 
@@ -139,28 +140,7 @@ export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }
               </div>
             ))}
           </div>
-          {manual && (
-            <div className="dw-orders-empty" style={{ display: 'grid', gap: 8 }}>
-              <span>
-                public.sud.uz endi qarorni faqat odam tasdiqlagandan keyin beradi. Qarorni shu saytda oʻzingiz ochib, PDF ni saqlang va shu yerga tanlang — u bir marta saqlanadi.
-              </span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <a className="btn btn-outline btn-sm" href="https://public.sud.uz/" target="_blank" rel="noopener noreferrer">
-                  <ExternalLink />
-                  <span>public.sud.uz ni ochish</span>
-                </a>
-                <label className="btn btn-outline btn-sm" style={{ cursor: importing ? 'wait' : 'pointer' }}>
-                  {importing ? <Loader2 className="spin" /> : <Upload />}
-                  <span>PDF ni tanlash</span>
-                  <input type="file" accept="application/pdf,.pdf" hidden disabled={importing} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = '' }} />
-                </label>
-                <button className="btn btn-outline btn-sm" disabled={opening === manual.id} onClick={() => void open(manual.id, manual.name, true)} title="Avtomatik yuklashni yana bir bor sinab koʻrish">
-                  <RefreshCw />
-                  <span>Avtomatik qayta urinish</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {manual && <OrderHandover importing={importing} busy={opening === manual.id} onFile={(f) => void importFile(f)} onRetry={() => void open(manual.id, manual.name, true)} />}
         </DwSection>
       )}
 

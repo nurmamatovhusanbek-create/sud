@@ -294,3 +294,35 @@ export function planCheck(prev: CaseCheck | null, sig: string, now: number, forc
   if (wait !== undefined && age >= wait) return { run: true, instances, reason: 'backoff' }
   return { run: false, instances, reason: 'waiting' }
 }
+
+// ---- searching the stored orders by case number (Settings › Qarorlar) --------------------------
+
+export interface LibraryItem extends StoredOrder {
+  /** the PDF is on this computer (opens at once, no captcha) */
+  downloaded: boolean
+  size: number
+  /** when the PDF was saved (ms), 0 when not downloaded */
+  savedAt: number
+}
+
+/**
+ * Orders matching what the person typed. «4-1001-2615/40333» matches exactly that case; a fragment («2615», «40333»,
+ * «4-1001») matches any case number containing it. Empty query = everything. Downloaded ones come first, newest first;
+ * the rest by case number. `total` counts all matches, `items` only the first `limit`.
+ */
+export function searchLibrary(
+  orders: StoredOrder[],
+  saved: Map<string, { size: number; savedAt: number }>,
+  opts: { q: string; savedOnly: boolean; limit: number },
+): { total: number; items: LibraryItem[] } {
+  const q = normalizeCaseNumber(opts.q)
+  const out: LibraryItem[] = []
+  for (const o of orders) {
+    if (q && !o.caseNumber.includes(q)) continue
+    const f = o.pdfId ? saved.get(o.pdfId.toLowerCase()) : undefined
+    if (opts.savedOnly && !f) continue
+    out.push({ ...o, downloaded: !!f, size: f?.size ?? 0, savedAt: f?.savedAt ?? 0 })
+  }
+  out.sort((a, b) => Number(b.downloaded) - Number(a.downloaded) || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
+  return { total: out.length, items: out.slice(0, Math.max(1, opts.limit)) }
+}
