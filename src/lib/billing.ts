@@ -1,3 +1,4 @@
+import { chainFetch } from '@/lib/net/chain-fetch'
 import crypto from 'crypto'
 import ZAI from 'z-ai-web-dev-sdk'
 
@@ -220,7 +221,7 @@ async function fetchJsonWithRetry<T>(
       // captcha and for what it unlocks); anything else goes through the scheduler / a pinned worker.
       const directOrigin = directOriginOf(worker)
       const res = directOrigin
-        ? await fetch(url, {
+        ? await chainFetch(url, {
             method,
             body,
             headers: {

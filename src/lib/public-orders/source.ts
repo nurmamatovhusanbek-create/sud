@@ -1,4 +1,5 @@
 import 'server-only'
+import { chainFetch } from '@/lib/net/chain-fetch'
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
 import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
@@ -24,7 +25,7 @@ const HEADERS = {
 
 async function fetchUpstream(path: string, opts: { timeoutMs: number; background: boolean }): Promise<Response> {
   const url = BASE + path
-  if (DIRECT_LIST) return fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
+  if (DIRECT_LIST) return chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
   return fetchViaWorkers(url, {
     originKey: 'adolatapi1.sud.uz',
     headers: HEADERS,
@@ -44,7 +45,7 @@ const realDeps: OrderFileDeps = {
     // never race a duplicate: the first request spends the token
     const res =
       route === DIRECT
-        ? await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
+        ? await chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
         : await fetchViaWorkers(url, { originKey: 'adolatapi1.sud.uz', headers: HEADERS, timeoutMs: 45_000, maxAttempts: 1, hedgeMs: 45_000, priority: 'interactive', worker: route })
     const body = new Uint8Array(await res.arrayBuffer())
     if (!res.ok) console.error(`[orders-file] ${route === DIRECT ? 'direct' : 'worker'} HTTP ${res.status}: ${Buffer.from(body.subarray(0, 200)).toString('utf8').replace(/\s+/g, ' ')}`)

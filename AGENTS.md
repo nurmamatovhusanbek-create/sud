@@ -118,6 +118,7 @@ Both document APIs need their templates traced into the standalone build (`outpu
 - **Validate the shape of every raw `fetch()` response before storing it.** An error body (401 with
   `APP_API_TOKEN` set, 429, 500) is valid JSON with no data fields; `settings-view` once did
   `setData(json)` and then `data.workers.length`, which white-screened the whole Settings page.
+- **«unable to verify the first certificate» on a DIRECT sud.uz request** = the host sends only its own certificate, not the intermediate (Chrome downloads the missing one itself; Node does not). Direct calls (orders list/PDF, billing/captcha direct route) go through `lib/net/chainFetch`: only after that exact error it reads the leaf's AIA «CA Issuers» URL (public hosts only, size/time capped), accepts an issuer only if it really signed the certificate below, and retries with Node's roots plus those intermediates. Trust is never widened and certificate checking is never turned off — never «fix» this with `NODE_TLS_REJECT_UNAUTHORIZED=0` or `rejectUnauthorized: false`. Test: `net/__tests__/chain-fetch.test.ts` (builds a real broken chain with openssl). A new direct `fetch` to a sud.uz host should use `chainFetch` too.
 - **Stale `.next` types** can break `typecheck` after you delete a page/route. Clear with
   `rm -rf .next/dev/types .next/types` and re-run.
 - **Never commit secrets.** Network captures the owner pastes may contain live cookies

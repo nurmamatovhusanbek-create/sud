@@ -129,8 +129,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
 | `identity.ts` | app/page.tsx |  |
+| `net/chain-fetch.ts` | lib/billing.ts, lib/public-orders/source.ts | lib/net/__tests__/chain-fetch.test.ts |
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
-| `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
+| `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/net/chain-fetch.ts, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orders-watchlist.ts` | components/shell/orders-auto-check.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx |  |
 | `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts |
