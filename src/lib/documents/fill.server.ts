@@ -15,7 +15,7 @@ import { docById } from './registry'
 import { fillXml } from './fill.shared'
 import { applyLetterhead } from './banner'
 import { applyScriptToZip, resolveScript, valuesFor } from './script'
-import type { LatinScript } from '@/core/uz-alphabet'
+import type { UzScript } from '@/core/uz-alphabet'
 import { isCustomId } from './custom'
 import { ensureCustomRegistered, readCustomTemplate } from './custom.server'
 
@@ -34,7 +34,7 @@ export interface GenerateOpts {
    *  uploader (court petitions) omit it so an embedded letterhead is kept. */
   blankIfNone?: boolean
   /** Which Uzbek Latin alphabet to write in (default: the old one, the templates' own). English documents ignore it. */
-  script?: LatinScript
+  script?: UzScript
 }
 
 /** Raw bytes of a document's .docx template (also served to the live preview). */
@@ -68,7 +68,7 @@ export async function generateDocx(
   if (!docXmlFile) throw new Error('Shablon buzilgan')
 
   // the alphabet: the template's own words first (every text part, {{placeholders}} skipped), then the values
-  const script = resolveScript(await docXmlFile.async('string'), def.lang, opts.script ?? 'old')
+  const script = resolveScript(await docXmlFile.async('string'), def.lang, opts.script ?? 'old', def.cyrillic)
   if (script) await applyScriptToZip(zip, script)
   const xml = await zip.file('word/document.xml')!.async('string')
   zip.file('word/document.xml', fillXml(xml, valuesFor(values, script)))

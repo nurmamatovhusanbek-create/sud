@@ -16,7 +16,7 @@
  */
 
 import type JSZip from 'jszip'
-import { findEdits, looksEnglish, toLatinScript, type Edit, type LatinScript } from '@/core/uz-alphabet'
+import { effectiveScript, findEdits, looksEnglish, toLatinScript, type Edit, type UzScript } from '@/core/uz-alphabet'
 import { withDerived } from './derive'
 
 const PLACEHOLDER = /\{\{[a-z_0-9]+\}\}/g
@@ -60,7 +60,7 @@ interface Run {
 }
 
 /** The edits for one paragraph's text: {{placeholders}} are opaque, everything else is converted. */
-function editsFor(text: string, script: LatinScript): Edit[] {
+function editsFor(text: string, script: UzScript): Edit[] {
   const out: Edit[] = []
   let at = 0
   const sweep = (end: number) => {
@@ -76,7 +76,7 @@ function editsFor(text: string, script: LatinScript): Edit[] {
 }
 
 /** Rewrite the text of one group of consecutive runs; returns [run, newText] only for runs that changed. */
-function rewriteGroup(runs: Run[], script: LatinScript): Map<Run, string> {
+function rewriteGroup(runs: Run[], script: UzScript): Map<Run, string> {
   const changed = new Map<Run, string>()
   const joined = runs.map((r) => r.text).join('')
   const edits = editsFor(joined, script)
@@ -100,7 +100,7 @@ function rewriteGroup(runs: Run[], script: LatinScript): Map<Run, string> {
 }
 
 /** `word/*.xml` with the template's own words written in `script`. Unchanged text, tags and attributes are left as they are. */
-export function convertWordXml(xml: string, script: LatinScript): string {
+export function convertWordXml(xml: string, script: UzScript): string {
   const groups: Run[][] = []
   let cur: Run[] = []
   const flush = () => {
@@ -134,7 +134,7 @@ export function convertWordXml(xml: string, script: LatinScript): string {
 }
 
 /** Convert every text part of an opened .docx in place. Returns how many parts changed. */
-export async function applyScriptToZip(zip: JSZip, script: LatinScript): Promise<number> {
+export async function applyScriptToZip(zip: JSZip, script: UzScript): Promise<number> {
   let changed = 0
   for (const name of Object.keys(zip.files)) {
     if (!TEXT_PART.test(name)) continue
@@ -151,7 +151,7 @@ export async function applyScriptToZip(zip: JSZip, script: LatinScript): Promise
 }
 
 /** Every value in `script`. Strings only; the keys are untouched. */
-export function convertValues(values: Record<string, string>, script: LatinScript): Record<string, string> {
+export function convertValues(values: Record<string, string>, script: UzScript): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(values)) out[k] = typeof v === 'string' ? toLatinScript(v, script) : v
   return out
@@ -162,7 +162,7 @@ export function convertValues(values: Record<string, string>, script: LatinScrip
  * all written in `script`. Typed text is first normalised to the old alphabet, whatever it was typed in, so the
  * derivations (core/translit, initials) see ONE spelling; the result is then converted once, at the end.
  */
-export function valuesForScript(values: Record<string, string>, script: LatinScript): Record<string, string> {
+export function valuesForScript(values: Record<string, string>, script: UzScript): Record<string, string> {
   return convertValues(withDerived(convertValues(values, 'old')), script)
 }
 
@@ -180,15 +180,16 @@ export function plainText(xml: string): string {
 
 /**
  * The alphabet this document will really be written in, or `null` for «leave every character exactly as it is».
- * An English document (declared, or one that reads as English) gets `null` in BOTH directions: its «sh» and «ch» are not
- * Uzbek letters, and a Turkish surname such as «Özdemir» must not become «Oʻzdemir» either.
+ * An English document (declared, or one that reads as English) gets `null` in EVERY direction: its «sh» and «ch» are not
+ * Uzbek letters, and a Turkish surname such as «Özdemir» must not become «Oʻzdemir» either. Cyrillic is only written when
+ * the document was made for it (`cyrillic`, DocDef.cyrillic); any other document stays in the Latin alphabet.
  */
-export function resolveScript(documentXml: string, lang: string | undefined, requested: LatinScript): LatinScript | null {
+export function resolveScript(documentXml: string, lang: string | undefined, requested: UzScript, cyrillic?: boolean): UzScript | null {
   if (lang === 'en') return null
-  return looksEnglish(plainText(documentXml)) ? null : requested
+  return looksEnglish(plainText(documentXml)) ? null : effectiveScript(requested, cyrillic)
 }
 
 /** The values for a document: converted for `script`, or exactly what was typed plus the derived keys when `script` is null. */
-export function valuesFor(values: Record<string, string>, script: LatinScript | null): Record<string, string> {
+export function valuesFor(values: Record<string, string>, script: UzScript | null): Record<string, string> {
   return script ? valuesForScript(values, script) : withDerived(values)
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { applyEdits, findEdits, hasNewLetters, isProtectedToken, parseLatinScript, toLatinScript, toNewLatin, toOldLatin } from '../uz-alphabet'
+import { applyEdits, effectiveScript, findEdits, hasNewLetters, isProtectedToken, parseLatinScript, parseScript, scriptsFor, toLatinScript, toNewLatin, toOldLatin } from '../uz-alphabet'
+import { uzCyrToLat } from '../translit'
 
 /** The alphabet chart (2026): [new, old]. Rows that changed are the four marked «O‘ZGARGAN». */
 const CHANGED: [string, string][] = [
@@ -266,5 +267,187 @@ describe('properties', () => {
       if (/^[ŞÇ]$/.test(w)) continue
       expect(toNewLatin(toOldLatin(w))).toBe(w)
     }
+  })
+})
+
+// ---- Uzbek Cyrillic ----------------------------------------------------------------------------------------------------
+
+const cyr = (t: string) => toLatinScript(t, 'cyr')
+
+describe('Uzbek Cyrillic: the letters', () => {
+  // [old Latin, Cyrillic]: lower and upper case, the way the alphabet chart lists them
+  const LETTERS: [string, string][] = [
+    ['a', 'а'], ['b', 'б'], ['d', 'д'], ['f', 'ф'], ['g', 'г'], ['h', 'ҳ'], ['i', 'и'], ['j', 'ж'], ['k', 'к'], ['l', 'л'],
+    ['m', 'м'], ['n', 'н'], ['o', 'о'], ['p', 'п'], ['q', 'қ'], ['r', 'р'], ['s', 'с'], ['t', 'т'], ['u', 'у'], ['v', 'в'],
+    ['x', 'х'], ['z', 'з'], ['oʻ', 'ў'], ['gʻ', 'ғ'], ['sh', 'ш'], ['ch', 'ч'], ['ng', 'нг'], ['ya', 'я'], ['yo', 'ё'], ['yu', 'ю'],
+  ]
+  for (const [lat, ru] of LETTERS) {
+    test(`${lat} → ${ru}`, () => {
+      expect(cyr(lat)).toBe(ru)
+      expect(cyr(lat.charAt(0).toUpperCase() + lat.slice(1))).toBe(ru.charAt(0).toUpperCase() + ru.slice(1))
+    })
+  }
+  test('a lone y is й, ye is е, e is э at the start of a word and after a vowel, е after a consonant', () => {
+    expect(cyr('y')).toBe('й')
+    expect(cyr('yetti')).toBe('етти')
+    expect(cyr('Erkin')).toBe('Эркин')
+    expect(cyr('Sherzod')).toBe('Шерзод')
+    expect(cyr('poeziya')).toBe('поэзия')
+    expect(cyr('Yeva')).toBe('Ева')
+  })
+  test('yoʻq is йўқ (y + oʻ), not ёʻқ', () => {
+    expect(cyr('yoʻq')).toBe('йўқ')
+    expect(cyr('YOʻQ')).toBe('ЙЎҚ')
+    expect(cyr('yo‘l')).toBe('йўл')
+    expect(cyr('yoki')).toBe('ёки')
+  })
+  test('the tutuq belgisi is ъ between letters; ʼ between s and h only says «two letters»', () => {
+    expect(cyr('maʼno')).toBe('маъно')
+    expect(cyr('da’vogar')).toBe('даъвогар')
+    expect(cyr("ta'sir")).toBe('таъсир')
+    expect(cyr('Isʼhoq')).toBe('Исҳоқ')
+    expect(cyr('shahar')).toBe('шаҳар')
+  })
+  test('ts is ц only between vowels or at the start of a word', () => {
+    expect(cyr('federatsiya')).toBe('федерация')
+    expect(cyr('Tsentr')).toBe('Центр')
+    expect(cyr('bitsh')).toBe('битш')
+  })
+  test('capitals: Sh and SH are both Ш, whole words stay upper case, initials stay initials', () => {
+    expect(cyr('Sh')).toBe('Ш')
+    expect(cyr('SH')).toBe('Ш')
+    expect(cyr('SHARTNOMA')).toBe('ШАРТНОМА')
+    expect(cyr('OʻZBEKISTON')).toBe('ЎЗБЕКИСТОН')
+    expect(cyr('Turgunov Sh.A.')).toBe('Тургунов Ш.А.')
+    expect(cyr('Yusupov')).toBe('Юсупов')
+    expect(cyr('YUSUPOV')).toBe('ЮСУПОВ')
+  })
+  test('loan words: the Latin spelling drops the ъ that Cyrillic keeps', () => {
+    expect(cyr('subyektlar')).toBe('субъектлар')
+    expect(cyr('obyekt')).toBe('объект')
+    expect(cyr('Inyektor')).toBe('Инъектор')
+    expect(cyr('Yakshanba yaxshi')).toBe('Якшанба яхши') // not a prefix: ordinary ya
+    expect(cyr('Mayya')).toBe('Майя')
+  })
+  test('abbreviations read letter by letter', () => {
+    expect(cyr('MChJ')).toBe('МЧЖ')
+    expect(cyr('MCHJ')).toBe('МЧЖ')
+    expect(cyr('JSHSHIR')).toBe('ЖШШИР')
+    expect(cyr('QK')).toBe('ҚК')
+    expect(cyr('IIO')).toBe('ИИО')
+    expect(cyr('MFY')).toBe('МФЙ')
+    expect(cyr('STIR')).toBe('СТИР')
+  })
+  test('the new Latin alphabet is read too', () => {
+    expect(cyr('Özbekiston Şahar Çoy Ğulom')).toBe('Ўзбекистон Шаҳар Чой Ғулом')
+  })
+})
+
+describe('Uzbek Cyrillic: sentences the documents contain', () => {
+  const PAIRS: [string, string][] = [
+    ['Oʻzbekiston Respublikasi Iqtisodiy protsessual kodeksining 42-moddasiga muvofiq', 'Ўзбекистон Республикаси Иқтисодий процессуал кодексининг 42-моддасига мувофиқ'],
+    ['Ishning sud majlisi 17.11.2026 kuni soat 10:00ga belgilangan.', 'Ишнинг суд мажлиси 17.11.2026 куни соат 10:00га белгиланган.'],
+    ['SOʻRAYMAN:', 'СЎРАЙМАН:'],
+    ['«Xoʻjalik yurituvchi subʼyektlar faoliyatining shartnomaviy-huquqiy bazasi toʻgʻrisida»gi Qonun', '«Хўжалик юритувчи субъектлар фаолиятининг шартномавий-ҳуқуқий базаси тўғрисида»ги Қонун'],
+    ['“Shahar-Choy” MChJ, Toshkent sh., 2026-yil', '“Шаҳар-Чой” МЧЖ, Тошкент ш., 2026-йил'],
+    ['Joriy sanaga koʻra jami qarzdorlik quyidagicha:', 'Жорий санага кўра жами қарздорлик қуйидагича:'],
+  ]
+  for (const [lat, ru] of PAIRS) {
+    test(lat.slice(0, 40), () => {
+      expect(cyr(lat)).toBe(ru)
+    })
+  }
+})
+
+describe('Uzbek Cyrillic: what is never rewritten', () => {
+  test('e-mail, links, domains and codes stay Latin, exactly', () => {
+    for (const t of ['a.b@gmail.com', 'https://my.sud.uz/x', 'www.lex.uz', 'sud.uz', 'AA1234567', 'SH-12/2026', 'PF-5712', '12A', 'M2']) expect(cyr(t)).toBe(t)
+  })
+  test('a code keeps its letters but the Uzbek word hanging on it is converted', () => {
+    expect(cyr('SH-12/2026-sonli')).toBe('SH-12/2026-сонли')
+    expect(cyr('(SH-12/2026-sonli),')).toBe('(SH-12/2026-сонли),')
+    expect(toNewLatin('SH-12/2026-shartnoma')).toBe('SH-12/2026-şartnoma')
+    expect(toOldLatin('SH-12/2026-şartnoma')).toBe('SH-12/2026-shartnoma')
+    expect(cyr('a@b.uz-sonli')).toBe('a@b.uz-sonli') // a link is never split
+  })
+  test('a suffix written straight after a number is a word and is converted', () => {
+    expect(cyr('10:00ga')).toBe('10:00га')
+    expect(cyr('2026y.')).toBe('2026й.')
+    expect(cyr('5ta shahar')).toBe('5та шаҳар')
+  })
+  test('foreign words and brands stay Latin whole (never half Latin, half Cyrillic)', () => {
+    for (const t of ['Coca-Cola', 'Wi-Fi', 'Windows', 'Cable']) expect(cyr(t)).toBe(t)
+    expect(cyr('Windows va shahar')).toBe('Windows ва шаҳар')
+  })
+  test('Cyrillic text is left alone, and converting twice is converting once', () => {
+    expect(cyr('Ўзбекистон шаҳар')).toBe('Ўзбекистон шаҳар')
+    expect(cyr(cyr('Toshkent shahar'))).toBe(cyr('Toshkent shahar'))
+    expect(cyr('Ahmad Ахмад')).toBe('Аҳмад Ахмад')
+  })
+  test('digits, punctuation, quotes and spacing are untouched', () => {
+    expect(cyr('«17» noyabr, 2026-yil; 5-chi (№ 12/34) 0,4%')).toBe('«17» ноябр, 2026-йил; 5-чи (№ 12/34) 0,4%')
+    expect(cyr('  a   b ')).toBe('  а   б ')
+    expect(cyr('')).toBe('')
+  })
+  test('a quote mark is not a tutuq: it stays where it was', () => {
+    expect(cyr("'Sud' ‘Sud’")).toBe("'Суд' ‘Суд’")
+  })
+})
+
+describe('Uzbek Cyrillic: the script helpers', () => {
+  test('parseScript knows the three scripts and falls back to old', () => {
+    expect(parseScript('cyr')).toBe('cyr')
+    expect(parseScript('new')).toBe('new')
+    for (const v of ['old', '', null, undefined, 'kirill', 3]) expect(parseScript(v)).toBe('old')
+    expect(parseLatinScript('cyr')).toBe('old') // the Latin-only parser never returns Cyrillic
+  })
+  test('Cyrillic is offered, and used, only by a document that has a Cyrillic version', () => {
+    expect(scriptsFor(true)).toEqual(['old', 'new', 'cyr'])
+    expect(scriptsFor(false)).toEqual(['old', 'new'])
+    expect(scriptsFor(undefined)).toEqual(['old', 'new'])
+    expect(effectiveScript('cyr', true)).toBe('cyr')
+    expect(effectiveScript('cyr', false)).toBe('old')
+    expect(effectiveScript('new', false)).toBe('new')
+  })
+  test('findEdits: sorted, non-overlapping, absolute; applyEdits = toLatinScript', () => {
+    const t = 'Oʻzbek shahar, ya’ni a@b.uz yoʻq'
+    const e = findEdits(t, 'cyr')
+    for (let i = 0; i < e.length; i++) {
+      expect(e[i].end).toBeGreaterThanOrEqual(e[i].start)
+      if (i) expect(e[i].start).toBeGreaterThanOrEqual(e[i - 1].end)
+    }
+    expect(applyEdits(t, e)).toBe(cyr(t))
+  })
+})
+
+describe('Uzbek Cyrillic: the reverse converter reads it back', () => {
+  const norm = (t: string) => t.toLowerCase().replace(/[ʻ‘’'`´]/g, 'ʻ').replace(/ʼ/g, 'ʻ')
+  test('hand-picked words: Latin → Cyrillic → Latin is the same text', () => {
+    for (const w of ['Oʻzbekiston', 'yoʻq', 'yoki', 'Erkin', 'maʼno', 'Isʼhoq', 'federatsiya', 'shahar', 'Gʻulom', 'poeziya', 'yetti', 'Xoʻjalik', 'qoʻshimcha', 'Chilonzor', 'MChJ', 'Sh.A.']) {
+      expect(norm(uzCyrToLat(cyr(w))), w).toBe(norm(w))
+    }
+  })
+  test('fuzz: random words survive the round trip', () => {
+    let seed = 99
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32)
+    const pick = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)]
+    const SYL = ['a', 'o', 'u', 'i', 'e', 'b', 'd', 'g', 'k', 'l', 'm', 'n', 'q', 'r', 't', 'y', 'z', 'sh', 'ch', 'oʻ', 'gʻ', 'ng', 'ts', 'ʼ', 's', 'h', 'x', 'ya', 'yo', 'yu', 'j', 'p', 'f', 'v']
+    let checked = 0
+    for (let n = 0; n < 6000; n++) {
+      let word = ''
+      for (let s = 0, len = 1 + Math.floor(rnd() * 6); s < len; s++) {
+        const syl = pick(SYL)
+        if (/s$/i.test(word) && syl.startsWith('h')) word += 'ʼ' // s + h as two letters carries the tutuq
+        word += syl
+      }
+      // «ye» is one letter (е); after a consonant the Cyrillic reader cannot tell it from «e», so such words are not generated
+      if (/(?<![aeiou])ye/i.test(word) || /^ʼ|ʼʼ|ʻʼ/.test(word) || /^(?:ob|sub|pod|pred|raz|iz|in|kon|ad)y[aeou]/i.test(word)) continue
+      const text = rnd() < 0.5 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+      const back = uzCyrToLat(cyr(text))
+      expect(norm(back), `${text} → ${cyr(text)} → ${back}`).toBe(norm(text))
+      expect(cyr(text)).not.toMatch(/[A-Za-z]/) // nothing Latin is left in an Uzbek word
+      checked++
+    }
+    expect(checked).toBeGreaterThan(4000)
   })
 })

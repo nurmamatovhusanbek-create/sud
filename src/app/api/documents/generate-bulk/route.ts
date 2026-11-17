@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
-import { parseLatinScript } from '@/core/uz-alphabet'
+import { parseScript } from '@/core/uz-alphabet'
 import { generateBulkZip } from '@/lib/documents/bulk.server'
 import { MAX_BULK_ROWS } from '@/lib/documents/bulk'
 
@@ -40,7 +40,7 @@ async function POST_impl(req: NextRequest) {
     const out = await generateBulkZip(docId, rows, {
       letterhead: typeof body.letterhead === 'string' ? body.letterhead : undefined,
       blankIfNone: body.blankLetterhead === true,
-      script: parseLatinScript(body.script),
+      script: parseScript(body.script),
     })
     return new NextResponse(new Uint8Array(out.buffer), {
       status: 200,

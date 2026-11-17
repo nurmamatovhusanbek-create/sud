@@ -7,7 +7,7 @@
 
 import type { StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
-import type { LatinScript } from '@/core/uz-alphabet'
+import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
@@ -217,7 +217,7 @@ export async function exportHearingsXlsx(params: { tin: string; hearings: unknow
 async function fetchDocumentBlob(
   docId: string,
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean; script?: LatinScript },
+  opts: { letterhead?: string; blank?: boolean; script?: UzScript },
 ): Promise<{ blob: Blob; filename: string }> {
   let res: Response
   try {
@@ -254,7 +254,7 @@ function saveFile(blob: Blob, filename: string): void {
 export async function generateDocument(
   docId: string,
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: UzScript } = {},
 ): Promise<void> {
   const { blob, filename } = await fetchDocumentBlob(docId, values, opts)
   saveFile(blob, filename)
@@ -264,7 +264,7 @@ export async function generateDocument(
 export async function generateDocumentsBulk(
   docId: string,
   rows: Record<string, string>[],
-  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: UzScript } = {},
 ): Promise<void> {
   let res: Response
   try {
@@ -292,7 +292,7 @@ export async function generateDocumentsBulk(
 export async function generateDocumentsZip(
   docIds: string[],
   values: Record<string, string>,
-  opts: { letterhead?: string; blank?: boolean; script?: LatinScript } = {},
+  opts: { letterhead?: string; blank?: boolean; script?: UzScript } = {},
   zipName = 'hujjatlar',
 ): Promise<void> {
   const { default: JSZip } = await import('jszip')
@@ -353,7 +353,7 @@ export async function generatePretenzia(payload: {
   letterhead?: string
   blankLetterhead?: boolean
   /** the Uzbek Latin alphabet (Uzbek talabnoma only) */
-  script?: LatinScript
+  script?: UzScript
   constants: Record<string, string>
   contracts: { no: string; date: string; mainDebtTiyin: number; paymentTiyin: number; delayStart: string }[]
   terms?: { ratePerDay: number; capFraction: number }

@@ -36,8 +36,8 @@ import { LetterheadRow } from '@/components/proto/letterhead'
 import { DocPreview } from '@/components/proto/doc-preview'
 import { SectionProfiles } from '@/components/views/doc-profiles'
 import { BulkPanel } from '@/components/views/doc-bulk'
-import { useLatinScript } from '@/lib/documents/script-pref'
-import { SCRIPT_LABEL, LATIN_SCRIPTS, parseLatinScript } from '@/core/uz-alphabet'
+import { useDocScript } from '@/lib/documents/script-pref'
+import { SCRIPT_LABEL, effectiveScript, scriptsFor } from '@/core/uz-alphabet'
 import { clearDraft, draftKeyFor, loadDraft, saveDraft } from '@/lib/documents/drafts'
 import { checkDoc, validateField, type DocCheck, type Issue } from '@/lib/documents/validate'
 
@@ -128,8 +128,8 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
   // the check shown before a download, with what to do when it is confirmed
   // «Jadvaldan»: one document for many spreadsheet rows (replaces the preview while open)
   const [bulk, setBulk] = useState(false)
-  // which Uzbek Latin alphabet the document is written in (an English document ignores it)
-  const [script, setScript] = useLatinScript()
+  // how the document is written: old / new Latin, or Cyrillic where the document has a Cyrillic version (an English document ignores it)
+  const [pickedScript, setScript] = useDocScript()
   const [review, setReview] = useState<{ report: DocCheck; go: () => void } | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -181,6 +181,8 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
     el.focus({ preventScroll: true })
   }
 
+  // a document without a Cyrillic version stays Latin even when «Кирилл» was picked for another one
+  const script = effectiveScript(pickedScript, cur.cyrillic)
   // what every generation path (Word, ZIP, PDF, spreadsheet) is asked for: the letterhead choice and the alphabet
   const genOpts = { ...(tab.letterhead ? { letterhead: letterhead || undefined, blank: !letterhead } : {}), script }
 
@@ -336,9 +338,9 @@ export function DocEditor({ tab, doc, letterhead, onLetterhead, onBack, backLabe
             {cur.lang === 'en' ? (
               <span className="faint" style={{ fontSize: 12 }} title="Ingliz tilidagi hujjatda lotin alifbosi almashtirilmaydi">Ingliz tili</span>
             ) : (
-              <div className="seg dedit-script" role="group" aria-label="Yozuv (alifbo)" title="Oʻzbekcha matn qaysi lotin alifbosida yoziladi. Yangi alifboda Gʻ Oʻ Sh Ch → Ğ Ö Ş Ç; boshqa harflar va tutuq belgisi (ʼ) oʻzgarmaydi.">
-                {LATIN_SCRIPTS.map((k) => (
-                  <button key={k} type="button" className={script === k ? 'on' : ''} aria-pressed={script === k} onClick={() => setScript(parseLatinScript(k))}>
+              <div className="seg dedit-script" role="group" aria-label="Yozuv (alifbo)" title={`Oʻzbekcha matn qaysi yozuvda boʻladi. Yangi alifboda Gʻ Oʻ Sh Ch → Ğ Ö Ş Ç; boshqa harflar va tutuq belgisi (ʼ) oʻzgarmaydi.${cur.cyrillic ? ' Kirill: oʻzbek kirill alifbosi.' : ' Bu hujjatning kirillcha varianti yoʻq.'}`}>
+                {scriptsFor(cur.cyrillic).map((k) => (
+                  <button key={k} type="button" className={script === k ? 'on' : ''} aria-pressed={script === k} onClick={() => setScript(k)}>
                     {SCRIPT_LABEL[k]}
                   </button>
                 ))}

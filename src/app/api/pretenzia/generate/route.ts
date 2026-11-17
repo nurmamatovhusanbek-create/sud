@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
-import { parseLatinScript } from '@/core/uz-alphabet'
+import { parseScript } from '@/core/uz-alphabet'
 import { generatePretenzia } from '@/lib/pretenzia/fill.server'
 import type { ClaimConstants, ClaimContractInput } from '@/lib/pretenzia/render'
 
@@ -91,7 +91,7 @@ async function POST_impl(req: NextRequest) {
 
   let out
   try {
-    out = await generatePretenzia(contracts, constants, { letterhead, blankIfNone: blankLetterhead, script: parseLatinScript(body.script) })
+    out = await generatePretenzia(contracts, constants, { letterhead, blankIfNone: blankLetterhead, script: parseScript(body.script) })
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi' },

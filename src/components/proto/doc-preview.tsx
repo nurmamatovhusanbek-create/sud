@@ -22,7 +22,7 @@ import { applyLetterhead } from '@/lib/documents/banner'
 import { sourceKey } from '@/lib/documents/derive'
 import { applyScriptToZip, resolveScript, valuesFor } from '@/lib/documents/script'
 import { docById } from '@/lib/documents/registry'
-import { toLatinScript, type LatinScript } from '@/core/uz-alphabet'
+import { toLatinScript, type UzScript } from '@/core/uz-alphabet'
 import { FIELDS } from '@/lib/documents/registry'
 
 interface Tpl {
@@ -89,7 +89,7 @@ export function DocPreview({
   /** when no banner is uploaded, blank the template's embedded one (as the download does) */
   blank: boolean
   /** the Uzbek Latin alphabet; an English document ignores it (documents/script › resolveScript) */
-  script?: LatinScript
+  script?: UzScript
   activeKey: string | null
   onPick: (key: string) => void
 }) {
@@ -141,7 +141,7 @@ export function DocPreview({
       try {
         const z = await JSZip.loadAsync(tpl.buf)
         // the same alphabet step as the download: the template's own words first, then the values (markers go in last)
-        const eff = resolveScript(tpl.xml, docById(tpl.docId)?.lang, script)
+        const eff = resolveScript(tpl.xml, docById(tpl.docId)?.lang, script, docById(tpl.docId)?.cyrillic)
         if (eff) await applyScriptToZip(z, eff)
         const xml = eff ? await z.file('word/document.xml')!.async('string') : tpl.xml
         // the hint shown in an empty spot is a label from the form (old spelling): written in the same alphabet as the page

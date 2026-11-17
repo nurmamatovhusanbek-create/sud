@@ -6,7 +6,8 @@ import { describe, expect, mock, test } from 'bun:test'
 import fs from 'node:fs'
 import path from 'node:path'
 import JSZip from 'jszip'
-import { toNewLatin, toOldLatin } from '@/core/uz-alphabet'
+import { isProtectedToken, toLatinScript, toNewLatin, toOldLatin } from '@/core/uz-alphabet'
+import { uzCyrToLat } from '@/core/translit'
 import { DOCS, FIELDS } from '../registry'
 import { withDerived } from '../derive'
 import { applyScriptToZip, convertValues, convertWordXml, plainText, resolveScript, valuesForScript, valuesFor } from '../script'
@@ -354,7 +355,7 @@ describe('end to end: a generated document in both alphabets', () => {
 
   test('the spreadsheet ZIP: every row in the chosen alphabet', async () => {
     const rows = [{ court: 'Toshkent shahar sudi', case_number: '4-1001-2610/1' }, { court: 'Chirchiq shahar sudi', case_number: '4-1001-2610/2' }]
-    for (const script of ['old', 'new'] as const) {
+    for (const script of ['old', 'new', 'cyr'] as const) {
       const zip = await JSZip.loadAsync((await generateBulkZip('court_postpone', rows, { script })).buffer)
       const names = Object.keys(zip.files).sort()
       expect(names.length).toBe(2)
@@ -363,10 +364,156 @@ describe('end to end: a generated document in both alphabets', () => {
         expect(t[0]).toContain('Toşkent şahar sudi')
         expect(t[1]).toContain('Çirçiq şahar sudi')
         expect(t.join('')).toContain('4-1001-2610/1') // numbers untouched
+      } else if (script === 'cyr') {
+        expect(t[0]).toContain('Тошкент шаҳар суди')
+        expect(t[1]).toContain('Чирчиқ шаҳар суди')
+        expect(t.join('')).toContain('4-1001-2610/1') // numbers untouched
       } else {
         expect(t[0]).toContain('Toshkent shahar sudi')
         expect(t[1]).toContain('Chirchiq shahar sudi')
       }
+    }
+  })
+})
+
+// ---- Uzbek Cyrillic ----------------------------------------------------------------------------------------------------
+
+const CYR_DOCS = DOCS.filter((d) => d.cyrillic)
+
+describe('Cyrillic: which documents have it', () => {
+  test('the four court petitions, and only documents written in Uzbek', () => {
+    expect(CYR_DOCS.map((d) => d.id).sort()).toEqual(['court_cancel', 'court_copy', 'court_deadline', 'court_postpone'])
+    for (const d of CYR_DOCS) expect(d.lang).toBe('uz')
+  })
+  test('resolveScript: Cyrillic only for a document that has it; English never', () => {
+    const xml = doc(para(run('Toshkent shahar sudi')))
+    expect(resolveScript(xml, 'uz', 'cyr', true)).toBe('cyr')
+    expect(resolveScript(xml, 'uz', 'cyr', false)).toBe('old')
+    expect(resolveScript(xml, 'uz', 'cyr')).toBe('old')
+    expect(resolveScript(xml, 'uz', 'new', false)).toBe('new')
+    expect(resolveScript(doc(para(run('Toshkent'))), 'en', 'cyr', true)).toBeNull()
+    expect(resolveScript(doc(para(run('the court shall not be of the case'))), 'uz', 'cyr', true)).toBeNull()
+  })
+})
+
+describe('Cyrillic: Word splits words across runs', () => {
+  test('Oʻ + zbekiston in two runs, an apostrophe in a run of its own', () => {
+    const xml = doc(para(run('Oʻ'), run('zbekiston')), para(run('O'), run('’'), run('zbek')), para(run('sh'), run('ahar'), run(' va ch'), run('oy')))
+    const out = convertWordXml(xml, 'cyr')
+    expect(paragraphs(out)).toEqual(['Ўзбекистон', 'Ўзбек', 'шаҳар ва чой'])
+    expect(skeleton(out)).toBe(skeleton(xml))
+  })
+  test('the run properties stay on the run their text started in', () => {
+    const xml = doc(para('<w:r><w:rPr><w:b/></w:rPr><w:t>Sh</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>ahar</w:t></w:r>'))
+    const out = convertWordXml(xml, 'cyr')
+    expect(out).toContain('<w:b/></w:rPr><w:t>Ш</w:t>')
+    expect(out).toContain('<w:i/></w:rPr><w:t>аҳар</w:t>')
+  })
+  test('placeholders are opaque; the words around them are converted; a suffix hanging on one is converted', () => {
+    const out = convertWordXml(doc(para(run('{{court}}ining shartnomasi {{x}}')), para(run('{{a}}'), run('iga'))), 'cyr')
+    expect(paragraphs(out)).toEqual(['{{court}}инг шартномаси {{x}}'.replace('инг', 'ининг'), '{{a}}ига'])
+  })
+  test('a break is not read across: a word is never glued over a line break', () => {
+    const out = convertWordXml(doc(para(run('sh') + '<w:br/>' + run('ahar'))), 'cyr')
+    expect(out).toContain('ш</w:t>')
+  })
+  test('nothing but text changes: not one tag, attribute or untouched run', () => {
+    const xml = doc(para(run('Toshkent', ' xml:space="preserve"'), '<w:tab/>', run('a&amp;b')))
+    expect(skeleton(convertWordXml(xml, 'cyr'))).toBe(skeleton(xml))
+    expect(convertWordXml(xml, 'cyr')).toContain('а&amp;б')
+  })
+})
+
+describe('Cyrillic: every shipped Cyrillic template', () => {
+  for (const d of CYR_DOCS) {
+    describe(d.id, () => {
+      test('skeleton and placeholders are untouched; each paragraph is the Latin one converted', async () => {
+        for (const p of await parts(d.file)) {
+          const out = convertWordXml(p.xml, 'cyr')
+          expect(skeleton(out)).toBe(skeleton(p.xml))
+          expect(placeholderList(out)).toEqual(placeholderList(p.xml))
+          const before = paragraphs(p.xml)
+          const after = paragraphs(out)
+          expect(after.length).toBe(before.length)
+          before.forEach((b, i) => {
+            const keep: string[] = []
+            const masked = b.replace(PLACE, (m) => (keep.push(m), '\u0001'))
+            let k = 0
+            expect(after[i], `${d.id} ¶${i}`).toBe(toLatinScript(masked, 'cyr').replace(/\u0001/g, () => keep[k++]))
+          })
+        }
+      })
+      test('no Latin word is left (only e-mail, links and codes)', async () => {
+        for (const p of await parts(d.file)) {
+          for (const para of paragraphs(convertWordXml(p.xml, 'cyr'))) {
+            for (const tok of para.replace(PLACE, ' ').split(/\s+/)) {
+              if (isProtectedToken(tok, 'cyr')) continue
+              expect(tok, `${d.id}: «${tok}»`).not.toMatch(/[A-Za-z]/)
+            }
+          }
+        }
+      })
+      test('it reads back to the Latin text (the reverse converter of the app)', async () => {
+        const norm = (x: string) => x.toLowerCase().replace(/[ʻ‘’'`´ʼ]/g, 'ʻ').replace(/ʻy/g, 'y').replace(/\s+/g, ' ')
+        for (const p of await parts(d.file)) {
+          const back = paragraphs(convertWordXml(p.xml, 'cyr')).map((t) => norm(uzCyrToLat(t)))
+          expect(back).toEqual(paragraphs(p.xml).map(norm))
+        }
+      })
+    })
+  }
+})
+
+describe('Cyrillic: a generated document', () => {
+  for (const d of CYR_DOCS) {
+    test(`${d.id}: Cyrillic words, values converted, nothing unfilled, nothing else changed`, async () => {
+      const values = sample(d.fields)
+      const a = await generateDocx(d.id, values, { script: 'old' })
+      const b = await generateDocx(d.id, values, { script: 'cyr' })
+      const za = await JSZip.loadAsync(a.buffer)
+      const zb = await JSZip.loadAsync(b.buffer)
+      expect(Object.keys(zb.files).sort()).toEqual(Object.keys(za.files).sort())
+      for (const name of Object.keys(za.files)) {
+        if (za.files[name].dir) continue
+        const xa = await za.file(name)!.async('string')
+        const xb = await zb.file(name)!.async('string')
+        if (!TEXT_PART.test(name)) {
+          expect(xb === xa, `${d.id}: ${name} must be identical`).toBe(true)
+          continue
+        }
+        expect(skeleton(xb), `${d.id} ${name}`).toBe(skeleton(xa))
+        expect(xb).not.toMatch(/\{\{/)
+        const pa = paragraphs(xa)
+        const pb = paragraphs(xb)
+        expect(pb.length).toBe(pa.length)
+        pa.forEach((t, i) => expect(pb[i], `${d.id} ${name} ¶${i}`).toBe(toLatinScript(t, 'cyr')))
+        for (const para of pb) for (const tok of para.split(/\s+/)) if (!isProtectedToken(tok, 'cyr')) expect(tok, `${d.id}: «${tok}»`).not.toMatch(/[A-Za-z]/)
+      }
+      const t = paragraphs(await zb.file('word/document.xml')!.async('string')).join('\n')
+      expect(t).toContain('Шуҳрат Ўктамов Ғуломович, Чилонзор шаҳар') // the typed value, converted
+    })
+  }
+
+  test('typed in Cyrillic already: it stays as typed', async () => {
+    const d = CYR_DOCS[0]
+    const out = await generateDocx(d.id, { ...sample(d.fields), judge: 'Ўктамов Ғ.Ш.' }, { script: 'cyr' })
+    expect(paragraphs(await (await JSZip.loadAsync(out.buffer)).file('word/document.xml')!.async('string')).join('\n')).toContain('Ўктамов Ғ.Ш.')
+  })
+
+  test('typed in the new Latin alphabet: read all the same', async () => {
+    const d = CYR_DOCS[0]
+    const out = await generateDocx(d.id, { ...sample(d.fields), court: 'Toşkent şahar Çilonzor iqtisodiy sudi' }, { script: 'cyr' })
+    expect(paragraphs(await (await JSZip.loadAsync(out.buffer)).file('word/document.xml')!.async('string')).join('\n')).toContain('Тошкент шаҳар Чилонзор иқтисодий суди')
+  })
+
+  test('a document WITHOUT a Cyrillic version stays in Latin when Cyrillic is asked for', async () => {
+    for (const d of DOCS.filter((x) => !x.cyrillic)) {
+      const values = sample(d.fields)
+      const asked = await generateDocx(d.id, values, { script: 'cyr' })
+      const old = await generateDocx(d.id, values, { script: 'old' })
+      const xa = await (await JSZip.loadAsync(asked.buffer)).file('word/document.xml')!.async('string')
+      const xo = await (await JSZip.loadAsync(old.buffer)).file('word/document.xml')!.async('string')
+      expect(xa, d.id).toBe(xo)
     }
   })
 })

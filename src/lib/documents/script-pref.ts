@@ -1,26 +1,27 @@
 'use client'
 
 /**
- * Which Uzbek Latin alphabet the operator writes documents in (core/uz-alphabet), remembered in the browser. One global
+ * How the operator writes documents in Uzbek: old Latin, new Latin or Cyrillic (core/uz-alphabet), remembered in the browser. One global
  * choice shared by the document editor, the spreadsheet panel and the Uzbek talabnoma; it is sent with each request
- * (the server never remembers it). Default: the old alphabet, which is what the templates are written in.
+ * (the server never remembers it). Default: the old alphabet, which is what the templates are written in. A document
+ * without a Cyrillic version (DocDef.cyrillic) ignores a saved «cyr» and stays Latin.
  */
 
 import { useCallback, useSyncExternalStore } from 'react'
-import { DEFAULT_LATIN_SCRIPT, parseLatinScript, type LatinScript } from '@/core/uz-alphabet'
+import { DEFAULT_LATIN_SCRIPT, parseScript, type UzScript } from '@/core/uz-alphabet'
 
 export const SCRIPT_KEY = 'sud-doc-script'
 const EVENT = 'sud:doc-script'
 
-export function getLatinScript(): LatinScript {
+export function getDocScript(): UzScript {
   try {
-    return parseLatinScript(localStorage.getItem(SCRIPT_KEY))
+    return parseScript(localStorage.getItem(SCRIPT_KEY))
   } catch {
     return DEFAULT_LATIN_SCRIPT
   }
 }
 
-export function setLatinScript(s: LatinScript): void {
+export function setDocScript(s: UzScript): void {
   try {
     localStorage.setItem(SCRIPT_KEY, s)
   } catch {
@@ -39,7 +40,7 @@ function subscribe(cb: () => void): () => void {
 }
 
 /** `[script, setScript]`; the server render and the first client render say «old», then the saved choice. */
-export function useLatinScript(): [LatinScript, (s: LatinScript) => void] {
-  const script = useSyncExternalStore(subscribe, getLatinScript, () => DEFAULT_LATIN_SCRIPT)
-  return [script, useCallback((s: LatinScript) => setLatinScript(s), [])]
+export function useDocScript(): [UzScript, (s: UzScript) => void] {
+  const script = useSyncExternalStore(subscribe, getDocScript, () => DEFAULT_LATIN_SCRIPT)
+  return [script, useCallback((s: UzScript) => setDocScript(s), [])]
 }

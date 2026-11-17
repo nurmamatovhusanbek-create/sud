@@ -9,7 +9,7 @@ import path from 'node:path'
 import JSZip from 'jszip'
 import { applyLetterhead } from '@/lib/documents/banner'
 import { applyScriptToZip, convertValues } from '@/lib/documents/script'
-import type { LatinScript } from '@/core/uz-alphabet'
+import type { UzScript } from '@/core/uz-alphabet'
 import { renderClaimValues, type ClaimConstants, type ClaimContractInput } from './render'
 
 const TEMPLATE_DIR = path.join(process.cwd(), 'src', 'lib', 'documents', 'templates')
@@ -22,7 +22,7 @@ export interface LetterheadOpts {
   /** When no letterhead is given, blank the embedded banner (keep the space). */
   blankIfNone?: boolean
   /** The Uzbek Latin alphabet to write in; only the Uzbek talabnoma uses it (the Russian one is never converted). */
-  script?: LatinScript
+  script?: UzScript
 }
 
 function escapeXml(s: string): string {

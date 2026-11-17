@@ -36,6 +36,8 @@ export interface DocDef {
   file: string
   /** the document's language: one language, or both side by side (Russian | Uzbek) */
   lang: 'uz' | 'en' | 'ru-uz'
+  /** the form has an Uzbek Cyrillic version (the «Кирилл» choice of the Yozuv switch). Off by default: a document opts in. */
+  cyrillic?: boolean
   /** ascii slug for the download filename */
   slug: string
   /** the complete, ordered list of field keys this document fills (its
@@ -293,25 +295,25 @@ export const DOCS: DocDef[] = [
   },
   // ---- court petitions (Sud arizalari) — separate: one card + form per doc ----
   {
-    id: 'court_copy', tab: 'court', lang: 'uz', slug: 'ish-hujjatlaridan-nusxa-olish',
+    id: 'court_copy', tab: 'court', lang: 'uz', cyrillic: true, slug: 'ish-hujjatlaridan-nusxa-olish',
     title: 'Ish hujjatlaridan nusxa olish', subtitle: 'Iqtisodiy sudga ariza',
     file: 'court_copy.docx', keywords: 'nusxa kochirma copy',
     fields: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time'],
   },
   {
-    id: 'court_postpone', tab: 'court', lang: 'uz', slug: 'sud-majlisini-qoldirish',
+    id: 'court_postpone', tab: 'court', lang: 'uz', cyrillic: true, slug: 'sud-majlisini-qoldirish',
     title: 'Sud majlisini qoldirish', subtitle: 'Majlisni keyinga qoldirish arizasi',
     file: 'court_postpone.docx', keywords: 'qoldirish keyinga majlis postpone',
     fields: ['court', 'judge', 'case_number', 'company', 'rep_name', 'address', 'plaintiff', 'contract_subject', 'hearing_date', 'hearing_time', 'reason', 'legal_basis', 'phone'],
   },
   {
-    id: 'court_deadline', tab: 'court', lang: 'uz', slug: 'muddatni-tiklash',
+    id: 'court_deadline', tab: 'court', lang: 'uz', cyrillic: true, slug: 'muddatni-tiklash',
     title: 'Muddatni tiklash', subtitle: 'Protsessual muddatni tiklash iltimosnomasi',
     file: 'court_deadline.docx', keywords: 'muddat tiklash deadline',
     fields: ['court', 'applicant_person', 'phone', 'passport'],
   },
   {
-    id: 'court_cancel', tab: 'court', lang: 'uz', slug: 'sud-buyrugini-bekor-qilish',
+    id: 'court_cancel', tab: 'court', lang: 'uz', cyrillic: true, slug: 'sud-buyrugini-bekor-qilish',
     title: 'Sud buyrugʻini bekor qilish', subtitle: 'Buyruqqa eʼtiroz / bekor qilish arizasi',
     file: 'court_cancel.docx', keywords: 'buyruq bekor cancel etiroz',
     fields: ['court', 'company', 'rep_name', 'order_date', 'order_number', 'beneficiary', 'amount', 'director', 'executor'],

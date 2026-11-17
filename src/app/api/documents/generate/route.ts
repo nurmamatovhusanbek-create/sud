@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/server/middleware'
-import { parseLatinScript } from '@/core/uz-alphabet'
+import { parseScript } from '@/core/uz-alphabet'
 import { generateDocx } from '@/lib/documents/fill.server'
 
 export const dynamic = 'force-dynamic'
@@ -39,7 +39,7 @@ async function POST_impl(req: NextRequest) {
 
   let out
   try {
-    out = await generateDocx(docId, values, { letterhead, blankIfNone, script: parseLatinScript(body.script) })
+    out = await generateDocx(docId, values, { letterhead, blankIfNone, script: parseScript(body.script) })
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : 'Hujjatni yaratib boʻlmadi' },
