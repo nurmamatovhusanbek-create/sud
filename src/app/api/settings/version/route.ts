@@ -7,7 +7,9 @@
  *                the GitHub API is asked (no-cache); if neither answers, `check.error` says why.
  *
  * Response:
- *   { local: { version, sha, branch, dirty, gitAvailable }, check?: UpdateCheck }
+ *   { local: { version, sha, branch, dirty, gitAvailable, bootedAt }, check?: UpdateCheck }
+ *   bootedAt = when THIS server process started (ms): the update screen waits for a new one (an update restarts the server,
+ *   sometimes twice), see lib/update-wait.ts
  */
 
 import { NextResponse } from 'next/server'
@@ -15,6 +17,9 @@ import { APP_VERSION } from '@/lib/version'
 import { getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { githubFetcher, gitRunner, runUpdateCheckShared } from '@/lib/update-check'
 import { guard } from '@/server/middleware'
+
+// when this server process started: a restarted server has a later one
+const BOOTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,6 +35,7 @@ async function GET_impl(request: Request) {
       branch: getLocalGitBranch(),
       dirty: isWorkingTreeClean() === false,
       gitAvailable: localSha !== null,
+      bootedAt: BOOTED_AT,
     },
   }
   if (wantsCheck) {

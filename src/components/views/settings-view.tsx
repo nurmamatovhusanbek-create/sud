@@ -33,6 +33,7 @@ import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
 import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
 import { toast } from 'sonner'
+import { waitForUpdate, type VersionSnap } from '@/lib/update-wait'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
@@ -160,28 +161,21 @@ const UPDATE_ERROR_LABELS: Record<string, string> = {
   not_supervised: "Server nazoratchisiz ishga tushirilgan — avtomatik qayta ishga tushirib boʻlmaydi",
 }
 
-/** Poll until the server answers again (it genuinely goes offline mid-restart —
- *  connection-refused during that window is expected, not a failure) or the
- *  budget runs out (production mode rebuilds can take a while). */
-async function pollForRestart(onTick: (elapsedMs: number) => void): Promise<boolean> {
-  const start = Date.now()
-  const budgetMs = 120_000
-  const intervalMs = 1500
-  while (Date.now() - start < budgetMs) {
-    await new Promise((r) => setTimeout(r, intervalMs))
-    onTick(Date.now() - start)
-    try {
-      const res = await fetch(`/api/settings/version?_=${Date.now()}`, { cache: 'no-store', headers: authHeaders() })
-      if (res.ok) return true
-    } catch {
-      // still restarting — keep polling
-    }
+/** One look at the running server: its commit and when this process started. null = it did not answer (expected mid-restart). */
+async function readVersion(): Promise<VersionSnap | null> {
+  try {
+    const res = await fetch(`/api/settings/version?_=${Date.now()}`, { cache: 'no-store', headers: authHeaders(), signal: AbortSignal.timeout(4000) })
+    if (!res.ok) return null
+    const j = await res.json()
+    const l = j?.local
+    return l && typeof l.bootedAt === 'number' ? { sha: typeof l.sha === 'string' ? l.sha : null, bootedAt: l.bootedAt } : null
+  } catch {
+    return null
   }
-  return false
 }
 
 interface UpdateInfo {
-  local: { version: string; sha: string | null; branch: string | null; dirty: boolean; gitAvailable: boolean }
+  local: { version: string; sha: string | null; branch: string | null; dirty: boolean; gitAvailable: boolean; bootedAt?: number }
   check?: {
     source: 'git' | 'github' | null
     remote: { sha: string; message: string; author: string; date: string; commitUrl: string } | null
@@ -248,12 +242,28 @@ function UpdatesTab() {
 
   const runUpdate = useCallback(async () => {
     setUpdateState('pulling')
+    // what the server is NOW, to recognise the updated one afterwards (an update restarts it, sometimes twice)
+    const before = await readVersion()
+    const finish = async () => {
+      setUpdateState('restarting')
+      setElapsed(0)
+      const outcome = await waitForUpdate({ read: readVersion, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: Date.now, onTick: setElapsed }, before)
+      return outcome
+    }
     let res: Response
     try {
       res = await fetch('/api/settings/update', { method: 'POST', headers: privilegedHeaders() })
     } catch {
-      setUpdateState('idle')
-      toast.error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+      // The connection was cut. During an update that is usually the restart itself (the pull changed a file Next watches and
+      // it restarted the server under this very request), not a failure: look at the server instead of assuming.
+      const outcome = await finish()
+      if (outcome === 'updated') {
+        toast.success('Yangilandi — sahifa qayta yuklanmoqda…')
+        window.location.reload()
+      } else if (outcome === 'unchanged') {
+        setUpdateState('idle')
+        toast.error('Tarmoq xatosi — serverga ulanib boʻlmadi')
+      } else setUpdateState('timeout')
       return
     }
     const body = await res.json().catch(() => null)
@@ -274,14 +284,12 @@ function UpdatesTab() {
       void load()
       return
     }
-    setUpdateState('restarting')
-    setElapsed(0)
-    const ok = await pollForRestart(setElapsed)
-    if (ok) {
+    const outcome = await finish()
+    if (outcome === 'timeout') setUpdateState('timeout')
+    else {
+      // 'unchanged' here would mean the server answered steadily and never changed although it said it was restarting: reload anyway
       toast.success('Yangilandi — sahifa qayta yuklanmoqda…')
       window.location.reload()
-    } else {
-      setUpdateState('timeout')
     }
   }, [load])
 

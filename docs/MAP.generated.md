@@ -166,6 +166,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `theme.ts` | components/shell/app-shell.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
 | `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
+| `update-wait.ts` | components/views/settings-view.tsx | lib/__tests__/update-wait.test.ts |
 | `use-orders-job.ts` | components/sections/cases.tsx, components/shell/orders-loader.tsx, components/views/orders-control.tsx, components/views/orders-settings.tsx, components/views/orders-view.tsx |  |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
