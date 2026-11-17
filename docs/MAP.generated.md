@@ -19,6 +19,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/documents/generate-bulk` | POST | POST /api/documents/generate-bulk body: { docId, rows: Record<string,string>[], letterhead?, blankLetterhead?, | `documents/generate-bulk/route.ts` |
 | `/api/documents/generate` | POST | POST /api/documents/generate body: { docId: string, values: Record<string,string> } | `documents/generate/route.ts` |
 | `/api/documents/template` | GET (no-rate-limit) | GET /api/documents/template?id=<docId> | `documents/template/route.ts` |
+| `/api/presence` | POST, GET | POST { id, bye? } a page's heartbeat (every 30 s) or its goodbye. Answers `{ autoExit }`: the page stops pingi | `presence/route.ts` |
 | `/api/pretenzia/generate` | POST | POST /api/pretenzia/generate | `pretenzia/generate/route.ts` |
 | `/api/public-orders/cache` | GET (no-rate-limit) |  | `public-orders/cache/route.ts` |
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
@@ -79,8 +80,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/bills/route, api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, +4 |  |
-| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, +11 |  |
-| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/custom/route, +27 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `envelope.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/presence/route, api/public-orders/cache/route, api/public-orders/fetch/route, api/public-orders/file/route, +12 |  |
+| `middleware.ts` | api/bills/export/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, api/court-cases/route, api/documents/custom/route, +28 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `presence.ts` | api/presence/route | server/__tests__/presence.test.ts |
 | `security.ts` | proxy.ts, server/middleware.ts | server/__tests__/security.test.ts |
 
 ### Source adapters
@@ -94,7 +96,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +24 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +25 |  |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -140,7 +142,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
 | `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/xss.test.ts |
-| `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
+| `public-orders/company-job.ts` | api/presence/route, api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
 | `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
@@ -207,6 +209,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `command-palette.tsx` | app/page.tsx |  |
 | `orders-auto-check.tsx` | app/layout.tsx |  |
 | `orders-loader.tsx` | app/layout.tsx |  |
+| `presence-beat.tsx` | app/layout.tsx |  |
 
 ### Shared UI kit (`components/proto`)
 
@@ -303,6 +306,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SNAPSHOT_DIR` | lib/snapshot-store.ts, server/config.ts |
 | `SNAPSHOT_KEEP_MS` | server/config.ts |
 | `SNAPSHOT_TTL_MS` | server/config.ts |
+| `SUD_AUTO_EXIT` | app/api/presence/route.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
 | `TOR_ENABLED` | server/config.ts |
 | `TOR_SOCKS_PORT` | server/config.ts |
@@ -373,6 +377,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__resetSnapshotsForTests` | lib/snapshot-store.ts |
 | `__sudHealthPools` | lib/health-registry.ts |
 | `__sudHealthStore` | lib/health-store.ts |
+| `__sudPresence` | server/presence.ts |
 | `__sudSecurity` | server/audit.ts |
 | `__sudSnapshots` | lib/snapshot-store.ts |
 | `__sudUpdating` | app/api/settings/update/route.ts |

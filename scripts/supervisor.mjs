@@ -27,7 +27,7 @@ import { createWriteStream, existsSync, unlinkSync } from 'node:fs'
 import { platform } from 'node:os'
 import { join } from 'node:path'
 import { cleanDevCache, isNextDirConflict, nextDirHelp } from './next-cache.mjs'
-import { markInstalled, needsInstall, warmUp } from './boot-helpers.mjs'
+import { get, getJson, IDLE_GRACE_MS, markInstalled, needsInstall, shouldStop, warmUp } from './boot-helpers.mjs'
 
 const mode = process.argv[2]
 if (mode !== 'dev' && mode !== 'start') {
@@ -47,6 +47,7 @@ let attempt = 0
 let restarting = false
 let deliberate = false // true = a sentinel-driven update restart (force reinstall)
 let portStreak = 0     // consecutive quick exits caused by port 3000 being busy
+let stopping = false    // the last window was closed (SUD_AUTO_EXIT): do not respawn
 let cacheStreak = 0    // consecutive quick exits caused by Next being unable to create .next/dev (EEXIST)
 
 const PORT = process.env.PORT || '3000'
@@ -170,6 +171,7 @@ async function cycle(doInstall = true) {
   child.on('exit', (code, signal) => {
     current = null
     console.log(`[supervisor] server exited (code=${code} signal=${signal})`)
+    if (stopping) return
     const shortLived = Date.now() - sinceLastStart < 15_000
     // Reset the backoff/streak once a run stayed up a while — this only guards
     // genuine crash loops, not the deliberate one-shot updater restart.
@@ -236,4 +238,43 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
   })
 }
 
-void cycle()
+// ---- stop by itself when the last window is closed (only when Sud.bat started us: SUD_AUTO_EXIT=1) -----------------------
+// The page pings /api/presence while it is open (components/shell/presence-beat). Asleep computers are not «closed»:
+// a long gap between our own polls means the machine slept, so decisions wait a minute for the page to ping again.
+const IDLE_POLL_MS = 15_000
+if (process.env.SUD_AUTO_EXIT === '1') {
+  console.log(`[supervisor] avtomatik toʻxtash yoqilgan: oxirgi oyna yopilgach ${IDLE_GRACE_MS / 1000} s dan soʻng server oʻzi toʻxtaydi (Sud.bat keep — yoqmaslik uchun)`)
+  let lastPoll = Date.now()
+  let holdUntil = 0
+  let polling = false
+  const auth = process.env.APP_API_TOKEN ? { Authorization: `Bearer ${process.env.APP_API_TOKEN}` } : {}
+  setInterval(async () => {
+    const now = Date.now()
+    if (now - lastPoll > 3 * IDLE_POLL_MS) holdUntil = now + 60_000 // the computer was asleep
+    lastPoll = now
+    if (now < holdUntil || polling || restarting || stopping || !current) return
+    polling = true
+    try {
+      const snap = await getJson(PORT, '/api/presence', { headers: auth })
+      if (snap && shouldStop(snap) && !stopping && !restarting && current) {
+        stopping = true
+        console.log('[supervisor] oxirgi oyna yopildi — server toʻxtatilmoqda. Qayta ochish: Sud.bat')
+        killTree(current)
+        setTimeout(() => process.exit(0), 2_000)
+      }
+    } finally {
+      polling = false
+    }
+  }, IDLE_POLL_MS)
+}
+
+// Something already answers on our port (typically the server Sud.bat started): say so instead of failing three times.
+// Only at the very first start — after a restart the old server may still be going down.
+async function start() {
+  if ((await get(PORT, '/api/settings/version', 2_000)) !== 0) {
+    console.log(`[supervisor] Ilova allaqachon ishlayapti: http://localhost:${PORT}\n  Sud.bat orqali ochilgan boʻlishi mumkin. Toʻxtatish: Sud.bat stop (yoki menyuda S).`)
+    process.exit(0)
+  }
+  void cycle()
+}
+void start()

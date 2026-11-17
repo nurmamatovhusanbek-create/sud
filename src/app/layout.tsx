@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import { OrdersLoader } from "@/components/shell/orders-loader";
 import { OrdersAutoCheck } from "@/components/shell/orders-auto-check";
+import { PresenceBeat } from "@/components/shell/presence-beat";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 // v18 faces (Plus Jakarta Sans for the UI, IBM Plex Mono for figures) are self-hosted: fonts.css + ./fonts/*.woff2.
 // Not next/font/google: that downloads from Google at dev/build time and fails offline or behind a firewall.
@@ -40,6 +41,7 @@ export default function RootLayout({
         {children}
         <OrdersLoader />
         <OrdersAutoCheck />
+        <PresenceBeat />
         <Toaster position="bottom-right" closeButton />
       </body>
     </html>

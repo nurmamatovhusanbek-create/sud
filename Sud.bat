@@ -5,6 +5,8 @@ rem                                     and opens the browser. Its log is dev.lo
 rem   double-click, app running     : a 4-second menu - Open (default) / Stop / Desktop shortcut / show the log
 rem   Sud.bat stop | shortcut | log    : those actions without the menu
 rem   Sud.bat window                   : start with a visible (minimized) server window, to watch it when troubleshooting
+rem   Sud.bat keep                     : start without the automatic stop (below)
+rem The server stops by itself about a minute after the last browser window of the app is closed (SUD_AUTO_EXIT).
 rem Without Git Bash it falls back to plain cmd, which needs bun and node on the Windows PATH.
 setlocal
 title Sud tizimi
@@ -19,6 +21,8 @@ if /i "%~1"=="stop" goto stop
 if /i "%~1"=="shortcut" goto shortcut
 if /i "%~1"=="log" goto log
 if /i "%~1"=="window" set "SHOWWIN=1"
+if /i "%~1"=="keep" set "KEEP=1"
+if not defined KEEP set "SUD_AUTO_EXIT=1"
 
 rem Already running? Then offer the menu.
 curl.exe -s -o nul --max-time 3 "%URL%/api/settings/version"

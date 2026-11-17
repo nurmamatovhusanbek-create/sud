@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { markInstalled, needsInstall, warmUp } from '../../../scripts/boot-helpers.mjs'
+import { IDLE_GRACE_MS, NEVER_OPENED_MS, markInstalled, needsInstall, shouldStop, warmUp } from '../../../scripts/boot-helpers.mjs'
 
 const dirs: string[] = []
 function project(deps = '{"name":"x"}', lock = 'lock-1') {
@@ -75,5 +75,28 @@ describe('warmUp', () => {
     let t = 0
     const r = await warmUp({ port: 1, alive: () => true, now: () => t, wait: async () => { t += 60_000 }, maxWaitMs: 120_000, get: async () => 0 })
     expect(r).toBeNull()
+  })
+})
+
+describe('shouldStop (the last window was closed)', () => {
+  const snap = (o = {}) => ({ openTabs: 0, idleMs: 0, everSeen: true, uptimeMs: 1e9, busy: false, ...o })
+  test('stops only after the grace period with no window open', () => {
+    expect(shouldStop(snap({ idleMs: IDLE_GRACE_MS - 1 }))).toBe(false)
+    expect(shouldStop(snap({ idleMs: IDLE_GRACE_MS + 1 }))).toBe(true)
+  })
+  test('never while a window is open, however old the last ping looks', () => {
+    expect(shouldStop(snap({ openTabs: 1, idleMs: 1e9 }))).toBe(false)
+  })
+  test('never while a background order job is running', () => {
+    expect(shouldStop(snap({ idleMs: 1e9, busy: true }))).toBe(false)
+  })
+  test('a server nobody ever opened is judged by its uptime, not by idle time', () => {
+    expect(shouldStop(snap({ everSeen: false, idleMs: 1e9, uptimeMs: NEVER_OPENED_MS - 1 }))).toBe(false)
+    expect(shouldStop(snap({ everSeen: false, idleMs: 0, uptimeMs: NEVER_OPENED_MS + 1 }))).toBe(true)
+  })
+  test('garbage or a missing answer means keep running', () => {
+    for (const bad of [null, undefined, 'x', 5, {}, { idleMs: 'a', everSeen: true }, { everSeen: true, idleMs: NaN }]) {
+      expect(shouldStop(bad as never)).toBe(false)
+    }
   })
 })

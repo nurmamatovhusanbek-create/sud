@@ -70,6 +70,45 @@ export function get(port, path, timeoutMs = 600_000) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+/** GET a JSON API route; resolves with its `data`, or null when anything is off (down, slow, not JSON, `ok: false`). */
+export function getJson(port, path, { headers = {}, timeoutMs = 5_000 } = {}) {
+  return new Promise((resolve) => {
+    const req = request({ host: '127.0.0.1', port, path, method: 'GET', headers, timeout: timeoutMs }, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          resolve(j && j.ok === true && j.data && typeof j.data === 'object' ? j.data : null)
+        } catch {
+          resolve(null)
+        }
+      })
+      res.on('error', () => resolve(null))
+    })
+    req.on('timeout', () => { req.destroy(); resolve(null) })
+    req.on('error', () => resolve(null))
+    req.end()
+  })
+}
+
+/** How long nobody may have the app open before a server started by Sud.bat stops itself. */
+export const IDLE_GRACE_MS = 60_000
+/** A server that was started but never opened (the browser did not come up) stops after this long. */
+export const NEVER_OPENED_MS = 10 * 60_000
+
+/**
+ * Should the supervisor stop the server? `snap` is GET /api/presence. Conservative on purpose: anything unexpected,
+ * a window still open, or a background order job still running means «no».
+ */
+export function shouldStop(snap, { graceMs = IDLE_GRACE_MS, neverMs = NEVER_OPENED_MS } = {}) {
+  if (!snap || typeof snap !== 'object') return false
+  if (snap.busy) return false
+  if (typeof snap.openTabs === 'number' && snap.openTabs > 0) return false
+  if (!snap.everSeen) return Number.isFinite(snap.uptimeMs) && snap.uptimeMs > neverMs
+  return Number.isFinite(snap.idleMs) && snap.idleMs > graceMs
+}
+
 /**
  * Compile the first page before a person asks for it. `alive()` says whether the server this warm-up belongs to is
  * still the current one (a restart makes the old warm-up stop). The server is not listening yet when this starts, so
