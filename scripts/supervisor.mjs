@@ -27,6 +27,7 @@ import { createWriteStream, existsSync, unlinkSync } from 'node:fs'
 import { platform } from 'node:os'
 import { join } from 'node:path'
 import { cleanDevCache, isNextDirConflict, nextDirHelp } from './next-cache.mjs'
+import { markInstalled, needsInstall, warmUp } from './boot-helpers.mjs'
 
 const mode = process.argv[2]
 if (mode !== 'dev' && mode !== 'start') {
@@ -103,11 +104,11 @@ function runStep(label, cmd, args) {
       // Don't strand the app with no server over a failed prep step (e.g. a
       // transient network blip on install) — log it and start what's on disk.
       else console.error(`[supervisor] ${label} failed (exit ${code}) — continuing`)
-      resolve()
+      resolve(code === 0)
     })
     child.on('error', (e) => {
       console.error(`[supervisor] ${label} failed to start: ${e.message}`)
-      resolve()
+      resolve(false)
     })
   })
 }
@@ -119,7 +120,13 @@ async function cycle(doInstall = true) {
   // update — NOT on every rapid crash-restart (that just spammed `bun install`
   // while the real problem, e.g. a busy port, never got surfaced).
   if (doInstall) {
-    await runStep('bun install', bunCmd, ['install'])
+    // Only when the dependency files changed (see boot-helpers.mjs): a needless install rewrites node_modules and
+    // makes Turbopack wait for the filesystem to settle on every start.
+    if (needsInstall(process.cwd())) {
+      if (await runStep('bun install', bunCmd, ['install'])) markInstalled(process.cwd())
+    } else {
+      console.log('[supervisor] bun install skipped: dependencies unchanged')
+    }
     if (mode === 'start') await runStep('bun run build', bunCmd, ['run', 'build'])
   }
 
@@ -152,6 +159,11 @@ async function cycle(doInstall = true) {
   child.stdout?.on('data', scan)
   child.stderr?.on('data', scan)
   current = child
+
+  // Compile the first page now, so the browser does not wait on it (the first request used to take 30+ s on Windows).
+  void warmUp({ port: PORT, alive: () => current === child }).then((secs) => {
+    if (secs !== null) console.log(`[supervisor] tayyor: http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT} (birinchi sahifa ${secs} s da tayyorlandi)`)
+  })
 
   child.on('exit', (code, signal) => {
     current = null

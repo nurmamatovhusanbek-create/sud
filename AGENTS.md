@@ -135,6 +135,7 @@ Both document APIs need their templates traced into the standalone build (`outpu
   `next dev` with the **same Node that runs it** (`process.execPath`), not `bun x next`: under Bun's
   runtime on Windows Next's HMR WebSocket fails with «Error handling upgrade request … upgrade requires
   a Request object» (spammed by every open tab after an update restart). `bun` still does install/build.
+  **Start-up speed** (`scripts/boot-helpers.mjs`, tested): the supervisor runs `bun install` only when `package.json`/`bun.lock` changed since the last good install (stamp `node_modules/.sud-install-stamp`) — a needless install rewrites `node_modules` and Turbopack then «waits for the filesystem to settle» on every start. After Next is listening it also requests `/` and the two local API calls itself (never a scraping route), so the first page is compiled before the browser asks (35 s on Windows, tab stuck on the spinner) and it prints `[supervisor] tayyor: …`. Open the browser after that line.
   If Next dies at once with `EEXIST … mkdir …\.next\dev` (Windows, usually a OneDrive-synced folder), the supervisor deletes `.next/dev` (dev cache only) and retries twice, then stops and says to move the project out of OneDrive (`scripts/next-cache.mjs`); never loop on it.
 
 ---
