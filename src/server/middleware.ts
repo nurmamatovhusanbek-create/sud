@@ -122,6 +122,8 @@ export interface GuardOptions {
    * cross-site page cannot send) and get a much smaller request budget.
    */
   privileged?: boolean
+  /** Raise the 8 MB request-body cap for ONE route that really takes a file (an uploaded court order). */
+  maxBodyBytes?: number
 }
 
 function forbidden(error: string, code: string): NextResponse {
@@ -158,7 +160,7 @@ export function guard(handler: ApiHandler, opts: GuardOptions = {}): ApiHandler 
     }
     const cross = crossSiteReason(req.method, req.headers)
     if (cross) return refuse('cross_site', cross, forbidden("Boshqa saytdan kelgan soʻrov rad etildi", 'cross_site'))
-    if (bodyTooLarge(req.headers)) return refuse('too_large', req.headers.get('content-length') ?? undefined, NextResponse.json({ ok: false, error: 'Soʻrov hajmi juda katta', code: 'too_large' }, { status: 413 }))
+    if (bodyTooLarge(req.headers, opts.maxBodyBytes)) return refuse('too_large', req.headers.get('content-length') ?? undefined, NextResponse.json({ ok: false, error: 'Soʻrov hajmi juda katta', code: 'too_large' }, { status: 413 }))
     if (opts.privileged && !privilegedHeaderOk(req.headers)) {
       return refuse('privileged_header', undefined, forbidden("Bu amal uchun ilovaning oʻz sahifasidan yuborilgan tasdiq sarlavhasi kerak", 'privileged_header'))
     }

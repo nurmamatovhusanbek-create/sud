@@ -10,6 +10,17 @@
 /** the route that means «this machine calls the site itself» (its origin is the page's) */
 export const DIRECT = 'direct'
 
+/**
+ * Every route was tried and none got a token the download accepted (or none could mint one). The site now wants a
+ * human-verified token for downloads; callers treat this as «ask the person to download it by hand», not as a glitch.
+ */
+export class CaptchaRefusedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CaptchaRefusedError'
+  }
+}
+
 /** Upstream's refusal of a missing / spent / wrong captcha token: HTTP 403 {"message":"Каптча тасдиқланмади"}. */
 export const isCaptchaRefusal = (status: number, body: string): boolean => status === 403 && /капт?ча|captcha/i.test(body)
 
@@ -61,5 +72,5 @@ export async function fetchOrderFileWith(pdfId: string, deps: OrderFileDeps, max
     }
     throw new Error(`public.sud.uz file: HTTP ${res.status} (${label(route)}) ${clip(text, 80)}`.trim())
   }
-  throw new Error(`public.sud.uz file: captcha oʻtmadi · ${notes.join(' · ') || 'yoʻl topilmadi'}`)
+  throw new CaptchaRefusedError(`public.sud.uz file: captcha oʻtmadi · ${notes.join(' · ') || 'yoʻl topilmadi'}`)
 }

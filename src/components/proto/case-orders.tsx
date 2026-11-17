@@ -13,9 +13,9 @@
  */
 
 import { useEffect, useState } from 'react'
-import { FileText, Loader2, RefreshCw } from 'lucide-react'
+import { ExternalLink, FileText, Loader2, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchPublicOrders, getPublicOrders, openPublicOrderPdf, type PublicOrdersData } from '@/lib/api-client'
+import { fetchPublicOrders, getPublicOrders, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type PublicOrdersData } from '@/lib/api-client'
 import { PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, splitDecisions, type KnownDecision } from '@/core/public-orders'
 import { DwSection } from '@/components/proto/drawer'
 
@@ -35,6 +35,9 @@ function Quote({ d }: { d: KnownDecision }) {
 export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }: { caseNumber: string; courtType: string; decisions: KnownDecision[]; ongoing?: boolean }) {
   const [state, setState] = useState<State>({ status: 'loading' })
   const [opening, setOpening] = useState<string | null>(null)
+  // the order whose automatic download the site refused: its card shows the hand-over (save the PDF there, drop it here)
+  const [manual, setManual] = useState<{ id: string; name: string } | null>(null)
+  const [importing, setImporting] = useState(false)
   const [queueing, setQueueing] = useState(false)
   const [tick, setTick] = useState(0)
 
@@ -69,15 +72,32 @@ export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }
   const looked = !!checked
   const lookupFailed = !!checked?.error && !orders.length
 
-  const open = async (pdfId: string, name: string) => {
+  const open = async (pdfId: string, name: string, retryAuto = false) => {
     setOpening(pdfId)
     try {
-      await openPublicOrderPdf(pdfId, name)
+      await openPublicOrderPdf(pdfId, name, { retryAuto })
+      setManual(null)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Qarorni ochib boʻlmadi')
+      if (e instanceof ManualOrderError) setManual({ id: pdfId, name })
+      else toast.error(e instanceof Error ? e.message : 'Qarorni ochib boʻlmadi')
     } finally {
       setOpening(null)
     }
+  }
+
+  const importFile = async (file: File | undefined) => {
+    if (!file || !manual) return
+    setImporting(true)
+    const r = await importPublicOrderPdf(manual.id, file)
+    setImporting(false)
+    if (!r.ok) {
+      toast.error(r.error)
+      return
+    }
+    toast.success('Qaror saqlandi — endi PDF bir bosishda ochiladi')
+    const { id, name } = manual
+    setManual(null)
+    void open(id, name)
   }
 
   const check = async () => {
@@ -119,6 +139,28 @@ export function CaseOrders({ caseNumber, courtType, decisions, ongoing = false }
               </div>
             ))}
           </div>
+          {manual && (
+            <div className="dw-orders-empty" style={{ display: 'grid', gap: 8 }}>
+              <span>
+                public.sud.uz endi qarorni faqat odam tasdiqlagandan keyin beradi. Qarorni shu saytda oʻzingiz ochib, PDF ni saqlang va shu yerga tanlang — u bir marta saqlanadi.
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a className="btn btn-outline btn-sm" href="https://public.sud.uz/" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink />
+                  <span>public.sud.uz ni ochish</span>
+                </a>
+                <label className="btn btn-outline btn-sm" style={{ cursor: importing ? 'wait' : 'pointer' }}>
+                  {importing ? <Loader2 className="spin" /> : <Upload />}
+                  <span>PDF ni tanlash</span>
+                  <input type="file" accept="application/pdf,.pdf" hidden disabled={importing} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = '' }} />
+                </label>
+                <button className="btn btn-outline btn-sm" disabled={opening === manual.id} onClick={() => void open(manual.id, manual.name, true)} title="Avtomatik yuklashni yana bir bor sinab koʻrish">
+                  <RefreshCw />
+                  <span>Avtomatik qayta urinish</span>
+                </button>
+              </div>
+            </div>
+          )}
         </DwSection>
       )}
 

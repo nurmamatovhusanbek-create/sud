@@ -12,7 +12,7 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 | | `engine.ts` | `lookupCase(deps, job)` — I/O injected; 3 instances in parallel; keeps only rows whose case number equals the job's |
 | | `company-job.ts` | the queue: `planCases` (DETECT, free), `enqueueCases` (SCRAPE), pause/resume/cancel/`retryFailed`; `globalThis.__publicOrdersJob`; `MAX_QUEUE` |
 | | `store.ts`, `data-dir.ts` | shard files + `checked.jsonl` in `~/.sud-tizimi/public-orders` (`PUBLIC_ORDERS_DIR`); `cacheStats` |
-| API | `app/api/public-orders/{fetch,status,orders,file,cache}` | `fetch`: `{action: start|plan|pause|resume|cancel|retry}` |
+| API | `app/api/public-orders/{fetch,status,orders,file,cache,import}` | `fetch`: `{action: start|plan|pause|resume|cancel|retry}`; `import`: the hand-over of a PDF (below) |
 | Client | `lib/orders-watchlist.ts` | Kuzatuv run (`checkWatchlistOrders`), `planWatchlistOrders`, pause/resume, opt-in switch (`sud-orders-auto`, default OFF) |
 | | `lib/use-orders-job.ts` | ONE shared status poll for every consumer |
 | | `lib/registry.ts` | `meta.orderCases` (compact case list) written whenever stats are read → Kuzatuv can DETECT without scraping |
@@ -36,7 +36,8 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 9. **One shape, one signature:** every caller builds jobs with `orderJobCase` (status + result). Two shapes ⇒ screens keep «changing» each other's cases.
 10. **One status poll** (`use-orders-job.ts`); local reads (`status`, `cache`, `orders`) are exempt from the scrape rate limit, `plan/start/...` are not.
 11. **Searches are slow** (≈10 s per `case_number`+`instance`, a minute+ without instance) ⇒ background only, one case at a time, 3 instance searches in parallel. Never hedge/duplicate them.
-12. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
+12. **A PDF may need a person («Qoʻlda yuklash»).** public.sud.uz now accepts a download only with a token from a SOLVED human challenge (`public-sud-api.md`). When every automatic route is refused, `GET /file` answers `409 manual_required` and the automatic route rests for 30 min (`ManualDownloadRequired`, no more captchas burned; `&retry=1` = the card's «Avtomatik qayta urinish»). The order card then offers: open public.sud.uz, save the PDF there, pick it → `POST /api/public-orders/import?id=<pdf id>` (raw body, up to 100 MB: `guard({maxBodyBytes})`; only a real `%PDF-` is kept, a site-wrapped multipart file is unwrapped) → stored in `files/` exactly like an automatic download, so every later click is served from disk. The id comes from the card the person picked, never from the file. Listing/search and the case database are unaffected.
+13. PDFs are anonymised, rows carry no parties/STIR; only look up cases the owner opened/watches.
 
 ## Flow
 
@@ -50,6 +51,6 @@ end of run (running→done/error) ─► toast (+ «Qayta urinish» → POST /fe
 ```
 
 ## Tests
-`core/__tests__/public-orders.test.ts` (policy) · `lib/public-orders/__tests__/{engine,company-job,store,data-dir}.test.ts`.
+`core/__tests__/public-orders.test.ts` (policy) · `lib/public-orders/__tests__/{engine,company-job,store,data-dir,order-file,order-pdf,import-route}.test.ts`.
 Live scraping does not work in the sandbox: e2e uses a mock upstream (`PUBLIC_ORDERS_API=http://localhost:PORT`) and
 mocked `/api/stats` (see AGENTS §1).

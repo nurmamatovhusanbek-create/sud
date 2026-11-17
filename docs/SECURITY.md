@@ -25,6 +25,7 @@ Since it can now work in the background (queued scraping, `git pull` + restart, 
 
 ## Rules for changes
 
+- `guard(…, {maxBodyBytes})` raises the 8 MB body cap for ONE route that takes a file: `public-orders/import` (an order PDF the person saved from public.sud.uz, 100 MB, validated as `%PDF-`, stored only under its uuid). Cross-site pages are refused by the same guard as every other POST.
 - Every `/api` route = `guard()`; a route that changes the machine/app/queue direction is **`privileged`** (and the caller uses `privilegedHeaders()`).
 - Never add an external origin; self-host instead. Never disable TLS verification. Never commit secrets (`.env*`, tokens, captured cookies).
 - Never make a page load, refresh or tab switch start work; start work from a click or an opt-in setting.

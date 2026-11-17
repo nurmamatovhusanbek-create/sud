@@ -2,7 +2,8 @@ import { afterAll, describe, expect, mock, test } from 'bun:test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createOrderPdfLoader, NotPdfError, type OrderPdfDeps } from '../order-pdf'
+import { createOrderPdfLoader, ManualDownloadRequired, NotPdfError, pdfFromUpload, type OrderPdfDeps } from '../order-pdf'
+import { CaptchaRefusedError } from '../order-file'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const PDF = enc('%PDF-1.4 hello')
@@ -131,5 +132,78 @@ describe('pdf-store (real disk)', () => {
     const bad = '11111111-1111-1111-1111-111111111111'
     fs.writeFileSync(path.join(dir, 'files', `${bad}.pdf`), 'garbage')
     expect(await readPdf(bad)).toBeNull()
+  })
+})
+
+describe('captcha refusal → manual download', () => {
+  const refuse = async () => {
+    throw new CaptchaRefusedError('public.sud.uz file: captcha oʻtmadi · bu kompyuter: token qabul qilinmadi')
+  }
+
+  test('a refusal becomes «manual download required» and the automatic route rests, no more captchas spent', async () => {
+    const h = harness(refuse)
+    const load = createOrderPdfLoader(h.deps)
+    await expect(load('a')).rejects.toBeInstanceOf(ManualDownloadRequired)
+    await expect(load('b')).rejects.toBeInstanceOf(ManualDownloadRequired)
+    expect(h.log.fetches).toEqual(['a']) // «b» never reached the site
+  })
+  test('a request queued behind the refused one is also stopped (it must not spend three more captchas)', async () => {
+    const h = harness(refuse)
+    const load = createOrderPdfLoader(h.deps)
+    const results = await Promise.allSettled([load('a'), load('b'), load('c')])
+    expect(results.every((r) => r.status === 'rejected' && r.reason instanceof ManualDownloadRequired)).toBe(true)
+    expect(h.log.fetches).toEqual(['a'])
+  })
+  test('the pause ends after 30 min; «qayta urinish» reopens it at once', async () => {
+    let refusing = true
+    const h = harness(async () => {
+      if (refusing) throw new CaptchaRefusedError('public.sud.uz file: captcha oʻtmadi')
+      return wrap(PDF)
+    })
+    const load = createOrderPdfLoader(h.deps)
+    await expect(load('a')).rejects.toBeInstanceOf(ManualDownloadRequired)
+    refusing = false
+    await expect(load('a')).rejects.toBeInstanceOf(ManualDownloadRequired) // still resting
+    expect((await load('a', { retryAuto: true })).cached).toBe(false) // the person asked
+    const h2 = harness(async () => wrap(PDF))
+    const load2 = createOrderPdfLoader(h2.deps)
+    refusing = true
+    h2.deps.fetch = async () => { throw new CaptchaRefusedError('x') }
+    await expect(load2('z')).rejects.toBeInstanceOf(ManualDownloadRequired)
+    h2.tick(31 * 60_000)
+    h2.deps.fetch = async () => wrap(PDF)
+    expect((await load2('z')).cached).toBe(false)
+  })
+  test('other failures are NOT turned into a manual request (a timeout is just a timeout)', async () => {
+    const h = harness(async () => { throw new Error('public.sud.uz file: HTTP 500') })
+    const load = createOrderPdfLoader(h.deps)
+    await expect(load('a')).rejects.toThrow('HTTP 500')
+    await expect(load('a')).rejects.toThrow('HTTP 500') // tried again, not rested
+    expect(h.log.fetches.length).toBe(2)
+  })
+  test('a file that is already on disk is served even while the automatic route rests', async () => {
+    const h = harness(refuse)
+    const load = createOrderPdfLoader(h.deps)
+    await expect(load('a')).rejects.toBeInstanceOf(ManualDownloadRequired)
+    h.disk.set('b', PDF)
+    expect((await load('b')).cached).toBe(true)
+  })
+})
+
+describe('pdfFromUpload (a file the person saved from public.sud.uz)', () => {
+  test('plain PDF and multipart envelope are both accepted', () => {
+    expect(Buffer.from(pdfFromUpload(PDF).bytes).toString()).toBe('%PDF-1.4 hello')
+    const w = pdfFromUpload(new Uint8Array(wrap(PDF, 'a.pdf')))
+    expect(Buffer.from(w.bytes).toString()).toBe('%PDF-1.4 hello')
+    expect(w.filename).toBe('a.pdf')
+  })
+  test('anything else is refused (an HTML error page, a wrong file, an empty body)', () => {
+    expect(() => pdfFromUpload(enc('<html>403</html>'))).toThrow(NotPdfError)
+    expect(() => pdfFromUpload(new Uint8Array())).toThrow(NotPdfError)
+  })
+  test('a large file passes unchanged (no size logic in the unwrap)', () => {
+    const big = new Uint8Array(20 * 1024 * 1024)
+    big.set(enc('%PDF-1.7'))
+    expect(pdfFromUpload(big).bytes.length).toBe(big.length)
   })
 })

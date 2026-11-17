@@ -452,30 +452,58 @@ export function getPublicOrdersStatus(signal?: AbortSignal) {
   return request<PublicOrdersStatus>('/api/public-orders/status', signal)
 }
 
+/** public.sud.uz wants a person to verify the download: the order has to be saved by hand and given to the app. */
+export class ManualOrderError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ManualOrderError'
+  }
+}
+
 /**
  * Open an order's PDF. The window is opened FIRST (inside the click, or popup blockers reject it),
  * then pointed at the file once it has arrived — the same trick the company report uses.
+ * Throws `ManualOrderError` when the site refuses the automatic download (the card then offers the hand-over).
  */
-export async function openPublicOrderPdf(pdfId: string, name?: string): Promise<void> {
+export async function openPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<void> {
   const win = window.open('', '_blank')
   if (!win) throw new Error('Brauzer oynani blokladi — pop-up ruxsatini bering')
   win.document.title = 'Qaror yuklanmoqda…'
   win.document.body.textContent = 'Qaror yuklanmoqda…'
   try {
-    const res = await fetch(`/api/public-orders/file?id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}`, { headers: authHeaders() })
+    const qs = `id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}${opts.retryAuto ? '&retry=1' : ''}`
+    const res = await fetch(`/api/public-orders/file?${qs}`, { headers: authHeaders() })
     if (!res.ok) {
       let msg = 'Qarorni olib boʻlmadi'
+      let code = ''
       try {
         const j = await res.json()
         if (j?.error) msg = j.error
+        if (typeof j?.code === 'string') code = j.code
       } catch { /* not JSON */ }
-      throw new Error(msg)
+      throw code === 'manual_required' ? new ManualOrderError(msg) : new Error(msg)
     }
     const blob = await res.blob()
     win.location.href = URL.createObjectURL(blob)
   } catch (e) {
     try { win.close() } catch { /* already closed */ }
     throw e
+  }
+}
+
+/** Hand an order's PDF, saved by the person from public.sud.uz, to the app (stored like an automatic download). */
+export async function importPublicOrderPdf(pdfId: string, file: File): Promise<ApiResult<{ id: string; size: number }>> {
+  try {
+    const res = await fetch(`/api/public-orders/import?id=${encodeURIComponent(pdfId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', ...authHeaders() },
+      body: file,
+    })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
   }
 }
 
