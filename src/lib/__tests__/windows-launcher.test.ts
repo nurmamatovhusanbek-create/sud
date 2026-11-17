@@ -25,8 +25,11 @@ describe('Windows launchers', () => {
     expect(t).toContain('bash.exe') // Git Bash first: it is where bun and node are on PATH
     expect(t).toContain('CHERE_INVOKING=1') // or the login shell leaves this folder
     expect(t).toContain('bun run dev')
-    expect(t).toContain('start "" "%URL%"')
-    expect(t).toContain('127.0.0.1') // never a LAN address
+    // the browser opens «localhost»: the registry (watchlist) is saved per origin, so 127.0.0.1 would show an empty app
+    expect(t).toContain('set "OPENURL=http://localhost:3000"')
+    expect(t).toContain('start "" "%OPENURL%"')
+    expect(t).not.toMatch(/start "" "%URL%"/)
+    expect(t).toContain('127.0.0.1') // the checks stay on loopback, never a LAN address
   })
   test('stop kills the supervisor before the window and the port listener, and never itself', () => {
     const t = readFileSync(join(root, 'Sud.bat'), 'utf8')

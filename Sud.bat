@@ -9,6 +9,9 @@ title Sud tizimi
 cd /d "%~dp0"
 
 set "URL=http://127.0.0.1:3000"
+rem The BROWSER must open "localhost", not 127.0.0.1: the watchlist and settings live in the browser per address, so a
+rem different address shows an empty app. (The checks below can use 127.0.0.1.)
+set "OPENURL=http://localhost:3000"
 
 if /i "%~1"=="stop" goto stop
 if /i "%~1"=="shortcut" goto shortcut
@@ -66,7 +69,7 @@ pause
 exit /b 1
 
 :open
-start "" "%URL%"
+start "" "%OPENURL%"
 exit /b 0
 
 :menu
