@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { defaultBackupDir, restoreMissing } from './meta-backup'
 
 /**
  * Where the local orders cache lives.
@@ -31,11 +32,34 @@ export function migrateLegacy(from: string, to: string): boolean {
 
 let memo: { key: string; dir: string } | null = null
 
+/** What the last start-up restore from the protected copy did (shown in Settings › Qarorlar). */
+export const lastRestore: { files: number; at: number } = { files: 0, at: 0 }
+
+/**
+ * The first time the folder is used: if its metadata files were deleted (a folder removed by accident), put them back from the
+ * protected copy (`meta-backup.ts`). Only missing / empty files are restored; nothing existing is ever overwritten.
+ */
+function restoreFromBackup(dir: string): void {
+  try {
+    const bak = defaultBackupDir(process.env, os.homedir(), process.platform)
+    if (!bak) return
+    const n = restoreMissing(dir, path.join(bak, 'latest'))
+    if (n > 0) {
+      lastRestore.files = n
+      lastRestore.at = Date.now()
+      console.log(`[orders] qarorlar maʼlumotlari zaxira nusxadan tiklandi: ${n} fayl (${bak})`)
+    }
+  } catch (e) {
+    console.error('[orders] zaxiradan tiklab boʻlmadi:', e instanceof Error ? e.message : e)
+  }
+}
+
 export function dataDir(): string {
-  const key = `${process.env.PUBLIC_ORDERS_DIR ?? ''}|${process.cwd()}`
+  const key = `${process.env.PUBLIC_ORDERS_DIR ?? ''}|${process.env.PUBLIC_ORDERS_BACKUP_DIR ?? ''}|${process.cwd()}`
   if (memo?.key === key) return memo.dir
   const dir = resolveDataDir(process.env, os.homedir())
   if (!process.env.PUBLIC_ORDERS_DIR) migrateLegacy(legacyDataDir(process.cwd()), dir)
+  restoreFromBackup(dir)
   memo = { key, dir }
   return dir
 }

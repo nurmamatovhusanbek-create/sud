@@ -43,4 +43,8 @@ export interface OrdersCacheStats {
   bytes: number
   /** newest lookup, ISO */
   lastCheckedAt: string | null
+  /** the protected second copy of the metadata (null = backup is off) */
+  backup: { dir: string; lastAt: string | null; files: number; days: number } | null
+  /** set when this start restored deleted metadata from that copy */
+  restored: { files: number; at: string } | null
 }

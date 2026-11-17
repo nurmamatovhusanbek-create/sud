@@ -139,13 +139,15 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
 | `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts |  |
 | `public-orders/company-job.ts` | api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
-| `public-orders/data-dir.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts |
+| `public-orders/data-dir.ts` | lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
+| `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
+| `public-orders/meta-backup.ts` | lib/public-orders/data-dir.ts, lib/public-orders/meta-backup-runner.ts | lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route | lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route | lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
 | `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
-| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/library/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/library/route, api/public-orders/orders/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts, lib/use-orders-job.ts |  |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
 | `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +8 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
@@ -289,6 +291,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `NEXT_PUBLIC_APP_API_TOKEN` | lib/api-client.ts |
 | `ORGINFO_DIRECT_FALLBACK` | lib/orginfo.ts |
 | `PUBLIC_ORDERS_API` | lib/public-orders/source.ts |
+| `PUBLIC_ORDERS_BACKUP_DIR` | lib/public-orders/data-dir.ts |
 | `PUBLIC_ORDERS_DIR` | lib/public-orders/data-dir.ts |
 | `PUBLIC_ORDERS_VIA_WORKERS` | lib/public-orders/source.ts |
 | `RATE_LIMIT_MAX` | server/config.ts |
@@ -325,7 +328,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-orders-pill-hidden` | components/shell/orders-loader.tsx |
 | `sud-registry-v1` | lib/registry.ts |
 | `sud-saved-companies` | lib/registry.ts |
-| `sud-tizimi` | lib/update-check.ts |
+| `sud-tizimi` | lib/public-orders/meta-backup.ts, lib/update-check.ts |
 | `sud-watchlist` | lib/registry.ts |
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
 | `sud:company-refreshed` | lib/hard-refresh.ts |

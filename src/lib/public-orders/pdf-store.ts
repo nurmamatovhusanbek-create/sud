@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { dataDir } from './data-dir'
 import { isOrderFileId } from '@/core/public-orders'
+import { scheduleMetaBackup } from './meta-backup-runner'
 
 /**
  * Downloaded order PDFs, one file per order: `<data dir>/files/<pdf id>.pdf` (default `~/.sud-tizimi/public-orders/files`).
@@ -62,6 +63,7 @@ function appendDownload(r: DownloadRecord): Promise<void> {
   return serial(async () => {
     await fs.mkdir(dir(), { recursive: true, mode: 0o700 })
     await fs.appendFile(logFile(), JSON.stringify(r) + '\n', { encoding: 'utf8', mode: 0o600 })
+    scheduleMetaBackup()
   })
 }
 

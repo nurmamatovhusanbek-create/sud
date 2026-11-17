@@ -460,6 +460,23 @@ export class ManualOrderError extends Error {
   }
 }
 
+/** The order's PDF bytes from the app's own server (which keeps a copy on disk). Throws `ManualOrderError` when the site wants a person. */
+async function fetchOrderPdf(pdfId: string, name: string | undefined, retryAuto: boolean): Promise<Blob> {
+  const qs = `id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}${retryAuto ? '&retry=1' : ''}`
+  const res = await fetch(`/api/public-orders/file?${qs}`, { headers: authHeaders() })
+  if (!res.ok) {
+    let msg = 'Qarorni olib boʻlmadi'
+    let code = ''
+    try {
+      const j = await res.json()
+      if (j?.error) msg = j.error
+      if (typeof j?.code === 'string') code = j.code
+    } catch { /* not JSON */ }
+    throw code === 'manual_required' ? new ManualOrderError(msg) : new Error(msg)
+  }
+  return res.blob()
+}
+
 /**
  * Open an order's PDF. The window is opened FIRST (inside the click, or popup blockers reject it),
  * then pointed at the file once it has arrived — the same trick the company report uses.
@@ -471,24 +488,16 @@ export async function openPublicOrderPdf(pdfId: string, name?: string, opts: { r
   win.document.title = 'Qaror yuklanmoqda…'
   win.document.body.textContent = 'Qaror yuklanmoqda…'
   try {
-    const qs = `id=${encodeURIComponent(pdfId)}${name ? `&name=${encodeURIComponent(name)}` : ''}${opts.retryAuto ? '&retry=1' : ''}`
-    const res = await fetch(`/api/public-orders/file?${qs}`, { headers: authHeaders() })
-    if (!res.ok) {
-      let msg = 'Qarorni olib boʻlmadi'
-      let code = ''
-      try {
-        const j = await res.json()
-        if (j?.error) msg = j.error
-        if (typeof j?.code === 'string') code = j.code
-      } catch { /* not JSON */ }
-      throw code === 'manual_required' ? new ManualOrderError(msg) : new Error(msg)
-    }
-    const blob = await res.blob()
-    win.location.href = URL.createObjectURL(blob)
+    win.location.href = URL.createObjectURL(await fetchOrderPdf(pdfId, name, opts.retryAuto === true))
   } catch (e) {
     try { win.close() } catch { /* already closed */ }
     throw e
   }
+}
+
+/** Save an order's PDF on this computer WITHOUT opening it (the server stores it; «Yuklangan» then shows on the Qarorlar page). */
+export async function downloadPublicOrderPdf(pdfId: string, name?: string, opts: { retryAuto?: boolean } = {}): Promise<void> {
+  await fetchOrderPdf(pdfId, name, opts.retryAuto === true)
 }
 
 /** Hand an order's PDF, saved by the person from public.sud.uz, to the app (stored like an automatic download). */

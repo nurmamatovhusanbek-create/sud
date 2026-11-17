@@ -2,7 +2,8 @@ import 'server-only'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
-import { dataDir } from './data-dir'
+import { dataDir, lastRestore } from './data-dir'
+import { currentBackup, scheduleMetaBackup } from './meta-backup-runner'
 import type { OrdersCacheStats } from './types'
 
 export { dataDir }
@@ -49,6 +50,7 @@ export function appendOrders(orders: StoredOrder[]): Promise<void> {
     }
     await fs.mkdir(path.join(dataDir(), 'shards'), { recursive: true, mode: 0o700 })
     for (const [n, lines] of byShard) await fs.appendFile(shardFile(n), lines.join('\n') + '\n', { encoding: 'utf8', mode: 0o600 })
+    scheduleMetaBackup()
   })
 }
 
@@ -125,6 +127,7 @@ export async function markChecked(c: CaseCheck): Promise<void> {
   await serial(async () => {
     await fs.mkdir(dataDir(), { recursive: true, mode: 0o700 })
     await fs.appendFile(checkedFile(), JSON.stringify(rec) + '\n', { encoding: 'utf8', mode: 0o600 }) // private to this user
+    scheduleMetaBackup()
   })
 }
 
@@ -139,6 +142,7 @@ let allMemo: { sig: string; orders: StoredOrder[] } | null = null
 
 /** All stored orders (the last copy of each id). Re-read only when a shard changed (name + size + mtime signature). */
 export async function allOrders(): Promise<StoredOrder[]> {
+  scheduleMetaBackup({ ifStale: true }) // a first read after a start also takes the first copy of what is already there
   const shards = path.join(dataDir(), 'shards')
   let names: string[]
   try {
@@ -202,5 +206,17 @@ export async function cacheStats(): Promise<OrdersCacheStats> {
       orders += ids.size
     }
   } catch { /* no shards yet */ }
-  return { dir: dataDir(), cases: checked.size, withOrders, orders, failed, bytes, lastCheckedAt: last ? new Date(last).toISOString() : null }
+  scheduleMetaBackup({ ifStale: true })
+  const bk = currentBackup()
+  return {
+    dir: dataDir(),
+    cases: checked.size,
+    withOrders,
+    orders,
+    failed,
+    bytes,
+    lastCheckedAt: last ? new Date(last).toISOString() : null,
+    backup: bk ? { dir: bk.dir, lastAt: bk.lastAt ? new Date(bk.lastAt).toISOString() : null, files: bk.files, days: bk.days } : null,
+    restored: lastRestore.files ? { files: lastRestore.files, at: new Date(lastRestore.at).toISOString() } : null,
+  }
 }

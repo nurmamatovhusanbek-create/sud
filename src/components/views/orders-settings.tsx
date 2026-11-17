@@ -187,6 +187,29 @@ export function OrdersTab() {
           Kesh hech qachon oʻchirilmaydi: faqat yangi yozuvlar qoʻshiladi va oʻzgargan ishlar yangilanadi, chunki uni qayta yigʻish uzoq davom etadi.
         </p>
         {cache && <div className="kv"><span className="k">Saqlanadigan joy</span><span className="mono" style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{cache.dir}</span></div>}
+        {cache && (
+          <>
+            <div className="kv">
+              <span className="k">Himoyalangan zaxira nusxa</span>
+              <span className="mono" style={{ overflowWrap: 'anywhere', textAlign: 'right' }}>{cache.backup ? cache.backup.dir : 'oʻchiq'}</span>
+            </div>
+            {cache.backup && (
+              <div className="kv">
+                <span className="k">Oxirgi nusxa</span>
+                <span className="mono">{cache.backup.files ? `${dmyHm(cache.backup.lastAt)} · ${cache.backup.files} fayl · ${cache.backup.days} kunlik` : 'hali olinmagan (bir necha soniyada olinadi)'}</span>
+              </div>
+            )}
+            {cache.restored && (
+              <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '8px 0 0', color: 'var(--text-2)' }}>
+                Oxirgi ishga tushirishda oʻchirilgan qarorlar maʼlumotlari zaxira nusxadan avtomatik tiklandi ({cache.restored.files} fayl, {dmyHm(cache.restored.at)}). Yuklab olingan PDF fayllar “Qarorlar” sahifasida “Mavjud emas” deb koʻrinadi va “Qayta yuklash” bilan qaytariladi.
+              </p>
+            )}
+            <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '8px 0 0' }}>
+              Qarorlar maʼlumotlarining (roʻyxat, tekshiruvlar, yuklab olish tarixi) ikkinchi nusxasi oddiy papkangizdan boshqa, kam ochiladigan joyda saqlanadi va har oʻzgarishdan keyin yangilanadi.
+              Asosiy papka tasodifan oʻchirilsa, ilova keyingi ishga tushganda uni oʻzi tiklaydi (PDF fayllar nusxalanmaydi: ularni qayta yuklab olish mumkin). Maʼlumotlarni butunlay tozalamoqchi boʻlsangiz, ikkala papkani ham oʻchiring.
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

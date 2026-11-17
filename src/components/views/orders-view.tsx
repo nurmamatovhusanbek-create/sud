@@ -1,24 +1,26 @@
 'use client'
 
 /**
- * Qarorlar — the page for the published court orders kept on this computer (sidebar, below Statistika). Built like the
- * Sud ishlari window: a filter bar (search + court type + instance + download state), a dense list and the shared pager,
- * all filtered and paged on the SERVER (`GET /api/public-orders/library`), so a library of thousands of orders stays fast.
+ * Qarorlar — the page for the published court orders (sidebar, below Statistika). Two parts:
  *
- * Every row says whether its PDF is on this computer: «Yuklangan» (file there), «Mavjud emas» (saved once, the file has since been
- * deleted: the download log remembers its size and date) or «Yuklanmagan» (never). A click opens it; a missing one is fetched again
- * from the stored order data (same hand-over as the case drawer when public.sud.uz wants a person) and its state updates.
- * A typed full case number can also be looked up on public.sud.uz (both back ends, criminal included) and stored here.
+ *  1. «Yangi qaror qidirish»: type a case number, search public.sud.uz for its published orders (both back ends, criminal
+ *     included) and save the PDFs on this computer: one by one, or «Hammasini yuklab olish».
+ *  2. The archive: the stored orders in a list built like Sud ishlari (search, court type, instance, download state, shared
+ *     pager), filtered and paged on the SERVER (`GET /api/public-orders/library`). Every row has an explicit button: «Ochish»
+ *     (the PDF is on this computer), «Yuklab olish» (never downloaded) or «Qayta yuklash» (saved once, the file has since
+ *     been deleted: «Mavjud emas»; the download log remembers its size and date).
+ *
+ * When public.sud.uz wants a person to pass its captcha, the row shows the same hand-over as the case drawer.
  * Settings › Qarorlar keeps only the queue / cache control panel.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, FileText, Loader2, RefreshCw, Search } from 'lucide-react'
+import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
-import { fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { courtTypeOfCase, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
 import { useOrdersJob } from '@/lib/use-orders-job'
 
@@ -37,6 +39,7 @@ const INSTANCE_SEG: { key: string; label: string }[] = [
   { key: 'INSPECTION', label: 'Taftish' },
 ]
 
+const CASE_RE = /^\d+-[\d-]+\/\d+$/
 const p2 = (n: number) => String(n).padStart(2, '0')
 const dmy = (t: number): string => {
   const d = new Date(t)
@@ -45,6 +48,7 @@ const dmy = (t: number): string => {
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
 
 export function OrdersView() {
+  // ---- the archive -------------------------------------------------------------------------------------------------
   const [q, setQ] = useState('')
   const [court, setCourt] = useState('')
   const [instance, setInstance] = useState('')
@@ -54,17 +58,21 @@ export function OrdersView() {
   const [data, setData] = useState<LibraryPage | null>(null)
   const [failed, setFailed] = useState(false)
   const [tick, setTick] = useState(0)
-  const [opening, setOpening] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null) // the row being opened / downloaded
   const [manual, setManual] = useState<LibraryItem | null>(null)
   const [importing, setImporting] = useState(false)
-  // «public.sud.uz dan qidirish»: look ONE typed case number up (both systems) and store what is found
-  const [lookCourt, setLookCourt] = useState<PublicCourtType | ''>('')
-  const [looking, setLooking] = useState(false)
-  const { job } = useOrdersJob()
   const first = useRef(true)
 
-  const fullNumber = /^\d+-[\d-]+\/\d+$/.test(normalizeCaseNumber(q))
-  const lookCourtShown = lookCourt || courtTypeOfCase(q) || 'ECONOMIC'
+  // ---- «Yangi qaror qidirish» --------------------------------------------------------------------------------------
+  const [newNumber, setNewNumber] = useState('')
+  const [newCourt, setNewCourt] = useState<PublicCourtType | ''>('')
+  const [looking, setLooking] = useState(false)
+  const [searched, setSearched] = useState<string | null>(null) // the case number whose search just finished
+  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
+  const { job } = useOrdersJob()
+  const newNorm = normalizeCaseNumber(newNumber)
+  const newValid = CASE_RE.test(newNorm)
+  const newCourtShown = newCourt || courtTypeOfCase(newNorm) || 'ECONOMIC'
 
   // local read; typing is debounced and a newer request cancels the older one
   useEffect(() => {
@@ -91,39 +99,47 @@ export function OrdersView() {
     if (data && safePage !== page) setPage(safePage)
   }, [data, safePage, page])
 
-  // while a looked-up case is being searched, re-read every 3 s; one more read when it ends
+  // while the searched case is being looked up, re-read every 3 s; when it ends show what was found
   const running = job?.state === 'running'
   useEffect(() => {
     if (!looking) return
     if (!running) {
       const t = setTimeout(() => {
-        setTick((n) => n + 1)
         setLooking(false)
+        setSearched(newNorm)
+        // show exactly what the search found: that case, every state
+        setQ(newNorm)
+        setCourt('')
+        setInstance('')
+        setStatus('all')
+        setPage(1)
+        setTick((n) => n + 1)
       }, 1500) // the queue may not have picked the case up yet: give it a moment before calling it finished
       return () => clearTimeout(t)
     }
     const t = setInterval(() => setTick((n) => n + 1), 3000)
     return () => clearInterval(t)
-  }, [looking, running])
+  }, [looking, running, newNorm])
 
-  const lookUp = async () => {
+  const search = async () => {
+    setSearched(null)
     setLooking(true)
-    const r = await fetchPublicOrders([{ caseNumber: normalizeCaseNumber(q), courtType: lookCourtShown }], { force: true })
+    const r = await fetchPublicOrders([{ caseNumber: newNorm, courtType: newCourtShown }], { force: true })
     if (!r.ok) {
       setLooking(false)
       toast.error(r.error)
       return
     }
-    setStatus('all') // what it finds is not downloaded yet: show it
     toast.success('Qidirilmoqda — public.sud.uz dan olinmoqda (orqa fonda)')
   }
 
+  // ---- opening / downloading ---------------------------------------------------------------------------------------
   const open = async (o: LibraryItem, retryAuto = false) => {
     if (!o.pdfId) {
       toast.error('Bu yozuvda fayl yoʻq')
       return
     }
-    setOpening(o.id)
+    setBusy(o.id)
     try {
       await openPublicOrderPdf(o.pdfId, o.pdfName, { retryAuto })
       setManual(null)
@@ -133,7 +149,7 @@ export function OrdersView() {
       if (e instanceof ManualOrderError) setManual(o)
       else toast.error(e instanceof Error ? e.message : 'Qarorni ochib boʻlmadi')
     } finally {
-      setOpening(null)
+      setBusy(null)
     }
   }
 
@@ -152,6 +168,33 @@ export function OrdersView() {
     void open(o)
   }
 
+  const items = data?.items ?? []
+  const todo = items.filter((o) => o.state !== 'saved' && o.pdfId)
+
+  /** Save every not-yet-downloaded order on this page, one after another (the server spaces the captchas); stops at the first one that needs a person. */
+  const downloadAll = async () => {
+    const list = todo
+    setBulk({ done: 0, total: list.length })
+    let ok = 0
+    for (const o of list) {
+      try {
+        await downloadPublicOrderPdf(o.pdfId, o.pdfName)
+        ok++
+      } catch (e) {
+        if (e instanceof ManualOrderError) {
+          setManual(o)
+          toast.error('public.sud.uz bu qarorni qoʻlda yuklashni talab qildi — pastdagi yoʻriqnomaga qarang')
+        } else toast.error(`${o.caseNumber}: ${e instanceof Error ? e.message : 'yuklab boʻlmadi'}`)
+        break
+      } finally {
+        setBulk((b) => (b ? { ...b, done: b.done + 1 } : b))
+      }
+    }
+    setBulk(null)
+    setTick((n) => n + 1)
+    if (ok) toast.success(`${ok} ta qaror yuklab olindi`)
+  }
+
   const counts = data?.counts
   const statusOptions = useMemo(
     () => [
@@ -161,15 +204,16 @@ export function OrdersView() {
       ...(counts && counts.gone > 0 ? [{ key: 'gone', label: `Mavjud emas · ${counts.gone}` }] : status === 'gone' ? [{ key: 'gone', label: 'Mavjud emas' }] : []),
       { key: 'all', label: `Hammasi${counts ? ` · ${counts.all}` : ''}` },
     ],
-    [counts],
+    [counts, status],
   )
   // any filter change goes back to page 1
   const reset = <T,>(set: (v: T) => void) => (v: T) => {
     set(v)
     setPage(1)
   }
-  const items = data?.items ?? []
   const filtered = !!(q.trim() || court || instance)
+  // the banner under the search: only while the list shows that very case
+  const showResult = searched !== null && normalizeCaseNumber(q) === searched && !!data
 
   return (
     <div>
@@ -179,9 +223,72 @@ export function OrdersView() {
           Qarorlar <span className="g2">arxivi</span>
         </h1>
         <p>
-          Eʼlon qilingan sud qarorlari: ish raqami boʻyicha qidiring, qaysilari kompyuteringizga yuklab olinganini koʻring va PDF ni bir bosishda oching.
+          Eʼlon qilingan sud qarorlari: yangi ish raqamini qidirib yuklab oling, arxivdan qidiring va qaysilari kompyuteringizga yuklab olinganini koʻring.
           {data ? ` Yuklangan PDF: ${data.savedPdfs} ta · roʻyxatdagi qarorlar: ${data.stored} ta.` : ''}
         </p>
+      </div>
+
+      <div className="p-card rise-c" style={{ marginBottom: 14 }}>
+        <div className="card-h">
+          <div className="ico"><Download /></div>
+          <h2>Yangi qaror qidirish va yuklab olish</h2>
+        </div>
+        <div className="filterbar" style={{ marginBottom: 0 }}>
+          <div className="f-search" style={{ flex: '1 1 300px', minWidth: 240 }}>
+            <Search />
+            <input
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newValid && !looking) void search()
+              }}
+              placeholder="Ish raqami: 4-1001-2615/40333"
+              aria-label="Yangi qaror uchun ish raqami"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <select
+            value={newCourtShown}
+            onChange={(e) => setNewCourt(e.target.value as PublicCourtType)}
+            aria-label="Sud turi"
+            style={{ height: 40, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--surface-inset)', color: 'var(--text-1)', padding: '0 10px', fontSize: 13 }}
+          >
+            <option value="ECONOMIC">Iqtisodiy</option>
+            <option value="CIVIL">Fuqarolik</option>
+            <option value="ADMINISTRATIVE">Maʼmuriy</option>
+            <option value="CRIMINAL">Jinoyat</option>
+          </select>
+          <button className="btn btn-primary" disabled={!newValid || looking} onClick={() => void search()} title="Bu ish raqamini public.sud.uz dan qidirib, topilgan qarorlarni arxivga qoʻshadi">
+            {looking ? <Loader2 className="spin" /> : <Search />}
+            <span>{looking ? 'Qidirilmoqda…' : 'Qidirish'}</span>
+          </button>
+        </div>
+        <p className="faint" style={{ fontSize: 12, lineHeight: 1.5, margin: '8px 0 0' }}>
+          2024 dan oldingi va keyingi qarorlar ikkalasi ham qidiriladi (jinoyat ishlari ham). Topilgan qarorlar quyidagi roʻyxatda chiqadi; PDF ni “Yuklab olish” bilan saqlaysiz.
+          {newNumber && !newValid ? ' Ish raqami shu koʻrinishda boʻlsin: 4-1001-2615/40333.' : ''}
+        </p>
+        {showResult && (
+          <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 10 }}>
+            {data!.counts.all === 0 ? (
+              <span>
+                <b className="mono">{searched}</b> boʻyicha public.sud.uz da eʼlon qilingan qaror topilmadi (ish hali koʻrilayotgan boʻlishi yoki qaror eʼlon qilinmagan boʻlishi mumkin).
+              </span>
+            ) : (
+              <>
+                <span>
+                  <b className="mono">{searched}</b>: {data!.counts.all} ta qaror topildi{todo.length ? `, ${todo.length} tasi hali yuklanmagan` : ' — hammasi yuklangan'}.
+                </span>
+                {todo.length > 0 && (
+                  <button className="btn btn-primary btn-sm" disabled={!!bulk} onClick={() => void downloadAll()}>
+                    {bulk ? <Loader2 className="spin" /> : <Download />}
+                    <span>{bulk ? `Yuklanmoqda ${bulk.done}/${bulk.total}…` : `Hammasini yuklab olish (${todo.length})`}</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="p-card rise-c">
@@ -191,8 +298,8 @@ export function OrdersView() {
             <input
               value={q}
               onChange={(e) => reset(setQ)(e.target.value)}
-              placeholder="Ish raqami (4-1001-2615/40333, 2615) yoki sud, sudya, toifa…"
-              aria-label="Qarorlarni qidirish"
+              placeholder="Arxivdan qidirish: ish raqami (2615) yoki sud, sudya, toifa…"
+              aria-label="Arxivdan qidirish"
               autoComplete="off"
               spellCheck={false}
             />
@@ -207,27 +314,6 @@ export function OrdersView() {
           </button>
         </div>
 
-        {fullNumber && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '0 0 10px' }}>
-            <select
-              value={lookCourtShown}
-              onChange={(e) => setLookCourt(e.target.value as PublicCourtType)}
-              aria-label="Sud turi"
-              style={{ height: 32, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--surface-inset)', color: 'var(--text-1)', padding: '0 8px', fontSize: 13 }}
-            >
-              <option value="ECONOMIC">Iqtisodiy</option>
-              <option value="CIVIL">Fuqarolik</option>
-              <option value="ADMINISTRATIVE">Maʼmuriy</option>
-              <option value="CRIMINAL">Jinoyat</option>
-            </select>
-            <button className="btn btn-outline btn-sm" disabled={looking} onClick={() => void lookUp()} title="Bu ish raqamini public.sud.uz dan qidirib, topilgan qarorlarni shu yerga saqlaydi">
-              {looking ? <Loader2 className="spin" /> : <Search />}
-              <span>{looking ? 'Qidirilmoqda…' : 'public.sud.uz dan qidirish'}</span>
-            </button>
-            <span className="faint" style={{ fontSize: 12 }}>2024 dan oldingi va keyingi qarorlar ikkalasi ham qidiriladi</span>
-          </div>
-        )}
-
         {failed && !data ? (
           <EmptyBlock icon={<Search />} title="Qidiruvni bajarib boʻlmadi" hint="Server javob bermadi. “Yangilash” ni bosib qayta urinib koʻring." />
         ) : !data ? (
@@ -240,18 +326,18 @@ export function OrdersView() {
               filtered
                 ? status === 'saved' && counts && counts.never + counts.gone > 0
                   ? `Yuklanmagan yoki fayli oʻchirilgan ${counts.never + counts.gone} ta mos qaror bor — “Hammasi” ni tanlang.`
-                  : fullNumber
-                    ? 'Bu raqamni “public.sud.uz dan qidirish” bilan qidirib koʻring.'
-                    : 'Boshqa soʻz yoki filtr bilan urinib koʻring.'
-                : 'Ish kartasidagi “PDF” tugmasini bossangiz, qaror shu yerga saqlanadi; “Tekshirish” esa eʼlon qilingan qarorlar roʻyxatini yangilaydi.'
+                  : 'Boshqa soʻz yoki filtr bilan urinib koʻring. Yangi ish boʻlsa, yuqoridagi “Qidirish” bilan public.sud.uz dan oling.'
+                : 'Yuqorida ish raqamini qidirib, qarorlarni yuklab oling.'
             }
           />
         ) : (
           <>
             <div className="list">
               {items.map((o) => (
-                <div className="lrow" key={o.id} data-order={o.caseNumber} onClick={() => void open(o)} style={{ opacity: opening === o.id ? 0.7 : 1 }}>
-                  <div className={`lead${o.downloaded ? ' ink' : ''}`}>{opening === o.id ? <Loader2 className="spin" /> : <FileText />}</div>
+                <div className="lrow" key={o.id} data-order={o.caseNumber} style={{ cursor: 'default' }}>
+                  <div className={`lead${o.state === 'saved' ? ' ink' : ''}`}>
+                    <FileText />
+                  </div>
                   <div className="main-c">
                     <b className="mono">{o.caseNumber}</b>
                     <div className="sub">
@@ -266,7 +352,7 @@ export function OrdersView() {
                       Yuklangan
                     </span>
                   ) : o.state === 'gone' ? (
-                    <span className="badge b-warn" title={`${dmy(o.savedAt)} da yuklangan, keyin fayl oʻchirilgan. PDF ni bossangiz qaytadan yuklab olinadi.`}>
+                    <span className="badge b-warn" title={`${dmy(o.savedAt)} da yuklangan, keyin fayl oʻchirilgan. “Qayta yuklash” ni bossangiz qaytadan yuklab olinadi.`}>
                       Mavjud emas
                     </span>
                   ) : (
@@ -276,7 +362,15 @@ export function OrdersView() {
                     {o.state !== 'never' ? size(o.size) : o.pdfSize ? size(o.pdfSize) : '-'}
                     <small>{o.state === 'saved' ? dmy(o.savedAt) : o.state === 'gone' ? `${dmy(o.savedAt)} · oʻchirilgan` : ''}</small>
                   </div>
-                  <span className="chev">›</span>
+                  <button
+                    className={`btn btn-sm ${o.state === 'saved' ? 'btn-primary' : 'btn-outline'}`}
+                    disabled={!o.pdfId || busy === o.id || !!bulk}
+                    onClick={() => void open(o)}
+                    title={o.state === 'saved' ? 'Saqlangan PDF ni ochish' : o.state === 'gone' ? 'Fayl oʻchirilgan: public.sud.uz dan qayta yuklab ochish' : 'public.sud.uz dan yuklab olib ochish'}
+                  >
+                    {busy === o.id ? <Loader2 className="spin" /> : o.state === 'saved' ? <FileText /> : <Download />}
+                    <span>{o.state === 'saved' ? 'Ochish' : o.state === 'gone' ? 'Qayta yuklash' : 'Yuklab olish'}</span>
+                  </button>
                 </div>
               ))}
             </div>
@@ -289,7 +383,7 @@ export function OrdersView() {
             <p className="faint" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
               Qaror: <b className="mono">{manual.caseNumber}</b>
             </p>
-            <OrderHandover importing={importing} busy={opening === manual.id} onFile={(f) => void importFile(f)} onRetry={() => void open(manual, true)} />
+            <OrderHandover importing={importing} busy={busy === manual.id} onFile={(f) => void importFile(f)} onRetry={() => void open(manual, true)} />
           </div>
         )}
       </div>
