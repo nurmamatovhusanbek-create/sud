@@ -6,8 +6,10 @@
  * getCfWorkerUrls()) resolves defaults through this module. No other file
  * may hardcode worker URLs.
  *
- * These are the operator's own workers — deploy/replace via the Workers
- * settings UI (persisted to workers.json) or CF_WORKER_URLS env.
+ * These are workers the operator controls or trusts (confirmed by the owner, Nov 2026): three Cloudflare accounts,
+ * `nurmamatovhusanbek`, `uzwebfox` and `najimsheikh071`. A worker sees every request in plaintext and can forge answers, so a
+ * worker on any OTHER account is flagged in Settings › Workerlar (core/worker-trust.ts). Add accounts you trust with
+ * TRUSTED_WORKER_ACCOUNTS=acc1,acc2. Deploy/replace via the Workers settings UI (persisted to workers.json) or CF_WORKER_URLS.
  */
 
 export const DEFAULT_WORKERS: string[] = [

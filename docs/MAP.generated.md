@@ -71,6 +71,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
+| `worker-trust.ts` | lib/workers-config.ts | core/__tests__/worker-trust.test.ts |
 
 ### Server middleware / config / security
 
@@ -303,6 +304,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
 | `TOR_ENABLED` | server/config.ts |
 | `TOR_SOCKS_PORT` | server/config.ts |
+| `TRUSTED_WORKER_ACCOUNTS` | lib/workers-config.ts |
 | `VLM_API_KEY` | server/config.ts |
 | `VLM_BASE_URL` | server/config.ts |
 | `VLM_CONFIG_FILE` | lib/vlm-config.ts |

@@ -82,6 +82,8 @@ interface WorkerEntry {
   lastTestedAt: string | null
   lastTestResult: 'ok' | 'fail' | null
   lastTestDetail?: string
+  /** on a Cloudflare account the operator named (false = it can read and forge every request sent through it) */
+  trusted?: boolean
 }
 
 interface WorkersResponse {
@@ -564,7 +566,9 @@ function WorkersTab() {
       if (result.ok) {
         setNewUrl('')
         setTestOut(null)
-        toast.success('Worker qoʻshildi (workers.json)')
+        if (result.trusted === false) {
+          toast.warning('Worker qoʻshildi, lekin u siz koʻrsatgan hisobda emas: u orqali ketgan har bir soʻrovni oʻqiy oladi va javobni soxtalashtira oladi. Faqat oʻzingizniki yoki ishongan odamningiz workerini ishlating.', { duration: 12000 })
+        } else toast.success('Worker qoʻshildi (workers.json)')
         await fetchWorkers()
       } else {
         const msgs: Record<string, string> = {
@@ -642,6 +646,11 @@ function WorkersTab() {
                     : 'Hali test qilinmagan'}
                 </div>
               </div>
+              {w.trusted === false && (
+                <span className="badge b-warn" title="Bu worker siz koʻrsatgan Cloudflare hisobida emas: u orqali ketgan har bir soʻrovni (STIR, ish raqami, kvitansiya) oʻqiy oladi va javobni soxtalashtira oladi. Faqat ishonchli workerlarni qoldiring.">
+                  Begona hisob
+                </span>
+              )}
               {w.lastTestResult === 'ok' ? (
                 <span className="badge b-pos"><Check />OK</span>
               ) : w.lastTestResult === 'fail' ? (

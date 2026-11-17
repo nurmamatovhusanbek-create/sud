@@ -16,6 +16,7 @@
 import fs from 'fs'
 import path from 'path'
 import { DEFAULT_WORKERS } from './worker-defaults'
+import { isTrustedWorker, trustedAccounts } from '@/core/worker-trust'
 
 export interface WorkerEntry {
   url: string
@@ -54,6 +55,13 @@ export function isPublicDnsName(hostname: string): boolean {
   if (/\.(local|internal|lan|localdomain|home|corp|intranet)$/.test(h)) return false
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h)
 }
+
+/** Accounts whose workers are trusted: the default pool's (see worker-defaults.ts) + TRUSTED_WORKER_ACCOUNTS. */
+export function trustedWorkerAccounts(): Set<string> {
+  return trustedAccounts(DEFAULT_WORKERS, (process.env.TRUSTED_WORKER_ACCOUNTS ?? '').split(','))
+}
+
+export const isWorkerTrusted = (url: string): boolean => isTrustedWorker(url, trustedWorkerAccounts())
 
 export function normalizeWorkerUrl(url: string): string | null {
   let u = url.trim()

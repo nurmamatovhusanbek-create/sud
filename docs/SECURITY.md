@@ -67,6 +67,7 @@ obfuscated code, no network call to an unknown host from the app's own code.
 | 7 | Low | A worker URL could carry any port (`:6379`): the «test worker» fetch would probe any port of a public host | a worker is https on 443 only | `lib/__tests__/workers-url.test.ts` |
 | 8 | Low | Control characters in scraped text were forwarded upstream (`/api/company?q=%00`) or written into Word / Excel XML (XML 1.0 forbids them: the whole file is rejected) | cleaned before use | `zip-guard.test.ts` (XML), route cleans `q` |
 | 9 | Info | `X-Powered-By: Next.js` | `poweredByHeader: false` | – |
+| 10 | Medium (owner decision) | Four of the six default workers sit on Cloudflare accounts other than the operator's main one; the code comment called them all «the operator's own». A worker's owner reads and can forge every request | the owner confirmed all six are theirs / trusted; the claim is now recorded accurately, and ANY worker outside the named accounts is flagged in Settings and on add | `core/__tests__/worker-trust.test.ts` |
 
 Checked and found sound (do not «fix»): every API route refuses a forged Host / Origin / `Sec-Fetch-Site` (42 × 6 matrix); the privileged
 routes refuse a call without `x-sud-action` and are rate-limited (10/min); ids are validated before any path or URL is built (uuid,
@@ -79,7 +80,7 @@ Residual risks the design accepts (owner decisions): the Content-Security-Policy
 bootstrap), so the defence against script injection is escaping, not CSP; any LOCAL process can call a privileged route by adding the
 `x-sud-action` header (a browser cannot; a program on the same machine could already do anything as the same user); the in-app update
 trusts `origin/main` of the repository; a VLM / worker host is checked when it is saved, not pinned at connection time (DNS TOCTOU);
-the scraping workers see every request in plaintext, so only workers the operator controls belong in the pool.
+the scraping workers see every request in plaintext and can forge answers: the owner confirmed (Nov 2026) that the six default workers, on the Cloudflare accounts `nurmamatovhusanbek`, `uzwebfox` and `najimsheikh071`, are theirs or trusted. A worker on ANY OTHER account is flagged «Begona hisob» in Settings › Workerlar and with a warning when it is added (`core/worker-trust.ts`; name more trusted accounts with `TRUSTED_WORKER_ACCOUNTS`). Keep the pool to workers you control.
 
 ## Checklist before merging
 

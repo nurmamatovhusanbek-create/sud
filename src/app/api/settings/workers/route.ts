@@ -14,6 +14,7 @@ import {
   removeWorker,
   normalizeWorkerUrl,
   getWorkerUrls,
+  isWorkerTrusted,
 } from '@/lib/workers-config'
 import { getCfWorkerUrls } from '@/lib/cf-worker-pool'
 import { pruneAllPools } from '@/lib/health-registry'
@@ -55,7 +56,9 @@ async function GET_impl() {
 
   return NextResponse.json({
     source,
-    workers: mergedWorkers,
+    // `trusted`: the worker is on an account the operator named. An untrusted worker can read and forge every request
+    // sent through it, so the UI flags it.
+    workers: mergedWorkers.map((w) => ({ ...w, trusted: isWorkerTrusted(w.url) })),
   })
 }
 
@@ -105,7 +108,7 @@ async function POST_impl(request: Request) {
   }
 
   return NextResponse.json(
-    { ok: true, worker: entry },
+    { ok: true, worker: entry, trusted: isWorkerTrusted(normalized) },
     { status: 201 },
   )
 }
