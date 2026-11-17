@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { dateKey, daysUntil, formatDmy, parseYmd } from '../dates'
+import { dateKey, daysUntil, formatDmy, parseYmd, stillAhead } from '../dates'
 
 describe('dateKey — sort dd.mm.yyyy by DATE, not by string', () => {
   test('the raw strings mis-order (the bug this guards against)', () => {
@@ -44,4 +44,18 @@ describe('daysUntil', () => {
 
 describe('formatDmy', () => {
   test('zero-pads', () => expect(formatDmy(new Date(2026, 0, 5))).toBe('05.01.2026'))
+})
+
+describe('stillAhead', () => {
+  const now = new Date(2026, 10, 17, 9, 30) // 17 Nov 2026
+  const rows = [{ d: '12.11.2026' }, { d: '2026-11-16' }, { d: '17.11.2026' }, { d: '2026-11-18' }, { d: '01.01.2027' }, { d: '' }, { d: 'abc' }]
+  test('drops what has passed, keeps today and later, in the input order', () => {
+    expect(stillAhead(rows, (r) => r.d, now).map((r) => r.d)).toEqual(['17.11.2026', '2026-11-18', '01.01.2027'])
+  })
+  test('a row with no readable date is not «ahead»', () => {
+    expect(stillAhead([{ d: null }, { d: undefined }], (r) => r.d, now)).toEqual([])
+  })
+  test('a hearing on the 12th, looked at on the 17th, is gone: the stale-card bug', () => {
+    expect(stillAhead([{ d: '2026-11-12' }], (r) => r.d, now)).toEqual([])
+  })
 })

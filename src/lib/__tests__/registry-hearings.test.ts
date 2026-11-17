@@ -8,10 +8,25 @@ describe('upcoming hearings in the registry meta', () => {
       { isoDate: '2026-10-02', hearingTime: '10:25', caseNumber: '4-1/2', courtName: 'Sud' },
       { isoDate: '2026-10-02', hearingTime: '10:20', caseNumber: '4-1/1' },
       { caseNumber: 'no date' },
-    ])
+    ], new Date(2026, 8, 30, 12).getTime())
     expect(patch.upcoming?.map((h) => `${h.iso} ${h.time}`)).toEqual(['2026-10-02 10:20', '2026-10-02 10:25', '2026-10-20 09:00'])
     expect(patch.nextHearingIso).toBe('2026-10-02')
     expect(patch.nextHearingCase).toBe('4-1/1')
+  })
+
+  test('«next» is the first hearing that has NOT passed, never an old one the list still holds', () => {
+    const now = new Date(2026, 10, 17, 9, 30).getTime() // 17 Nov, as in the field report
+    const patch = hearingMetaPatch([{ isoDate: '2026-11-12', caseNumber: 'old' }, { isoDate: '2026-11-17', caseNumber: 'today' }, { isoDate: '2026-11-25', caseNumber: 'later' }], now)
+    expect(patch.nextHearingIso).toBe('2026-11-17')
+    expect(patch.nextHearingCase).toBe('today')
+  })
+
+  test('only passed hearings: there is NO next hearing (not «the last one»)', () => {
+    const now = new Date(2026, 10, 17, 9, 30).getTime()
+    const patch = hearingMetaPatch([{ isoDate: '2026-11-11', caseNumber: 'a' }, { isoDate: '2026-11-12', caseNumber: 'b' }], now)
+    expect(patch.nextHearingIso).toBeUndefined()
+    expect(patch.nextHearingCase).toBeUndefined()
+    expect(futureUpcoming(patch, now)).toEqual([])
   })
 
   test('older cache entries (only the single next hearing) still read as one hearing', () => {

@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { stillAhead } from '@/core/dates'
 import {
   Activity,
   BarChart3,
@@ -342,14 +343,13 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
     cacheKey: `upcoming:${stir}`,
   })
   const hView = hearings.state as ResourceState<UpcomingHearingsData>
-  const upcomingCount =
+  // the cached list outlives its dates: count and show only hearings that have not passed
+  const hearingsAhead =
     hView.status === 'success' || hView.status === 'partial'
-      ? (hView.data.count ?? hView.data.hearings?.length ?? 0)
+      ? stillAhead((hView.data.hearings ?? []) as unknown as Record<string, unknown>[], (h) => h.isoDate as string | undefined)
       : null
-  const nextHearing =
-    hView.status === 'success' || hView.status === 'partial'
-      ? (hView.data.hearings[0] as Record<string, unknown> | undefined)
-      : undefined
+  const upcomingCount = hearingsAhead ? hearingsAhead.length : null
+  const nextHearing = hearingsAhead?.[0]
 
   // Recent bills (3 newest non-cancelled receipts from the cache)
   const recentBills = useMemo(() => {

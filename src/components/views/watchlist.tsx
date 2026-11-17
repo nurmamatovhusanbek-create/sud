@@ -69,7 +69,7 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
           </button>
         </div>
       </div>
-      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={meta?.nextHearingIso} />
+      <CardStats score={meta?.score} rating={meta?.rating} hearingIso={futureUpcoming(meta)[0]?.iso /* a hearing that has passed is not «keyingi» */} />
     </div>
   )
 }

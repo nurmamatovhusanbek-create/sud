@@ -7,7 +7,8 @@
  * detail drawer.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { stillAhead } from '@/core/dates'
 import { CalendarDays, FileSpreadsheet } from 'lucide-react'
 import { EmptyBlock, SkRows, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
@@ -75,8 +76,12 @@ export function HearingsSection() {
 
   const view = state as ResourceState<UpcomingHearingsData>
   const loaded = view.status === 'success' || view.status === 'partial'
-  const hearings = loaded ? (view.data.hearings as unknown as Record<string, unknown>[]) : []
-  const hearingsCount = loaded ? view.data.count ?? hearings.length : undefined
+  // the cached list outlives its dates: a hearing that has passed is not «upcoming»
+  const hearings = useMemo(
+    () => (loaded ? stillAhead(view.data.hearings as unknown as Record<string, unknown>[], (h) => h.isoDate as string | undefined) : []),
+    [loaded, view],
+  )
+  const hearingsCount = loaded ? hearings.length : undefined
 
   useEffect(() => {
     if (loaded) setCounts({ hearings: hearingsCount })

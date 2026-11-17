@@ -36,6 +36,20 @@ export function daysUntil(s: string | null | undefined, now: Date = new Date()):
   return Math.round((new Date(p.y, p.m - 1, p.d).getTime() - t.getTime()) / 86_400_000)
 }
 
+/**
+ * The rows whose date has not passed (today counts), in the input order; rows with no readable date are dropped.
+ *
+ * A list of hearings is fetched once and then cached (in the browser and in the registry), so it OUTLIVES its own
+ * dates: a hearing fetched last week for yesterday is still in it today. Every place that shows «the next hearing» or
+ * counts «upcoming» ones must read through this, not trust the list.
+ */
+export function stillAhead<T>(rows: readonly T[], date: (row: T) => string | null | undefined, now: Date = new Date()): T[] {
+  return rows.filter((r) => {
+    const d = daysUntil(date(r), now)
+    return d !== null && d >= 0
+  })
+}
+
 /** `dd.mm.yyyy` for a Date. */
 export function formatDmy(date: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')

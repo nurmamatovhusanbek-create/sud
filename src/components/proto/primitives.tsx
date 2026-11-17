@@ -9,6 +9,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
+import { daysUntil } from '@/core/dates'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 import { bandFor, clampPct, dialAngle, dialGeom, tickLook, type DialZones } from './dial-geometry'
@@ -439,7 +440,9 @@ export function CardStats({
     if (!hearingIso) return null
     const [y, m, d] = hearingIso.split('-').map(Number)
     if (!y || !m || !d) return null
-    const days = Math.ceil((new Date(y, m - 1, d).getTime() - Date.now()) / 86_400_000)
+    // a hearing that has passed is not «keyingi»: a cached list outlives its dates (core/dates › stillAhead)
+    const days = daysUntil(hearingIso)
+    if (days === null || days < 0) return null
     return { d: String(d).padStart(2, '0'), mo: MONTHS[m - 1] ?? '', days }
   })()
   return (

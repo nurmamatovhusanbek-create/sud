@@ -327,7 +327,7 @@ export function isWatched(stir: string): boolean {
 const MAX_UPCOMING = 30
 
 /** The registry patch for a company's upcoming-hearing list (nearest first). One place, used wherever hearings are read. */
-export function hearingMetaPatch(hearings: Record<string, unknown>[]): Partial<CompanyMeta> {
+export function hearingMetaPatch(hearings: Record<string, unknown>[], now = Date.now()): Partial<CompanyMeta> {
   const upcoming: UpcomingHearing[] = hearings
     .filter((h) => typeof h?.isoDate === 'string' && h.isoDate)
     .map((h) => ({
@@ -339,7 +339,8 @@ export function hearingMetaPatch(hearings: Record<string, unknown>[]): Partial<C
     }))
     .sort((a, b) => a.iso.localeCompare(b.iso) || (a.time || '').localeCompare(b.time || ''))
     .slice(0, MAX_UPCOMING)
-  const first = upcoming[0]
+  // «next» is the first hearing that has NOT passed (the list may still hold older ones; readers filter it again)
+  const first = upcoming.find((h) => (daysUntilIso(h.iso, now) ?? -1) >= 0)
   return {
     upcoming,
     nextHearingIso: first?.iso,
