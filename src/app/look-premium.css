@@ -2,13 +2,13 @@
    LOOK · «Premium» — precise, technical, quiet. Selected in Settings › Koʻrinish; the default.
    ----------------------------------------------------------------------------
    This is a legal and registry tool, not a lifestyle product: no serif, no decorative ornament, no warm hospitality
-   palette. The identity is PRECISION, from four things used the same way on every screen:
-     INK     #0E1830-family   the sidebar, primary buttons, monograms
-     PAPER   cool white       crisp surfaces on a faintly tinted canvas (never a pure-white page)
-     ONE BLUE  #2755D4        selection, the active-page marker, links, focus: nothing else is coloured
+   palette. The identity is PRECISION, from three things used the same way on every screen:
+     TWO COLOURS  near-white and near-black (ink). No blue, no accent hue, in either theme (the owner: «two colours
+                  seems fine»). Selection, the active-page marker, links, focus rings and tab underlines are ink (white in dark).
+     PAPER        crisp white surfaces on a faintly grey canvas (never a pure-white page)
      TYPE    IBM Plex Sans for the interface and IBM Plex Mono for every identifier and figure (STIR, case
              numbers, amounts), always tabular, so columns of numbers line up like a ledger
-   Status colours stay semantic and muted (green won/paid, burgundy lost/overdue, amber pending).
+   Statuses are the same ink dot and a word; the semantic status tokens remain for dials and charts only.
    Same screens and markup as «Tinch» (calm): tokens plus this layer, never a second copy of a screen.
    Owner rules hold: no glow (crisp focus), no blur over animation, no external asset, tokens not hex.
    ============================================================================ */
@@ -17,47 +17,47 @@
 [data-look='premium'] {
   --font-sans: "IBM Plex Sans", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
-  --ink:      #111318;   /* sidebar, primary fill: a neutral near-black (navy made every surface blue, so the one blue stopped standing out) */
-  --ink-2:    #1C1F27;
-  --ico-a:    #2F63E8;   /* tile icon gradient: the one blue ... */
-  --ico-b:    #15171D;   /* ... down to ink */
-  --mark:     #8FB0FF;   /* the accent on ink (active-page marker) */
+  --ink:      #111114;   /* sidebar, primary fill: a neutral near-black */
+  --ink-2:    #1C1C1F;
+  --ico-a:    #5A5B63;   /* tile icon gradient: graphite ... */
+  --ico-b:    #111114;   /* ... down to ink (no hue) */
+  --mark:     #FFFFFF;   /* the active-page marker on the ink sidebar */
 
-  --bg-canvas:       #F2F4F8;
-  --bg-sunken:       #E9ECF2;
+  --bg-canvas:       #F4F4F5;
+  --bg-sunken:       #EBEBED;
   --surface:         #FFFFFF;
   --surface-raised:  #FFFFFF;
   --surface-overlay: #FFFFFF;
-  --surface-inset:   #F6F8FB;
-  --surface-hover:   #F1F4F9;
-  --surface-active:  #E8ECF4;
+  --surface-inset:   #F8F8F9;
+  --surface-hover:   #F2F2F4;
+  --surface-active:  #E9E9EC;
 
-  --text-1: #0F1728;
-  --text-2: #424D66;
-  --text-3: #66708A;
-  --text-disabled: #A7ADBB;
+  --text-1: #111114;
+  --text-2: #4A4B52;
+  --text-3: #6B6C74;
+  --text-disabled: #A9AAB0;
 
-  --border-subtle:  rgba(15, 23, 40, 0.08);
-  --border-default: rgba(15, 23, 40, 0.15);
-  --border-strong:  rgba(15, 23, 40, 0.28);
+  --border-subtle:  rgba(17, 17, 20, 0.08);
+  --border-default: rgba(17, 17, 20, 0.15);
+  --border-strong:  rgba(17, 17, 20, 0.28);
 
-  --brand:      #2755D4;
-  --brand-ink:  #1F46B2;
-  --brand-100:  #E4EBFB;
-  --brand-50:   #EFF3FC;
-  --accent:          #14161C;
-  --accent-hover:    #262A34;
-  --accent-pressed:  #0C0D11;
+  --brand:      #111114;   /* selection, links, focus: ink, not a hue */
+  --brand-ink:  #111114;
+  --brand-100:  #ECECEF;
+  --brand-50:   #F4F4F6;
+  --accent:          #111114;
+  --accent-hover:    #2A2A2F;
+  --accent-pressed:  #000000;
   --accent-contrast: #FFFFFF;
-  --accent-soft:     #E4EBFB;
-  --accent-ring:     rgba(39, 85, 212, 0.30);
-  --brand-tile: #14161C;
+  --accent-soft:     #ECECEF;
+  --accent-ring:     rgba(17, 17, 20, 0.28);
+  --brand-tile: #111114;
 
   --status-positive-solid: #1F7A55; --status-positive-soft: #E3F0EA; --status-positive-text: #165C40; --status-positive-line: #BBD8C9; --status-positive-base: #1F7A55;
   --status-negative-solid: #B03A48; --status-negative-soft: #F7E4E7; --status-negative-text: #8F2B38; --status-negative-line: #E6BFC5; --status-negative-base: #B03A48;
   --status-warning-solid:  #B27A16; --status-warning-soft:  #F8EDD3; --status-warning-text:  #77510C; --status-warning-line:  #E7D2A0; --status-warning-base:  #B27A16;
-  --status-info-solid:     #2755D4; --status-info-soft:     #E4EBFB; --status-info-text:     #1F46B2; --status-info-line:     #C4D2F3; --status-info-base:     #2755D4;
-  --status-neutral-soft: #EDF0F5; --status-neutral-text: #566075; --status-neutral-line: #D9DEE8;
+  --status-info-solid:     #111114; --status-info-soft:     #ECECEF; --status-info-text:     #111114; --status-info-line:     #D6D6DA; --status-info-base:     #111114;
+  --status-neutral-soft: #EEEEF0; --status-neutral-text: #565760; --status-neutral-line: #DADADE;
 
   --radius-xl: 16px; --radius-lg: 12px; --radius-md: 10px; --radius-sm: 8px;
   --r-xl: 16px; --r-lg: 12px; --r-md: 10px; --r-sm: 8px;
@@ -73,12 +73,12 @@
 /* ---------- 1b. tokens · dark: ink canvas, cool-white text, the same single blue ---------- */
 [data-look='premium'][data-theme='dark'] {
   /* Graphite ramp from the unslop tokens (heydamir/unslop, CC BY 4.0): depth from surface STEPS and hairlines, not shadows;
-     the primary button is an off-white from the ramp with dark text; the one blue stays small (marker, links, icons). */
+     the primary button is an off-white from the ramp with dark text; there is NO blue: the marker, links and focus ring are the off-white. */
   --ink:      #0F0F10;   /* deepest surface: the sidebar */
   --ink-2:    #19191B;
-  --ico-a:    #8FB0FF;
-  --ico-b:    #3F5AB0;
-  --mark:     #8FB0FF;
+  --ico-a:    #DADADD;   /* tile icon gradient: light graphite ... */
+  --ico-b:    #5E5E65;   /* ... down to mid graphite (no hue) */
+  --mark:     #EDEDED;
 
   --bg-canvas:       #141415;
   --bg-sunken:       #0F0F10;
@@ -98,22 +98,22 @@
   --border-default: rgba(237, 237, 237, 0.13);
   --border-strong:  rgba(237, 237, 237, 0.24);
 
-  --brand:      #8FB0FF;
-  --brand-ink:  #B4CAFF;
-  --brand-100:  rgba(143, 176, 255, 0.16);
-  --brand-50:   rgba(143, 176, 255, 0.10);
+  --brand:      #EDEDED;
+  --brand-ink:  #FFFFFF;
+  --brand-100:  rgba(237, 237, 237, 0.12);
+  --brand-50:   rgba(237, 237, 237, 0.08);
   --accent:          #EDEDED;
   --accent-hover:    #FFFFFF;
   --accent-pressed:  #D4D4D6;
   --accent-contrast: #0F0F10;
-  --accent-soft:     rgba(143, 176, 255, 0.16);
-  --accent-ring:     rgba(143, 176, 255, 0.45);
+  --accent-soft:     rgba(237, 237, 237, 0.12);
+  --accent-ring:     rgba(237, 237, 237, 0.45);
   --brand-tile: #2A2A2E;
 
   --status-positive-solid: #4CC38A; --status-positive-soft: rgba(76, 195, 138, 0.14); --status-positive-text: #86D8B1; --status-positive-line: rgba(76, 195, 138, 0.30); --status-positive-base: #4CC38A;
   --status-negative-solid: #E5484D; --status-negative-soft: rgba(229, 72, 77, 0.14);  --status-negative-text: #F08A8D; --status-negative-line: rgba(229, 72, 77, 0.30);  --status-negative-base: #E5484D;
   --status-warning-solid:  #D9A648; --status-warning-soft:  rgba(217, 166, 72, 0.14); --status-warning-text:  #EBC987; --status-warning-line:  rgba(217, 166, 72, 0.30);  --status-warning-base:  #D9A648;
-  --status-info-solid:     #8FB0FF; --status-info-soft:     rgba(143, 176, 255, 0.16); --status-info-text:    #B4CAFF; --status-info-line:    rgba(143, 176, 255, 0.30); --status-info-base:    #8FB0FF;
+  --status-info-solid:     #EDEDED; --status-info-soft:     rgba(237, 237, 237, 0.10); --status-info-text:    #EDEDED; --status-info-line:    rgba(237, 237, 237, 0.24); --status-info-base:    #EDEDED;
   --status-neutral-soft: rgba(237, 237, 237, 0.08); --status-neutral-text: #A1A1A6; --status-neutral-line: rgba(237, 237, 237, 0.14);
 
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -138,26 +138,26 @@
 [data-look='premium'] .kpi .val, [data-look='premium'] .cc-col .num, [data-look='premium'] .datecard .dc-date .d { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
 /* ---------- 3. sidebar: solid ink, white text, a blue marker on the active page ---------- */
-[data-look='premium'] .side { background: var(--ink); color: #C4CBDA; border-right: 0; }
+[data-look='premium'] .side { background: var(--ink); color: #C9C9CD; border-right: 0; }
 [data-look='premium'] .brand .logo { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 10px; }
 [data-look='premium'] .brand b { color: #FFFFFF; font-weight: 600; font-size: 16px; }
-[data-look='premium'] .brand span { color: #8A94AB; }
-[data-look='premium'] .nav-label { color: #7D88A0; font-weight: 500; }
-[data-look='premium'] .nav button { color: #B6BED0; font-weight: 500; }
-[data-look='premium'] .nav button svg { color: #8A94AB; }
+[data-look='premium'] .brand span { color: #8D8D93; }
+[data-look='premium'] .nav-label { color: #85858B; font-weight: 500; }
+[data-look='premium'] .nav button { color: #B8B8BD; font-weight: 500; }
+[data-look='premium'] .nav button svg { color: #8D8D93; }
 [data-look='premium'] .nav button:hover { background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
-[data-look='premium'] .nav button:hover svg { color: #C4CBDA; }
+[data-look='premium'] .nav button:hover svg { color: #C9C9CD; }
 [data-look='premium'] .nav button:active { background: rgba(255, 255, 255, 0.09); }
 [data-look='premium'] .nav button.on { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; box-shadow: none; }
 [data-look='premium'] .nav button.on svg { color: var(--mark); }
 [data-look='premium'] .nav button.on::before { content: ""; position: absolute; left: -16px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 2px 2px 0; background: var(--mark); }
-[data-look='premium'] .nav button .pip { color: #8A94AB; }
-[data-look='premium'] .nav button.on .pip { color: #C4CBDA; }
-[data-look='premium'] .sysstat { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.08); color: #C4CBDA; }
+[data-look='premium'] .nav button .pip { color: #8D8D93; }
+[data-look='premium'] .nav button.on .pip { color: #C9C9CD; }
+[data-look='premium'] .sysstat { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.08); color: #C9C9CD; }
 [data-look='premium'] .sysstat:hover { background: rgba(255, 255, 255, 0.09); }
 [data-look='premium'] .sysstat b { color: #FFFFFF; }
-[data-look='premium'] .sysstat small { color: #8A94AB; }
-[data-look='premium'] .side-foot .rail-mini { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.10); color: #C4CBDA; }
+[data-look='premium'] .sysstat small { color: #8D8D93; }
+[data-look='premium'] .side-foot .rail-mini { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.10); color: #C9C9CD; }
 [data-look='premium'] .side-foot .rail-mini:hover { background: rgba(255, 255, 255, 0.13); color: #FFFFFF; }
 
 /* ---------- 4. companies: the ledger; an ink monogram, mono identifiers ---------- */
