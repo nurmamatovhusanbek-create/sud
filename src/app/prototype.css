@@ -1004,8 +1004,12 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .fb-row .f-search { flex: 1 1 280px; max-width: 440px; }
 .fb-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .list { gap: 0; }
-.lrow { border-radius: 0; border-bottom: 1px solid var(--border-subtle); padding: 14px 8px; }
-.list > .lrow:last-child { border-bottom: 0; }
+/* a row is a TABLE row (hairline between rows), but its hover and selected states are ROUNDED like everything else: the row bleeds 8px past
+   the text column with a 10px radius, and the hairline is a pseudo-element that steps out of the way of a highlighted row and the one above it */
+.lrow { position: relative; border-radius: var(--r-md); margin: 0 -8px; padding: 14px 16px; border-bottom: 0; }
+.lrow::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 1px; background: var(--border-subtle); transition: opacity .12s var(--ease); }
+.list > .lrow:last-child::after { display: none; }
+.lrow:hover::after, .lrow.sel::after, .lrow:has(+ .lrow:hover)::after, .lrow:has(+ .lrow.sel)::after { opacity: 0; }
 .card-h h2, .card-h h3 { font-weight: 600; }
 
 /* ---------- case rows: a real table (named columns that line up from row to row; no amount column: the court site does not give it) ---------- */
@@ -1143,7 +1147,8 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 :root[data-dock='open'] .scroll { margin-right: var(--dock-w); }
 .drawer.dock .drawer-swap { animation: p-rise .24s var(--ease-emph) both; }
 /* the open row, in the list beside it */
-.lrow.sel { background: var(--surface-active); box-shadow: inset 3px 0 0 var(--text-1); }
+.lrow.sel { background: var(--surface-active); }
+.lrow.sel::before { content: ""; position: absolute; left: 5px; top: 50%; width: 3px; height: 22px; margin-top: -11px; border-radius: 2px; background: var(--text-1); }
 .lrow.sel .chev { color: var(--text-1); }
 
 /* ---- phone fixes (390 px): the Kompaniya tab stacks; a hearing row keeps its time and countdown on screen ---- */
