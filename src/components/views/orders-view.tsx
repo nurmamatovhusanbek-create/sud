@@ -18,9 +18,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
-import { OrderHandover } from '@/components/proto/order-handover'
+import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
-import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { courtTypeOfCase, ORDERS_GAP_SECONDS_DEFAULT, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
 import { useOrdersJob } from '@/lib/use-orders-job'
 
@@ -168,6 +168,22 @@ export function OrdersView() {
     const o = manual
     setManual(null)
     void open(o)
+  }
+
+  /** A HAR saved from the browser: every order PDF in it is stored, matched by the id in its own file request. */
+  const importHar = async (file: File | undefined) => {
+    if (!file) return
+    setImporting(true)
+    const r = await importPublicOrdersHar(file)
+    setImporting(false)
+    if (!r.ok) {
+      toast.error(r.error, { duration: 12000 })
+      return
+    }
+    const n = r.data.saved.length
+    toast.success(n === 1 ? 'Qaror saqlandi' : `${n} ta qaror saqlandi`)
+    if (manual && r.data.saved.some((x) => x.id === manual.pdfId)) setManual(null)
+    setTick((t) => t + 1) // the lists and counts re-read what is on disk now
   }
 
   const items = data?.items ?? []
@@ -455,12 +471,21 @@ export function OrdersView() {
           </>
         )}
 
+        {/* the site shows some orders only in a pop-up (no download button): a HAR saved from the browser carries the file */}
+        <div className="dw-orders-empty" style={{ marginTop: 12, display: 'grid', gap: 6 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <HarPicker importing={importing} onHar={(f) => void importHar(f)} />
+            <span className="faint" style={{ fontSize: 12.5 }}>Brauzerdan saqlangan HAR fayl: qarorni oʻzi topadi.</span>
+          </span>
+          <HarHowTo />
+        </div>
+
         {manual && (
           <div style={{ marginTop: 12 }}>
             <p className="faint" style={{ fontSize: 12.5, margin: '0 0 6px' }}>
               Qaror: <b className="mono">{manual.caseNumber}</b>
             </p>
-            <OrderHandover importing={importing} busy={busy === manual.id} onFile={(f) => void importFile(f)} onRetry={() => void open(manual, true)} />
+            <OrderHandover importing={importing} busy={busy === manual.id} onFile={(f) => void importFile(f)} onHar={(f) => void importHar(f)} onRetry={() => void open(manual, true)} />
           </div>
         )}
       </div>
