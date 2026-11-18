@@ -295,3 +295,14 @@ header's hard refresh makes the next Bills open (or the open one, immediately) s
 ## Ishga tushirish: oʻzi skrab qilmaydi
 
 Ilova ochilganda (launcher, Kuzatuv) hech qanday sud/orginfo soʻrovi ketmaydi: kartalar registry keshidagi maʼlumotni koʻrsatadi. Yangilash faqat bosish bilan boshlanadi: kartadagi tugma, Kuzatuvdagi «Yangilash» (hammasi, navbat bilan) yoki launcherdagi «Yangilash». Ochilishda faqat mahalliy chaqiruvlar qoladi (`settings/health`, `public-orders/status`). Kompaniya ochilganda `keepIdentityWarm` yengil company-info oʻqiydi, bu foydalanuvchi harakati. Test: `src/lib/__tests__/no-launch-scraping.test.ts`.
+
+
+## Koʻrinish (the look, Nov 2026)
+
+The interface was redone with the method of **unslop** by Damir Sokolovsky ([@heydamir](https://x.com/heydamir), https://github.com/heydamir/unslop, CC BY 4.0): audit the slop first, set a direction from the product, then fix spacing, colour, icons, copy, type, layout, details and motion in that order. Credit kept here as the licence asks.
+
+**Direction.** Product: a private desk tool for one Uzbek lawyer to look up companies, court cases, bills and hearings and to produce documents. Character: exact, calm, a little dry (a clerk's desk, not a start-up). World: a legal office, paper and ledgers: surfaces stay neutral graphite, the content carries the colour. Moment: the next hearing (amber marker when it is inside 7 days) and the won/lost chart. Signature: identifiers (STIR, case numbers) in IBM Plex Mono, tabular.
+
+**What changed (through the tokens in `globals.css`, then `prototype.css`).** Navy-tinted ramp to graphite (light and dark); sidebar from a blue gradient with a glowing active item to a neutral surface with a hairline, the active row a surface step; logo tile flat; all tracked all-caps label rules removed; weights 700/800 to 600 (small text 500); negative tracking on small text removed; half-pixel and sub-12px sizes onto the scale; radii onto 8/10/12/14/20; hover lifts removed; entrance 300 ms with an 8 px rise; counts as quiet mono text, not pills; KPI tiles numbers-only (no icon tile, no solid fill); card-header and document-tile icons without coloured tiles; «warning» is amber (it was blue, so «pending» looked like «info»); the launcher headline lost its two-tone colour and trailing period; the sidebar status line is derived from the real worker state.
+
+**Rules for new UI.** Colour means something or it is not there. One accent. No gradient, glow, blur or colour wash. Sentence-case labels at 12 px or more. Equal things have equal sizes, on the 4 px grid. A card is for an independent thing: no filled block inside a card inside a page (the hearing list is rows on the page). Text must be true (no default «healthy»).

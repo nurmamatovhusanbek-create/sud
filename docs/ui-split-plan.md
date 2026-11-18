@@ -81,7 +81,7 @@ Extract what the CSS already defines into `src/ui/`, with the **same** look firs
   Rules kept from AGENTS.md: forever-running motion animates only `transform`/`opacity`; no blur over animated content.
 - **Done when:** a test fails on an `animation:`/`@keyframes` outside that file, and the three modes are covered by a Playwright check.
 
-### M6 — Redesign (only after M3)
+### M6 — Redesign (a first pass was done early, see docs/design-notes.md › «Koʻrinish»; the rest waits for M3)
 Now a look change is edits in `src/ui` plus screen composition, with M0 showing exactly what moved. Proposed changes, in the order I would ship them:
 1. **Two levels, not five.** Page → section (one surface) → rows. Dividers and spacing replace nested boxes; a card is only for an independent thing (a company, an order, a case).
 2. **One section header.** The 36 px dark icon tile on every card header (`.card-h .ico`, 19 uses) is replaced by a quiet title + optional action; icons only where they carry meaning.
