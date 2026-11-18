@@ -169,6 +169,25 @@ describe('document shell', () => {
   })
 })
 
+describe('running header (navy edition)', () => {
+  test('company · STIR on the left, hidden on page 1 by an absolute cover over the first top margin, fixed (repeating) in print', () => {
+    const html = doc(FULL)
+    const head = html.match(/<div class="rp-runhead">[\s\S]*?<\/div>/)![0]
+    expect(head).toContain('PROCAB')
+    expect(head).toContain('STIR 302121267')
+    expect(html).toContain('<div class="rp-cover"></div>')
+    const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]
+    expect(css).toMatch(/\.rp-cover \{ position: absolute;[^}]*left: 66mm/) // over the analysis column only: the rail keeps its colour
+    expect(css.indexOf('@media print { .rp-runhead { position: fixed; } }')).toBeGreaterThan(css.indexOf('.rp-runhead { position: absolute'))
+  })
+  test('escaped like everything else', () => {
+    const evil = buildReportModel({ ...FULL, info: { ...FULL.info!, company: { ...FULL.info!.company!, officialName: '</style><script>alert(1)</script>' } } })
+    const html = buildReportDoc(evil)
+    expect(html).not.toContain('<script>alert')
+    expect(html.match(/<\/style>/g)).toHaveLength(1)
+  })
+})
+
 describe('fontKitFromRules', () => {
   const rules = [
     { family: '"__Plus_Jakarta_Sans_abc"', cssText: '@font-face { font-family: "__Plus_Jakarta_Sans_abc"; src: url(/_next/static/media/jk.woff2) format("woff2"); unicode-range: U+0000-00FF; }' },

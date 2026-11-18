@@ -5,7 +5,7 @@
 import { formatDmy } from '@/core/dates'
 import { escapeHtml as h } from '@/lib/print'
 import type { ReportModel } from './model'
-import { renderReportBody, renderReportFooter, renderReportWatermark, reportCss, reportTheme } from './render'
+import { renderReportBody, renderReportFooter, renderReportRunHead, renderReportWatermark, reportCss, reportTheme } from './render'
 import { renderInkDoc } from './render-ink'
 import type { Look } from '@/lib/look'
 
@@ -52,6 +52,7 @@ export function buildReportDoc(m: ReportModel, opts: ReportDocOpts = {}): string
 <div class="rp-sheet">
 <div class="rp-bg"></div>
 ${renderReportWatermark(t)}
+${renderReportRunHead(m)}
 <div class="rp-pin rp-pin-l">${foot.rail}</div><div class="rp-pin rp-pin-r">${foot.main}</div>
 <table class="rp">
 <colgroup><col class="l"><col></colgroup>

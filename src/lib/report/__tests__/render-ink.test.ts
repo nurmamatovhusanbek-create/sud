@@ -132,4 +132,26 @@ describe('premium edition', () => {
     expect(html).not.toContain('<img src=x')
     expect(html).not.toContain('<script>alert')
   })
+
+  test('running header on pages 2+: escaped text, fixed in print AFTER its base rule, covered on page 1 by the opaque masthead', () => {
+    const html = ink()
+    const head = html.match(/<div class="rp-runhead">[\s\S]*?<\/div>/)![0]
+    expect(head).toContain('PROCAB')
+    expect(head).toContain(`STIR ${M.stir}`)
+    const css = html.match(/<style>([\s\S]*?)<\/style>/)![1]
+    // the print rule must come after the base `position: absolute` rule, or the header never repeats (the bug this guards)
+    expect(css.indexOf('.rp-runhead { position: absolute')).toBeGreaterThan(-1)
+    expect(css.indexOf('@media print { .rp-runhead { position: fixed; } }')).toBeGreaterThan(css.indexOf('.rp-runhead { position: absolute'))
+    expect(css).toMatch(/\.rp-mast \{[^}]*position: relative; z-index: 2/)
+    expect(css).toMatch(/\.rp-runhead \{[^}]*z-index: 1/)
+    // the header sits BEFORE the masthead in the document (so the masthead paints over it on page 1)
+    expect(html.indexOf('class="rp-runhead"')).toBeLessThan(html.indexOf('class="rp-mast"'))
+  })
+
+  test('the running header never puts company data into a CSS string or markup', () => {
+    const evil = buildReportModel({ ...FULL, info: { ...FULL.info!, company: { ...FULL.info!.company!, officialName: '</style><script>alert(1)</script> "x" \\ \n' } } })
+    const html = buildReportDoc(evil, { look: 'premium' })
+    expect(html).not.toContain('<script>alert')
+    expect(html.match(/<\/style>/g)).toHaveLength(1)
+  })
 })

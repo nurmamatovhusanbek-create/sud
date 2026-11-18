@@ -284,10 +284,17 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   .rp-wm { position: absolute; z-index: -1; right: -20mm; bottom: -14mm; width: 88mm; opacity: ${t.dark ? 0.06 : 0.045}; pointer-events: none; }
   .rp-wm svg { display: block; width: 100%; height: auto; }
   @media print { .rp-foot, .rp-wm { position: fixed; } .rp-sheet { margin: 0; } }
+  /* running header on pages 2+: fixed (repeats), covered on page 1 by the opaque masthead above it */
+  .rp-runhead { position: absolute; z-index: 1; top: 5mm; left: 14mm; right: 14mm; display: flex; align-items: baseline; justify-content: space-between; gap: 6mm; padding-bottom: 1.8mm; border-bottom: .4pt solid var(--bd); font-size: 6.6pt; color: var(--t3); }
+  .rp-runhead .rn { display: flex; align-items: baseline; gap: 3mm; min-width: 0; }
+  .rp-runhead b { font-weight: 600; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-runhead .m { flex: none; }
+  .rp-runhead .rt { flex: none; }
+  @media print { .rp-runhead { position: fixed; } }
   @media screen { .rp-sheet { overflow: hidden; background: var(--bg); box-shadow: 0 8px 40px rgba(0,0,0,.16); margin: 24px auto; min-height: 297mm; } body { padding-bottom: 24px; } html { background: ${t.dark ? t.bg : '#ECECEE'}; } }
 
   /* masthead: one full-bleed ink band on page 1 only: who, status, the rating as a number over a ruler */
-  .rp-mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; padding: 13mm 14mm 9mm; background: var(--mast); color: #fff; }
+  .rp-mast { position: relative; z-index: 2; display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; padding: 13mm 14mm 9mm; background: var(--mast); color: #fff; }
   .rp-mast-l { min-width: 0; flex: 1; }
   .rp-mast-k { font-size: 7pt; font-weight: 500; color: rgba(255,255,255,.6); }
   .rp-mast h1 { margin: 2mm 0 3mm; font-size: 21pt; line-height: 1.15; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
@@ -305,7 +312,7 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
 
   table.rp { width: 100%; border-collapse: collapse; table-layout: fixed; }
   td.b { padding: 0 14mm; vertical-align: top; }
-  thead td { height: 9mm; }
+  thead td { height: 15mm; }
   tfoot td { height: 12mm; }
 
   /* the four outcomes, ONE ink: solid · tint · hatch · dashed outline */
@@ -316,8 +323,8 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   .rp-st.pending { background: transparent; border: 1px dashed var(--sw); }
 
   .rp-block { margin-top: 8mm; }
-  .rp-first { margin-top: 0; }
   .rp-avoid { break-inside: avoid; }
+  .rp-block.rp-first { margin-top: -6mm; } /* thead reserves 15mm for the running header; page 1 has the masthead there instead */
   .rp-sh { display: flex; align-items: center; gap: 3mm; margin-bottom: 3.6mm; font-size: 8.6pt; font-weight: 600; break-after: avoid; }
   .rp-sh::after { content: ""; order: 1; flex: 1; height: .5pt; background: var(--bd); }
   .rp-sh em { order: 2; font-style: normal; font-weight: 400; font-size: 6.6pt; color: var(--t3); }
@@ -432,6 +439,15 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   `
 }
 
+/**
+ * The running header: company name · STIR, and «Hisobot · date», at the top of every printed page from page 2. A fixed element repeats on
+ * every page; on page 1 the full-bleed masthead (positioned, higher z-index, opaque) covers it, so no CSS string and no page selector is
+ * needed. Escaped HTML text only.
+ */
+export function renderInkRunHead(m: ReportModel): string {
+  return `<div class="rp-runhead"><span class="rn"><b>${h(displayName(m.name))}</b><span class="m">STIR ${h(m.stir)}</span></span><span class="rt m">Hisobot · ${h(formatDmy(m.generatedAt))}</span></div>`
+}
+
 /** The whole document: masthead above one table whose thead / tfoot reserve the page margins, pinned footer, watermark. */
 export function renderInkDoc(m: ReportModel, o: { dark: boolean; title: string; stack: string; mono: string; fontFaceCss?: string }): string {
   const t = inkTheme(o.dark)
@@ -440,6 +456,7 @@ export function renderInkDoc(m: ReportModel, o: { dark: boolean; title: string; 
 <div class="rp-sheet">
 ${renderInkWatermark(t)}
 <div class="rp-foot"><span class="m">STIR ${h(m.stir)} · ${h(formatDmy(m.generatedAt))}</span><span>Hisobot tuzilgan paytdagi holatni aks ettiradi va rasmiy hujjat hisoblanmaydi.</span></div>
+${renderInkRunHead(m)}
 ${body.head}
 <table class="rp">
 <thead><tr><td class="b"></td></tr></thead>

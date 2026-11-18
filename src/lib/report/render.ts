@@ -365,6 +365,15 @@ export function renderReportWatermark(t: ReportTheme): string {
   return `<div class="rp-wm" aria-hidden="true">${brandMarkSvg(t.dark ? 'dark' : 'light')}</div>`
 }
 
+/**
+ * The running header: company name · STIR on the left, «Kompaniya hisoboti» on the right, repeated at the top of every printed page
+ * (a fixed element repeats) and hidden on page 1 by `.rp-cover`, an ABSOLUTE strip in the page colour over the top margin of the first page
+ * only. Everything is escaped HTML text: no company data ever goes into a CSS string.
+ */
+export function renderReportRunHead(m: ReportModel): string {
+  return `<div class="rp-runhead"><span class="rn"><b>${h(displayName(m.name))}</b><span class="m">STIR ${h(m.stir)}</span></span><span class="rt">Kompaniya hisoboti</span></div><div class="rp-cover"></div>`
+}
+
 /** Pinned bottom line (repeats on every page): the company key on the rail, the disclaimer beside it. No source names. */
 export function renderReportFooter(m: ReportModel): { rail: string; main: string } {
   return {
@@ -403,6 +412,14 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
   .rp-wm { position: absolute; z-index: -1; right: -24mm; bottom: -6mm; width: 124mm; opacity: ${t.dark ? 0.07 : 0.065}; pointer-events: none; }
   .rp-wm svg { display: block; width: 100%; height: auto; }
   @media print { .rp-bg, .rp-pin, .rp-wm { position: fixed; } .rp-bg { bottom: -9mm; } .rp-sheet { margin: 0; } }
+  /* running header on pages 2+: fixed (repeats), covered on page 1 by .rp-cover (absolute, first page only) */
+  .rp-runhead { position: absolute; z-index: 1; top: 5mm; left: calc(${RAIL_W} + 14mm); right: 15mm; display: flex; align-items: baseline; justify-content: space-between; gap: 6mm; padding-bottom: 1.6mm; border-bottom: .4pt solid var(--bd); font-size: 6.6pt; color: var(--t3); }
+  .rp-runhead .rn { display: flex; align-items: baseline; gap: 3mm; min-width: 0; }
+  .rp-runhead b { font-weight: 600; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-runhead .m { flex: none; }
+  .rp-runhead .rt { flex: none; }
+  .rp-cover { position: absolute; z-index: 2; top: 0; left: ${RAIL_W}; right: 0; height: 15mm; background: var(--bg); }
+  @media print { .rp-runhead { position: fixed; } }
   @media screen { .rp-sheet { overflow: hidden; background: var(--bg); box-shadow: 0 8px 40px rgba(20,24,52,.18); margin: 24px auto; min-height: 297mm; } body { padding-bottom: 24px; } html { background: ${t.dark ? t.bg : '#e9ebf5'}; } }
 
   table.rp { width: 100%; border-collapse: collapse; table-layout: fixed; }
