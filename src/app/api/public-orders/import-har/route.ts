@@ -13,7 +13,7 @@ export const MAX_HAR_BYTES = 256 * 1024 * 1024
  * POST /api/public-orders/import-har   body: the .har file itself
  *
  * The hand-over for orders public.sud.uz shows only in a pop-up (no download button): the person opens the order in their
- * own browser with DevTools › Network open, saves the log («Save all as HAR with content») and gives it to the app. Each
+ * own browser with DevTools › Network open, exports the log (Network › «Export HAR (sanitized)», or «with sensitive data» if the file contents are missing) and gives it to the app. Each
  * order file in it is stored like an automatic download (`pdf-store`), under the id in the file request's own path. Local only:
  * nothing is requested from any site; cookies/tokens in the HAR are never read. See lib/public-orders/har-import.
  */
@@ -26,12 +26,12 @@ export const POST = guard(
     try {
       found = extractOrdersFromHar(raw)
     } catch (e) {
-      if (e instanceof NotHarError) return jsonFail('Bu HAR fayl emas — DevTools › Network dan «Save all as HAR with content» bilan saqlangan faylni tanlang', 'not_har', 422)
+      if (e instanceof NotHarError) return jsonFail('Bu HAR fayl emas — DevTools › Network dagi «Export HAR» bilan saqlangan faylni tanlang', 'not_har', 422)
       return jsonFail('Faylni oʻqib boʻlmadi', 'read_failed', 500)
     }
     if (!found.files.length) {
       const why = found.noContent
-        ? 'HAR faylda qaror fayli bor, lekin uning ichi saqlanmagan: «Save all as HAR with content» ni tanlang (oddiy «Save as HAR» emas)'
+        ? 'HAR faylda qaror fayli bor, lekin uning ichi saqlanmagan: «Export HAR (with sensitive data)» bilan qayta saqlang'
         : 'HAR faylda qaror fayli topilmadi: Network ochiq turib qarorni oching, soʻng HAR ni saqlang'
       return jsonFail(why, 'no_order_file', 422)
     }

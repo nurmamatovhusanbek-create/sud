@@ -52,8 +52,9 @@ export function HarHowTo() {
       <ol style={{ margin: '6px 0 0', paddingLeft: 18, display: 'grid', gap: 3 }}>
         <li>public.sud.uz da <b>F12</b> bosing va yuqoridagi <b>Network</b> yorligʻini oching.</li>
         <li>Qarorni oching va oyna toʻliq yuklanguncha kuting.</li>
-        <li>Network roʻyxatida sichqonchaning oʻng tugmasini bosing va <b>Save all as HAR with content</b> ni tanlang. Fayl bitta boʻladi.</li>
-        <li>Shu faylni yuqoridagi <b>HAR fayldan yuklash</b> orqali tanlang. Qaror oʻzi topilib saqlanadi. Keyin HAR faylni oʻchirib tashlang: unda cookie va tokenlar bor.</li>
+        <li>Network oynasining yuqori qatorida (oʻng tomonda) <b>pastga qaragan strelka</b> belgisini bosing va <b>Export HAR (sanitized)</b> ni tanlang. Fayl bitta boʻladi.</li>
+        <li>Agar ilova «qaror fayli topilmadi» desa, xuddi shu joydan <b>Export HAR (with sensitive data)</b> ni tanlang.</li>
+        <li>Shu faylni yuqoridagi <b>HAR fayldan yuklash</b> orqali tanlang. Qaror oʻzi topilib saqlanadi. Keyin HAR faylni oʻchirib tashlang.</li>
       </ol>
     </details>
   )

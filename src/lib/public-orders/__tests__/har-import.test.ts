@@ -96,7 +96,7 @@ describe('POST /api/public-orders/import-har', () => {
     expect((await (await call(har([entry('https://public.sud.uz/a.json', 'x', undefined)]))).json()).code).toBe('no_order_file')
     const noContent = await (await call(har([entry(FILE_URL, null)]))).json()
     expect(noContent.code).toBe('no_order_file')
-    expect(noContent.error).toContain('with content')
+    expect(noContent.error).toContain('with sensitive data')
   })
   test('a page on another site cannot hand files to the app', async () => {
     expect((await call(har([entry(FILE_URL, PDF)]), { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' })).status).toBe(403)
