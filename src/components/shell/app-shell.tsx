@@ -47,6 +47,7 @@ import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
+import { thumbVars, useThumb } from '@/lib/use-thumb'
 import { DateTile, dateParts, daysLabel } from '@/components/proto/date-tile'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -134,7 +135,7 @@ function BellPopover() {
         }}
       >
         <Bell />
-        {alerts.length > 0 && <span className="cbadge">{alerts.length > 99 ? "99+" : alerts.length}</span>}
+        {alerts.length > 0 && <span className="cbadge" key={alerts.length}>{alerts.length > 99 ? "99+" : alerts.length}</span>}
       </button>
       {open && (
         <div className="pop" onClick={(e) => e.stopPropagation()}>
@@ -179,6 +180,18 @@ function BellPopover() {
         </div>
       )}
     </div>
+  )
+}
+
+/** A nav group whose active mark SLIDES from the old item to the new one (the indicator is one element, moved with transform only) */
+function ThumbNav({ label, activeKey, children }: { label: string; activeKey: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLElement>(null)
+  const { thumb, ready } = useThumb(ref, [activeKey])
+  return (
+    <nav className={`nav${thumb ? ' has-thumb' : ''}${ready ? ' thumb-ready' : ''}`} aria-label={label} ref={ref}>
+      {thumb && <span className="thumb" style={thumbVars(thumb)} aria-hidden="true" />}
+      {children}
+    </nav>
   )
 }
 
@@ -318,7 +331,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <div className="nav-label">Ish maydoni</div>
-        <nav className="nav" aria-label="Ish maydoni">
+        <ThumbNav label="Ish maydoni" activeKey={`${surface}:${section}`}>
           {WORKSPACE_NAV.map((n) => (
             <button key={n.key} className={navActive(n.key) ? 'on' : ''} onClick={() => navClick(n.key)}>
               {NAV_ICONS[n.key]}
@@ -326,10 +339,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {pipFor(n.key) !== undefined && <span className="pip">{pipFor(n.key)}</span>}
             </button>
           ))}
-        </nav>
+        </ThumbNav>
 
         <div className="nav-label">Tizim</div>
-        <nav className="nav" aria-label="Tizim">
+        <ThumbNav label="Tizim" activeKey={`${surface}:${section}`}>
           <button className={surface === 'documents' ? 'on' : ''} onClick={() => { setSideOpen(false); setSurface('documents') }}>
             <FileText />
             Hujjatlar
@@ -338,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Settings />
             Sozlamalar
           </button>
-        </nav>
+        </ThumbNav>
 
         <div className="side-spacer" />
         <button

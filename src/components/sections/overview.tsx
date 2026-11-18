@@ -25,6 +25,7 @@ import { Activity, BarChart3, CalendarDays, CircleX, Clock, Gavel, Minus, Receip
 import { SolidIcon, StatusIcon } from '@/components/ui-custom/solid-icons'
 import {
   Kpi,
+  CountUp,
   BarChart,
   EmptyBlock,
   OutcomeBoard,
@@ -311,19 +312,19 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
     <div className="stat-flow">
       <div className="kpis">
         <Kpi label="Jami sud ishlari" icon={<SolidIcon name="gavel" />} foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
-          <span>{s.total}</span>
+          <CountUp value={s.total} id={`ov-total-${stir}`} />
         </Kpi>
         <Kpi
           label="Yutuq darajasi" icon={<SolidIcon name="trophy" />}
           foot={winRate === null ? 'Hal qilingan ish yoʻq' : <>{s.win} yutgan / {s.win + s.lose} ta hal qilingan ishdan</>}
         >
-          <span>{winRateText(s.win, s.lose)}</span>
+          {winRate === null ? <span>{winRateText(s.win, s.lose)}</span> : <CountUp value={winRate} suffix="%" id={`ov-wr-${stir}`} />}
         </Kpi>
         <Kpi
           label="Kutilayotgan majlis" icon={<SolidIcon name="calendar-blank" />}
           foot={upcomingCount !== null ? <>{upcomingCount} ta majlis belgilangan</> : 'Majlislar boʻlimida yuklanadi'}
         >
-          <span>{upcomingCount ?? '-'}</span>
+          {upcomingCount === null ? <span>-</span> : <CountUp value={upcomingCount} id={`ov-up-${stir}`} />}
         </Kpi>
         <Kpi
           label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />}

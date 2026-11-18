@@ -54,10 +54,14 @@ export function ScrapeProgress({ title, phases, elapsed }: ScrapeCfg & { elapsed
             </div>
           </div>
           <span style={{ flex: 1 }} />
+          <span className="scrape-pct mono" aria-hidden="true">
+            {pct}
+            <small>%</small>
+          </span>
           <span className="spinner" />
         </div>
         <div className="stream-bar">
-          <div className="stream-fill" style={{ width: `${pct}%`, transition: reduced ? 'none' : undefined }} />
+          <div className="stream-fill" style={{ transform: `scaleX(${pct / 100})`, transition: reduced ? 'none' : undefined }} />
         </div>
         <div className="phases">
           {phases.map((p, i) => (

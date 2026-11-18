@@ -1,0 +1,112 @@
+/* ============================================================================
+   MOTION · «Premium» (the black edition). ONE file: every animation and transition of this look is declared here.
+   ----------------------------------------------------------------------------
+   What the unslop guide (§9) and this repo's rules allow, and how it is applied:
+     · ONE entrance per page: a short fade + 10 px rise with a small stagger (≤ 300 ms of delay in all). Not every card from another side.
+     · Motion that EXPLAINS: figures count up (script: CountUp / Dial), bars grow from their baseline, the outcome strip is wiped open
+       left to right, indicators SLIDE between items (sidebar mark, tabs, filter), overlays rise a few px from where they open.
+     · Only compositor-friendly properties: transform, opacity (and clip-path for the one-off strip wipe). NEVER width, height, top,
+       left, margin or a blur; no `transition: all`; no bounce / overshoot; no glow; no backdrop-filter over anything that moves.
+     · One easing curve (--ease-emphasized) and the duration tokens (--dur-1..4: 120 / 200 / 320 / 460 ms).
+     · Nothing loops except what is LIVE (the sidebar status pulse, spinners, the loading shimmer): transform / opacity only.
+     · Every `backwards`-filled entrance returns to the element's natural state, so with motion off nothing stays hidden.
+   Gating (AGENTS.md › animations): the last block switches ALL of it off for «Animatsiya: off» and for «auto» when the system asks
+   for reduced motion; «on» overrides the system. Script-driven motion asks `motionReduced()`. Guard: lib/__tests__/motion-css.test.ts.
+   ============================================================================ */
+
+@keyframes pm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes pm-slide { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes pm-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes pm-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pm-pop { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes pm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pm-badge { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes pm-sweep { 100% { transform: translateX(100%); } }
+@keyframes pm-nudge { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes pm-tick { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: none; } }
+
+/* ---- 1. the page enters: cards rise in order ---- */
+[data-look='premium'] .rise-c { animation: pm-rise var(--dur-3) var(--ease-emphasized) backwards; }
+[data-look='premium'] .rise-c:nth-child(2) { animation-delay: 60ms; }
+[data-look='premium'] .rise-c:nth-child(3) { animation-delay: 120ms; }
+[data-look='premium'] .rise-c:nth-child(4) { animation-delay: 180ms; }
+[data-look='premium'] .rise-c:nth-child(5) { animation-delay: 240ms; }
+[data-look='premium'] .rise-c:nth-child(n + 6) { animation-delay: 300ms; }
+[data-look='premium'] .rise { animation: pm-rise var(--dur-3) var(--ease-emphasized) backwards; animation-delay: calc(min(var(--i, 0), 8) * 45ms); }
+
+/* stat tiles: each rises, its big icon slides in from the edge a beat later */
+[data-look='premium'] .kpis > .kpi { animation: pm-rise var(--dur-3) var(--ease-emphasized) backwards; }
+[data-look='premium'] .kpis > .kpi:nth-child(2) { animation-delay: 55ms; }
+[data-look='premium'] .kpis > .kpi:nth-child(3) { animation-delay: 110ms; }
+[data-look='premium'] .kpis > .kpi:nth-child(4) { animation-delay: 165ms; }
+[data-look='premium'] .kpis > .kpi .kpi-ico { animation: pm-slide var(--dur-4) var(--ease-emphasized) 180ms backwards; }
+
+/* the first rows of a list rise one after another (capped: row 11 and later just appear) */
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(-n + 10):not(.rise) { animation: pm-rise var(--dur-2) var(--ease-emphasized) backwards; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(2):not(.rise) { animation-delay: 30ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(3):not(.rise) { animation-delay: 60ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(4):not(.rise) { animation-delay: 90ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(5):not(.rise) { animation-delay: 120ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(6):not(.rise) { animation-delay: 150ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(7):not(.rise) { animation-delay: 180ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(8):not(.rise) { animation-delay: 210ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(9):not(.rise) { animation-delay: 240ms; }
+[data-look='premium'] :is(.ccards, .datecards, .list) > :nth-child(10):not(.rise) { animation-delay: 270ms; }
+
+/* ---- 2. charts draw themselves ---- */
+/* the outcome strip is wiped open left to right (the hero first, the slice tiles a beat later); re-keyed per slice, so it replays on a pick */
+[data-look='premium'] .ob-strip.lg { animation: pm-wipe 720ms var(--ease-emphasized) 160ms backwards; }
+[data-look='premium'] .ob-strip.sm { animation: pm-wipe 560ms var(--ease-emphasized) 320ms backwards; }
+/* months: bars grow from the baseline, left to right */
+[data-look='premium'] .bar { transition: none; transform-origin: 50% 100%; animation: pm-grow 640ms var(--ease-emphasized) backwards; animation-delay: calc(140ms + min(var(--i, 0), 12) * 36ms); }
+/* the rating ruler: its ticks light as the figure counts (script), each with a quick step, never a loop */
+[data-look='premium'] .ruler i { transition: background-color var(--dur-1) var(--ease-standard); }
+
+/* ---- 3. indicators slide (one element, moved with transform; placed first, animated on later changes) ---- */
+[data-look='premium'] .seg, [data-look='premium'] .set-tabs { position: relative; }
+[data-look='premium'] :is(.seg, .set-tabs) .thumb { display: block; position: absolute; left: 0; bottom: 0; width: 100px; height: 2px; background: var(--brand); transform-origin: 0 50%; transform: translateX(calc(var(--tx) * 1px)) scaleX(calc(var(--tw) / 100)); pointer-events: none; }
+[data-look='premium'] :is(.seg, .set-tabs).thumb-ready .thumb { transition: transform var(--dur-3) var(--ease-emphasized); }
+[data-look='premium'] .seg.has-thumb button.on, [data-look='premium'] .set-tabs.has-thumb .set-tab.on { box-shadow: none; }
+
+[data-look='premium'] .nav { position: relative; }
+[data-look='premium'] .nav .thumb { position: absolute; z-index: 0; left: 0; top: 0; width: 100%; height: 36px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); transform: translateY(calc(var(--ty) * 1px)); pointer-events: none; }
+[data-look='premium'] .nav .thumb::before { content: ""; position: absolute; left: -16px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 2px 2px 0; background: var(--mark); }
+[data-look='premium'] .nav.thumb-ready .thumb { transition: transform var(--dur-3) var(--ease-emphasized); }
+[data-look='premium'] .nav.has-thumb button.on { background: none; }
+[data-look='premium'] .nav.has-thumb button.on::before { display: none; }
+[data-look='premium'] .nav.has-thumb button.on:hover { background: rgba(255, 255, 255, 0.06); }
+
+/* ---- 4. overlays rise a few pixels from where they open; the scrim only fades (no blur) ---- */
+[data-look='premium'] .overlay { animation: pm-fade var(--dur-2) var(--ease-standard); }
+[data-look='premium'] .cmdk { animation: pm-pop var(--dur-2) var(--ease-emphasized); }
+[data-look='premium'] .pop { animation: pm-pop var(--dur-2) var(--ease-emphasized); transform-origin: 100% 0; }
+[data-look='premium'] .drawer { transition: transform var(--dur-3) var(--ease-emphasized), visibility 0s linear var(--dur-3); }
+[data-look='premium'] .drawer.open { transition: transform var(--dur-3) var(--ease-emphasized), visibility 0s; }
+[data-look='premium'] .drawer-scrim { transition: opacity var(--dur-3) var(--ease-standard); }
+[data-look='premium'] .cbadge { animation: pm-badge var(--dur-2) var(--ease-emphasized); }
+
+/* ---- 5. loading: a calm ink shimmer on skeletons (live, so it may loop: transform only), content then rises in ---- */
+[data-look='premium'] .sk::after { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text-1) 7%, transparent), transparent); animation: pm-sweep 1.5s var(--ease-standard) infinite; }
+
+/* the loading card: the bar fills with transform (scaleX, set by the component), a quiet ink sweep runs over it while it is live, the
+   active phase slides in as it becomes current, a finished phase's check pops, and the percentage beside it counts up with the bar */
+[data-look='premium'] .stream-fill { transition: transform var(--dur-4) var(--ease-emphasized); }
+[data-look='premium'] .stream-fill::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-contrast) 38%, transparent), transparent); animation: pm-sweep 1.6s var(--ease-standard) infinite; }
+[data-look='premium'] .phase.active { animation: pm-nudge var(--dur-3) var(--ease-emphasized) backwards; }
+[data-look='premium'] .phase.done .pd svg { animation: pm-tick var(--dur-3) var(--ease-emphasized) backwards; }
+[data-look='premium'] .phase { transition: color var(--dur-2) var(--ease-standard); }
+[data-look='premium'] .phase .pd { transition: background-color var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard); }
+
+/* ---- 6. feedback: quick surface and colour steps, a tiny press ---- */
+[data-look='premium'] .btn { transition: background-color var(--dur-1) var(--ease-standard), border-color var(--dur-1) var(--ease-standard), color var(--dur-1) var(--ease-standard), transform var(--dur-1) var(--ease-standard); }
+[data-look='premium'] .btn:active { transform: scale(0.97); }
+[data-look='premium'] :is(.ccard, .lrow, .datecard, .ob2-tile, .notif, .cmdk-item) { transition: background-color var(--dur-1) var(--ease-standard), border-color var(--dur-1) var(--ease-standard); }
+
+/* ============================================================================
+   GATE: «Animatsiya: off», and «auto» while the system asks for reduced motion, switch ALL of the above off. «on» overrides the system.
+   Spinners and the status pulse are feedback, not decoration: the pulse has its own gate in prototype.css; the spinner keeps turning.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look='premium']:not([data-motion='on']) :where(*, *::before, *::after):not(.spinner):not(.spin) { animation: none !important; transition: none !important; }
+}
+:root[data-look='premium'][data-motion='off'] :where(*, *::before, *::after):not(.spinner):not(.spin) { animation: none !important; transition: none !important; }

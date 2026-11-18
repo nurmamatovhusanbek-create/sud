@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { thumbVars, useThumb } from '@/lib/use-thumb'
 import {
   Activity,
   AlertTriangle,
@@ -962,6 +963,8 @@ type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 's
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const tabThumb = useThumb(tabsRef, [tab])
 
   useEffect(() => {
     document.title = 'Sozlamalar · Sud tizimi'
@@ -975,7 +978,8 @@ export function SettingsView() {
         <p>Yangilanishlar, Cloudflare workerlar va tarmoq holatini boshqaring.</p>
       </div>
 
-      <div className="set-tabs">
+      <div className={`set-tabs${tabThumb.thumb ? ' has-thumb' : ''}${tabThumb.ready ? ' thumb-ready' : ''}`} ref={tabsRef}>
+        {tabThumb.thumb && <span className="thumb" style={thumbVars(tabThumb.thumb)} aria-hidden="true" />}
         <button className={`set-tab ${tab === 'looks' ? 'on' : ''}`} onClick={() => setTab('looks')}>
           <Palette />
           Koʻrinish

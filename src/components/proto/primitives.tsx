@@ -11,6 +11,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import { dateParts, DateTile, daysLabel, isNear } from './date-tile'
 import { motionReduced } from '@/lib/motion'
+import { thumbVars, useThumb } from '@/lib/use-thumb'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
@@ -242,7 +243,7 @@ export function BarChart({
             onClick={() => onBarClick?.(i, n, labels[i])}
           >
             <div className="bar-track">
-              <div className="bar" style={{ height: mounted ? `${Math.round((n / maxT) * 100)}%` : '0%' }} />
+              <div className="bar" style={{ height: mounted ? `${Math.round((n / maxT) * 100)}%` : '0%', ['--i' as string]: i }} />
             </div>
             <div className="bar-lbl">{labels[i]}</div>
           </div>
@@ -307,23 +308,10 @@ export function Seg({
   onChange: (key: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [thumb, setThumb] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
-  useEffect(() => {
-    const root = ref.current
-    if (!root) return
-    const measure = () => {
-      const active = root.querySelector<HTMLButtonElement>('button.on')
-      if (!active) return setThumb(null)
-      setThumb({ left: active.offsetLeft, top: active.offsetTop, width: active.offsetWidth, height: active.offsetHeight })
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(root)
-    return () => ro.disconnect()
-  }, [value, options])
+  const { thumb, ready } = useThumb(ref, [value, options])
   return (
-    <div className={`seg${thumb ? ' has-thumb' : ''}`} ref={ref}>
-      {thumb && <span className="thumb" style={{ left: thumb.left, top: thumb.top, width: thumb.width, height: thumb.height }} />}
+    <div className={`seg${thumb ? ' has-thumb' : ''}${ready ? ' thumb-ready' : ''}`} ref={ref}>
+      {thumb && <span className="thumb" style={thumbVars(thumb)} />}
       {options.map((o) => (
         <button key={o.key} className={value === o.key ? 'on' : ''} onClick={() => onChange(o.key)}>
           {o.label}
@@ -446,7 +434,7 @@ export function CardStats({
         <div className="cc-col">
           <div className="k">Reyting</div>
           <div className="v">
-            <span className="num">{score != null ? score : '—'}</span>
+            <span className="num">{score != null ? <CountUp value={score} /> : '—'}</span>
             {rating ? <span className={`lt ${familyBadgeClass(ratingBandFamily(rating) ?? 'neutral')}`}>{rating}</span> : null}
           </div>
         </div>
@@ -561,7 +549,7 @@ export function OutcomeBoard({
             </div>
           </div>
           <div className="ob2-main">
-            <OutcomeStrip counts={counts} total={total} size="lg" />
+            <OutcomeStrip key={subject.id ?? subject.label} counts={counts} total={total} size="lg" />
             <div className="ob2-stats">
               {PIZZA_STATUS_ORDER.map((st) => (
                 <div key={st} className={`ob2-stat${counts[st] === 0 ? ' zero' : ''}`} style={{ ['--sw' as string]: 'var(--text-1)' }}>
@@ -571,7 +559,7 @@ export function OutcomeBoard({
                     <i className={`st ${st} ob2-sw`} />
                   </div>
                   <div className="ob2-stat-n mono">
-                    {counts[st]}
+                    <CountUp value={counts[st]} />
                     <small>{total ? `${Math.round((counts[st] / total) * 100)}%` : ''}</small>
                   </div>
                 </div>
@@ -596,7 +584,7 @@ export function OutcomeBoard({
             >
               <span className="ob2-tile-h">
                 <span className="ob2-tile-name">{it.label}</span>
-                <span className="ob2-tile-n mono">{t}</span>
+                <span className="ob2-tile-n mono"><CountUp value={t} /></span>
               </span>
               <OutcomeStrip counts={c} total={t} size="sm" />
               <span className="ob2-tile-f">

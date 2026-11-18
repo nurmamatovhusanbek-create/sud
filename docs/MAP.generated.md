@@ -180,6 +180,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
 | `update-wait.ts` | components/views/settings-view.tsx | lib/__tests__/update-wait.test.ts |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
+| `use-thumb.ts` | components/proto/primitives.tsx, components/shell/app-shell.tsx, components/views/settings-view.tsx | lib/__tests__/motion-css.test.ts |
 | `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx | lib/__tests__/ui-boundary.test.ts |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
