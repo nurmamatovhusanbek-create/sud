@@ -69,6 +69,7 @@ describe('premium edition', () => {
     expect(strokes).toHaveLength(51)
     expect(strokes.filter((s) => !s.startsWith('rgba')).length).toBe(Math.floor(score / 2) + 1)
     expect(html).toContain(`<div class="rp-rate-n m">${Math.round(score)}</div>`)
+    expect(html.indexOf('rp-rate-n')).toBeLessThan(html.indexOf('<table class="rp">')) // the rating sits in the masthead
   })
 
   test('hearings use the calendar leaf: month, day, and an inverted leaf when within 7 days', () => {
@@ -89,13 +90,40 @@ describe('premium edition', () => {
     expect(html).toContain('font-family: "IBM Plex Sans", "Plus Jakarta Sans", "IBM Plex Sans", "Plus Jakarta Sans"')
   })
 
-  test('the page band keeps the rail colour and the paper is the page colour, in both themes', () => {
+  test('the paper is the page colour in both themes (it stays white otherwise: a bright strip in dark mode)', () => {
     for (const dark of [false, true]) {
       const t = inkTheme(dark)
-      const html = ink(FULL, dark)
-      expect(html).toContain(`@page { size: A4; margin: 0 0 9mm; background: ${t.surface};`)
-      expect(html).toContain(`@bottom-left { content: ""; width: 66mm; background: ${t.rail.bg}; }`)
+      expect(ink(FULL, dark)).toContain(`@page { size: A4; margin: 0 0 12mm; background: ${t.surface};`)
     }
+  })
+
+  test('structure: masthead first, then the verdict, the board beside «Diqqat», then months, the case table, and the facts LAST', () => {
+    const html = ink()
+    const order = ['class="rp-mast"', '>Xulosa<', '>Taqsimot<', '>Diqqat<', '>Oylik faollik<', '>Natijalar<', 'class="rp-ct"', '>Kompaniya maʼlumotlari<'].map((k) => html.indexOf(k))
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    // no left rail any more: the masthead is OUTSIDE the table, the facts are inside the analysis, after the cases
+    expect(html.indexOf('class="rp-mast"')).toBeLessThan(html.indexOf('<table class="rp">'))
+    expect(html).not.toContain('rp-rail')
+    expect(html).not.toContain('class="rp-bg"')
+    expect(html.indexOf('>Asosiy maʼlumot<')).toBeGreaterThan(html.indexOf('class="rp-ct"'))
+  })
+
+  test('«Diqqat» holds the hearings and the payments; the latest cases are a table with columns', () => {
+    const html = ink()
+    const att = html.match(/<aside class="rp-col rp-att">[\s\S]*?<\/aside>/)![0]
+    expect(att).toContain('Yaqin majlislar')
+    expect(att).toContain('Toʻlovlar')
+    expect(att).toContain('rp-leaf')
+    const head = [...html.match(/<table class="rp-ct"><thead><tr>([\s\S]*?)<\/tr>/)![1].matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((x) => x[1])
+    expect(head).toEqual(['Holat', 'Tomon', 'Rol', 'Ish raqami', 'Sana', 'Summa'])
+    expect((html.match(/<td class="p">/g) ?? []).length).toBe(M.cases!.latest.length)
+  })
+
+  test('no hearings and no bills: the board takes the whole row, no empty «Diqqat» column', () => {
+    const html = ink({ ...FULL, hearings: null, bills: null })
+    expect(html).not.toContain('<aside')
+    expect(html).toContain('rp-2 rp-block one')
   })
 
   test('company text is escaped here too', () => {

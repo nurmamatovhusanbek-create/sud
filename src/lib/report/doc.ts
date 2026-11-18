@@ -6,7 +6,7 @@ import { formatDmy } from '@/core/dates'
 import { escapeHtml as h } from '@/lib/print'
 import type { ReportModel } from './model'
 import { renderReportBody, renderReportFooter, renderReportWatermark, reportCss, reportTheme } from './render'
-import { inkCss, inkTheme, renderInkBody, renderInkWatermark } from './render-ink'
+import { renderInkDoc } from './render-ink'
 import type { Look } from '@/lib/look'
 
 export interface ReportDocOpts {
@@ -37,18 +37,21 @@ const MONO_STACK = '"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Cons
 export function buildReportDoc(m: ReportModel, opts: ReportDocOpts = {}): string {
   const dark = !!opts.dark
   const ink = opts.look === 'premium'
-  const t = ink ? inkTheme(dark) : reportTheme(dark)
-  // premium: IBM Plex Sans first, Plus Jakarta Sans for what Plex lacks (ʻ ʼ); calm: Plus Jakarta Sans
-  const sans = ink ? [opts.fontPlexSans, opts.fontFamily].filter(Boolean).join(', ') : opts.fontFamily
-  const stack = sans ? `${sans}, ${ink ? PREMIUM_STACK : SYSTEM_STACK}` : ink ? PREMIUM_STACK : SYSTEM_STACK
-  const mono = opts.fontMono ? `${opts.fontMono}, ${MONO_STACK}` : MONO_STACK
   const title = `Kompaniya hisoboti ${m.stir} ${formatDmy(m.generatedAt)}`
-  const body = ink ? renderInkBody(m, t) : renderReportBody(m, t)
+  const mono = opts.fontMono ? `${opts.fontMono}, ${MONO_STACK}` : MONO_STACK
+  if (ink) {
+    // premium: IBM Plex Sans first, Plus Jakarta Sans for what Plex lacks (ʻ ʼ)
+    const sans = [opts.fontPlexSans, opts.fontFamily].filter(Boolean).join(', ')
+    return renderInkDoc(m, { dark, title, stack: sans ? `${sans}, ${PREMIUM_STACK}` : PREMIUM_STACK, mono, fontFaceCss: opts.fontFaceCss })
+  }
+  const t = reportTheme(dark)
+  const stack = opts.fontFamily ? `${opts.fontFamily}, ${SYSTEM_STACK}` : SYSTEM_STACK
+  const body = renderReportBody(m, t)
   const foot = renderReportFooter(m)
-  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${h(title)}</title><style>${opts.fontFaceCss ?? ''}${ink ? inkCss(t, stack, mono) : reportCss(t, stack, mono)}</style></head><body>
+  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${h(title)}</title><style>${opts.fontFaceCss ?? ''}${reportCss(t, stack, mono)}</style></head><body>
 <div class="rp-sheet">
 <div class="rp-bg"></div>
-${ink ? renderInkWatermark(t) : renderReportWatermark(t)}
+${renderReportWatermark(t)}
 <div class="rp-pin rp-pin-l">${foot.rail}</div><div class="rp-pin rp-pin-r">${foot.main}</div>
 <table class="rp">
 <colgroup><col class="l"><col></colgroup>

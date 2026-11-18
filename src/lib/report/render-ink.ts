@@ -93,42 +93,26 @@ function monthly(points: { label: string; count: number }[], t: ReportTheme): st
     <line x1="0" y1="78" x2="600" y2="78" stroke="${t.border}" stroke-width="1"/>${bars}</svg>`
 }
 
-// ---- the rail (left column) --------------------------------------------------
+// ---- structure ---------------------------------------------------------------
+//
+//  PAGE 1   masthead (full-bleed ink band: who, status, the rating as a number over a ruler)
+//           Xulosa     the four key figures
+//           Taqsimot | Diqqat    the outcome board (wide)  ·  what needs attention NOW: hearings and payments (narrow)
+//  THEN     Faollik | Natijalar  months beside the result wording
+//           Turkum               tiles by category (when there are ≥ 2)
+//           Soʻnggi ishlar       a real table with columns
+//  LAST     Kompaniya maʼlumotlari   the registry facts as an appendix (three columns + owners)
+// The verdict and what to do about it come first; static registry facts, which the old edition parked in a rail on every page, go last.
 
-function renderRail(m: ReportModel): string {
+function masthead(m: ReportModel): string {
   const r = m.rating
   const status = m.status ? `<span class="st"><i></i>${h(m.status.text)}</span>` : ''
-  const sub = [m.legalForm ? `<span>${h(m.legalForm)}</span>` : '', status].filter(Boolean).join('<span class="sep">·</span>')
+  const meta = [m.legalForm ? `<span>${h(m.legalForm)}</span>` : '', status, `<span class="m">STIR ${h(m.stir)}</span>`].filter(Boolean).join('<span class="sep">·</span>')
   const rating = r
-    ? `<div class="rp-rate"><div class="rp-rate-k">Hamkor reytingi · ${h(r.category)}</div><div class="rp-rate-n m">${r.score === null ? '–' : Math.round(clampPct(r.score))}</div>${ruler(r.score)}<div class="rp-rate-s m"><span>0</span><span>100</span></div></div>`
+    ? `<div class="rp-rate"><div class="rp-rate-k">Hamkor reytingi · ${h(r.category)}</div><div class="rp-rate-row"><div class="rp-rate-n m">${r.score === null ? '–' : Math.round(clampPct(r.score))}</div><div class="rp-rate-r">${ruler(r.score)}<div class="rp-rate-s m"><span>0</span><span>100</span></div></div></div></div>`
     : `<div class="rp-rate rp-rate-none">Reyting mavjud emas</div>`
-
-  const facts = m.facts.filter((f) => f.label !== 'STIR' && f.label !== 'Holat')
-  const rows = m.founders.rows
-  const owners = rows.length
-    ? `<div class="rp-own">${rows
-        .map(
-          (f) =>
-            `<div><div class="r"><b>${h(f.name)}</b><span class="m">${h(f.share !== null ? `${String(f.share).replace('.', ',')}%` : f.text || '–')}</span></div>${
-              f.share !== null ? `<div class="bar"><i style="width:${Math.min(100, f.share)}%"></i></div>` : ''
-            }</div>`,
-        )
-        .join('')}${m.founders.others ? `<div class="more">yana ${m.founders.others} ta</div>` : ''}</div>`
-    : ''
-
-  return [
-    `<h1>${h(displayName(m.name))}</h1>`,
-    sub ? `<div class="rp-sub">${sub}</div>` : '',
-    rating,
-    railGroup('Asosiy maʼlumot', railDl(facts)),
-    railGroup('Taʼsischilar', owners),
-    railGroup('Aloqa', railDl(m.contacts)),
-    railGroup('Roʻyxatga olish', railDl(m.registration)),
-    railGroup('Faoliyat kodlari', railDl(m.codes)),
-  ].join('\n')
+  return `<header class="rp-mast"><div class="rp-mast-l"><div class="rp-mast-k">Kompaniya hisoboti</div><h1>${h(displayName(m.name))}</h1><div class="rp-meta">${meta}</div></div>${rating}</header>`
 }
-
-// ---- the main column ---------------------------------------------------------
 
 function kpis(m: ReportModel): string {
   return `<div class="rp-kpis">${m.kpis
@@ -137,7 +121,7 @@ function kpis(m: ReportModel): string {
 }
 
 /** one strip: every case of a slice as ONE row of fills, proportional */
-function strip(counts: Record<PizzaStatus, number>, size: 'lg' | 'sm'): string {
+function strip(counts: Record<PizzaStatus, number>, size: 'lg' | 'md' | 'sm'): string {
   const total = PIZZA_STATUS_ORDER.reduce((n, st) => n + counts[st], 0)
   return `<div class="rp-strip ${size}">${total === 0 ? '<i class="empty"></i>' : PIZZA_STATUS_ORDER.filter((st) => counts[st] > 0).map((st) => `<i class="rp-st ${st}" style="flex:${counts[st]}"></i>`).join('')}</div>`
 }
@@ -152,7 +136,15 @@ function tiles(items: PizzaItem[]): string {
     .join('')}</div>`
 }
 
-function signature(m: ReportModel, t: ReportTheme): string {
+/** the calendar leaf: month on an ink band, the day big; inverted when the date is close */
+function leaf(date: string, near: boolean): string {
+  const mt = /^(\d{1,2})\.(\d{1,2})\./.exec(date)
+  if (!mt) return `<span class="rp-leaf txt m">${h(date)}</span>`
+  return `<span class="rp-leaf${near ? ' near' : ''}"><i>${h(MONTHS_UZ[Number(mt[2]) - 1] ?? '')}</i><b>${h(mt[1].padStart(2, '0'))}</b></span>`
+}
+
+
+function distribution(m: ReportModel): string {
   const c = m.cases
   if (!c) return ''
   const rate = c.winRate
@@ -163,81 +155,104 @@ function signature(m: ReportModel, t: ReportTheme): string {
       `<div class="rp-stat${counts[st] === 0 ? ' zero' : ''}"><div class="h"><i class="rp-st ${st}"></i>${PIZZA_STATUS_LABEL[st]}</div><b class="m">${fmtInt(counts[st])}</b><small class="m">${total ? `${Math.round((counts[st] / total) * 100)}%` : ''}</small></div>`,
   ).join('')
   const roles = c.asPlaintiff + c.asDefendant > 0 ? `<div class="rp-roles"><span>Daʼvogar / javobgar</span><b class="m">${fmtInt(c.asPlaintiff)} / ${fmtInt(c.asDefendant)}</b></div>` : ''
-  const hero = `<div class="rp-hero">
-      <div class="rp-big"><b>${rate === null ? '–' : `${rate}%`}</b><span>yutuq darajasi<small>${rate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(c.win + c.lose)} ta hal qilingan ishdan`}</small></span></div>
-      <div class="rp-hero-r">${strip(counts, 'lg')}<div class="rp-stats">${stats}</div>${roles}</div>
-    </div>`
-  const turkum = c.pieTurkum.length >= 2 ? `<div class="rp-block rp-avoid">${sec('Turkum boʻyicha')}${tiles(c.pieTurkum)}</div>` : ''
-  return `<div class="rp-block rp-avoid">${sec('Taqsimot', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}${hero}
-      ${c.pie.length ? `<div class="rp-sub-h">Sud turi boʻyicha</div>${tiles(c.pie)}` : ''}</div>
-    ${
-      c.results.length
-        ? `<div class="rp-block rp-avoid">${sec('Natijalar')}<div class="rp-res">${c.results
-            .map((r) => `<div>${mark(r.tone)}<span>${h(r.label)}</span><b class="m">${fmtInt(r.count)}</b></div>`)
-            .join('')}</div></div>`
-        : ''
-    }
-    <div class="rp-block rp-avoid">${sec('Oylik faollik', 'soʻnggi 12 oy')}${monthly(c.monthly, t)}</div>
-    ${turkum}`
+  return `<section class="rp-col">${sec('Taqsimot', `joriy ${fmtInt(c.inProgress)} · yakunlangan ${fmtInt(c.decided)}`)}
+    <div class="rp-big"><b>${rate === null ? '–' : `${rate}%`}</b><span>yutuq darajasi<small>${rate === null ? 'hal qilingan ish yoʻq' : `${fmtInt(c.win + c.lose)} ta hal qilingan ishdan`}</small></span></div>
+    ${strip(counts, 'lg')}<div class="rp-stats">${stats}</div>${roles}
+    ${c.pie.length ? `<div class="rp-sub-h">Sud turi boʻyicha</div>${tiles(c.pie)}` : ''}</section>`
 }
 
-function latest(m: ReportModel): string {
+/** «Diqqat»: what needs the reader NOW: the coming hearings and the money */
+function attention(m: ReportModel): string {
+  const parts: string[] = []
+  if (m.hearings !== null) {
+    parts.push(
+      `<div class="rp-att-h">Yaqin majlislar${m.hearings.length ? `<em>${fmtInt(m.hearings.length)}</em>` : ''}</div>${
+        m.hearings.length
+          ? m.hearings
+              .map((x) => {
+                const near = x.daysLeft !== null && x.daysLeft >= 0 && x.daysLeft <= 7
+                const left = x.daysLeft !== null && x.daysLeft >= 0 ? (x.daysLeft === 0 ? 'Bugun' : x.daysLeft === 1 ? 'Ertaga' : `${x.daysLeft} kun qoldi`) : ''
+                return `<div class="rp-hr">${leaf(x.date, near)}<div class="w"><b>${h(x.court || 'Sud')}</b><span>${x.caseNumber ? `Ish <span class="m">${h(x.caseNumber)}</span>` : ''}${x.judge ? ` · sudya ${h(x.judge)}` : ''}</span><span class="when">${x.time ? `<span class="m tm">${h(x.time)}</span>` : ''}${left ? `<span class="${near ? 'near' : ''}">${left}</span>` : ''}</span></div></div>`
+              })
+              .join('')
+          : `<div class="rp-empty">Belgilangan majlis yoʻq</div>`
+      }`,
+    )
+  }
+  const b = m.bills
+  if (b) {
+    const paid = b.paidTotal / 100
+    const over = b.overdueTotal / 100
+    const bar =
+      paid + over > 0
+        ? `<div class="rp-strip md rp-pay">${paid > 0 ? `<i class="rp-st won" style="flex:${paid}"></i>` : ''}${over > 0 ? `<i class="rp-st neutral" style="flex:${over}"></i>` : ''}</div>`
+        : ''
+    parts.push(
+      `<div class="rp-att-h">Toʻlovlar<em>${h(formatDmy(b.loadedAt))} holatiga</em></div>${bar}
+      <div class="rp-pl"><div><b><i class="rp-st won"></i>${h(shortSum(paid))}</b><span>toʻlangan · ${fmtInt(b.paidCount)} / ${fmtInt(b.count)} kvitansiya</span></div><div><b><i class="rp-st neutral"></i>${h(shortSum(over))}</b><span>muddati oʻtgan</span></div></div>`,
+    )
+  }
+  return parts.length ? `<aside class="rp-col rp-att">${sec('Diqqat')}${parts.join('')}</aside>` : ''
+}
+
+function activity(m: ReportModel, t: ReportTheme): string {
+  const c = m.cases
+  if (!c) return ''
+  const results = c.results.length
+    ? `<div class="rp-col">${sec('Natijalar')}<div class="rp-res">${c.results.map((r) => `<div>${mark(r.tone)}<span>${h(r.label)}</span><b class="m">${fmtInt(r.count)}</b></div>`).join('')}</div></div>`
+    : ''
+  return `<div class="rp-2 rp-avoid rp-block"><div class="rp-col">${sec('Oylik faollik', 'soʻnggi 12 oy')}${monthly(c.monthly, t)}</div>${results}</div>
+    ${c.pieTurkum.length >= 2 ? `<div class="rp-block rp-avoid">${sec('Turkum boʻyicha')}${tiles(c.pieTurkum)}</div>` : ''}`
+}
+
+/** the latest cases as a real table: status · party · role · case number · date · amount */
+function casesTable(m: ReportModel): string {
   const c = m.cases
   if (!c || !c.latest.length) return ''
-  return `<div class="rp-block">${sec('Soʻnggi ishlar', `jami ${fmtInt(c.total)}`)}<div class="rp-rows">${c.latest
-    .map((r) => {
-      const meta = [r.role === 'plaintiff' ? 'Daʼvogar' : 'Javobgar', r.result, r.number].filter(Boolean)
-      return `<div class="r">${mark(r.tone)}<div class="w"><b>${h(r.party ? displayName(r.party) : '–')}</b><span>${meta.map((x, i) => (i === meta.length - 1 ? `<span class="m">${h(x)}</span>` : h(x))).join(' · ')}</span></div><div class="am"><b class="m">${r.amount !== null ? h(shortSum(r.amount)) : '–'}</b><span>${h(r.date)}</span></div></div>`
-    })
-    .join('')}</div></div>`
+  return `<div class="rp-block">${sec('Soʻnggi ishlar', `jami ${fmtInt(c.total)}`)}<table class="rp-ct"><thead><tr><th>Holat</th><th>Tomon</th><th>Rol</th><th>Ish raqami</th><th>Sana</th><th class="n">Summa</th></tr></thead><tbody>${c.latest
+    .map(
+      (r) =>
+        `<tr><td><span class="s">${mark(r.tone)}${h(r.result || '–')}</span></td><td class="p">${h(r.party ? displayName(r.party) : '–')}</td><td>${r.role === 'plaintiff' ? 'Daʼvogar' : 'Javobgar'}</td><td class="m">${h(r.number)}</td><td class="m">${h(r.date)}</td><td class="n m">${r.amount !== null ? h(shortSum(r.amount)) : '–'}</td></tr>`,
+    )
+    .join('')}</tbody></table></div>`
 }
 
-/** the calendar leaf: month on an ink band, the day big; inverted when the date is close */
-function leaf(date: string, near: boolean): string {
-  const mt = /^(\d{1,2})\.(\d{1,2})\./.exec(date)
-  if (!mt) return `<span class="rp-leaf txt m">${h(date)}</span>`
-  return `<span class="rp-leaf${near ? ' near' : ''}"><i>${h(MONTHS_UZ[Number(mt[2]) - 1] ?? '')}</i><b>${h(mt[1].padStart(2, '0'))}</b></span>`
+/** the registry facts, last: three columns of ruled lists, then the owners with their share bars */
+function appendix(m: ReportModel): string {
+  const facts = m.facts.filter((f) => f.label !== 'STIR' && f.label !== 'Holat')
+  const group = (title: string, rows: { label: string; value: string; mono?: boolean }[]) => railGroup(title, railDl(rows))
+  const cols = [
+    group('Asosiy maʼlumot', facts),
+    [group('Aloqa', m.contacts), group('Roʻyxatga olish', m.registration)].join(''),
+    group('Faoliyat kodlari', m.codes),
+  ].filter((x) => x)
+  const rows = m.founders.rows
+  const owners = rows.length
+    ? `<div class="rp-own">${rows
+        .map(
+          (f) =>
+            `<div><div class="r"><b>${h(f.name)}</b><span class="m">${h(f.share !== null ? `${String(f.share).replace('.', ',')}%` : f.text || '–')}</span></div>${
+              f.share !== null ? `<div class="bar"><i style="width:${Math.min(100, f.share)}%"></i></div>` : ''
+            }</div>`,
+        )
+        .join('')}${m.founders.others ? `<div class="more">yana ${m.founders.others} ta</div>` : ''}</div>`
+    : ''
+  if (!cols.length && !owners) return ''
+  return `<div class="rp-block rp-app">${sec('Kompaniya maʼlumotlari')}<div class="rp-3">${cols.map((x) => `<div>${x}</div>`).join('')}</div>${owners ? `<div class="rp-sub-h">Taʼsischilar</div>${owners}` : ''}</div>`
 }
 
-function hearings(m: ReportModel): string {
-  if (m.hearings === null) return ''
-  return `<div class="rp-block">${sec('Yaqin majlislar')}${
-    m.hearings.length
-      ? m.hearings
-          .map((x) => {
-            const near = x.daysLeft !== null && x.daysLeft >= 0 && x.daysLeft <= 7
-            const left = x.daysLeft !== null && x.daysLeft >= 0 ? (x.daysLeft === 0 ? 'Bugun' : x.daysLeft === 1 ? 'Ertaga' : `${x.daysLeft} kun qoldi`) : ''
-            return `<div class="rp-hr">${leaf(x.date, near)}<div class="w"><b>${h(x.court || 'Sud')}</b><span>${x.caseNumber ? `Ish <span class="m">${h(x.caseNumber)}</span>` : ''}${x.judge ? ` · sudya ${h(x.judge)}` : ''}</span></div><div class="t">${x.time ? `<span class="m tm">${h(x.time)}</span>` : ''}${left ? `<span class="${near ? 'near' : ''}">${left}</span>` : ''}</div></div>`
-          })
-          .join('')
-      : `<div class="rp-empty">Belgilangan majlis yoʻq</div>`
-  }</div>`
-}
-
-function bills(m: ReportModel): string {
-  const b = m.bills
-  if (!b) return ''
-  const paid = b.paidTotal / 100
-  const over = b.overdueTotal / 100
-  const bar =
-    paid + over > 0
-      ? `<div class="rp-strip lg rp-pay">${paid > 0 ? `<i class="rp-st won" style="flex:${paid}"></i>` : ''}${over > 0 ? `<i class="rp-st neutral" style="flex:${over}"></i>` : ''}</div>`
-      : ''
-  return `<div class="rp-block rp-avoid">${sec('Toʻlovlar', `${formatDmy(b.loadedAt)} holatiga`)}${bar}
-    <div class="rp-pl"><span><b><i class="rp-st won"></i>${h(shortSum(paid))}</b>toʻlangan · ${fmtInt(b.paidCount)} / ${fmtInt(b.count)} kvitansiya</span><span class="r"><b><i class="rp-st neutral"></i>${h(shortSum(over))}</b>muddati oʻtgan</span></div></div>`
-}
-
-/** The report body: the rail cell and the main cell of the one table row. */
-export function renderInkBody(m: ReportModel, t: ReportTheme): { rail: string; main: string } {
+/** The report body, in reading order (the masthead sits above the table, full-bleed). */
+export function renderInkBody(m: ReportModel, t: ReportTheme): { head: string; main: string } {
+  const board = distribution(m)
+  const att = attention(m)
   return {
-    rail: renderRail(m),
+    head: masthead(m),
     main: [
-      `<div class="rp-eyebrow">Sud faolligi</div><h2>Sudlardagi natijalar</h2>`,
-      kpis(m),
-      signature(m, t),
-      latest(m),
-      hearings(m),
-      bills(m),
+      `<div class="rp-block rp-first">${sec('Xulosa')}${kpis(m)}</div>`,
+      board || att ? `<div class="rp-2 rp-block${board && att ? '' : ' one'}">${board}${att}</div>` : '',
+      activity(m, t),
+      casesTable(m),
+      appendix(m),
       m.notes.map(note).join(''),
     ].join('\n'),
   }
@@ -250,38 +265,48 @@ export function renderInkWatermark(t: ReportTheme): string {
 
 // ---- CSS ---------------------------------------------------------------------
 
-const RAIL_W = '66mm'
-
 export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): string {
   const ink = t.t1
   return `
-  :root { --bg:${t.surface}; --t1:${t.t1}; --t2:${t.t2}; --t3:${t.t3}; --bd:${t.border}; --bs:${t.borderSoft}; --ink:${ink}; --rail:${t.rail.bg}; --paper:${t.surface}; --inset:${t.inset}; }
+  :root { --bg:${t.surface}; --t1:${t.t1}; --t2:${t.t2}; --t3:${t.t3}; --bd:${t.border}; --bs:${t.borderSoft}; --ink:${ink}; --paper:${t.surface}; --inset:${t.inset}; --mast:${t.rail.bg}; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html { background: var(--bg); }
   body { font-family: ${fontStack}; font-size: 8.4pt; line-height: 1.45; -webkit-font-smoothing: antialiased; color: var(--t1); }
   b, strong { font-weight: 600; }
   .m { font-family: ${monoStack}; font-variant-numeric: tabular-nums; }
 
-  @page { size: A4; margin: 0 0 9mm; background: ${t.surface};
-    @bottom-left { content: ""; width: ${RAIL_W}; background: ${t.rail.bg}; }
-    @bottom-right { content: counter(page) " / " counter(pages); font: 500 7.5pt ${monoStack}; color: ${t.t3}; padding-right: 15mm; vertical-align: top; padding-top: 2mm; } }
+  @page { size: A4; margin: 0 0 12mm; background: ${t.surface};
+    @bottom-right { content: counter(page) " / " counter(pages); font: 500 7.5pt ${monoStack}; color: ${t.t3}; padding-right: 14mm; vertical-align: top; padding-top: 3mm; } }
 
   .rp-sheet { position: relative; isolation: isolate; width: 210mm; margin: 0 auto; }
-  .rp-bg { position: absolute; z-index: -1; top: 0; bottom: 0; left: 0; width: ${RAIL_W}; background: var(--rail); }
-  .rp-pin { position: absolute; bottom: 4mm; font-size: 6.4pt; line-height: 1.3; }
-  .rp-pin-l { left: 11mm; width: 46mm; display: flex; justify-content: space-between; color: rgba(255,255,255,.5); }
-  .rp-pin-r { left: calc(${RAIL_W} + 14mm); right: 15mm; color: var(--t3); }
-  .rp-wm { position: absolute; z-index: -1; right: -24mm; bottom: -6mm; width: 124mm; opacity: ${t.dark ? 0.07 : 0.055}; pointer-events: none; }
+  .rp-foot { position: absolute; bottom: 4mm; left: 14mm; right: 28mm; display: flex; gap: 6mm; font-size: 6.4pt; line-height: 1.3; color: var(--t3); }
+  .rp-foot .m { color: var(--t2); }
+  .rp-wm { position: absolute; z-index: -1; right: -20mm; bottom: -14mm; width: 88mm; opacity: ${t.dark ? 0.06 : 0.045}; pointer-events: none; }
   .rp-wm svg { display: block; width: 100%; height: auto; }
-  @media print { .rp-bg, .rp-pin, .rp-wm { position: fixed; } .rp-bg { bottom: -9mm; } .rp-sheet { margin: 0; } }
+  @media print { .rp-foot, .rp-wm { position: fixed; } .rp-sheet { margin: 0; } }
   @media screen { .rp-sheet { overflow: hidden; background: var(--bg); box-shadow: 0 8px 40px rgba(0,0,0,.16); margin: 24px auto; min-height: 297mm; } body { padding-bottom: 24px; } html { background: ${t.dark ? t.bg : '#ECECEE'}; } }
 
+  /* masthead: one full-bleed ink band on page 1 only: who, status, the rating as a number over a ruler */
+  .rp-mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 10mm; padding: 13mm 14mm 9mm; background: var(--mast); color: #fff; }
+  .rp-mast-l { min-width: 0; flex: 1; }
+  .rp-mast-k { font-size: 7pt; font-weight: 500; color: rgba(255,255,255,.6); }
+  .rp-mast h1 { margin: 2mm 0 3mm; font-size: 21pt; line-height: 1.15; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
+  .rp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 1mm 2.4mm; font-size: 7.6pt; color: rgba(255,255,255,.78); }
+  .rp-meta .sep { opacity: .5; }
+  .rp-meta .st i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: #fff; }
+  .rp-rate { flex: none; width: 66mm; }
+  .rp-rate-k { font-size: 6.8pt; color: rgba(255,255,255,.6); }
+  .rp-rate-row { display: flex; align-items: flex-end; gap: 4mm; margin-top: 1.4mm; }
+  .rp-rate-n { font-size: 36pt; line-height: .9; font-weight: 600; letter-spacing: -.04em; }
+  .rp-rate-r { flex: 1; padding-bottom: .6mm; }
+  .rp-ruler { display: block; width: 100%; height: auto; }
+  .rp-rate-s { display: flex; justify-content: space-between; margin-top: .8mm; font-size: 5.8pt; color: rgba(255,255,255,.5); }
+  .rp-rate-none { padding-bottom: 1mm; font-size: 7pt; color: rgba(255,255,255,.6); }
+
   table.rp { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  table.rp col.l { width: ${RAIL_W}; }
-  td.l { padding: 0 9mm 0 11mm; color: #fff; vertical-align: top; }
-  td.r { padding: 0 15mm 0 14mm; vertical-align: top; }
-  thead td { height: 15mm; }
-  tfoot td { height: 14mm; }
+  td.b { padding: 0 14mm; vertical-align: top; }
+  thead td { height: 9mm; }
+  tfoot td { height: 12mm; }
 
   /* the four outcomes, ONE ink: solid · tint · hatch · dashed outline */
   .rp-st { --sw: var(--ink); display: inline-block; flex: none; }
@@ -290,64 +315,48 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   .rp-st.neutral { background: repeating-linear-gradient(45deg, var(--sw) 0 1.2px, color-mix(in srgb, var(--sw) 14%, transparent) 1.2px 3px); }
   .rp-st.pending { background: transparent; border: 1px dashed var(--sw); }
 
-  /* rail */
-  .rp-rail h1 { margin: 0 0 2.4mm; font-size: 14pt; line-height: 1.2; font-weight: 600; letter-spacing: -.01em; overflow-wrap: anywhere; }
-  .rp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 1mm 2mm; font-size: 7.2pt; color: rgba(255,255,255,.72); }
-  .rp-sub .sep { opacity: .5; }
-  .rp-sub .st i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: #fff; }
-  .rp-rate { break-inside: avoid; margin: 8mm 0 0; padding-top: 3mm; border-top: .5pt solid rgba(255,255,255,.18); }
-  .rp-rate-k { font-size: 6.6pt; color: rgba(255,255,255,.6); }
-  .rp-rate-n { margin: 1.6mm 0 3mm; font-size: 40pt; line-height: 1; font-weight: 600; letter-spacing: -.04em; }
-  .rp-ruler { display: block; width: 100%; height: auto; }
-  .rp-rate-s { display: flex; justify-content: space-between; margin-top: 1mm; font-size: 6pt; color: rgba(255,255,255,.5); }
-  .rp-rate-none { padding: 3mm 0; font-size: 7pt; color: rgba(255,255,255,.6); }
-  .rp-rg { break-inside: avoid; margin-top: 7mm; padding-top: 2.6mm; border-top: .5pt solid rgba(255,255,255,.18); }
-  .rp-rg h3 { margin-bottom: 2.4mm; font-size: 6.6pt; font-weight: 500; color: rgba(255,255,255,.55); }
-  .rp-rg dl > div { margin-bottom: 2.2mm; break-inside: avoid; }
-  .rp-rg dt { font-size: 6pt; color: rgba(255,255,255,.5); }
-  .rp-rg dd { font-size: 7.4pt; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
-  .rp-rg dd.m { font-size: 7pt; }
-  .rp-own > div { margin-bottom: 2.4mm; font-size: 7pt; line-height: 1.25; break-inside: avoid; }
-  .rp-own .r { display: flex; justify-content: space-between; gap: 3mm; }
-  .rp-own .r b { font-weight: 500; overflow-wrap: anywhere; }
-  .rp-own .r span { flex: none; font-size: 6.6pt; color: rgba(255,255,255,.7); }
-  .rp-own .bar { height: 2px; margin-top: 1.1mm; border-radius: 1px; background: rgba(255,255,255,.18); }
-  .rp-own .bar i { display: block; height: 100%; border-radius: 1px; background: #fff; }
-  .rp-own .more { font-size: 6.4pt; color: rgba(255,255,255,.5); }
-
-  /* main */
-  .rp-eyebrow { font-size: 7pt; font-weight: 500; color: var(--t3); }
-  td.r h2 { margin: 1.2mm 0 6mm; font-size: 19pt; line-height: 1.15; font-weight: 600; letter-spacing: -.02em; }
-  .rp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 5mm; }
-  .rp-kpi { break-inside: avoid; padding-top: 2.4mm; border-top: 1.4pt solid var(--ink); }
-  .rp-kpi .l { font-size: 6.8pt; font-weight: 500; color: var(--t2); }
-  .rp-kpi .v { margin-top: 1.6mm; font: 600 21pt ${monoStack}; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .rp-kpi .v small { margin-left: 1mm; font-size: 7.6pt; font-weight: 500; letter-spacing: 0; color: var(--t3); }
-  .rp-kpi .s { margin-top: 1.6mm; font-size: 6.2pt; line-height: 1.35; color: var(--t3); }
-
-  .rp-block { margin-top: 9mm; }
+  .rp-block { margin-top: 8mm; }
+  .rp-first { margin-top: 0; }
   .rp-avoid { break-inside: avoid; }
   .rp-sh { display: flex; align-items: center; gap: 3mm; margin-bottom: 3.6mm; font-size: 8.6pt; font-weight: 600; break-after: avoid; }
   .rp-sh::after { content: ""; order: 1; flex: 1; height: .5pt; background: var(--bd); }
   .rp-sh em { order: 2; font-style: normal; font-weight: 400; font-size: 6.6pt; color: var(--t3); }
   .rp-sub-h { margin: 6mm 0 2.4mm; font-size: 6.8pt; font-weight: 500; color: var(--t3); }
 
-  /* outcome board: hero + strip + stat columns, then tiles */
-  .rp-hero { display: grid; grid-template-columns: 46mm minmax(0, 1fr); gap: 8mm; align-items: end; }
-  .rp-big b { display: block; font: 600 44pt ${monoStack}; line-height: .9; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
-  .rp-big span { display: block; margin-top: 2.4mm; font-size: 7pt; font-weight: 500; color: var(--t2); }
+  /* Xulosa */
+  .rp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 6mm; }
+  .rp-kpi { break-inside: avoid; padding-top: 2.4mm; border-top: 1.4pt solid var(--ink); }
+  .rp-kpi .l { font-size: 6.8pt; font-weight: 500; color: var(--t2); }
+  .rp-kpi .v { margin-top: 1.6mm; font: 600 22pt ${monoStack}; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rp-kpi .v small { margin-left: 1mm; font-size: 7.6pt; font-weight: 500; letter-spacing: 0; color: var(--t3); }
+  .rp-kpi .s { margin-top: 1.6mm; font-size: 6.2pt; line-height: 1.35; color: var(--t3); }
+
+  /* two columns: the board (wide) beside what needs attention (narrow) */
+  .rp-2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 9mm; align-items: start; }
+  .rp-2.one { grid-template-columns: minmax(0, 1fr); }
+  .rp-2 > .rp-col { min-width: 0; }
+  .rp-att { padding-left: 7mm; border-left: .5pt solid var(--bd); }
+  .rp-att-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 2.4mm; font-size: 7pt; font-weight: 500; color: var(--t2); }
+  .rp-att-h em { font-style: normal; font: 400 6.4pt ${monoStack}; color: var(--t3); }
+  .rp-att-h:not(:first-child) { margin-top: 6mm; }
+
+  /* outcome board */
+  .rp-big { margin-bottom: 4mm; }
+  .rp-big b { display: block; font: 600 46pt ${monoStack}; line-height: .9; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+  .rp-big span { display: block; margin-top: 2.4mm; font-size: 7.4pt; font-weight: 500; color: var(--t2); }
   .rp-big small { display: block; margin-top: .6mm; font-size: 6.4pt; font-weight: 400; color: var(--t3); }
   .rp-strip { display: flex; gap: 1.2px; width: 100%; }
-  .rp-strip i { display: block; flex-shrink: 1; height: 100%; min-width: 2px; border-radius: 2px; }
-  .rp-strip.lg { height: 13mm; }
+  .rp-strip i { display: block; height: 100%; min-width: 2px; border-radius: 2px; }
+  .rp-strip.lg { height: 12mm; }
   .rp-strip.lg i { border-radius: 2.2mm; }
+  .rp-strip.md { height: 5mm; }
   .rp-strip.sm { height: 2.6mm; }
   .rp-strip i.empty { flex: 1; background: var(--bs); }
-  .rp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; margin-top: 4mm; }
+  .rp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; margin-top: 3.6mm; }
   .rp-stat { padding-top: 2mm; border-top: .5pt solid var(--bd); }
   .rp-stat.zero { opacity: .5; }
   .rp-stat .h { display: flex; align-items: center; gap: 1.6mm; font-size: 6.4pt; color: var(--t2); }
-  .rp-stat .h i { width: 10px; height: 7px; border-radius: 2px; margin-left: 0; }
+  .rp-stat .h i { width: 10px; height: 7px; border-radius: 2px; }
   .rp-stat b { display: inline-block; margin-top: 1mm; font-size: 15pt; line-height: 1; letter-spacing: -.02em; }
   .rp-stat small { margin-left: 1.6mm; font-size: 6pt; color: var(--t3); }
   .rp-roles { display: flex; justify-content: space-between; gap: 2mm; margin-top: 3mm; padding-top: 1.6mm; border-top: .4pt solid var(--bs); font-size: 6.8pt; color: var(--t2); }
@@ -360,7 +369,26 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   .rp-tile .f { display: flex; justify-content: space-between; margin-top: 2mm; font-size: 6.2pt; color: var(--t3); }
   .rp-tile .f b { font-size: 6.6pt; font-weight: 500; color: var(--t2); }
 
-  .rp-res { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8mm; }
+  /* attention: hearings + payments */
+  .rp-hr { display: grid; grid-template-columns: 11mm minmax(0, 1fr); gap: 3.4mm; align-items: start; padding: 2.2mm 0; border-bottom: .4pt solid var(--bs); font-size: 7.4pt; break-inside: avoid; }
+  .rp-hr .w b { display: block; }
+  .rp-hr .w > span { display: block; font-size: 6.4pt; color: var(--t3); overflow-wrap: anywhere; }
+  .rp-hr .when { display: flex; align-items: baseline; gap: 3.2mm; margin-top: .6mm; }
+  .rp-hr .when .tm { font-size: 8pt; font-weight: 600; color: var(--t1); }
+  .rp-hr .when .near { font-weight: 600; color: var(--t1); }
+  .rp-leaf { display: inline-flex; flex-direction: column; width: 11mm; height: 12.6mm; border: .6pt solid var(--ink); border-radius: 1.8mm; overflow: hidden; background: var(--paper); }
+  .rp-leaf i { display: grid; place-items: center; height: 3.6mm; font-style: normal; font-size: 5.6pt; font-weight: 600; background: var(--ink); color: var(--paper); }
+  .rp-leaf b { flex: 1; display: grid; place-items: center; font: 600 11pt ${monoStack}; color: var(--ink); }
+  .rp-leaf.near b { background: var(--ink); color: var(--paper); }
+  .rp-leaf.near i { background: var(--paper); color: var(--ink); }
+  .rp-leaf.txt { width: auto; padding: 0 1mm; font-size: 6.6pt; align-items: center; justify-content: center; }
+  .rp-empty { padding: 1.6mm 0; font-size: 7.4pt; color: var(--t3); }
+  .rp-pay { margin: 0 0 3mm; }
+  .rp-pl { display: grid; gap: 2.4mm; font-size: 6.6pt; color: var(--t3); }
+  .rp-pl b { display: flex; align-items: center; gap: 1.6mm; font: 600 12pt ${monoStack}; letter-spacing: -.02em; color: var(--t1); }
+  .rp-pl b i { width: 10px; height: 7px; border-radius: 2px; }
+
+  /* activity: months beside the result wording */
   .rp-res > div { display: flex; align-items: center; gap: 2.4mm; padding: 1.6mm 0; border-bottom: .4pt solid var(--bs); font-size: 7.2pt; break-inside: avoid; }
   .rp-res i { width: 10px; height: 7px; border-radius: 2px; flex: none; }
   .rp-res span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -369,36 +397,55 @@ export function inkCss(t: ReportTheme, fontStack: string, monoStack: string): st
   .rp-bar-v { font: 500 10px ${monoStack}; }
   .rp-bar-l { font: 500 10px ${fontStack}; }
 
-  /* latest cases + hearings: ruled rows, no boxes */
-  .rp-rows .r { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 3.2mm; align-items: center; padding: 2.2mm 0; border-bottom: .4pt solid var(--bs); break-inside: avoid; }
-  .rp-rows .r > i { height: 7px; border-radius: 2px; }
-  .rp-rows .w b { display: block; font-size: 7.6pt; overflow-wrap: anywhere; }
-  .rp-rows .w span { font-size: 6.4pt; color: var(--t3); overflow-wrap: anywhere; }
-  .rp-rows .am { text-align: right; }
-  .rp-rows .am b { display: block; font-size: 7.4pt; font-weight: 500; white-space: nowrap; }
-  .rp-rows .am span { font-size: 6.4pt; color: var(--t3); white-space: nowrap; }
-  .rp-hr { display: grid; grid-template-columns: 11mm minmax(0, 1fr) auto; gap: 4mm; align-items: center; padding: 2.4mm 0; border-bottom: .4pt solid var(--bs); font-size: 7.4pt; break-inside: avoid; }
-  .rp-leaf { display: inline-flex; flex-direction: column; width: 11mm; height: 12.6mm; border: .6pt solid var(--ink); border-radius: 1.8mm; overflow: hidden; background: var(--paper); }
-  .rp-leaf i { display: grid; place-items: center; height: 3.6mm; font-style: normal; font-size: 5.6pt; font-weight: 600; background: var(--ink); color: var(--paper); }
-  .rp-leaf b { flex: 1; display: grid; place-items: center; font: 600 11pt ${monoStack}; color: var(--ink); }
-  .rp-leaf.near b { background: var(--ink); color: var(--paper); }
-  .rp-leaf.near i { background: var(--paper); color: var(--ink); }
-  .rp-leaf.txt { width: auto; padding: 0 1mm; font-size: 6.6pt; align-items: center; justify-content: center; }
-  .rp-hr .w b { display: block; }
-  .rp-hr .w span { font-size: 6.6pt; color: var(--t3); }
-  .rp-hr .t { display: flex; flex-direction: column; align-items: flex-end; font-size: 6.6pt; color: var(--t3); line-height: 1.3; }
-  .rp-hr .t .tm { font-size: 9pt; font-weight: 600; color: var(--t1); }
-  .rp-hr .t .near { font-weight: 600; color: var(--t1); }
-  .rp-empty { padding: 2.4mm 0; font-size: 7.4pt; color: var(--t3); }
+  /* latest cases: a table with columns */
+  table.rp-ct { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.2pt; }
+  .rp-ct th:nth-child(1) { width: 46mm; }
+  .rp-ct th { padding: 0 2mm 1.6mm 0; text-align: left; font-size: 6.2pt; font-weight: 500; color: var(--t3); border-bottom: .8pt solid var(--ink); }
+  .rp-ct th.n, .rp-ct td.n { text-align: right; padding-right: 0; }
+  .rp-ct td { padding: 2.2mm 2mm 2.2mm 0; border-bottom: .4pt solid var(--bs); vertical-align: middle; overflow-wrap: anywhere; }
+  .rp-ct tr { break-inside: avoid; }
+  .rp-ct td.p { font-weight: 600; }
+  .rp-ct td.m { font-size: 6.8pt; }
+  .rp-ct .s { display: inline-flex; align-items: center; gap: 2mm; }
+  .rp-ct .s i { width: 10px; height: 7px; border-radius: 2px; }
+  .rp-ct th:nth-child(3) { width: 16mm; } .rp-ct th:nth-child(4) { width: 34mm; } .rp-ct th:nth-child(5) { width: 19mm; } .rp-ct th:nth-child(6) { width: 22mm; }
 
-  .rp-pay { margin: 0 0 3mm; height: 6mm; }
-  .rp-pl { display: flex; justify-content: space-between; gap: 4mm; font-size: 6.8pt; color: var(--t2); }
-  .rp-pl b { display: flex; align-items: center; gap: 1.6mm; font: 600 12pt ${monoStack}; letter-spacing: -.02em; color: var(--t1); }
-  .rp-pl b i { width: 10px; height: 7px; border-radius: 2px; }
-  .rp-pl .r { text-align: right; }
-  .rp-pl .r b { justify-content: flex-end; }
+  /* appendix: the registry facts */
+  .rp-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 8mm; }
+  .rp-rg { break-inside: avoid; margin-bottom: 4mm; }
+  .rp-rg h3 { margin-bottom: 2mm; font-size: 7pt; font-weight: 600; }
+  .rp-rg dl > div { padding: 1.4mm 0; border-bottom: .4pt solid var(--bs); break-inside: avoid; }
+  .rp-rg dt { font-size: 6pt; color: var(--t3); }
+  .rp-rg dd { font-size: 7.4pt; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+  .rp-rg dd.m { font-size: 7pt; }
+  .rp-own { display: grid; grid-template-columns: 1fr 1fr; gap: 2.4mm 8mm; }
+  .rp-own > div { font-size: 7.2pt; line-height: 1.25; break-inside: avoid; }
+  .rp-own .r { display: flex; justify-content: space-between; gap: 3mm; }
+  .rp-own .r b { font-weight: 500; overflow-wrap: anywhere; }
+  .rp-own .r span { flex: none; font-size: 6.8pt; color: var(--t2); }
+  .rp-own .bar { height: 2px; margin-top: 1.1mm; border-radius: 1px; background: var(--bs); }
+  .rp-own .bar i { display: block; height: 100%; border-radius: 1px; background: var(--ink); }
+  .rp-own .more { font-size: 6.4pt; color: var(--t3); }
 
   /* honest gaps */
   .rp-note { margin-top: 5mm; padding: 2.4mm 3.2mm; border: 1px dashed var(--ink); border-radius: 2mm; background: var(--inset); font-size: 7.2pt; break-inside: avoid; }
   `
+}
+
+/** The whole document: masthead above one table whose thead / tfoot reserve the page margins, pinned footer, watermark. */
+export function renderInkDoc(m: ReportModel, o: { dark: boolean; title: string; stack: string; mono: string; fontFaceCss?: string }): string {
+  const t = inkTheme(o.dark)
+  const body = renderInkBody(m, t)
+  return `<!doctype html><html lang="uz" data-theme="${o.dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${h(o.title)}</title><style>${o.fontFaceCss ?? ''}${inkCss(t, o.stack, o.mono)}</style></head><body>
+<div class="rp-sheet">
+${renderInkWatermark(t)}
+<div class="rp-foot"><span class="m">STIR ${h(m.stir)} · ${h(formatDmy(m.generatedAt))}</span><span>Hisobot tuzilgan paytdagi holatni aks ettiradi va rasmiy hujjat hisoblanmaydi.</span></div>
+${body.head}
+<table class="rp">
+<thead><tr><td class="b"></td></tr></thead>
+<tbody><tr><td class="b rp-main">${body.main}</td></tr></tbody>
+<tfoot><tr><td class="b"></td></tr></tfoot>
+</table>
+</div>
+</body></html>`
 }
