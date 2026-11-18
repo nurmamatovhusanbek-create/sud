@@ -11,6 +11,9 @@
 import { classifyOutcome, type Classification, type PartyRole } from './classify'
 import { uzCyrToLat } from './translit'
 
+/** one request to the orders API every this many seconds (lib/public-orders/pace; PUBLIC_ORDERS_MIN_GAP_MS overrides) */
+export const ORDERS_GAP_SECONDS_DEFAULT = 10
+
 export type PublicCourtType = 'ECONOMIC' | 'CIVIL' | 'ADMINISTRATIVE' | 'CRIMINAL'
 export const PUBLIC_COURT_TYPES: PublicCourtType[] = ['ECONOMIC', 'CIVIL', 'ADMINISTRATIVE', 'CRIMINAL']
 

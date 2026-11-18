@@ -1,5 +1,6 @@
 import 'server-only'
 import { chainFetch } from '@/lib/net/chain-fetch'
+import { ordersPace } from '@/lib/public-orders/pace'
 import { assertNotWafBlocked, noteWafBlock, parseWafBlock, throwUpstreamFailure, wafMessage } from '@/lib/public-orders/waf'
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
@@ -27,6 +28,8 @@ const HEADERS = {
 async function fetchUpstream(path: string, opts: { timeoutMs: number; background: boolean }): Promise<Response> {
   const url = BASE + path
   if (DIRECT_LIST) assertNotWafBlocked() // the firewall already refused us: do not make it worse
+  await ordersPace(opts.background ? 'background' : 'interactive') // one request every few seconds, however many are waiting
+  if (DIRECT_LIST) assertNotWafBlocked() // …and it may have been refused while this one waited
   if (DIRECT_LIST) return chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(opts.timeoutMs) })
   return fetchViaWorkers(url, {
     originKey: 'adolatapi1.sud.uz',
@@ -43,6 +46,8 @@ const realDeps: OrderFileDeps = {
   download: async (pdfId, token, route) => {
     const path = orderFilePath(pdfId) // uuid → the library file, `old-…` → the pre-2024 file; nothing else is ever built
     if (!path) throw new Error('Fayl identifikatori notoʻgʻri')
+    if (route === DIRECT) assertNotWafBlocked()
+    await ordersPace('interactive') // a person asked for this file: ahead of any crawl, but never closer than the gap to the last request
     if (route === DIRECT) assertNotWafBlocked()
     const url = `${BASE}${path}?recaptcha_token=${encodeURIComponent(token)}`
     // never race a duplicate: the first request spends the token

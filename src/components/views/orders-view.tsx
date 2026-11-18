@@ -21,7 +21,7 @@ import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
-import { courtTypeOfCase, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
+import { courtTypeOfCase, ORDERS_GAP_SECONDS_DEFAULT, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
 import { useOrdersJob } from '@/lib/use-orders-job'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -245,7 +245,7 @@ export function OrdersView() {
       return
     }
     // each one costs a captcha and a few seconds: a long list is a decision, not a click
-    if (list.length > 20 && !window.confirm(`${list.length} ta qaror birin-ketin yuklanadi (har biri bir necha soniya, jami taxminan ${Math.ceil((list.length * 4) / 60)} daqiqa). Davom etamizmi?`)) return
+    if (list.length > 20 && !window.confirm(`${list.length} ta qaror birin-ketin yuklanadi (har biri bir necha soniya, jami taxminan ${Math.ceil((list.length * ORDERS_GAP_SECONDS_DEFAULT) / 60)} daqiqa: sayt bloklamasligi uchun har ${ORDERS_GAP_SECONDS_DEFAULT} soniyada bitta soʻrov). Davom etamizmi?`)) return
     await runBulk(list)
   }
 
