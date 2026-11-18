@@ -39,15 +39,15 @@ describe('searchLibrary', () => {
     const r = run({}, orders, saved, history)
     expect(r.items.map((o) => [o.id, o.state])).toEqual([['2', 'saved'], ['1', 'saved'], ['3', 'gone'], ['4', 'never']])
     expect(r.items[2]).toMatchObject({ size: 77_000, savedAt: 150, downloaded: false })
-    expect(r.counts).toEqual({ all: 4, saved: 2, gone: 1, never: 1 })
+    expect(r.counts).toEqual({ all: 4, saved: 2, gone: 1, never: 1, hidden: 0 })
     expect(run({ status: 'gone' }, orders, saved, history).items.map((o) => o.id)).toEqual(['3'])
     expect(r.items[1].size).toBe(115_409) // saved ones show the real file, not the log
   })
   test('status filter, and the counts show how the matches split BEFORE that filter', () => {
     expect(run({ status: 'saved' }).items.map((o) => o.id)).toEqual(['2', '1'])
-    expect(run({ status: 'saved' }).counts).toEqual({ all: 4, saved: 2, gone: 0, never: 2 })
+    expect(run({ status: 'saved' }).counts).toEqual({ all: 4, saved: 2, gone: 0, never: 2, hidden: 0 })
     expect(run({ status: 'never' }).items.map((o) => o.id)).toEqual(['3', '4'])
-    expect(run({ status: 'never', q: '2605' }).counts).toEqual({ all: 1, saved: 0, gone: 0, never: 1 })
+    expect(run({ status: 'never', q: '2605' }).counts).toEqual({ all: 1, saved: 0, gone: 0, never: 1, hidden: 0 })
   })
   test('court type and instance filters', () => {
     const mixed = [...orders, { ...ord('5', '3-2001-2102/901', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'), courtType: 'ADMINISTRATIVE' as const }]
@@ -142,3 +142,34 @@ describe('disk side: order index, saved PDFs and the download log', () => {
     expect(m.get('old-civil-5')).toMatchObject({ size: 9, savedAt: 3 })
   })
 })
+
+describe('cleared orders («Tozalash»)', () => {
+  const D = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  const saved = new Map([[A, { size: 1, savedAt: 200 }]])
+  const none = new Map<string, { size: number; savedAt: number }>()
+  const run = (o: Partial<LibraryQuery> = {}, hidden = new Set([B, C, A])) =>
+    searchLibrary(orders, saved, none, { q: '', status: 'all', offset: 0, limit: 50, hidden, ...o })
+
+  test('they leave the lists and the counts, and only the hidden view and a search still show them', () => {
+    const r = run({ status: 'never' })
+    expect(r.items.map((i) => i.pdfId)).toEqual([D]) // B and C are cleared; A is downloaded (never hidden), so it is not «never» anyway
+    expect(r.counts).toEqual({ all: 2, saved: 1, gone: 0, never: 1, hidden: 2 })
+    expect(run({ status: 'hidden' }).items.map((i) => i.pdfId).sort()).toEqual([B, C].sort())
+  })
+  test('a downloaded order is never hidden, whatever the set says', () => {
+    const r = run({ status: 'saved' })
+    expect(r.items).toHaveLength(1)
+    expect(r.items[0]).toMatchObject({ pdfId: A, hidden: false })
+  })
+  test('a SEARCH finds a cleared order again, with its metadata, marked hidden, ready for «Yuklab olish»', () => {
+    const r = run({ q: '2605' })
+    expect(r.items).toHaveLength(1)
+    expect(r.items[0]).toMatchObject({ caseNumber: '2-1005-2605/31875', pdfId: C, hidden: true, state: 'never' })
+    expect(r.counts.never).toBe(1) // counted while searching: it is listed
+  })
+  test('ids compare case-insensitively; no set clears nothing', () => {
+    expect(run({ status: 'never' }, new Set([B.toUpperCase().toLowerCase()])).counts.hidden).toBe(1)
+    expect(run({ status: 'never' }, new Set()).counts).toMatchObject({ never: 3, hidden: 0 })
+  })
+})
+

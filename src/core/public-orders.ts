@@ -328,9 +328,12 @@ export interface LibraryItem extends StoredOrder {
   size: number
   /** when the PDF was (last) saved (ms), 0 for `never` */
   savedAt: number
+  /** the person cleared it from the lists («Tozalash»): out of the lists and counts, but its record is kept and a search still finds it.
+   *  Only while it is NOT downloaded: a downloaded order is never hidden. */
+  hidden: boolean
 }
 
-export type LibraryStatus = 'all' | LibraryState
+export type LibraryStatus = 'all' | LibraryState | 'hidden'
 
 export interface LibraryQuery {
   /** a case number or a part of it («2615»), or words from the court / judge / category (Latin or Cyrillic) */
@@ -338,6 +341,8 @@ export interface LibraryQuery {
   status: LibraryStatus
   courtType?: PublicCourtType | ''
   instance?: string
+  /** pdf ids (lower case) the person cleared */
+  hidden?: ReadonlySet<string>
   offset: number
   limit: number
 }
@@ -363,9 +368,10 @@ export function searchLibrary(
   saved: Map<string, { size: number; savedAt: number }>,
   history: Map<string, { size: number; savedAt: number }>,
   opts: LibraryQuery,
-): { total: number; items: LibraryItem[]; counts: { all: number; saved: number; gone: number; never: number } } {
+): { total: number; items: LibraryItem[]; counts: { all: number; saved: number; gone: number; never: number; hidden: number } } {
   const qn = normalizeCaseNumber(opts.q)
   const ql = fold(opts.q)
+  const searching = !!opts.q.trim()
   const matched: LibraryItem[] = []
   for (const o of orders) {
     if (opts.courtType && o.courtType !== opts.courtType) continue
@@ -375,11 +381,14 @@ export function searchLibrary(
     const f = o.pdfId ? saved.get(key) : undefined
     const h = o.pdfId && !f ? history.get(key) : undefined
     const state: LibraryState = f ? 'saved' : h ? 'gone' : 'never'
-    matched.push({ ...o, state, downloaded: !!f, size: (f ?? h)?.size ?? 0, savedAt: (f ?? h)?.savedAt ?? 0 })
+    matched.push({ ...o, state, downloaded: !!f, size: (f ?? h)?.size ?? 0, savedAt: (f ?? h)?.savedAt ?? 0, hidden: !f && !!o.pdfId && !!opts.hidden?.has(key) })
   }
-  const n = (st: LibraryState) => matched.filter((o) => o.state === st).length
-  const counts = { all: matched.length, saved: n('saved'), gone: n('gone'), never: n('never') }
-  const out = opts.status === 'all' ? matched : matched.filter((o) => o.state === opts.status)
+  // cleared orders stay out of the lists and counts — except when the person SEARCHES (then every match shows, with its
+  // download button) or opens the «Tozalangan» view itself
+  const visible = searching ? matched : matched.filter((o) => !o.hidden)
+  const n = (st: LibraryState) => visible.filter((o) => o.state === st).length
+  const counts = { all: visible.length, saved: n('saved'), gone: n('gone'), never: n('never'), hidden: matched.filter((o) => o.hidden).length }
+  const out = opts.status === 'hidden' ? matched.filter((o) => o.hidden) : opts.status === 'all' ? visible : visible.filter((o) => o.state === opts.status)
   const rank: Record<LibraryState, number> = { saved: 0, gone: 1, never: 2 }
   out.sort((a, b) => rank[a.state] - rank[b.state] || b.savedAt - a.savedAt || a.caseNumber.localeCompare(b.caseNumber) || a.instance.localeCompare(b.instance))
   const start = Math.max(0, opts.offset)

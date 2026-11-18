@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
-import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { courtTypeOfCase, ORDERS_GAP_SECONDS_DEFAULT, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
 import { useOrdersJob } from '@/lib/use-orders-job'
 
@@ -61,6 +61,7 @@ export function OrdersView() {
   const [busy, setBusy] = useState<string | null>(null) // the row being opened / downloaded
   const [manual, setManual] = useState<LibraryItem | null>(null)
   const [importing, setImporting] = useState(false)
+  const [sel, setSel] = useState<Map<string, LibraryItem>>(new Map()) // orders ticked in «Yuklanmagan» / «Mavjud emas» (by file id)
   const first = useRef(true)
 
   // ---- «Yangi qaror qidirish» --------------------------------------------------------------------------------------
@@ -92,6 +93,9 @@ export function OrdersView() {
       ac.abort()
     }
   }, [q, status, court, instance, page, pageSize, tick])
+
+  // a selection belongs to the view it was made in
+  useEffect(() => setSel(new Map()), [status, q, court, instance])
 
   // a page that no longer exists (the list got shorter) falls back to the last one
   const total = data?.total ?? 0
@@ -192,6 +196,57 @@ export function OrdersView() {
     setTick((t) => t + 1) // the lists and counts re-read what is on disk now
   }
 
+  // ---- «Tozalash»: clear orders from the lists (their records stay; a search still finds them) -----------------------
+  const hide = async (ids: string[]) => {
+    if (!ids.length) return
+    const r = await setOrdersHidden('hide', ids)
+    if (!r.ok) {
+      toast.error(r.error)
+      return
+    }
+    setSel(new Map())
+    setTick((t) => t + 1)
+    toast.success(`${r.data.changed} ta qaror tozalandi`, {
+      description: 'Roʻyxatdan va sonlardan chiqdi; ish raqami bilan qidirsangiz yana topiladi.',
+      action: { label: 'Qaytarish', onClick: () => void restore(ids) },
+      duration: 12000,
+    })
+  }
+  const restore = async (ids: string[]) => {
+    const r = await setOrdersHidden('restore', ids)
+    if (!r.ok) {
+      toast.error(r.error)
+      return
+    }
+    setTick((t) => t + 1)
+    toast.success(`${r.data.changed} ta qaror qaytarildi`)
+  }
+  /** everything in this view that is NOT ticked, across all pages */
+  const clearTheRest = async (state: 'never' | 'gone') => {
+    let all: LibraryItem[]
+    try {
+      all = await collect(state)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Roʻyxatni olib boʻlmadi')
+      return
+    }
+    const rest = all.filter((o) => !sel.has(o.pdfId.toLowerCase()))
+    if (!rest.length) {
+      toast.info('Tozalanadigan qaror yoʻq')
+      return
+    }
+    if (!window.confirm(`${sel.size} ta tanlangan qaror qoladi, qolgan ${rest.length} tasi roʻyxatdan tozalanadi (ularning yozuvlari saqlanadi, ish raqami bilan qidirsangiz topiladi). Davom etamizmi?`)) return
+    await hide(rest.map((o) => o.pdfId))
+  }
+  const toggle = (o: LibraryItem) =>
+    setSel((m) => {
+      const n = new Map(m)
+      const k = o.pdfId.toLowerCase()
+      if (n.has(k)) n.delete(k)
+      else n.set(k, o)
+      return n
+    })
+
   const items = data?.items ?? []
   const todo = items.filter((o) => o.state !== 'saved' && o.pdfId)
 
@@ -281,6 +336,8 @@ export function OrdersView() {
       // saved once, the file has been deleted since: shown only when there is such an order (it is the exception)
       ...(counts && counts.gone > 0 ? [{ key: 'gone', label: `Mavjud emas · ${counts.gone}` }] : status === 'gone' ? [{ key: 'gone', label: 'Mavjud emas' }] : []),
       { key: 'all', label: `Hammasi${counts ? ` · ${counts.all}` : ''}` },
+      // cleared by the person: shown only when there are some (their records are kept)
+      ...(counts && counts.hidden > 0 ? [{ key: 'hidden', label: `Tozalangan · ${counts.hidden}` }] : status === 'hidden' ? [{ key: 'hidden', label: 'Tozalangan' }] : []),
     ],
     [counts, status],
   )
@@ -410,6 +467,15 @@ export function OrdersView() {
           />
         ) : (
           <>
+            {status === 'hidden' && (
+              <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
+                <span>Tozalangan qarorlar: <b>{data?.counts.hidden ?? 0} ta</b>. Yozuvlari saqlangan; kerak boʻlsa yuklab oling yoki roʻyxatga qaytaring.</span>
+                <button className="btn btn-outline btn-sm" onClick={() => void restore(items.map((o) => o.pdfId))} title="Shu sahifadagilarni roʻyxatga qaytarish">
+                  <RefreshCw />
+                  <span>Sahifadagilarni qaytarish</span>
+                </button>
+              </div>
+            )}
             {(status === 'never' || status === 'gone') && counts && (status === 'never' ? counts.never : counts.gone) > 0 && (
               <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
                 <span>
@@ -424,6 +490,22 @@ export function OrdersView() {
                       <span>Toʻxtatish</span>
                     </button>
                   )}
+                  {sel.size > 0 && !bulk && (
+                    <>
+                      <button className="btn btn-outline btn-sm" onClick={() => void runBulk([...sel.values()])} title="Faqat tanlangan qarorlarni birin-ketin yuklab olish">
+                        <Download />
+                        <span>Tanlanganlarni yuklash ({sel.size})</span>
+                      </button>
+                      <button className="btn btn-outline btn-sm" onClick={() => void hide([...sel.values()].map((o) => o.pdfId))} title="Tanlanganlarni roʻyxatdan tozalash (yozuvlari saqlanadi)">
+                        <X />
+                        <span>Tanlanganlarni tozalash</span>
+                      </button>
+                      <button className="btn btn-outline btn-sm" onClick={() => void clearTheRest(status)} title="Tanlanmaganlarning hammasini (barcha sahifalardan) tozalash">
+                        <X />
+                        <span>Qolganlarini tozalash</span>
+                      </button>
+                    </>
+                  )}
                   <button className="btn btn-primary btn-sm" disabled={!!bulk} onClick={() => void downloadView(status)} title="Roʻyxatdagi barcha qarorlarni (hamma sahifalardan) birin-ketin yuklab olish">
                     {bulk ? <Loader2 className="spin" /> : <Download />}
                     <span>{bulk ? `Yuklanmoqda ${bulk.done}/${bulk.total}…` : status === 'never' ? `Barchasini yuklash (${counts.never})` : `Barchasini qayta yuklash (${counts.gone})`}</span>
@@ -435,7 +517,18 @@ export function OrdersView() {
               {items.map((o) => (
                 <div className="lrow" key={o.id} data-order={o.caseNumber} style={{ cursor: 'default' }}>
                   <div className={`lead${o.state === 'saved' ? ' ink' : ''}`}>
-                    <FileText />
+                    {(status === 'never' || status === 'gone') && o.pdfId && o.state !== 'saved' ? (
+                      <input
+                        type="checkbox"
+                        checked={sel.has(o.pdfId.toLowerCase())}
+                        disabled={!!bulk}
+                        onChange={() => toggle(o)}
+                        aria-label={`${o.caseNumber} ni tanlash`}
+                        style={{ width: 16, height: 16, cursor: 'pointer' }}
+                      />
+                    ) : (
+                      <FileText />
+                    )}
                   </div>
                   <div className="main-c">
                     <b className="mono">{o.caseNumber}</b>
@@ -454,6 +547,8 @@ export function OrdersView() {
                     <span className="badge b-warn" title={`${dmy(o.savedAt)} da yuklangan, keyin fayl oʻchirilgan. “Qayta yuklash” ni bossangiz qaytadan yuklab olinadi.`}>
                       Mavjud emas
                     </span>
+                  ) : o.hidden ? (
+                    <span className="badge b-neu" title="Roʻyxatdan tozalangan; yozuvi saqlangan">Tozalangan</span>
                   ) : (
                     <span className="badge b-neu">Yuklanmagan</span>
                   )}
@@ -461,6 +556,12 @@ export function OrdersView() {
                     {o.state !== 'never' ? size(o.size) : o.pdfSize ? size(o.pdfSize) : '-'}
                     <small>{o.state === 'saved' ? dmy(o.savedAt) : o.state === 'gone' ? `${dmy(o.savedAt)} · oʻchirilgan` : ''}</small>
                   </div>
+                  {o.hidden && (
+                    <button className="btn btn-outline btn-sm" disabled={!!bulk} onClick={() => void restore([o.pdfId])} title="Roʻyxatga qaytarish">
+                      <RefreshCw />
+                      <span>Qaytarish</span>
+                    </button>
+                  )}
                   <button
                     className={`btn btn-sm ${o.state === 'saved' ? 'btn-primary' : 'btn-outline'}`}
                     disabled={!o.pdfId || busy === o.id || !!bulk}

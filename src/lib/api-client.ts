@@ -557,7 +557,7 @@ export interface LibraryPage {
   total: number
   items: LibraryItem[]
   /** how the matches split by download state, before the status filter */
-  counts: { all: number; saved: number; gone: number; never: number }
+  counts: { all: number; saved: number; gone: number; never: number; hidden: number }
   page: number
   size: number
   /** PDFs on this computer / orders in the local index */
@@ -570,6 +570,22 @@ export function getPublicOrdersLibrary(
 ) {
   const qs = new URLSearchParams({ q: f.q, status: f.status, court: f.court, instance: f.instance, page: String(f.page), size: String(f.size) })
   return request<LibraryPage>(`/api/public-orders/library?${qs}&_=${Date.now()}`, signal)
+}
+
+/** «Tozalash» / «Qaytarish»: clear orders from the Qarorlar lists (their records are kept) or bring them back. Local state only. */
+export async function setOrdersHidden(action: 'hide' | 'restore', ids: string[]): Promise<ApiResult<{ changed: number; total: number }>> {
+  try {
+    const res = await fetch('/api/public-orders/hidden', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action, ids }),
+    })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data) return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
 }
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
