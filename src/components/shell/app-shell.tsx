@@ -133,7 +133,7 @@ function BellPopover() {
         }}
       >
         <Bell />
-        {alerts.length > 0 && <span className="cbadge">{alerts.length}</span>}
+        {alerts.length > 0 && <span className="cbadge">{alerts.length > 99 ? "99+" : alerts.length}</span>}
       </button>
       {open && (
         <div className="pop" onClick={(e) => e.stopPropagation()}>

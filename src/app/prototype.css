@@ -715,7 +715,7 @@ img, svg { max-width: 100%; }
 .bell { position: relative; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-subtle); background: var(--surface); display: grid; place-items: center; color: var(--text-2); transition: transform .18s var(--ease), background .16s, color .16s; }
 .bell:hover { color: var(--text-1); background: var(--surface-hover); }
 .bell svg { width: 17px; height: 17px; }
-.cbadge { position: absolute; top: 5px; right: 5px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 20px; background: var(--neg-base); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; border: 2px solid var(--surface); }
+.cbadge { position: absolute; top: -6px; right: -6px; box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--neg-base); color: #fff; font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--bg, var(--surface)); pointer-events: none; }
 
 /* ---- Hujjatlar (document engine) ------------------------------------------- */
 .doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 14px; }
@@ -1128,3 +1128,6 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .dtile.sm { width: 38px; height: 44px; border-radius: 8px; }
 .dtile.sm .dt-m { height: 14px; font-size: 9.5px; }
 .dtile.sm .dt-d { font-size: 17px; }
+/* a date row that already sits in a titled card is not a second card: no frame, no fill (Statistika «Keyingi majlis») */
+.p-card > .datecard { border: 0 !important; background: none !important; box-shadow: none !important; padding: 4px 0 0; }
+.p-card > .datecard:hover { background: none !important; }
