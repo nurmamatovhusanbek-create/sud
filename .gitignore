@@ -19,3 +19,6 @@ sud-explore4/
 
 # HAR network captures hold live cookies and tokens: never commit
 *.har
+
+# ui:shots output (docs/ui-split-plan.md M0)
+ui-shots/

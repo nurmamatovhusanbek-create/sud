@@ -54,7 +54,7 @@
   --brand-tile: #111114;
 
   --status-positive-solid: #111114; --status-positive-soft: #ECECEF; --status-positive-text: #111114; --status-positive-line: #D6D6DA; --status-positive-base: #111114;
-  --status-negative-solid: #B03A48; --status-negative-soft: #F7E4E7; --status-negative-text: #8F2B38; --status-negative-line: #E6BFC5; --status-negative-base: #B03A48;
+  --status-negative-solid: #111114; --status-negative-soft: #ECECEF; --status-negative-text: #111114; --status-negative-line: #D6D6DA; --status-negative-base: #111114;
   --status-warning-solid:  #111114; --status-warning-soft:  #ECECEF; --status-warning-text:  #111114; --status-warning-line:  #D6D6DA; --status-warning-base:  #111114;
   --status-info-solid:     #111114; --status-info-soft:     #ECECEF; --status-info-text:     #111114; --status-info-line:     #D6D6DA; --status-info-base:     #111114;
   --status-neutral-soft: #EEEEF0; --status-neutral-text: #565760; --status-neutral-line: #DADADE;
@@ -111,7 +111,7 @@
   --brand-tile: #2A2A2E;
 
   --status-positive-solid: #EDEDED; --status-positive-soft: rgba(237, 237, 237, 0.10); --status-positive-text: #EDEDED; --status-positive-line: rgba(237, 237, 237, 0.24); --status-positive-base: #EDEDED;
-  --status-negative-solid: #E5484D; --status-negative-soft: rgba(229, 72, 77, 0.14);  --status-negative-text: #F08A8D; --status-negative-line: rgba(229, 72, 77, 0.30);  --status-negative-base: #E5484D;
+  --status-negative-solid: #EDEDED; --status-negative-soft: rgba(237, 237, 237, 0.10); --status-negative-text: #EDEDED; --status-negative-line: rgba(237, 237, 237, 0.24); --status-negative-base: #EDEDED;
   --status-warning-solid:  #EDEDED; --status-warning-soft:  rgba(237, 237, 237, 0.10); --status-warning-text:  #EDEDED; --status-warning-line:  rgba(237, 237, 237, 0.24); --status-warning-base:  #EDEDED;
   --status-info-solid:     #EDEDED; --status-info-soft:     rgba(237, 237, 237, 0.10); --status-info-text:    #EDEDED; --status-info-line:    rgba(237, 237, 237, 0.24); --status-info-base:    #EDEDED;
   --status-neutral-soft: rgba(237, 237, 237, 0.08); --status-neutral-text: #A1A1A6; --status-neutral-line: rgba(237, 237, 237, 0.14);
@@ -232,3 +232,20 @@
 [data-look='premium'] .sysstat[data-state='degraded'] .pulse { background: linear-gradient(90deg, #FFFFFF 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px #FFFFFF; }
 [data-look='premium'] .sysstat[data-state='down'] .pulse { background: transparent; box-shadow: inset 0 0 0 1.5px #FFFFFF; }
 [data-look='premium'] .sysstat[data-state='degraded'] .pulse::after, [data-look='premium'] .sysstat[data-state='down'] .pulse::after { display: none; }
+
+/* ---------- 13. the detail drawer / docked detail in ink (it kept the navy accent pair and a navy scrim) ---------- */
+[data-look='premium'] .drawer { --dw-a: var(--text-1); --dw-soft: var(--surface-inset); }
+[data-look='premium'] .drawer-scrim { background: rgba(10, 10, 12, 0.46); }
+[data-look='premium'] .drawer-mast .logo { background: var(--ink); color: #FFFFFF; }
+[data-look='premium'][data-theme='dark'] .drawer-mast .logo { background: #2A2A2E; }
+[data-look='premium'] .dw-next { border-left-color: var(--text-1); }
+[data-look='premium'] .dw-party button.n:hover { color: var(--text-1); }
+[data-look='premium'] .dw-fig { border-color: var(--border-default); }
+[data-look='premium'] .drawer.dock { background: var(--surface); }
+
+/* ---------- 14. no red anywhere (owner: «change all»): the negative tokens are ink too, so what sat on them must read on ink ----------
+   A solid status colour is now ink (light) or near-white (dark): the text on it is the look's contrast colour, never a hard #fff. */
+[data-look='premium'] [data-sonner-toast][data-type='success'], [data-look='premium'] [data-sonner-toast][data-type='error'], [data-look='premium'] [data-sonner-toast][data-type='warning'] { background: var(--accent) !important; color: var(--accent-contrast) !important; }
+[data-look='premium'] .badge.solid.b-pos, [data-look='premium'] .badge.solid.b-neg { color: var(--accent-contrast); }
+[data-look='premium'] .cbadge { background: var(--text-1); color: var(--surface); border-color: var(--surface); }
+[data-look='premium'] .alert.err > svg { color: var(--text-1); }

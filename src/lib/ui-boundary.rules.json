@@ -1,0 +1,27 @@
+{
+  "_comment": "Modules a component under src/components must not import (type-only imports are fine). Read by lib/__tests__/ui-boundary.test.ts (the ratchet) and by eslint.config.mjs (the editor rule). docs/ui-split-plan.md, M1.",
+  "forbidden": [
+    "@/lib/api-client",
+    "@/lib/registry",
+    "@/lib/use-registry",
+    "@/lib/enrich",
+    "@/lib/store",
+    "@/lib/billing",
+    "@/lib/court-case",
+    "@/lib/orginfo",
+    "@/lib/chamber",
+    "@/lib/stats",
+    "@/lib/identity",
+    "@/lib/hard-refresh",
+    "@/lib/bills-cache",
+    "@/lib/bills-snapshot",
+    "@/lib/snapshot-store",
+    "@/lib/health-store",
+    "@/lib/health-registry",
+    "@/lib/rating-service",
+    "@/lib/public-orders",
+    "@/lib/pretenzia",
+    "@/lib/documents",
+    "@/lib/report"
+  ]
+}

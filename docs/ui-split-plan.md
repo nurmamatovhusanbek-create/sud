@@ -35,7 +35,7 @@ Forbidden in `components`: `fetch(`, `@/lib/api-client`, registry / store / enri
 
 ## Milestones
 
-### M0 — Safety net (no UI change)
+### M0 — Safety net (no UI change) — DONE: `bun run ui:shots` (`scripts/ui-shots.mjs`)
 Without it, «nothing changed» is a guess.
 - `bun run ui:shots`: Playwright opens every screen (launcher, Kuzatuv, company tabs, Sud ishlari, Qarorlar, Hujjatlar, Sozlamalar tabs, drawer, ⌘K)
   at 1300 / 960 / 700 px × light / dark, with seeded `localStorage` and `/api/*` mocked from fixtures (live scraping does not work here, AGENTS.md §2).
@@ -43,7 +43,7 @@ Without it, «nothing changed» is a guess.
 - Baseline PNGs are produced locally (not committed: size); the script diffs a run against the last accepted run and prints changed screens.
 - **Done when:** two runs on the same commit differ by 0 pixels (animations frozen), and every screen above has a shot.
 
-### M1 — Boundary rules in code (started)
+### M1 — Boundary rules in code — DONE: ratchet test + ESLint `no-restricted-imports` (`eslint.config.mjs`, list in `src/lib/ui-boundary.rules.json`, baseline files exempt)
 - `src/lib/__tests__/ui-boundary.test.ts` + `ui-boundary.baseline.json`: a ratchet. Today's 24 files / 69 violations are listed; a NEW violation fails the
   test, and a fixed one must be deleted from the list, so it only shrinks. (Done: this is what gets committed with the plan.)
 - Then an ESLint `no-restricted-imports` rule for `src/components/**` and `src/ui/**` so the editor shows it at once (same list, with the baseline files exempt).
@@ -75,7 +75,7 @@ Extract what the CSS already defines into `src/ui/`, with the **same** look firs
 - Token scales instead of one-off numbers: spacing (4/8/12/16/24/32), radius (3), elevation (2), type (6 sizes), motion (`--dur-1…3`, `--ease-out`).
 - **Done when:** every colour, radius and duration in `src/ui` is a token, and M0 diff = 0.
 
-### M5 — Motion layer
+### M5 — Motion layer — DONE for Premium: `app/motion-premium.css` + `lib/__tests__/motion-css.test.ts` (Tinch's motion is still spread over `prototype.css`)
 - Already done: the operator switch (`lib/motion`, sidebar «Animatsiya»: auto / on / off) and the rule that reduced-motion CSS is gated on it.
 - Add: motion tokens, and a short list of named motions (page enter, list stagger, drawer slide, number count-up, skeleton, status pulse) in ONE file; nothing else may declare `animation`.
   Rules kept from AGENTS.md: forever-running motion animates only `transform`/`opacity`; no blur over animated content.
@@ -104,3 +104,6 @@ Each item is a separate commit with before/after shots from M0.
 - Hidden coupling in the large files (`cases.tsx` keeps hearing-date logic inside, `overview.tsx` mixes layout and calculation). Mitigation: move calculations into `core/` first (they get tests), then the hook.
 - Screenshot flakiness (fonts, animations, time): freeze time, disable motion through the new setting, wait for `document.fonts.ready`.
 - Scope creep into redesign during M2/M3: the M0 diff is the guard; a pixel change in a split commit is a bug or an explicit, listed decision.
+
+## Status (Nov 2026)
+Done: M0 (the screenshot runner: 1300 / 960 / 700 × light / dark × looks, API mocked, motion off, clock fixed; two runs of one commit are byte-identical; `--accept` stores the baseline, a later run prints changed / new / missing screens and exits 1), M1 (the ratchet and the editor rule), M5 for Premium, and the Premium look itself. NOT done, on purpose: M2 (feature hooks: 24 files / 69 violations are still in the baseline), M3 (`src/ui` primitives) and M4 (CSS ownership). They are a behaviour-preserving refactor of the biggest files (`settings-view`, `cases`, `overview`, `bills`) and should go one screen per commit with `bun run ui:shots` as the guard, not in one sweep.

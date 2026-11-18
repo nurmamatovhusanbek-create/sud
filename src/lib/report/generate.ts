@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import { getCompanyInfo, getStats, getUpcomingHearings, searchCases } from '@/lib/api-client'
 import type { ApiResult, CompanyInfoData, CompanyStats, CourtCase, UpcomingHearingsData } from '@/lib/api-types'
 import { getCached, setCached } from '@/lib/cache'
-import { escapeHtml, isDarkTheme, openPrintWindow, palette, printIntoWindow } from '@/lib/print'
+import { currentLook, escapeHtml, isDarkTheme, openPrintWindow, palette, printIntoWindow } from '@/lib/print'
 import { getRecord } from '@/lib/registry'
 import { getLook } from '@/lib/look'
 import { buildReportDoc } from './doc'
@@ -65,7 +65,7 @@ async function load<T>(key: string | null, fetcher: () => Promise<ApiResult<T>>)
 }
 
 function loadingPage(dark: boolean): string {
-  const p = palette(dark)
+  const p = palette(dark, currentLook())
   return `<!doctype html><html lang="uz"><head><meta charset="utf-8"><title>Hisobot tayyorlanmoqda…</title><style>
   html,body{height:100%;margin:0;background:${p.bg};color:${p.t2};font:600 14px -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
   body{display:grid;place-items:center;text-align:center}
@@ -76,7 +76,7 @@ function loadingPage(dark: boolean): string {
 }
 
 function failedPage(dark: boolean, message: string): string {
-  const p = palette(dark)
+  const p = palette(dark, currentLook())
   return `<!doctype html><html lang="uz"><head><meta charset="utf-8"><title>Hisobot tayyor emas</title><style>
   html,body{height:100%;margin:0;background:${p.bg};color:${p.t1};font:600 14px -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
   body{display:grid;place-items:center;text-align:center;padding:24px}

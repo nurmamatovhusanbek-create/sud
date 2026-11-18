@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
 import { thumbVars, useThumb } from '@/lib/use-thumb'
+import { useBusy } from '@/lib/net-activity'
 import { DateTile, dateParts, daysLabel } from '@/components/proto/date-tile'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -196,6 +197,7 @@ function ThumbNav({ label, activeKey, children }: { label: string; activeKey: st
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const busy = useBusy()
   // the registry could not be saved (browser storage full): say so once instead of losing changes silently
   useEffect(() => {
     let told = false
@@ -389,6 +391,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="main">
         <header className="topbar">
+          <div className={`topload${busy ? ' on' : ''}`} role="progressbar" aria-hidden={!busy} aria-label="Yuklanmoqda" />
           <button className="menu-btn" aria-label="Menyu" onClick={() => setSideOpen((o) => !o)}>
             <Menu style={{ width: 18, height: 18 }} />
           </button>

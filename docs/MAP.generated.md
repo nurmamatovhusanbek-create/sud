@@ -135,6 +135,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `identity.ts` | app/page.tsx |  |
 | `look.ts` | components/views/appearance-settings.tsx, lib/report/doc.ts, lib/report/generate.ts | lib/__tests__/look.test.ts |
 | `motion.ts` | components/proto/primitives.tsx, components/proto/scrape-progress.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/motion.test.ts |
+| `net-activity.ts` | components/shell/app-shell.tsx, lib/api-client.ts | lib/__tests__/net-activity.test.ts |
 | `net/chain-fetch.ts` | lib/billing.ts, lib/public-orders/source.ts | lib/net/__tests__/chain-fetch.test.ts |
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
 | `net/pacer.ts` | lib/public-orders/pace.ts | lib/net/__tests__/pacer.test.ts |
@@ -145,7 +146,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
-| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/report/__tests__/xss.test.ts |
+| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/__tests__/print-look.test.ts, lib/report/__tests__/xss.test.ts |
 | `public-orders/company-job.ts` | api/presence/route, api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/hidden-store.ts, lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
@@ -164,7 +165,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
 | `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +7 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
 | `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render-ink.test.ts, lib/report/__tests__/render.test.ts |
-| `report/fonts.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
+| `report/fonts.ts` | lib/print.ts, lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/generate.ts` | components/company/context-bar.tsx |  |
 | `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render-ink.test.ts, lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
 | `report/render-ink.ts` | lib/report/doc.ts | lib/report/__tests__/render-ink.test.ts |

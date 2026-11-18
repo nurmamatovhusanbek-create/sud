@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
-import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
+import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { assignRoles, classifyOutcome, type PartyRole } from '@/core/classify'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
@@ -290,13 +290,15 @@ function HearingHistory({ items }: { items: Hearing[] }) {
   )
 }
 
-function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }) {
+function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }, nav?: DrawerOpts['nav']) {
   const EYEBROW = 'Ish tafsiloti'
+  // a case detail is list + detail: it DOCKS beside the list (wide screens) and the list steps through it (↑ ↓ / k j)
+  const BASE: DrawerOpts = { eyebrow: EYEBROW, dock: true, rowKey: `${courtType}|${caseNumber}`, nav }
   openProtoDrawer(
     caseNumber,
     <div style={{ marginTop: 22 }}><SkRows n={5} /></div>,
     'Yuklanmoqda…',
-    { eyebrow: EYEBROW },
+    BASE,
   )
 
   void (async () => {
@@ -312,7 +314,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
           </div>
         </div>,
         '',
-        { eyebrow: EYEBROW },
+        BASE,
       )
       return
     }
@@ -456,7 +458,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       </div>,
       g?.court || '',
       {
-        eyebrow: EYEBROW,
+        ...BASE,
         badges: g?.caseStatus ? (
           <span className="badge b-neu" style={{ height: 26 }}>
             <i className="p-dot" style={{ background: statusColor }} />
@@ -671,6 +673,20 @@ export function CasesSection() {
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  // stepping through the page's rows from the docked detail (↑ ↓): each row opens with its own prev / next
+  const openAt = (idx: number) => {
+    const m = paged[idx]
+    if (!m) return
+    openCaseDetail(m.c.caseNumber, m.courtType, company ?? undefined, {
+      pos: `${(safePage - 1) * pageSize + idx + 1} / ${filtered.length}`,
+      prev: idx > 0 ? () => openAt(idx - 1) : undefined,
+      next: idx < paged.length - 1 ? () => openAt(idx + 1) : undefined,
+    })
+  }
+  const dockedCase = useDockedRowKey()
+  useEffect(() => {
+    if (dockedCase) document.querySelector('.lrow.sel')?.scrollIntoView({ block: 'nearest' })
+  }, [dockedCase])
 
   if (!company) return null
 
@@ -768,7 +784,7 @@ export function CasesSection() {
               const fam: StatusFamilyKey = !c.result?.trim() ? 'pending' : role ? classifyOutcome(role, c.result) : 'unknown'
               const word = c.result?.trim() || (c.caseStatus ? statusEn(c.caseStatus) || c.caseStatus : '')
               return (
-                <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
+                <div className={`lrow${dockedCase && dockedCase === `${courtType}|${c.caseNumber}` ? ' sel' : ''}`} key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openAt(i)}>
                   <div className="lead">
                     <StatusIcon family={fam} size={28} />
                   </div>

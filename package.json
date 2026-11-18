@@ -13,7 +13,8 @@
     "test": "bun test src/core src/lib src/server",
     "map": "node scripts/gen-map.mjs",
     "map:check": "node scripts/gen-map.mjs --check",
-    "audit": "bun audit"
+    "audit": "bun audit",
+    "ui:shots": "node scripts/ui-shots.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

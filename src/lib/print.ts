@@ -15,6 +15,7 @@
  */
 
 import { brandMarkSvg } from '@/core/brand-mark'
+import { collectFontKit } from '@/lib/report/fonts'
 
 export interface Palette {
   bg: string; surface: string; inset: string
@@ -24,7 +25,34 @@ export interface Palette {
   pos: string; neg: string
 }
 
-export function palette(dark: boolean): Palette {
+/** which look the document follows: «premium» = ink / near-white (the app's default), «calm» = the navy edition */
+export type PrintLook = 'premium' | 'calm'
+
+/** The app's look from <html data-look>; «calm» only when asked for, and when there is no DOM (tests, server) the original navy sheet. */
+export function currentLook(): PrintLook {
+  if (typeof document === 'undefined') return 'calm'
+  return document.documentElement.getAttribute('data-look') === 'calm' ? 'calm' : 'premium'
+}
+
+export function palette(dark: boolean, look: PrintLook = 'calm'): Palette {
+  if (look === 'premium') {
+    const ink = dark ? '#EDEDED' : '#111114'
+    return {
+      bg: dark ? '#0B0B0C' : '#F4F4F5',
+      surface: dark ? '#141415' : '#FFFFFF',
+      inset: dark ? '#19191B' : '#F6F6F7',
+      t1: ink,
+      t2: dark ? '#A1A1A6' : '#4A4A52',
+      t3: dark ? '#85858B' : '#85858D',
+      border: dark ? 'rgba(255,255,255,0.16)' : '#D9D9DD',
+      borderSoft: dark ? 'rgba(255,255,255,0.08)' : '#E9E9EC',
+      accent: ink,
+      accentText: dark ? '#111114' : '#FFFFFF',
+      accentSoft: dark ? 'rgba(237,237,237,.10)' : '#ECECEF',
+      pos: ink,
+      neg: ink,
+    }
+  }
   return dark
     ? {
         bg: '#0f1326', surface: '#161b34', inset: '#1b2140',
@@ -42,7 +70,7 @@ export function palette(dark: boolean): Palette {
       }
 }
 
-function printCss(p: Palette): string {
+function printCss(p: Palette, ink = false): string {
   return `
   :root { --pbg:${p.bg}; --ps:${p.surface}; --pin:${p.inset}; --t1:${p.t1}; --t2:${p.t2}; --t3:${p.t3}; --pb:${p.border}; --pbs:${p.borderSoft}; --pa:${p.accent}; --pat:${p.accentText}; --pas:${p.accentSoft}; --pos:${p.pos}; --neg:${p.neg}; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -98,8 +126,22 @@ function printCss(p: Palette): string {
 
   @page { size: A4; margin: 12mm 10mm; }
   @media print { body { padding: 0; } .pr-sheet { border-radius: 0; border: none; } }
-`
+${ink ? INK_OVERRIDES : ''}`
 }
+
+/** The «premium» edition of the generic sheet: the same skeleton in ONE ink: Plex type, weights ≤ 600, sentence-case labels, no tracked caps. */
+const INK_OVERRIDES = `
+  body { font-family: "IBM Plex Sans", "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  .pr-brand b { font-weight: 600; } .pr-brand .by { letter-spacing: 0; }
+  .pr-eyebrow { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 10.5px; }
+  .pr-title { font-weight: 600; letter-spacing: -.015em; }
+  .pr-badge { background: transparent; color: var(--t1); font-weight: 600; }
+  .pr-sec { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; color: var(--t1); }
+  .pr-kv .v, .pr-next-date { font-weight: 600; }
+  .pr-total { font-weight: 600; } .pr-total .k { text-transform: none; letter-spacing: 0; color: var(--t1); } .pr-total .v { color: var(--t1); }
+  table.pr-table th { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 11px; }
+  .pr-pos, .pr-neg { font-weight: 600; }
+`
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? '')
@@ -123,9 +165,9 @@ export function isDarkTheme(): boolean {
 }
 
 /** Build the full themed document — exported so a caller/test can render it. */
-export function buildPrintDoc(title: string, bodyHtml: string, dark = isDarkTheme()): string {
-  const p = palette(dark)
-  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${printCss(p)}</style></head><body>
+export function buildPrintDoc(title: string, bodyHtml: string, dark = isDarkTheme(), look: PrintLook = currentLook(), fontFaceCss = ''): string {
+  const p = palette(dark, look)
+  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}" data-look="${look}"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${fontFaceCss}${printCss(p, look === 'premium')}</style></head><body>
 <div class="pr-sheet">
   <div class="pr-brand"><span class="pr-logo">${brandMarkSvg('tile')}</span><b>Sud tizimi</b><span class="by">by Nurmamatov</span></div>
   <div class="pr-inner">${bodyHtml}</div>
@@ -180,5 +222,6 @@ export function printIntoWindow(w: Window, fullHtml: string): void {
  * is blocked so the caller can surface a toast instead of failing silently.
  */
 export function printHtml(title: string, bodyHtml: string): void {
-  printIntoWindow(openPrintWindow(), buildPrintDoc(title, bodyHtml))
+  // the print window does not inherit the app's web fonts: hand it the @font-face rules (Plex for the premium sheet)
+  printIntoWindow(openPrintWindow(), buildPrintDoc(title, bodyHtml, isDarkTheme(), currentLook(), collectFontKit().css))
 }

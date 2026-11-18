@@ -5,6 +5,7 @@
  * legacy shapes) into ApiResult<T>.
  */
 
+import { beginActivity } from './net-activity'
 import type { LibraryItem, LibraryStatus, StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
 import type { UzScript } from '@/core/uz-alphabet'
@@ -35,6 +36,7 @@ export function privilegedHeaders(extra: Record<string, string> = {}): HeadersIn
 }
 
 async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<T>> {
+  const end = beginActivity() // drives the thin loading line under the topbar
   try {
     // cache: 'no-store': every answer is live data (the Qarorlar counts change when a file is saved); the browser must not reuse one
     const res = await fetch(url, { signal, headers: authHeaders(), cache: 'no-store' })
@@ -63,6 +65,8 @@ async function request<T>(url: string, signal?: AbortSignal): Promise<ApiResult<
     // text ("Failed to fetch" etc.), never something already localized, so
     // it must never reach a toast verbatim.
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
+  } finally {
+    end()
   }
 }
 

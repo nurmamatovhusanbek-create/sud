@@ -378,6 +378,7 @@ html, body { height: 100%; }
 /* visibility:hidden while closed keeps the off-screen panel out of the Tab order and skips painting its shadow */
 .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 94vw); background: var(--surface); z-index: 95; box-shadow: var(--elev-4); transform: translateX(100%); visibility: hidden; transition: transform .32s var(--ease-emph), visibility 0s linear .32s; display: flex; flex-direction: column; overscroll-behavior: contain; }
 .drawer.open { transform: none; visibility: visible; transition: transform .32s var(--ease-emph), visibility 0s; }
+.drawer-swap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .drawer-mast { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 20px; background: var(--surface); color: var(--text-2); border-bottom: 1px solid var(--border-subtle); flex: 0 0 auto; }
 .drawer-mast .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: var(--accent-contrast); flex: none; }
 .drawer-mast .logo svg { width: 15px; height: 15px; }
@@ -385,6 +386,9 @@ html, body { height: 100%; }
 .drawer-mast .x { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--text-2); background: transparent; transition: background-color .15s, color .15s; flex: none; }
 .drawer-mast .x:hover { background: var(--surface-active); color: var(--text-1); }
 .drawer-mast .x svg { width: 16px; height: 16px; }
+.drawer-mast .x:disabled { opacity: .35; pointer-events: none; }
+.dw-nav { display: inline-flex; align-items: center; gap: 2px; flex: none; margin-right: 4px; }
+.dw-nav .pos { margin-right: 6px; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .drawer-title { padding: 18px 22px 16px; border-bottom: 1px solid var(--border-subtle); flex: 0 0 auto; }
 .drawer-title h2 { margin: 0; font-size: 21px; font-weight: 600; line-height: 1.18; color: var(--text-1); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .drawer-title .sub { margin-top: 5px; font-size: 13px; line-height: 1.4; color: var(--text-2); overflow-wrap: anywhere; }
@@ -1131,3 +1135,36 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 /* a date row that already sits in a titled card is not a second card: no frame, no fill (Statistika «Keyingi majlis») */
 .p-card > .datecard { border: 0 !important; background: none !important; box-shadow: none !important; padding: 4px 0 0; }
 .p-card > .datecard:hover { background: none !important; }
+
+/* ---- docked detail (proto/drawer.tsx, opts.dock, ≥ 1360px): a column BESIDE the list, below the topbar; no scrim, nothing dims ---- */
+:root { --dock-w: clamp(440px, 34vw, 540px); }
+.drawer.dock { top: var(--topbar-h, 71px); height: calc(100dvh - var(--topbar-h, 71px)); width: var(--dock-w); z-index: 30; box-shadow: none; border-left: 1px solid var(--border-subtle); transform: none; transition: none; }
+.drawer.dock.open { visibility: visible; }
+:root[data-dock='open'] .scroll { margin-right: var(--dock-w); }
+.drawer.dock .drawer-swap { animation: p-rise .24s var(--ease-emph) both; }
+/* the open row, in the list beside it */
+.lrow.sel { background: var(--surface-active); box-shadow: inset 3px 0 0 var(--text-1); }
+.lrow.sel .chev { color: var(--text-1); }
+
+/* ---- phone fixes (390 px): the Kompaniya tab stacks; a hearing row keeps its time and countdown on screen ---- */
+@media (max-width: 900px) {
+  .prof-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .card-h { flex-wrap: wrap; row-gap: 8px; }
+  .datecard { min-width: 0; flex-wrap: wrap; row-gap: 8px; }
+  .datecard .dc-body { flex: 1; min-width: 0; }
+  .datecard .dc-when { flex: 0 0 100%; display: flex; align-items: baseline; gap: 12px; margin-left: 0; padding-left: 66px; text-align: left; }
+  .datecard .dc-time { font-size: 14px; }
+  .datecard .dc-left { margin-top: 0; }
+}
+
+/* ---- the thin loading line under the topbar (lib/net-activity: shown while a request has taken > 220 ms). LIVE, so it may loop; transform only ---- */
+.topbar { position: relative; }
+.topload { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity var(--dur-2, .2s) var(--ease); z-index: 5; }
+.topload.on { opacity: 1; }
+.topload::before { content: ""; position: absolute; inset: 0; width: 40%; background: var(--text-1); transform: translateX(-100%); animation: topload 1.3s var(--ease) infinite; }
+@keyframes topload { to { transform: translateX(250%); } }
+/* motion off / reduced: no sweep, just a steady line while loading */
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .topload::before { animation: none; transform: none; width: 100%; opacity: .5; } }
+:root[data-motion='off'] .topload::before { animation: none; transform: none; width: 100%; opacity: .5; }

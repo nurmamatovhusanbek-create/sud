@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
 import { SolidIcon } from '@/components/ui-custom/solid-icons'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
-import { openProtoDrawer, closeProtoDrawer, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
+import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
@@ -65,7 +65,7 @@ function Barcode({ seed }: { seed: string }) {
 }
 
 /** Receipt drawer — shared with the Overview "Soʻnggi toʻlovlar" strip. */
-export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
+export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav?: DrawerOpts['nav']) {
   const d = (b.detail || null) as CheckStatusResponse | null
   const status = d?.invoiceStatus ?? b.invoiceStatus
   const fam = billStatusFamilySafe(status)
@@ -154,6 +154,9 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined) {
     subline,
     {
       eyebrow: 'Toʻlov kvitansiyasi',
+      dock: true,
+      rowKey: b.number,
+      nav,
       footer: (
         <>
           <button className={`btn ${openCase ? 'btn-outline' : 'btn-primary'}`} onClick={printReceipt}>
@@ -319,6 +322,20 @@ export function BillsSection() {
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  // the receipt DOCKS beside the list (wide screens): the page's rows step with ↑ ↓
+  const openReceiptAt = (idx: number) => {
+    const b = paged[idx]
+    if (!b) return
+    openReceipt(b, stir, {
+      pos: `${(safePage - 1) * pageSize + idx + 1} / ${filtered.length}`,
+      prev: idx > 0 ? () => openReceiptAt(idx - 1) : undefined,
+      next: idx < paged.length - 1 ? () => openReceiptAt(idx + 1) : undefined,
+    })
+  }
+  const dockedBill = useDockedRowKey()
+  useEffect(() => {
+    if (dockedBill) document.querySelector('.lrow.sel')?.scrollIntoView({ block: 'nearest' })
+  }, [dockedBill])
 
   const checkInvoice = async () => {
     const v = invoice.replace(/\D/g, '')
@@ -470,7 +487,7 @@ export function BillsSection() {
                   const status = d?.invoiceStatus ?? b.invoiceStatus
                   const fam = billStatusFamilySafe(status)
                   return (
-                    <div className="lrow" key={`${b.number}-${i}`} data-bill={b.number} onClick={() => openReceipt(b, stir)}>
+                    <div className={`lrow${dockedBill && dockedBill === b.number ? ' sel' : ''}`} key={`${b.number}-${i}`} data-bill={b.number} onClick={() => openReceiptAt(i)}>
                       <div className="lead">
                         <Receipt />
                       </div>

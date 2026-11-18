@@ -19,30 +19,7 @@ const ROOT = path.join(process.cwd(), 'src', 'components')
 const BASELINE = path.join(import.meta.dir, 'ui-boundary.baseline.json')
 
 /** modules a component may not import (type-only imports are always fine) */
-const FORBIDDEN = [
-  '@/lib/api-client',
-  '@/lib/registry',
-  '@/lib/use-registry',
-  '@/lib/enrich',
-  '@/lib/store',
-  '@/lib/billing',
-  '@/lib/court-case',
-  '@/lib/orginfo',
-  '@/lib/chamber',
-  '@/lib/stats',
-  '@/lib/identity',
-  '@/lib/hard-refresh',
-  '@/lib/bills-cache',
-  '@/lib/bills-snapshot',
-  '@/lib/snapshot-store',
-  '@/lib/health-store',
-  '@/lib/health-registry',
-  '@/lib/rating-service',
-  '@/lib/public-orders',
-  '@/lib/pretenzia',
-  '@/lib/documents',
-  '@/lib/report',
-]
+const FORBIDDEN: string[] = JSON.parse(fs.readFileSync(path.join(import.meta.dir, '..', 'ui-boundary.rules.json'), 'utf8')).forbidden
 
 function files(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

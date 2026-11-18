@@ -12,7 +12,7 @@
  * Pure string building; escapes everything it prints (see __tests__/xss.test.ts).
  */
 
-import { escapeHtml as h } from '@/lib/print'
+import { escapeHtml as h, palette } from '@/lib/print'
 import { formatDmy } from '@/core/dates'
 import { winRate as calcWinRate } from '@/core/rates'
 import { MONTHS_UZ } from '@/core/trend'
@@ -32,23 +32,11 @@ import { displayName, figure, note, railDl, railGroup, sec, type ReportTheme } f
 // ---- theme -------------------------------------------------------------------
 
 export function inkTheme(dark: boolean): ReportTheme {
-  const ink = dark ? '#EDEDED' : '#111114'
-  const flat = { fg: ink, bg: dark ? 'rgba(237,237,237,.10)' : '#ECECEF' }
+  const p = palette(dark, 'premium') // ONE palette for every premium print document (lib/print.ts)
+  const flat = { fg: p.t1, bg: p.accentSoft }
   return {
+    ...p,
     dark,
-    bg: dark ? '#0B0B0C' : '#F4F4F5',
-    surface: dark ? '#141415' : '#FFFFFF',
-    inset: dark ? '#19191B' : '#F6F6F7',
-    t1: ink,
-    t2: dark ? '#A1A1A6' : '#4A4A52',
-    t3: dark ? '#85858B' : '#85858D',
-    border: dark ? 'rgba(255,255,255,0.16)' : '#D9D9DD',
-    borderSoft: dark ? 'rgba(255,255,255,0.08)' : '#E9E9EC',
-    accent: ink,
-    accentText: dark ? '#111114' : '#FFFFFF',
-    accentSoft: dark ? 'rgba(237,237,237,.10)' : '#ECECEF',
-    pos: ink,
-    neg: ink,
     rail: { bg: dark ? '#09090A' : '#111114', tone: { pos: '#FFFFFF', neg: '#FFFFFF', warn: '#FFFFFF', info: '#FFFFFF', neu: '#C9C9CD' } },
     tone: { pos: flat, neg: flat, warn: flat, info: flat, neu: flat },
     ramp: dark ? ['#EDEDED', '#BDBDC1', '#8D8D93', '#5C5C62', '#3A3A3F', '#26262A'] : ['#111114', '#3A3A40', '#6B6B73', '#9A9AA2', '#C6C6CC', '#E4E4E8'],
