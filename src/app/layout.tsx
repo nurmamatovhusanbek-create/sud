@@ -7,7 +7,7 @@ import { LOOK_BOOT_SCRIPT, MOTION_BOOT_SCRIPT, THEME_BOOT_SCRIPT } from "@/lib/t
 import "./fonts.css";
 import "./globals.css";
 import "./prototype.css";
-import "./look-vivid.css";
+import "./look-premium.css";
 
 export const metadata: Metadata = {
   title: "Sud tizimi",
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uz" data-theme="light" data-look="vivid" suppressHydrationWarning>
+    <html lang="uz" data-theme="light" data-look="premium" suppressHydrationWarning>
       <head>
         {/* the saved theme is put on <html> before the first paint: no flash of the other one */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT + MOTION_BOOT_SCRIPT + LOOK_BOOT_SCRIPT }} />

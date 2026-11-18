@@ -1,0 +1,205 @@
+/* ============================================================================
+   LOOK · «Premium» — deep ink, ivory and brass. Selected in Settings › Koʻrinish; the default.
+   ----------------------------------------------------------------------------
+   Identity = three materials used the same way everywhere, not a spread of colours:
+     INK    #0F1A2E-family   the sidebar, primary buttons, monograms, text
+     IVORY  warm off-white   the canvas and the surfaces (never a pure-white page)
+     BRASS  one metallic accent: the active marker, the hairline above a page title,
+            the star mark, the underline of the active tab. Never a fill, never text smaller than 18px.
+   Type: Newsreader (serif, self-hosted) for page titles, section titles, company names and figures;
+   Plus Jakarta Sans for everything else. Status colours stay semantic and muted (jewel tones).
+   Same screens and markup as «Tinch» (calm): tokens plus this layer, never a second copy of a screen.
+   Owner rules hold: no glow (crisp focus), no blur over animation, no external asset, tokens not hex.
+   ============================================================================ */
+
+/* ---------- 1. tokens · light ---------- */
+[data-look='premium'] {
+  --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+
+  --ink:      #0F1A2E;   /* sidebar, primary fill */
+  --ink-2:    #1B2A47;
+  --gold:     #B38A3E;   /* brass: decoration only */
+  --gold-lt:  #D9B66A;   /* brass on ink */
+  --gold-tx:  #7E5A17;   /* brass as small text on ivory, ≥4.5:1 */
+
+  --bg-canvas:       #F4F1EA;
+  --bg-sunken:       #ECE8DE;
+  --surface:         #FFFDF8;
+  --surface-raised:  #FFFDF8;
+  --surface-overlay: #FFFDF8;
+  --surface-inset:   #F8F5EE;
+  --surface-hover:   #F3EFE6;
+  --surface-active:  #EBE6DA;
+
+  --text-1: #141C2E;
+  --text-2: #475064;
+  --text-3: #6A7183;
+  --text-disabled: #A9ADB8;
+
+  --border-subtle:  rgba(20, 28, 46, 0.09);
+  --border-default: rgba(20, 28, 46, 0.16);
+  --border-strong:  rgba(20, 28, 46, 0.28);
+
+  --brand:      #1F3A6E;
+  --brand-ink:  #17305F;
+  --brand-100:  #E6EAF3;
+  --brand-50:   #F0F2F8;
+  --accent:          #15233E;
+  --accent-hover:    #1F3156;
+  --accent-pressed:  #0F1A2E;
+  --accent-contrast: #FBF8F0;
+  --accent-soft:     #E6EAF3;
+  --accent-ring:     rgba(31, 58, 110, 0.30);
+  --brand-tile: #15233E;
+
+  --status-positive-solid: #2F7D5B; --status-positive-soft: #E2EEE7; --status-positive-text: #1F5C41; --status-positive-line: #BCD6C8; --status-positive-base: #2F7D5B;
+  --status-negative-solid: #A33A4A; --status-negative-soft: #F4E2E5; --status-negative-text: #862A38; --status-negative-line: #E3BDC4; --status-negative-base: #A33A4A;
+  --status-warning-solid:  #B07A1C; --status-warning-soft:  #F6EBD2; --status-warning-text:  #75500F; --status-warning-line:  #E5D0A2; --status-warning-base:  #B07A1C;
+  --status-info-solid:     #1F3A6E; --status-info-soft:     #E6EAF3; --status-info-text:     #1B3566; --status-info-line:     #C5CEE2; --status-info-base:     #1F3A6E;
+  --status-neutral-soft: #EEEAE0; --status-neutral-text: #566075; --status-neutral-line: #DDD7C9;
+
+  --radius-xl: 18px; --radius-lg: 14px; --radius-md: 10px; --radius-sm: 8px;
+  --r-xl: 18px; --r-lg: 14px; --r-md: 10px; --r-sm: 8px;
+
+  --elev-1: 0 1px 2px rgba(20, 28, 46, 0.05), 0 4px 14px -6px rgba(20, 28, 46, 0.10);
+  --elev-2: 0 2px 4px rgba(20, 28, 46, 0.06), 0 10px 24px -8px rgba(20, 28, 46, 0.16);
+  --elev-3: 0 4px 8px rgba(20, 28, 46, 0.07), 0 18px 36px -10px rgba(20, 28, 46, 0.20);
+  --elev-4: 0 8px 16px rgba(20, 28, 46, 0.09), 0 30px 60px -16px rgba(20, 28, 46, 0.28);
+  --elev-focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand);
+  --overlay-scrim: rgba(15, 26, 46, 0.46);
+}
+
+/* ---------- 1b. tokens · dark: ink canvas, ivory text, brass kept ---------- */
+[data-look='premium'][data-theme='dark'] {
+  --ink:      #0A1120;
+  --ink-2:    #121C32;
+  --gold:     #C9A35A;
+  --gold-lt:  #E0C07A;
+  --gold-tx:  #E0C07A;
+
+  --bg-canvas:       #0E1626;
+  --bg-sunken:       #0A101D;
+  --surface:         #151F33;
+  --surface-raised:  #1A2540;
+  --surface-overlay: #1F2B49;
+  --surface-inset:   #111A2C;
+  --surface-hover:   rgba(255, 248, 230, 0.05);
+  --surface-active:  rgba(255, 248, 230, 0.09);
+
+  --text-1: #F1EDE2;
+  --text-2: #BAB6AA;
+  --text-3: #8F93A0;
+  --text-disabled: #5E6677;
+
+  --border-subtle:  rgba(241, 237, 226, 0.08);
+  --border-default: rgba(241, 237, 226, 0.14);
+  --border-strong:  rgba(241, 237, 226, 0.26);
+
+  --brand:      #9DB4E8;
+  --brand-ink:  #BCCBF0;
+  --brand-100:  rgba(157, 180, 232, 0.16);
+  --brand-50:   rgba(157, 180, 232, 0.10);
+  --accent:          #E8E1D0;
+  --accent-hover:    #F4EEDF;
+  --accent-pressed:  #D9D1BD;
+  --accent-contrast: #0F1A2E;
+  --accent-soft:     rgba(157, 180, 232, 0.16);
+  --accent-ring:     rgba(157, 180, 232, 0.45);
+  --brand-tile: #26365A;
+
+  --status-positive-solid: #4FB487; --status-positive-soft: rgba(79, 180, 135, 0.15); --status-positive-text: #86D8B1; --status-positive-line: rgba(79, 180, 135, 0.32); --status-positive-base: #4FB487;
+  --status-negative-solid: #E0707F; --status-negative-soft: rgba(224, 112, 127, 0.15); --status-negative-text: #F0A3AD; --status-negative-line: rgba(224, 112, 127, 0.32); --status-negative-base: #E0707F;
+  --status-warning-solid:  #D9A648; --status-warning-soft:  rgba(217, 166, 72, 0.15);  --status-warning-text:  #EBC987; --status-warning-line:  rgba(217, 166, 72, 0.32);  --status-warning-base:  #D9A648;
+  --status-info-solid:     #9DB4E8; --status-info-soft:     rgba(157, 180, 232, 0.16); --status-info-text:     #BCCBF0; --status-info-line:     rgba(157, 180, 232, 0.32); --status-info-base:     #9DB4E8;
+  --status-neutral-soft: rgba(241, 237, 226, 0.08); --status-neutral-text: #B4B1A7; --status-neutral-line: rgba(241, 237, 226, 0.16);
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.34);
+  --elev-3: 0 8px 24px rgba(0, 0, 0, 0.42);
+  --elev-4: 0 16px 44px rgba(0, 0, 0, 0.55);
+  --overlay-scrim: rgba(4, 8, 16, 0.58);
+}
+
+/* ---------- 2. type: the serif carries the identity, in a few places only ---------- */
+[data-look='premium'] .hero h1,
+[data-look='premium'] .section-head h2,
+[data-look='premium'] .cc-id .nm,
+[data-look='premium'] .kpi .val,
+[data-look='premium'] .cc-col .num,
+[data-look='premium'] .datecard .dc-date .d { font-family: var(--font-serif); }
+[data-look='premium'] .hero h1 { font-size: clamp(32px, 3.8vw, 44px); font-weight: 500; line-height: 1.08; letter-spacing: -0.012em; }
+[data-look='premium'] .section-head h2 { font-size: 22px; font-weight: 500; }
+[data-look='premium'] .cc-id .nm { font-size: 18px; font-weight: 500; }
+[data-look='premium'] .kpi .val { font-size: 40px; font-weight: 500; letter-spacing: -0.01em; line-height: 1; }
+[data-look='premium'] .cc-col .num { font-size: 24px; font-weight: 500; }
+[data-look='premium'] .datecard .dc-date .d { font-size: 28px; font-weight: 500; }
+[data-look='premium'] .hero p { font-size: 15px; color: var(--text-2); max-width: 62ch; }
+
+/* ---------- 3. page header: a brass hairline above the title, one quiet star at the far edge ---------- */
+[data-look='premium'] .hero { position: relative; margin-bottom: 28px; padding-top: 4px; }
+[data-look='premium'] .hero::before { content: ""; display: block; width: 40px; height: 2px; background: var(--gold); margin-bottom: 16px; }
+[data-look='premium'] .hero::after { content: ""; position: absolute; right: 0; top: -6px; width: 104px; height: 104px; pointer-events: none; opacity: .5;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 104 104'%3E%3Cg fill='none' stroke='%23B38A3E' stroke-width='1.1'%3E%3Crect x='24' y='24' width='56' height='56'/%3E%3Crect x='24' y='24' width='56' height='56' transform='rotate(45 52 52)'/%3E%3Ccircle cx='52' cy='52' r='18'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain; }
+@media (max-width: 760px) { [data-look='premium'] .hero::after { display: none; } }
+
+/* ---------- 4. sidebar: solid ink, ivory text, a brass marker on the active page ---------- */
+[data-look='premium'] .side { background: var(--ink); color: #C7CCD8; border-right: 0; }
+[data-look='premium'] .brand .logo { background: transparent; color: var(--gold-lt); border: 1px solid rgba(217, 182, 106, 0.55); border-radius: 10px; }
+[data-look='premium'] .brand b { font-family: var(--font-serif); color: #F4F0E4; font-size: 19px; font-weight: 500; letter-spacing: 0; }
+[data-look='premium'] .brand span { color: #8B94A8; }
+[data-look='premium'] .nav-label { color: #7F8AA0; font-weight: 500; }
+[data-look='premium'] .nav button { color: #B9C0CF; font-weight: 500; }
+[data-look='premium'] .nav button svg { color: #8E99AF; }
+[data-look='premium'] .nav button:hover { background: rgba(255, 255, 255, 0.06); color: #F4F0E4; }
+[data-look='premium'] .nav button:hover svg { color: #C7CCD8; }
+[data-look='premium'] .nav button:active { background: rgba(255, 255, 255, 0.09); }
+[data-look='premium'] .nav button.on { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; box-shadow: none; }
+[data-look='premium'] .nav button.on svg { color: var(--gold-lt); }
+[data-look='premium'] .nav button.on::before { content: ""; position: absolute; left: -16px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 2px 2px 0; background: var(--gold-lt); }
+[data-look='premium'] .nav button .pip { color: #8E99AF; }
+[data-look='premium'] .nav button.on .pip { color: #C7CCD8; }
+[data-look='premium'] .sysstat { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.08); color: #C7CCD8; }
+[data-look='premium'] .sysstat:hover { background: rgba(255, 255, 255, 0.09); }
+[data-look='premium'] .sysstat b { color: #F4F0E4; }
+[data-look='premium'] .sysstat small { color: #8B94A8; }
+[data-look='premium'] .side-foot .rail-mini { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.10); color: #C7CCD8; }
+[data-look='premium'] .side-foot .rail-mini:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }
+
+/* ---------- 5. stats: the calm hairline strip, but the figures are set in serif ---------- */
+[data-look='premium'] .kpi .lbl { color: var(--text-3); font-weight: 500; }
+[data-look='premium'] .kpi .val { margin-top: 10px; }
+
+/* ---------- 6. companies: the same ledger; an ink monogram, serif names and figures ---------- */
+[data-look='premium'] .ccard .mono-tile { width: 36px; height: 36px; border-radius: 50%; font-size: 12px; font-weight: 600; background: var(--ink); color: var(--gold-lt); }
+[data-look='premium'] .cc-col .days.warn { color: var(--warn-text); font-weight: 600; }
+
+/* ---------- 7. buttons: ink, with ivory text; the outline one sits on the surface ---------- */
+[data-look='premium'] .btn { font-weight: 600; }
+[data-look='premium'] .btn-primary { background: var(--accent); color: var(--accent-contrast); box-shadow: 0 1px 2px rgba(15, 26, 46, 0.22); }
+[data-look='premium'] .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+[data-look='premium'] .btn-outline { background: var(--surface); border-color: var(--border-default); }
+[data-look='premium'] .btn-outline:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+
+/* ---------- 8. options and tabs: plain text with a brass underline on the active one ---------- */
+[data-look='premium'] .seg { gap: 4px; }
+[data-look='premium'] .seg button { border-radius: 0; padding: 8px 12px; background: none; }
+[data-look='premium'] .seg button:hover { background: none; color: var(--text-1); }
+[data-look='premium'] .seg button.on { background: none; color: var(--text-1); box-shadow: inset 0 -2px 0 var(--gold); }
+[data-look='premium'] .set-tabs { display: flex; background: none; border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: 0; padding: 0; gap: 4px; }
+[data-look='premium'] .set-tab { border-radius: 0; padding: 12px 16px; }
+[data-look='premium'] .set-tab.on { background: none; color: var(--text-1); box-shadow: inset 0 -2px 0 var(--gold); }
+
+/* ---------- 9. surfaces ---------- */
+[data-look='premium'] .p-card, [data-look='premium'] .kpis, [data-look='premium'] .ccards { box-shadow: var(--elev-1); }
+[data-look='premium'] .p-card { border-radius: var(--r-lg); }
+[data-look='premium'] .field, [data-look='premium'] .f-search { background: var(--surface); border: 1px solid var(--border-default); }
+[data-look='premium'] .datecard { background: var(--surface); border: 1px solid var(--border-subtle); box-shadow: var(--elev-1); }
+[data-look='premium'] .datecard.now { background: var(--warn-soft); border-color: var(--warn-line); box-shadow: inset 3px 0 0 var(--gold); }
+[data-look='premium'] .card-h .ico { color: var(--gold-tx); }
+[data-look='premium'] .chip:hover { background: var(--accent); color: var(--accent-contrast); }
+[data-look='premium'] .doc-cat:hover, [data-look='premium'] .doc-tile:hover { border-color: var(--gold); }
+[data-look='premium'] .lrow:hover { background: var(--surface-hover); }
+
+@media (max-width: 700px) {
+  [data-look='premium'] .kpi .val { font-size: 30px; }
+}

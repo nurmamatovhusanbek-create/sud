@@ -1,8 +1,8 @@
 'use client'
 
 /**
- * Settings › Koʻrinish — how the app looks: the look (Yorqin / Tinch), light or dark, and animations.
- * The look only switches tokens and a CSS layer on <html data-look> (lib/look, app/look-vivid.css): the screens are the same.
+ * Settings › Koʻrinish — how the app looks: the look (Premium / Tinch), light or dark, and animations.
+ * The look only switches tokens and a CSS layer on <html data-look> (lib/look, app/look-premium.css): the screens are the same.
  */
 
 import { Moon, Palette, Sparkles, Sun } from 'lucide-react'
@@ -11,8 +11,8 @@ import { useMotion, type Motion } from '@/lib/motion'
 import { useTheme } from '@/lib/theme'
 
 const LOOKS: { id: Look; name: string; text: string }[] = [
-  { id: 'vivid', name: 'Yorqin', text: 'Iliq fon, rangli kartalar va yumshoq shakllar. Koʻzni charchatmaydi.' },
-  { id: 'calm', name: 'Tinch', text: 'Kulrang va chiziqlar, rang faqat maʼno uchun. Eng zich koʻrinish.' },
+  { id: 'premium', name: 'Premium', text: 'Toʻq koʻk, fil suyagi rangi va bitta tilla aksent. Sarlavhalarda serif harf. Tinch va nafis.' },
+  { id: 'calm', name: 'Tinch', text: 'Kulrang va ingichka chiziqlar, rang faqat maʼno uchun. Eng zich koʻrinish.' },
 ]
 
 const MOTIONS: { id: Motion; label: string }[] = [
@@ -30,6 +30,7 @@ function Preview({ look }: { look: Look }) {
       </div>
       <div className="lp-main">
         <b />
+        {look === 'premium' ? <u /> : null}
         <div className="lp-tiles"><i /><i /><i /></div>
         <div className="lp-rows"><i /><i /></div>
       </div>

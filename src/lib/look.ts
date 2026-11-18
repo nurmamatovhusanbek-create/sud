@@ -1,20 +1,20 @@
 'use client'
 
 /**
- * Which look the app wears: «vivid» (default) or «calm». Stored in localStorage['look'], put on <html data-look> before the first
+ * Which look the app wears: «premium» (default) or «calm». Stored in localStorage['look'], put on <html data-look> before the first
  * paint by LOOK_BOOT_SCRIPT (lib/theme-boot) and changed here. Light/dark is separate (lib/theme).
  */
 
 import { useCallback, useSyncExternalStore } from 'react'
 import { LOOK_KEY } from './theme-boot'
 
-export type Look = 'vivid' | 'calm'
+export type Look = 'premium' | 'calm'
 export { LOOK_KEY }
-export const DEFAULT_LOOK: Look = 'vivid'
+export const DEFAULT_LOOK: Look = 'premium'
 const EVENT = 'sud:look'
 
 export function parseLook(raw: unknown): Look {
-  return raw === 'calm' ? 'calm' : 'vivid'
+  return raw === 'calm' ? 'calm' : 'premium'
 }
 
 export function getLook(): Look {
