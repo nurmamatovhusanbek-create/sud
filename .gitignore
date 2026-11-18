@@ -16,3 +16,6 @@ sud-explore4/
 
 # local index of the public court orders (rebuildable cache)
 /data/
+
+# HAR network captures hold live cookies and tokens: never commit
+*.har
