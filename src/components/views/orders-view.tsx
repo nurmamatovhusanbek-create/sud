@@ -574,7 +574,6 @@ export function OrdersView() {
                 </div>
               ))}
             </div>
-            <ListPagination page={safePage} pageSize={pageSize} total={total} hideWhenSinglePage={false} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1) }} />
           </>
         )}
 
