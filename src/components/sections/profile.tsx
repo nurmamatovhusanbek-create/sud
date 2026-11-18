@@ -107,9 +107,9 @@ export function ProfileSection() {
   return (
     <div>
       {view.status === 'partial' && <PartialBanner errors={view.partialErrors} onRetry={() => void refetch()} />}
-      <div className="dash" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
-        <div className="rise-c">
-          <div className="dstrip" style={{ marginBottom: 16 }}>
+      <div className="dash prof-grid" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+        <div className="rise-c prof-main">
+          <div className="dstrip">
             <div className="dfield">
               <div className="k"><Building2 />Manzil</div>
               <div className="v">{c?.address || '-'}</div>
@@ -120,7 +120,7 @@ export function ProfileSection() {
             </div>
           </div>
 
-          <div className="dstrip" style={{ marginBottom: 16 }}>
+          <div className="dstrip dgrid">
             <div className="dfield">
               <div className="k"><CalendarDays />Roʻyxatdan oʻtgan</div>
               <div className="v mono">{c?.registeredDate || '-'}</div>
@@ -137,7 +137,7 @@ export function ProfileSection() {
               <div className="k"><Mail />Email</div>
               <div className="v mono">{c?.email || '-'}</div>
             </div>
-            <div className="dfield" style={{ minWidth: '100%' }}>
+            <div className="dfield wide">
               <div className="k"><Factory />OKED faoliyat turi</div>
               <div className="v">
                 {rating?.okedCode ? `${rating.okedCode} · ` : ''}
@@ -146,7 +146,7 @@ export function ProfileSection() {
             </div>
           </div>
 
-          <div style={{ marginTop: 16 }}>
+          <div className="prof-quick">
             <div className="eyebrow" style={{ marginBottom: 8 }}>Tezkor amallar</div>
             <div className="p-row" style={{ gap: 8, flexWrap: 'wrap' }}>
               {quick.map((q) => (
@@ -159,34 +159,25 @@ export function ProfileSection() {
           </div>
         </div>
 
-        <div className="p-card rise-c">
+        <div className="p-card rise-c prof-score">
           <div className="card-h">
-            <div className="ico"><Star /></div>
             <h2>Chamber reytingi</h2>
+            <div className="sp" />
+            <span className="badge b-neu">{rating?.category ? `Kategoriya ${rating.category}` : 'Kategoriya yoʻq'}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
-            {score !== null ? (
-              <Dial pct={score} size={200} label="Ishonch balli" id="profile-score" />
-            ) : (
-              <Dial pct={null} size={200} label="Ball mavjud emas" />
-            )}
-            {rating?.category ? (
-              <span
-                className="badge b-neu"
-                style={{ height: 28, fontSize: 13 }}
-              >
-                Kategoriya {rating.category}
-              </span>
-            ) : (
-              <span className="badge b-neu" style={{ height: 28, fontSize: 13 }}>Kategoriya yoʻq</span>
-            )}
-            <div className="faint" style={{ fontSize: 12 }}>{c?.thsht || '-'}</div>
-            <div className="faint" style={{ fontSize: 11 }}>admin.chamber.uz · Pudratchi reytingi</div>
+          <Dial
+            pct={score}
+            size={360}
+            label={score !== null ? 'Ishonch balli' : 'Ball mavjud emas'}
+            id={score !== null ? 'profile-score' : undefined}
+          />
+          <div className="faint prof-src">
+            {c?.thsht || '-'} · admin.chamber.uz · Pudratchi reytingi
           </div>
 
           {founders.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div className="eyebrow" style={{ marginBottom: 6 }}>Taʼsischilar</div>
+            <div className="prof-founders">
+              <div className="eyebrow" style={{ marginBottom: 2 }}>Taʼsischilar</div>
               {founders.map((f, i) => (
                 <div className="founder" key={i}>
                   <div className="av">{initials(f.name || '-')}</div>
