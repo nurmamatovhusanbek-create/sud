@@ -16,7 +16,7 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 | | `lib/registry.ts` | `meta.orderCases` (compact case list) written whenever stats are read → Kuzatuv can DETECT without scraping |
 | UI | `proto/case-orders.tsx` | the case drawer: published orders from the local records + the per-case «Tekshirish» (live; blocked while the site's firewall refuses scripts) |
 | | `views/orders-settings.tsx` | Settings › Qarorlar: the cache and backup numbers only |
-| | `views/orders-view.tsx`, `proto/order-handover.tsx` | the **Qarorlar page** (sidebar, below Statistika; surface `orders`): filter bar like Sud ishlari (search, court type, instance, download state: Yuklangan / Yuklanmagan / Mavjud emas / Hammasi), `.lrow` list, shared `ListPagination`; server-side filter + paging (`core/public-orders` `searchLibrary`; `GET /library?q&status=saved|gone|never|all&court&instance&page&size` = `store.allOrders` + `pdf-store.listPdfs` + `pdf-store.syncDownloads`); «Yuklangan · size · date» when the PDF is on disk; click = open (fetched if missing, same hand-over as the drawer); the «Yangi qaror qidirish va yuklab olish» card on top looks ONE typed case number up on public.sud.uz (both back ends) and lists what it found; «Yuklab olish» / «Hammasini yuklab olish» save the PDFs (`downloadPublicOrderPdf`: the server stores them, nothing opens); each row has an explicit button (**Ochish** / **Yuklab olish** / **Qayta yuklash**), rows are not clickable |
+| | `views/orders-view.tsx`, `proto/order-handover.tsx` | the **Qarorlar page** (sidebar, below Statistika; surface `orders`): filter bar like Sud ishlari (search, court type, instance, download state: Yuklangan / Yuklanmagan / Mavjud emas / Hammasi), `.lrow` list, shared `ListPagination`; server-side filter + paging (`core/public-orders` `searchLibrary`; `GET /library?q&status=saved|gone|never|all&court&instance&page&size` = `store.allOrders` + `pdf-store.listPdfs` + `pdf-store.syncDownloads`); «Yuklangan · size · date» when the PDF is on disk; click = open (fetched if missing, same hand-over as the drawer); orders come in through the HAR hand-over below and the case drawer's check (the typed-number search card was removed: public.sud.uz refuses scripts); «Yuklab olish» / «Hammasini yuklab olish» save the PDFs (`downloadPublicOrderPdf`: the server stores them, nothing opens); each row has an explicit button (**Ochish** / **Yuklab olish** / **Qayta yuklash**), rows are not clickable |
 | | `proto/case-orders.tsx` | drawer cards «Eʼlon qilingan / qilinmagan» |
 | | `sections/cases.tsx` | «Qarorlar · N» button, drawer wiring, `orderJobCase` |
 
@@ -48,6 +48,19 @@ drawer «Tekshirish» ─► POST /fetch {start,cases}   (the Kuzatuv / list bul
                                               └─► queue ─► loop: lookupCase ─► source ─► store
 a person-saved HAR / PDF ─► POST /import-har | /import ─► files/ + shards (the way new orders come in while the site refuses scripts)
 ```
+
+## Hand-over by HAR (how an order gets in while the site refuses scripts)
+
+For the person, step by step (the same text is in the app: `HarHowTo` in `proto/order-handover.tsx`):
+
+1. In YOUR browser open public.sud.uz, press **F12** › **Network** (keep it open), then search the case again (the search answer must be in the log too: it carries the case number, court and instance) and open the order.
+2. Network toolbar › **Export HAR (sanitized)**. If the importer says the file has no contents, export **with sensitive data** instead (older Chrome: «Save all as HAR with content»).
+3. Qarorlar › **HAR fayldan yuklash** › pick that one file.
+
+What the importer does (`lib/public-orders/har-import`, `POST /import-har`): reads ONLY each entry's URL path and response body; stores every order file under the id in its own path, and adds the order RECORDS from the browser's own search answers in the same file, so each file lands on a card. It never reads cookies, tokens or headers and sends no request to any site; the file itself is local and not kept (`*.har` is in `.gitignore`). Limits: 256 MB per file, at most 500 order files per HAR (`MAX_HAR_FILES`); Next's own body cap is raised to 300 MB in `next.config.ts` (`proxyClientMaxBodySize`, tested in `server/__tests__/body-limit.test.ts`: the default 10 MB cut a body silently).
+A file with no matching record is reported to the person and in dev.log (`[orders-har]`).
+
+**Tozalash:** in «Yuklanmagan» / «Mavjud emas» tick orders to download them, clear the ticked, or clear the rest. Cleared ids sit in `hidden.json` (`hidden-store`); the order records stay. A search finds a cleared order again (badge «Tozalangan», «Qaytarish», «Yuklab olish»); a downloaded order is never hidden.
 
 ## Tests
 `core/__tests__/public-orders.test.ts` (policy) · `lib/public-orders/__tests__/{engine,company-job,store,data-dir,order-file,order-pdf,import-route,library}.test.ts`.

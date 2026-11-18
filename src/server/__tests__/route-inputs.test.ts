@@ -48,3 +48,30 @@ describe('worker URLs', () => {
     expect(['unresolved_host', 'private_host']).toContain((await res.json()).error)
   })
 })
+
+describe('public-orders/fetch: only «start» is left', () => {
+  const post = async (body: unknown) => {
+    const { POST } = await import('@/app/api/public-orders/fetch/route')
+    return POST(new NextRequest('http://localhost:3000/api/public-orders/fetch', { method: 'POST', headers: { host: 'localhost:3000', 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+  }
+  for (const action of ['pause', 'resume', 'cancel', 'retry', 'plan', '']) {
+    test(`refuses action ${JSON.stringify(action)}`, async () => {
+      const res = await post({ action, cases: [{ caseNumber: '4-1001-2601/1', courtType: 'ECONOMIC' }] })
+      expect(res.status).toBe(400)
+    })
+  }
+})
+
+describe('public-orders/import-har: too many order files in one HAR', () => {
+  test('a HAR with more than MAX_HAR_FILES order files is refused before anything is written', async () => {
+    const { POST, MAX_HAR_FILES } = await import('@/app/api/public-orders/import-har/route')
+    const b64 = Buffer.from('%PDF-1.4 x').toString('base64')
+    const entries = Array.from({ length: MAX_HAR_FILES + 1 }, (_, i) => ({
+      request: { url: `https://adolatapi1.sud.uz/public/onStream/${(0x10000000 + i).toString(16)}-2222-4333-8444-555555555555` },
+      response: { content: { text: b64, encoding: 'base64' } },
+    }))
+    const res = await POST(new NextRequest('http://localhost:3000/api/public-orders/import-har', { method: 'POST', headers: { host: 'localhost:3000', 'content-type': 'application/octet-stream' }, body: JSON.stringify({ log: { entries } }) }))
+    expect(res.status).toBe(422)
+    expect((await res.json()).code).toBe('too_many')
+  })
+})

@@ -174,6 +174,14 @@ Key env variables (see `.env.example` for the full list):
 There is no `DATABASE_URL` — the app keeps no server database. Watchlist/registry state
 lives in the browser (`localStorage`).
 
+**Windows:** double-click `Sud.bat` (starts the app hidden, waits until the page answers, opens `http://localhost:3000`). Run it again while the app is
+running for a 4-second menu: Open (default) · Stop · Log (`dev.log`) · make a Desktop shortcut. `Sud.bat stop|shortcut|log` skip the menu. The app
+stops by itself about a minute after the last browser window closes; `Sud.bat keep` (or a plain `bun run dev`) keeps it running. Open it at
+`localhost`, not `127.0.0.1`: the browser keeps the watchlist per address.
+
+**Court orders:** public.sud.uz refuses scripts, so orders come in from YOUR browser: save a HAR from DevTools › Network and pick it in
+Qarorlar › «HAR fayldan yuklash» (steps: `docs/orders.md`). The app sends no request for this.
+
 **Verify:** open the app, search STIR `302678824`, confirm bills, cases and profile load.
 
 ## Scripts

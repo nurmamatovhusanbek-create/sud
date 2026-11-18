@@ -1,6 +1,6 @@
 import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
-import { cancelCases, enqueueCases, pauseCases, planCases, resumeCases, retryFailed } from '@/lib/public-orders/company-job'
+import { enqueueCases } from '@/lib/public-orders/company-job'
 import { normalizeCaseNumber, PUBLIC_COURT_OF, PUBLIC_COURT_TYPES, type PublicCourtType } from '@/core/public-orders'
 import type { JobCase } from '@/lib/public-orders/engine'
 
@@ -12,13 +12,12 @@ const MAX_CASES = 1500
 
 /**
  * POST /api/public-orders/fetch
- *   { action: 'plan', cases: [...] }   DETECT only: how many of these cases would really need a look; queues nothing
  *   { action: 'start', force?: boolean, keepPaused?: boolean, cases: [{ caseNumber, courtType, sig? }] }
  *      courtType: economic|civil|administrative (or the API's ECONOMIC…); sig = caseSignature() of the case data
- *   { action: 'pause' | 'resume' | 'cancel' }   pause keeps the queue (and its order); resume continues it; cancel drops it
  *   Cases still heard in the first instance (no result, ongoing status) are left out unless `force`: nothing can be published yet.
- * Queues the given cases for a BACKGROUND lookup of their published orders and returns at once; the global
- * loader and the case drawer follow progress through /status. Requests join one queue.
+ * Queues the given cases for a lookup of their published orders and returns at once; the case drawer follows the result
+ * through /orders. Requests join one queue. (Pause / resume / cancel / retry / plan were removed with the Kuzatuv bulk check
+ * and the queue controls: no screen sent them, and a door nothing uses is only attack surface.)
  */
 export const POST = guard(async (req) => {
   let body: { action?: string; cases?: unknown; force?: unknown; keepPaused?: unknown } = {}
@@ -27,11 +26,7 @@ export const POST = guard(async (req) => {
   } catch {
     return jsonFail('JSON tanasi kerak', 'bad_request', 400)
   }
-  if (body.action === 'pause') return jsonOk({ job: pauseCases() })
-  if (body.action === 'resume') return jsonOk({ job: resumeCases() })
-  if (body.action === 'cancel') return jsonOk({ job: cancelCases() })
-  if (body.action === 'retry') return jsonOk(await retryFailed())
-  if ((body.action !== 'start' && body.action !== 'plan') || !Array.isArray(body.cases)) return jsonFail("action 'start' / 'plan' + cases, yoki 'pause' / 'resume' / 'cancel' / 'retry' kerak", 'bad_request', 400)
+  if (body.action !== 'start' || !Array.isArray(body.cases)) return jsonFail("action 'start' + cases kerak", 'bad_request', 400)
 
   const cases: JobCase[] = []
   for (const c of body.cases.slice(0, MAX_CASES) as { caseNumber?: unknown; courtType?: unknown; sig?: unknown; result?: unknown; caseStatus?: unknown }[]) {
@@ -42,12 +37,6 @@ export const POST = guard(async (req) => {
     const result = typeof c?.result === 'string' ? c.result.slice(0, 300) : undefined
     const caseStatus = typeof c?.caseStatus === 'string' ? c.caseStatus.slice(0, 120) : undefined
     if (CASE_NUMBER_RE.test(caseNumber) && courtType) cases.push({ caseNumber, courtType, sig, result, caseStatus })
-  }
-  if (body.action === 'plan') {
-    // DETECT only: `need` = cases that really need a look; `ongoing` = still heard in the first instance (nothing to
-    // publish yet); `known` = already known / waiting out the back-off
-    const p = await planCases(cases)
-    return jsonOk({ need: p.need.length, ongoing: p.ongoing, known: p.known })
   }
   if (!cases.length) return jsonFail('Yaroqli ish raqami topilmadi', 'bad_request', 400)
   const { job, added, ongoing, known } = await enqueueCases(cases, { force: body.force === true, keepPaused: body.keepPaused === true })
