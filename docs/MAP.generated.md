@@ -222,7 +222,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `brand-mark.tsx` | components/proto/drawer.tsx, components/shell/app-shell.tsx |  |
 | `case-orders.tsx` | components/sections/cases.tsx |  |
-| `date-tile.tsx` | components/proto/primitives.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/views/watchlist.tsx |  |
+| `date-tile.tsx` | components/proto/primitives.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx, components/views/watchlist.tsx |  |
 | `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render.ts | core/__tests__/dial.test.ts |
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |

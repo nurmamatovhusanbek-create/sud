@@ -549,14 +549,13 @@ html, body { height: 100%; }
 .pop-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); }
 .pop-h b { font-size: 14px; }
 .pop-list { max-height: 320px; overflow-y: auto; }
-.notif { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
+.notif { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
 .notif:hover { background: var(--surface-hover); }
 .notif:last-child { border-bottom: none; }
-.notif .ni { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: 0 0 34px; }
-.notif .ni svg { width: 16px; height: 16px; }
 .notif .nt { min-width: 0; }
 .notif .nt b { font-size: 13px; display: block; }
-.notif .nt span { font-size: 12px; color: var(--text-3); }
+.notif .nt span { font-size: 12px; color: var(--text-3); display: block; margin-top: 2px; }
+.notif .nt span.nd { color: var(--text-1); font-weight: 600; }
 
 /* ---------- sonner retint (ink pill like .toast) ---------- */
 [data-sonner-toast] {

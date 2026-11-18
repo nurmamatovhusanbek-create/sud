@@ -47,6 +47,7 @@ import type { CompanyStats } from '@/lib/api-types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { BrandMark } from '@/components/proto/brand-mark'
+import { DateTile, dateParts, daysLabel } from '@/components/proto/date-tile'
 
 const NAV_ICONS: Record<string, React.ReactNode> = {
   bills: <Receipt />,
@@ -151,8 +152,6 @@ function BellPopover() {
               </div>
             ) : (
               alerts.map((a, i) => {
-                const [, m, d] = a.isoDate.split('-').map(Number)
-                const ddmm = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}`
                 const party = counterpartyFor(a.stir, a.caseNumber, a.name)
                 return (
                   <div
@@ -163,15 +162,14 @@ function BellPopover() {
                       openCompany(a.stir, { name: a.name }, 'hearings')
                     }}
                   >
-                    <div className="ni b-warn">
-                      <CalendarDays />
-                    </div>
+                    <DateTile iso={a.isoDate} size="sm" near />
                     <div className="nt">
                       <b>{party}</b>
                       <span>
-                        {ddmm} · {a.court || ''}
+                        {a.court || 'Sud'}
                         {a.time ? ` · ${a.time}` : ''}
                       </span>
+                      <span className="nd">{daysLabel(dateParts(a.isoDate)?.days ?? null)}</span>
                     </div>
                   </div>
                 )
