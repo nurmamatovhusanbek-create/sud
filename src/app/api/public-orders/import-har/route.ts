@@ -2,6 +2,7 @@ import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
 import { extractOrdersFromHar, NotHarError } from '@/lib/public-orders/har-import'
 import { writePdf } from '@/lib/public-orders/pdf-store'
+import { appendOrders } from '@/lib/public-orders/store'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,10 +42,16 @@ export const POST = guard(
         await writePdf(f.id, f.bytes, { name: f.filename ?? undefined, via: 'import' })
         saved.push({ id: f.id, size: f.bytes.length })
       }
+      // the records the browser's own searches returned: they put each file on its card (case number, court, instance…)
+      await appendOrders(found.orders)
     } catch {
       return jsonFail('Faylni saqlab boʻlmadi', 'write_failed', 500)
     }
-    return jsonOk({ saved, seen: found.seen })
+    // which saved files now have a card (a record whose pdfId is the file's id)
+    const known = new Set(found.orders.map((o) => o.pdfId))
+    const matched = saved.filter((x) => known.has(x.id)).map((x) => x.id)
+    console.log(`[orders-har] ${saved.length} PDF saved, ${found.orders.length} order records added, ${matched.length} PDF matched to a record (${saved.length - matched.length} without a record)`)
+    return jsonOk({ saved, matched, orders: found.orders.length, seen: found.seen })
   },
   { maxBodyBytes: MAX_HAR_BYTES + 1024 * 1024 },
 )

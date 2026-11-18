@@ -181,7 +181,13 @@ export function OrdersView() {
       return
     }
     const n = r.data.saved.length
-    toast.success(n === 1 ? 'Qaror saqlandi' : `${n} ta qaror saqlandi`)
+    const lost = n - r.data.matched.length
+    toast.success(n === 1 ? 'Qaror saqlandi' : `${n} ta qaror saqlandi`, {
+      description: lost
+        ? `${lost} tasi roʻyxatda koʻrinmaydi: HAR faylda uning ish raqami yoʻq. Network ochiq turib sahifani yangilang (F5), qarorni qidirib oching va HAR ni qayta saqlang.`
+        : `${r.data.orders} ta yozuv roʻyxatga qoʻshildi.`,
+      duration: lost ? 20000 : 6000,
+    })
     if (manual && r.data.saved.some((x) => x.id === manual.pdfId)) setManual(null)
     setTick((t) => t + 1) // the lists and counts re-read what is on disk now
   }

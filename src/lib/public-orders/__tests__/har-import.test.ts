@@ -18,9 +18,9 @@ const envelope = (pdf: Buffer, name = 'order.pdf') =>
     Buffer.from('\r\n--XYZ--\r\n'),
   ])
 const har = (entries: unknown[]) => Buffer.from(JSON.stringify({ log: { version: '1.2', entries } }))
-const entry = (url: string, body: Buffer | string | null, encoding: string | undefined = 'base64') => ({
+const entry = (url: string, body: Buffer | string | null, encoding: string | null = 'base64') => ({
   request: { method: 'GET', url, headers: [{ name: 'Cookie', value: 'SECRET-COOKIE' }] },
-  response: { status: 200, content: body === null ? { size: 1 } : { text: typeof body === 'string' ? body : body.toString('base64'), encoding } },
+  response: { status: 200, content: body === null ? { size: 1 } : { text: typeof body === 'string' ? body : body.toString('base64'), ...(encoding ? { encoding } : {}) } },
 })
 const FILE_URL = `https://adolatapi1.sud.uz/public/onStream/${ID}?recaptcha_token=eyJSECRET.TOKEN`
 
@@ -47,7 +47,7 @@ describe('orderIdFromFileUrl', () => {
 
 describe('extractOrdersFromHar', () => {
   test('takes the PDF out of the site envelope, under the id in the request path', () => {
-    const r = extractOrdersFromHar(har([entry('https://public.sud.uz/assets/x.svg', 'x', undefined), entry(FILE_URL, envelope(PDF, 'qaror.pdf'))]))
+    const r = extractOrdersFromHar(har([entry('https://public.sud.uz/assets/x.svg', 'x', null), entry(FILE_URL, envelope(PDF, 'qaror.pdf'))]))
     expect(r.files).toHaveLength(1)
     expect(r.files[0].id).toBe(ID)
     expect(r.files[0].filename).toBe('qaror.pdf')
@@ -58,7 +58,7 @@ describe('extractOrdersFromHar', () => {
   })
   test('the same order twice keeps the bigger file; an error page is skipped, not fatal', () => {
     const small = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(10, 0x42)])
-    const r = extractOrdersFromHar(har([entry(FILE_URL, small), entry(FILE_URL, '<html>403</html>', undefined), entry(FILE_URL, PDF)]))
+    const r = extractOrdersFromHar(har([entry(FILE_URL, small), entry(FILE_URL, '<html>403</html>', null), entry(FILE_URL, PDF)]))
     expect(r.files).toHaveLength(1)
     expect(r.files[0].bytes.length).toBe(PDF.length)
     expect(r.seen).toBe(3)
@@ -79,6 +79,36 @@ describe('extractOrdersFromHar', () => {
   })
 })
 
+const LIST_URL = 'https://adolatapi1.sud.uz/publications/list?size=30&page=0&court_type=CIVIL&case_number=2-1003-2113%2F20027&instance=FIRST'
+const LIST = JSON.stringify({
+  content: [
+    { id: 'row-1', case_number: '2-1003-2113/20027', instance: 'FIRST', result: 'FULFILLED', court_names: { uz: 'Toshkent sudi' }, responsible_judge_name: 'Sudya', categories: [{ uz: 'Fuqarolik' }], pdf: { id: 'f800da21-5c3f-44f5-87d6-fba366ed4209', name: 'q.pdf', size: 12345 } },
+    { id: 'row-2', case_number: '2-1003-2113/20027', instance: 'APPEAL', pdf: { id: '11111111-2222-3333-4444-555555555555', name: 'a.pdf', size: 1 } },
+  ],
+})
+
+describe('the browser\'s own search answers in the HAR', () => {
+  test('the order records come along, so a saved file lands on its card', () => {
+    const r = extractOrdersFromHar(har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF))]))
+    expect(r.orders.map((o) => o.id).sort()).toEqual(['row-1', 'row-2'])
+    const o = r.orders.find((x) => x.id === 'row-1')!
+    expect(o).toMatchObject({ caseNumber: '2-1003-2113/20027', courtType: 'CIVIL', instance: 'FIRST', pdfId: ID })
+    expect(r.files[0].id).toBe(o.pdfId) // the file's id IS the record's pdfId: that is what attaches them
+  })
+  test('a search answer that is not ours (other host, no court_type, garbage) adds nothing', () => {
+    const r = extractOrdersFromHar(
+      har([
+        entry('https://evil.example/publications/list?court_type=CIVIL', LIST, null),
+        entry('https://adolatapi1.sud.uz/publications/list?size=30', LIST, null),
+        entry('https://adolatapi1.sud.uz/publications/list?court_type=CIVIL', '{not json', null),
+        entry(FILE_URL, envelope(PDF)),
+      ]),
+    )
+    expect(r.orders).toHaveLength(0)
+    expect(r.files).toHaveLength(1)
+  })
+})
+
 describe('POST /api/public-orders/import-har', () => {
   const call = async (body: BodyInit | null, headers: Record<string, string> = {}) => {
     const { POST } = await import('@/app/api/public-orders/import-har/route')
@@ -91,9 +121,17 @@ describe('POST /api/public-orders/import-har', () => {
     expect(j.data.saved[0].id).toBe(ID)
     expect(fs.existsSync(path.join(dir, 'files', `${ID}.pdf`))).toBe(true)
   })
+  test('with the search answer in the HAR the order gets a record, and the answer says it matched', async () => {
+    const r = await call(har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF))]))
+    const j = await r.json()
+    expect(j.data.matched).toEqual([ID])
+    expect(j.data.orders).toBe(2)
+    const { allOrders } = await import('@/lib/public-orders/store')
+    expect((await allOrders()).some((o) => o.pdfId === ID && o.caseNumber === '2-1003-2113/20027')).toBe(true)
+  })
   test('says what is wrong: not a HAR, no order inside, no content saved', async () => {
     expect((await (await call(Buffer.from('nope'))).json()).code).toBe('not_har')
-    expect((await (await call(har([entry('https://public.sud.uz/a.json', 'x', undefined)]))).json()).code).toBe('no_order_file')
+    expect((await (await call(har([entry('https://public.sud.uz/a.json', 'x', null)]))).json()).code).toBe('no_order_file')
     const noContent = await (await call(har([entry(FILE_URL, null)]))).json()
     expect(noContent.code).toBe('no_order_file')
     expect(noContent.error).toContain('with sensitive data')

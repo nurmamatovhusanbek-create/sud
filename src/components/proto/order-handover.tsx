@@ -51,7 +51,7 @@ export function HarHowTo() {
       <summary style={{ cursor: 'pointer' }}>Qaror faqat oynada koʻrinsa: qanday saqlayman?</summary>
       <ol style={{ margin: '6px 0 0', paddingLeft: 18, display: 'grid', gap: 3 }}>
         <li>public.sud.uz da <b>F12</b> bosing va yuqoridagi <b>Network</b> yorligʻini oching.</li>
-        <li>Qarorni oching va oyna toʻliq yuklanguncha kuting.</li>
+        <li>Sahifani yangilang (<b>F5</b>), ish raqamini qidiring va qarorni oching. Oyna toʻliq yuklanguncha kuting. (Qidiruv ham yozilishi kerak: shunda ilova qaror qaysi ishniki ekanini biladi.)</li>
         <li>Network oynasining yuqori qatorida (oʻng tomonda) <b>pastga qaragan strelka</b> belgisini bosing va <b>Export HAR (sanitized)</b> ni tanlang. Fayl bitta boʻladi.</li>
         <li>Agar ilova «qaror fayli topilmadi» desa, xuddi shu joydan <b>Export HAR (with sensitive data)</b> ni tanlang.</li>
         <li>Shu faylni yuqoridagi <b>HAR fayldan yuklash</b> orqali tanlang. Qaror oʻzi topilib saqlanadi. Keyin HAR faylni oʻchirib tashlang.</li>
