@@ -10,6 +10,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import { daysUntil } from '@/core/dates'
+import { motionReduced } from '@/lib/motion'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 import { bandFor, clampPct, dialAngle, dialGeom, tickLook, type DialZones } from './dial-geometry'
@@ -71,7 +72,6 @@ export function useMounted(): boolean {
   return m
 }
 
-const REDUCED = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 /** Count-up number (eased, 750ms) — matches prototype countUp(). */
 // Remember the last value each keyed counter reached, so a REMOUNT (e.g. the
@@ -81,7 +81,7 @@ const REDUCED = typeof window !== 'undefined' && window.matchMedia?.('(prefers-r
 const countCache = new Map<string, number>()
 
 export function CountUp({ value, suffix = '', className, id }: { value: number; suffix?: string; className?: string; id?: string }) {
-  const skip = REDUCED || !Number.isFinite(value)
+  const skip = motionReduced() || !Number.isFinite(value)
   const seed = id != null && countCache.has(id) ? (countCache.get(id) as number) : Math.min(value, 0)
   const [display, setDisplay] = useState(skip ? value : seed)
   const fromRef = useRef(seed)
@@ -158,7 +158,7 @@ export function Dial({
     if (id != null) dialSeen.set(id, target)
     const from = fromRef.current
     if (from === target) return
-    if (REDUCED) { fromRef.current = target; setShown(target); return }
+    if (motionReduced()) { fromRef.current = target; setShown(target); return }
     const dur = from === 0 ? 1300 : 800
     const t0 = performance.now()
     let raf = 0

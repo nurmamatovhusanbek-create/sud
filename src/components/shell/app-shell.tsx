@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from '@/lib/theme'
+import { useMotion } from '@/lib/motion'
 import {
   BarChart3,
   Bell,
@@ -32,6 +33,8 @@ import {
   Receipt,
   Settings,
   Sun,
+  Zap,
+  ZapOff,
 } from 'lucide-react'
 import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
@@ -202,6 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
   const { theme, setTheme } = useTheme()
+  const { motion, setMotion } = useMotion()
   const [sideOpen, setSideOpen] = useState(false)
   // Escape closes the drawer (it covers its own hamburger; the scrim also closes it).
   useEffect(() => {
@@ -353,6 +357,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Sun className="theme-icon-light" style={{ width: 18, height: 18 }} />
             <Moon className="theme-icon-dark" style={{ width: 18, height: 18 }} />
+          </button>
+          <button
+            className="rail-mini"
+            title={motion === 'auto' ? 'Animatsiya: tizim sozlamasiga qarab (bosing: yoqish)' : motion === 'on' ? 'Animatsiya: doim yoqilgan (bosing: oʻchirish)' : 'Animatsiya: oʻchiq (bosing: tizimga qaytish)'}
+            onClick={() => setMotion(motion === 'auto' ? 'on' : motion === 'on' ? 'off' : 'auto')}
+            aria-label={`Animatsiya: ${motion === 'auto' ? 'avto' : motion === 'on' ? 'yoqilgan' : 'oʻchiq'}`}
+            data-motion-state={motion}
+          >
+            {motion === 'off' ? <ZapOff style={{ width: 18, height: 18 }} /> : <Zap style={{ width: 18, height: 18 }} fill={motion === 'on' ? 'currentColor' : 'none'} />}
           </button>
         </div>
       </aside>

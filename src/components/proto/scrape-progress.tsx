@@ -12,6 +12,8 @@
  * completion). prefers-reduced-motion: static first phase, no animation.
  */
 
+import { motionReduced } from '@/lib/motion'
+
 const EXPECTED_MS = 12_000
 
 export interface ScrapeCfg {
@@ -23,7 +25,7 @@ export function ScrapeProgress({ title, phases, elapsed }: ScrapeCfg & { elapsed
   const ms = elapsed ?? 0
   const step = Math.min(phases.length - 1, Math.floor(ms / (EXPECTED_MS / phases.length)))
   const pct = Math.min(96, 4 + Math.round((ms / EXPECTED_MS) * 88))
-  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const reduced = motionReduced()
 
   return (
     <div className="scrape" role="status" aria-live="polite">

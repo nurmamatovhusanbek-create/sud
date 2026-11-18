@@ -536,11 +536,17 @@
   html:not([data-theme='dark']) .theme-icon-dark { display: none; }
 
   /* Motion discipline: reduced motion gets complete static states */
+  /* «Animatsiya» button (lib/motion): data-motion="on" overrides the system's request, "off" forces stillness */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    :root:not([data-motion='on']) *, :root:not([data-motion='on']) *::before, :root:not([data-motion='on']) *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+  :root[data-motion='off'] *, :root[data-motion='off'] *::before, :root[data-motion='off'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

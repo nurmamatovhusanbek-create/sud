@@ -592,9 +592,11 @@ html, body { height: 100%; }
 .dial-u { font-weight: 500; color: var(--text-2); letter-spacing: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rise, .rise-c { animation: none !important; transition: none !important; opacity: 1 !important; }
-  .sysstat .pulse::after { animation: none; opacity: 0; }
+  :root:not([data-motion='on']) .rise, :root:not([data-motion='on']) .rise-c { animation: none !important; transition: none !important; opacity: 1 !important; }
+  :root:not([data-motion='on']) .sysstat .pulse::after { animation: none; opacity: 0; }
 }
+:root[data-motion='off'] .rise, :root[data-motion='off'] .rise-c { animation: none !important; transition: none !important; opacity: 1 !important; }
+:root[data-motion='off'] .sysstat .pulse::after { animation: none; opacity: 0; }
 
 /* ============================================================================
    v18 PARITY ADDITIONS — sud-tizimi-ui-v18.html

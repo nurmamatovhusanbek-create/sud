@@ -9,3 +9,12 @@ export const THEME_KEY = 'theme'
 export const THEME_BOOT_SCRIPT =
   "try{var d=document.documentElement,t=localStorage.getItem('" + THEME_KEY + "')==='dark'?'dark':'light';" +
   "d.setAttribute('data-theme',t);d.style.colorScheme=t}catch(e){}"
+
+/**
+ * Motion: «auto» (follow the system), «on» (animate even if the system asks for reduced motion) or «off». Only «on» / «off»
+ * are written on <html data-motion>; no attribute = auto. Its own script so the theme script and its tests stay as they are.
+ */
+export const MOTION_KEY = 'motion'
+
+export const MOTION_BOOT_SCRIPT =
+  "try{var m=localStorage.getItem('" + MOTION_KEY + "');if(m==='on'||m==='off')document.documentElement.setAttribute('data-motion',m)}catch(e){}"
