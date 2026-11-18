@@ -18,3 +18,13 @@ export const MOTION_KEY = 'motion'
 
 export const MOTION_BOOT_SCRIPT =
   "try{var m=localStorage.getItem('" + MOTION_KEY + "');if(m==='on'||m==='off')document.documentElement.setAttribute('data-motion',m)}catch(e){}"
+
+/**
+ * Look (the whole visual treatment, apart from light/dark): «vivid» (Yorqin: warm, colourful, soft) or «calm» (Tinch: the
+ * graphite, hairline look). Always put on <html data-look>; no saved choice = vivid. Same screens, same markup: a look is a
+ * set of tokens and a CSS layer (look-vivid.css), never a second copy of a screen (that was tried and reverted).
+ */
+export const LOOK_KEY = 'look'
+
+export const LOOK_BOOT_SCRIPT =
+  "try{document.documentElement.setAttribute('data-look',localStorage.getItem('" + LOOK_KEY + "')==='calm'?'calm':'vivid')}catch(e){document.documentElement.setAttribute('data-look','vivid')}"

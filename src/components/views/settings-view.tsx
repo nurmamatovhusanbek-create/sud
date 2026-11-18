@@ -17,6 +17,7 @@ import {
   FlaskConical,
   GitBranch,
   Library,
+  Palette,
   Plus,
   ScanEye,
   RefreshCw,
@@ -37,6 +38,7 @@ import { waitForUpdate, type VersionSnap } from '@/lib/update-wait'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
+import { AppearanceTab } from '@/components/views/appearance-settings'
 
 // ---- shared shapes --------------------------------------------------------------
 
@@ -956,7 +958,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
+type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -974,6 +976,10 @@ export function SettingsView() {
       </div>
 
       <div className="set-tabs">
+        <button className={`set-tab ${tab === 'looks' ? 'on' : ''}`} onClick={() => setTab('looks')}>
+          <Palette />
+          Koʻrinish
+        </button>
         <button className={`set-tab ${tab === 'updates' ? 'on' : ''}`} onClick={() => setTab('updates')}>
           <GitBranch />
           Yangilanishlar
@@ -1000,6 +1006,7 @@ export function SettingsView() {
         </button>
       </div>
 
+      {tab === 'looks' && <AppearanceTab />}
       {tab === 'updates' && <UpdatesTab />}
       {tab === 'workers' && <WorkersTab />}
       {tab === 'health' && <HealthTab />}

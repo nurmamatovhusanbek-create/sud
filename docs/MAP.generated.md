@@ -133,7 +133,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
 | `identity.ts` | app/page.tsx |  |
-| `motion.ts` | components/proto/primitives.tsx, components/proto/scrape-progress.tsx, components/shell/app-shell.tsx | lib/__tests__/motion.test.ts |
+| `look.ts` | components/views/appearance-settings.tsx | lib/__tests__/look.test.ts |
+| `motion.ts` | components/proto/primitives.tsx, components/proto/scrape-progress.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/motion.test.ts |
 | `net/chain-fetch.ts` | lib/billing.ts, lib/public-orders/source.ts | lib/net/__tests__/chain-fetch.test.ts |
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
 | `net/pacer.ts` | lib/public-orders/pace.ts | lib/net/__tests__/pacer.test.ts |
@@ -172,8 +173,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 | lib/__tests__/ui-boundary.test.ts |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
-| `theme-boot.ts` | app/layout.tsx, lib/motion.ts, lib/theme.ts | lib/__tests__/motion.test.ts, lib/__tests__/theme.test.ts |
-| `theme.ts` | components/shell/app-shell.tsx | lib/__tests__/theme.test.ts |
+| `theme-boot.ts` | app/layout.tsx, lib/look.ts, lib/motion.ts, lib/theme.ts | lib/__tests__/look.test.ts, lib/__tests__/motion.test.ts, lib/__tests__/theme.test.ts |
+| `theme.ts` | components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
 | `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
 | `update-wait.ts` | components/views/settings-view.tsx | lib/__tests__/update-wait.test.ts |
@@ -251,6 +252,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `appearance-settings.tsx` | components/views/settings-view.tsx |  |
 | `custom-templates.tsx` | components/views/documents-view.tsx |  |
 | `doc-bulk.tsx` | components/views/doc-editor.tsx |  |
 | `doc-editor.tsx` | components/views/documents-view.tsx |  |
@@ -345,6 +347,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:doc-script` | lib/documents/script-pref.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
 | `sud:force-section` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
+| `sud:look` | lib/look.ts |
 | `sud:motion` | lib/motion.ts |
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +1 |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |
@@ -360,6 +363,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud:doc-script` | lib/documents/script-pref.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
 | `sud:force-section` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |
+| `sud:look` | lib/look.ts |
 | `sud:motion` | lib/motion.ts |
 | `sud:open-case` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/command-palette.tsx |
 | `sud:registry-changed` | components/shell/app-shell.tsx, lib/registry.ts, lib/use-registry.ts |

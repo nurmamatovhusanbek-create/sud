@@ -1011,3 +1011,32 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
   .dedit-doc { height: 82dvh; }
 }
 
+
+/* ---------- Settings › Koʻrinish: look picker. The thumbnails show a look that may not be the active one, so they carry their own colours. ---------- */
+.look-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.look-opt { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 12px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--border-default); transition: border-color .15s var(--ease), box-shadow .15s var(--ease); }
+.look-opt:hover { border-color: var(--border-strong); }
+.look-opt.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.look-opt .lo-name { font-size: 15px; font-weight: 600; color: var(--text-1); margin-top: 4px; }
+.look-opt .lo-text { font-size: 13px; color: var(--text-2); line-height: 1.45; }
+.look-prev { display: flex; height: 132px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0, 0, 0, .08); }
+.look-prev .lp-side { flex: 0 0 52px; display: flex; flex-direction: column; gap: 8px; padding: 12px 10px; }
+.look-prev .lp-side i { display: block; height: 14px; border-radius: 6px; }
+.look-prev .lp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.look-prev .lp-main b { display: block; height: 14px; width: 55%; border-radius: 6px; }
+.look-prev .lp-tiles { display: flex; gap: 8px; }
+.look-prev .lp-tiles i { flex: 1; height: 34px; border-radius: 8px; }
+.look-prev .lp-rows { display: flex; flex-direction: column; gap: 6px; }
+.look-prev .lp-rows i { display: block; height: 16px; border-radius: 6px; }
+.look-prev.vivid { background: #F4F0E8; }
+.look-prev.vivid .lp-side { background: #FFFEFB; }
+.look-prev.vivid .lp-side i:nth-child(1) { background: #E5ECFF; } .look-prev.vivid .lp-side i:nth-child(2) { background: #DEF3E8; } .look-prev.vivid .lp-side i:nth-child(3) { background: #FFEECD; }
+.look-prev.vivid .lp-main b { background: #1A2133; opacity: .85; }
+.look-prev.vivid .lp-tiles i:nth-child(1) { background: #E5ECFF; } .look-prev.vivid .lp-tiles i:nth-child(2) { background: #DEF3E8; } .look-prev.vivid .lp-tiles i:nth-child(3) { background: #FFEECD; }
+.look-prev.vivid .lp-rows i { background: #FFFEFB; border-radius: 10px; }
+.look-prev.calm { background: #F6F6F7; }
+.look-prev.calm .lp-side { background: #FFFFFF; border-right: 1px solid rgba(23, 23, 23, .08); }
+.look-prev.calm .lp-side i { background: #EEEEF0; border-radius: 4px; }
+.look-prev.calm .lp-main b { background: #171717; opacity: .8; border-radius: 3px; }
+.look-prev.calm .lp-tiles i { background: #FFFFFF; border: 1px solid rgba(23, 23, 23, .08); border-radius: 6px; }
+.look-prev.calm .lp-rows i { background: #FFFFFF; border-bottom: 1px solid rgba(23, 23, 23, .08); border-radius: 0; }
