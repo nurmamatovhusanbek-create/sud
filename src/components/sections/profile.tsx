@@ -17,10 +17,8 @@ import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
 import { patchMeta, patchRecord, companyFactsPatch, getRecord } from '@/lib/registry'
-import { ratingBandFamily } from '@/core/status'
 import type { CompanyInfoData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
-import { bandFromFamily } from '@/components/proto/primitives'
 
 export function ProfileSection() {
   const company = useAppStore((s) => s.activeCompany)
@@ -99,8 +97,6 @@ export function ProfileSection() {
   const rating = view.data.rating
   const founders = (c?.founders as { name?: string; share?: string }[] | undefined) || []
   const score = typeof rating?.score === 'number' ? Math.min(100, rating.score) : null
-  const ratingFamily = rating?.category ? ratingBandFamily(rating.category) : null
-  const ratingBand = bandFromFamily(ratingFamily ?? 'neutral')
 
   const quick = [
     { key: 'bills', label: "Toʻlovlar", icon: <Receipt /> },
@@ -170,13 +166,13 @@ export function ProfileSection() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
             {score !== null ? (
-              <Dial pct={score} size={200} band={ratingBand} label="Ishonch balli" id="profile-score" />
+              <Dial pct={score} size={200} label="Ishonch balli" id="profile-score" />
             ) : (
               <Dial pct={null} size={200} label="Ball mavjud emas" />
             )}
             {rating?.category ? (
               <span
-                className={`badge ${ratingBand === 'pos' ? 'b-pos' : ratingBand === 'warn' ? 'b-warn' : ratingBand === 'neg' ? 'b-neg' : 'b-neu'}`}
+                className="badge b-neu"
                 style={{ height: 28, fontSize: 13 }}
               >
                 Kategoriya {rating.category}

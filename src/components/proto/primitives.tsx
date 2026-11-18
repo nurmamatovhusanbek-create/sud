@@ -13,7 +13,7 @@ import { daysUntil } from '@/core/dates'
 import { motionReduced } from '@/lib/motion'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
-import { bandFor, clampPct, dialAngle, dialGeom, tickLook, type DialZones } from './dial-geometry'
+import { clampPct, type DialZones } from './dial-geometry'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -120,10 +120,10 @@ export function CountUp({ value, suffix = '', className, id }: { value: number; 
 }
 
 /**
- * Dial — the hairline instrument gauge (geometry: proto/dial-geometry.ts, shared with the PDF report).
- * The needle sweeps to the value once on mount and glides from the old value to a new one; ticks light
- * as it passes. Nothing loops. `zones` paint the limits (e.g. workers: 60 / 90); without them the
- * dial uses `band`. `pct = null` draws an empty dial with «–».
+ * Dial — a score as a NUMBER over a PROGRESS BAR (a single goal is a progress bar, never a gauge). The figure counts up once on
+ * mount and glides to a new value; the bar is one ink fill on a neutral track. `zones` only draw the limits as hairline ticks
+ * (e.g. workers: 60 / 90) with their values under the bar on big instances: no colour band, the number is the signal.
+ * `pct = null` draws an empty bar with «–». Same props as the old gauge, so every call site keeps working.
  */
 /** worker success rate: < 60 dead · 60–89 slow · ≥ 90 healthy (the badges and dots use the same limits) */
 export const WORKER_ZONES: DialZones = [[60, 'neg'], [90, 'warn'], [100, 'pos']]
@@ -135,7 +135,6 @@ const dialSeen = new Map<string, number>() // keyed dials remember where they we
 export function Dial({
   pct,
   size,
-  band = 'neu',
   zones = null,
   label,
   unit = '',
@@ -143,6 +142,7 @@ export function Dial({
 }: {
   pct: number | null
   size: number
+  /** kept for call-site compatibility; the score is no longer coloured by a band */
   band?: Band
   zones?: DialZones | null
   label?: string
@@ -150,7 +150,6 @@ export function Dial({
   id?: string
 }) {
   const target = pct === null ? 0 : clampPct(pct)
-  const geom = useMemo(() => dialGeom(size, zones), [size, zones])
   const start = id != null && dialSeen.has(id) ? (dialSeen.get(id) as number) : 0
   const [shown, setShown] = useState(start)
   const fromRef = useRef(start)
@@ -174,33 +173,37 @@ export function Dial({
     return () => cancelAnimationFrame(raf)
   }, [target, id])
 
-  const col = BAND_VAR[(bandFor(target, zones, band) as Band)]
-  const num = size * (geom.small ? 0.22 : 0.27)
+  const big = size > 150
+  const limits = (zones ?? []).map(([v]) => v).filter((v) => v < 100)
   return (
-    <div className="dial" style={{ width: size, height: size }} role="img" aria-label={pct === null ? (label ?? 'Maʼlumot yoʻq') : `${label ? `${label}: ` : ''}${Math.round(target)}${unit}`}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
-        {geom.ticks.map((t) => {
-          const { lit, width } = tickLook(t, shown)
-          const stroke = pct !== null && lit ? col : t.zone ? `color-mix(in srgb, ${BAND_VAR[t.zone]} 38%, var(--border-subtle))` : 'var(--border-default)'
-          return <line key={t.v} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={stroke} strokeWidth={width} strokeLinecap="round" />
-        })}
-        {geom.labels.map((l) => (
-          <text key={l.v} x={l.x} y={l.y} textAnchor="middle" fontSize={9} fontFamily="var(--font-mono)" fill="var(--text-3)">{l.v}</text>
-        ))}
-        {pct !== null && shown > 0.4 ? (
-          <g transform={`rotate(${dialAngle(shown)} ${geom.cx} ${geom.cy})`}>
-            <line x1={geom.needle.x1} y1={geom.needle.y1} x2={geom.needle.x2} y2={geom.needle.y2} stroke={col} strokeWidth={3} strokeLinecap="round" />
-            <path d={geom.needle.tri} fill={col} />
-          </g>
-        ) : null}
-      </svg>
-      <div className="dial-ov" aria-hidden>
-        <div className="dial-n">
-          <span className="mono" style={{ fontSize: num }}>{pct === null ? '–' : Math.round(shown)}</span>
-          {unit && pct !== null ? <span className="mono dial-u" style={{ fontSize: num * 0.45 }}>{unit}</span> : null}
-        </div>
-        {label && !geom.small ? <div className="faint" style={{ fontSize: size > 150 ? 11.5 : 10, marginTop: size > 150 ? 6 : 1 }}>{label}</div> : null}
+    <div
+      className={`score${big ? ' score-big' : ''}`}
+      style={{ width: size }}
+      role="img"
+      aria-label={pct === null ? (label ?? 'Maʼlumot yoʻq') : `${label ? `${label}: ` : ''}${Math.round(target)}${unit}`}
+    >
+      {label && big ? <div className="score-l">{label}</div> : null}
+      <div className="score-n mono" aria-hidden>
+        {pct === null ? '–' : Math.round(shown)}
+        {unit && pct !== null ? <small>{unit}</small> : null}
       </div>
+      <div className="score-bar" aria-hidden>
+        <div className="meter">
+          <i style={{ width: `${pct === null ? 0 : shown}%` }} />
+        </div>
+        {limits.map((v) => (
+          <span key={v} className="score-tick" style={{ left: `${v}%` }} />
+        ))}
+      </div>
+      {big ? (
+        <div className="score-scale mono" aria-hidden>
+          <span style={{ left: '0%' }}>0</span>
+          {limits.map((v) => (
+            <span key={v} style={{ left: `${v}%` }}>{v}</span>
+          ))}
+          <span style={{ left: '100%' }}>100</span>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -477,188 +480,79 @@ export function CardStats({
   )
 }
 
-// ==== v18 additions — interactive pizza chart + win-rate ring ==================
+// ==== outcome bars (the distribution chart) + win-rate meter ==================
 
 import {
   pizzaCounts,
-  pizzaModel,
   pizzaTotal,
-  winRing as winRingGeom,
-  PIZZA_GEOM,
-  PIZZA_PAINT,
   PIZZA_STATUS_LABEL,
   PIZZA_STATUS_ORDER,
   type PizzaItem,
-  type PizzaStatus,
 } from '@/components/proto/pizza-geometry'
 import { winRate } from '@/core/rates'
 
-/** SVG paint for one status band, in the slice's hue — density (not hue) carries the status. */
-function bandPaint(status: PizzaStatus, col: string, hatch: string) {
-  switch (status) {
-    case 'won':
-      return { fill: col, stroke: 'var(--surface)', strokeWidth: 0.8 }
-    case 'lost':
-      return { fill: col, fillOpacity: 0.34, stroke: 'var(--surface)', strokeWidth: 0.8 }
-    case 'neutral':
-      return { fill: hatch, stroke: 'var(--surface)', strokeWidth: 0.8 }
-    default:
-      return {
-        fill: col,
-        fillOpacity: PIZZA_PAINT.pending.fillOpacity,
-        stroke: col,
-        strokeWidth: PIZZA_PAINT.pending.strokeWidth,
-        strokeDasharray: PIZZA_PAINT.pending.dash,
-      }
-  }
-}
-
 /**
- * Pizza — radial stack. Each wedge = one slice (court type or category); its radius
- * is the slice's own 100%, stacked from the hub: yutgan, yutqazgan, neytral, jarayonda
- * (solid · tint · hatch · dashed, all in the slice's hue). Total in a pill just outside,
- * navy dotted seams part the slices.
- *
- * Controlled: `selected` (index, or -1 for "nothing selected") is owned by the
- * parent. With nothing selected every slice shows crisp (good for a share/
- * screenshot); once a slice is picked it pops forward while the rest recede and
- * blur (pure CSS via .has-sel). Clicking a slice reports its index; the parent
- * decides selection (and toggles it off when the same slice is clicked again).
+ * OutcomeBars — the case distribution as a RANKED LIST WITH BARS (a share is a list with bars, never a pie): one row per slice
+ * (court type or category), longest first. The bar's length is the slice's total against the largest slice; inside it the four
+ * outcomes are stacked in ONE ink: solid (yutgan), tint (yutqazgan), hatch (neytral), dashed outline (jarayonda), so density and
+ * pattern carry the status and no hue is needed. Controlled like the old pizza: `selected` is an index into `items` (-1 = none),
+ * `onSelect` reports a row; the parent toggles it.
  */
-export function Pizza({
+export function OutcomeBars({
   items,
   onSelect,
   selected = -1,
-  size = 340,
 }: {
   items: PizzaItem[]
   onSelect?: (item: PizzaItem, index: number) => void
   selected?: number
-  size?: number
 }) {
-  const model = useMemo(() => pizzaModel(items), [items])
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
-  const { cx, cy, r0 } = PIZZA_GEOM
-  const hasSel = selected >= 0 && selected < items.length
-
-  const pick = (i: number) => {
-    const it = items[i]
-    if (it) onSelect?.(it, i)
-  }
-
+  const max = Math.max(1, ...items.map(pizzaTotal))
+  const order = items.map((_, i) => i).sort((x, y) => pizzaTotal(items[y]) - pizzaTotal(items[x]))
   return (
-    <svg
-      className={`pie-wrap${hasSel ? ' has-sel' : ''}`}
-      width={size}
-      height={size}
-      viewBox="0 0 340 340"
-      role="group" /* its wedges are buttons: an «img» may not contain interactive children */
-      aria-label="Ishlar taqsimoti, holatlar boʻyicha"
-    >
-      <defs>
-        {items.map((it, i) => (
-          <pattern key={i} id={`${uid}h${i}`} width={PIZZA_PAINT.hatch.size} height={PIZZA_PAINT.hatch.size} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width={PIZZA_PAINT.hatch.size} height={PIZZA_PAINT.hatch.size} fill={it.col} fillOpacity={PIZZA_PAINT.hatch.groundOpacity} />
-            <line x1={0} y1={0} x2={0} y2={PIZZA_PAINT.hatch.size} stroke={it.col} strokeWidth={PIZZA_PAINT.hatch.stripeWidth} strokeOpacity={PIZZA_PAINT.hatch.stripeOpacity} />
-          </pattern>
+    <div className="ob" style={{ ['--sw' as string]: 'var(--text-1)' }}>
+      <div className="ob-key" aria-hidden="true">
+        {PIZZA_STATUS_ORDER.map((st) => (
+          <span key={st}>
+            <i className={`st ${st}`} />
+            {PIZZA_STATUS_LABEL[st]}
+          </span>
         ))}
-      </defs>
-      {model.rings.map((r, i) => (
-        <circle key={i} className={`cring${r.edge ? ' edge' : ''}`} cx={cx} cy={cy} r={r.r} />
-      ))}
-      {model.wedges.map((w) => {
-        const it = items[w.index]
-        const isSel = hasSel && selected === w.index
-        return (
-          <g
-            key={w.index}
-            className={`cwedge${isSel ? ' sel' : ''}`}
-            data-i={w.index}
-            tabIndex={0}
-            role="button"
-            aria-pressed={isSel}
-            aria-label={w.aria}
-            // "Lift" the slice by growing it radially from the pie centre — this
-            // keeps it concentric with the guide rings (they come forward with
-            // it) instead of sliding off-grid the way a translate would.
-            style={isSel ? { transform: 'scale(1.06)' } : undefined}
-            onClick={() => pick(w.index)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                pick(w.index)
-              }
-            }}
-          >
-            {w.bands.map((b) => (
-              <path
-                key={b.status}
-                className={`cband ${b.status}`}
-                d={b.path}
-                {...bandPaint(b.status, it.col, `url(#${uid}h${w.index})`)}
-              />
-            ))}
-            {w.split && <path className="csplit" d={w.split} />}
-            {w.bands.map((b) =>
-              b.text ? (
-                <text key={b.status} className={b.status === 'won' ? 'cwon' : 'cnum'} x={b.text.x} y={b.text.y}>
-                  {b.text.v}
-                </text>
-              ) : null,
-            )}
-            <rect
-              x={w.pill.x - 12}
-              y={w.pill.y - 8}
-              width={24}
-              height={16}
-              rx={6}
-              fill={w.pill.fill}
-              stroke="var(--surface)"
-              strokeWidth={1.5}
-            />
-            <text className="ctot" x={w.pill.x} y={w.pill.y + 3.6}>
-              {w.pill.v}
-            </text>
-          </g>
-        )
-      })}
-      <circle className="pie-hub" cx={cx} cy={cy} r={r0} />
-      {model.seams.map((s, i) => (
-        <line key={i} className="csep" x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} />
-      ))}
-    </svg>
+      </div>
+      <div className="ob-rows">
+        {order.map((i) => {
+          const it = items[i]
+          const counts = pizzaCounts(it)
+          const total = pizzaTotal(it)
+          return (
+            <button
+              type="button"
+              key={it.id ?? it.label}
+              className={`ob-row${selected === i ? ' on' : ''}`}
+              aria-pressed={selected === i}
+              onClick={() => onSelect?.(it, i)}
+            >
+              <span className="ob-name">{it.label}</span>
+              <span className="ob-track">
+                <span className="ob-bar" style={{ width: `${(total / max) * 100}%` }}>
+                  {PIZZA_STATUS_ORDER.map((st) => (counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ flex: counts[st] }} /> : null))}
+                </span>
+              </span>
+              <span className="ob-n">{total}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
-/** Win-rate ring — the prototypeʼs ringSvg2 (88px detail-panel gauge). */
-export function WinRing({ pct, col, size = 88 }: { pct: number | null; col: string; size?: number }) {
-  const g = winRingGeom(pct ?? 0, col)
+/** A single goal is a progress bar: ink fill on a neutral track. `pct = null` draws the empty track. */
+export function MeterBar({ pct, label }: { pct: number | null; label?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 88 88" aria-label={pct === null ? 'Hal qilingan ish yoʻq' : `Yutuq ${pct}%`}>
-      <circle cx={44} cy={44} r={g.track} fill="none" stroke="var(--surface-inset)" strokeWidth={8} />
-      <circle
-        cx={44}
-        cy={44}
-        r={g.arc}
-        fill="none"
-        stroke={col}
-        strokeWidth={8}
-        strokeLinecap="round"
-        strokeDasharray={g.dash}
-        transform={`rotate(${g.rotate} 44 44)`}
-      />
-      <text
-        x={44}
-        y={49}
-        textAnchor="middle"
-        fontSize={18}
-        fontWeight={800}
-        fill="var(--text-1)"
-        fontFamily="var(--font-mono)"
-      >
-        {pct ?? '–'}
-      </text>
-    </svg>
+    <div className="meter" role="img" aria-label={pct === null ? (label ?? 'Maʼlumot yoʻq') : `${label ? `${label}: ` : ''}${Math.round(pct)}%`}>
+      <i style={{ width: `${pct === null ? 0 : Math.max(0, Math.min(100, pct))}%` }} />
+    </div>
   )
 }
 
@@ -685,7 +579,6 @@ export function PizzaDetail({
   return (
     <div>
       <div className="det-head">
-        <span className="sw" style={{ background: item.col }} />
         <span className="k">{kind}</span>
       </div>
       <div className="det-name">{item.full}</div>
@@ -693,20 +586,23 @@ export function PizzaDetail({
         Jami {total} ish ·{' '}
         {wr === null ? 'hal qilingan ish yoʻq' : `yutuq ${wr}% (${decided} ta hal qilingan ishdan)`}
       </div>
-      <div className="det-ring">
-        <WinRing pct={wr} col={item.col} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="stackbar" style={{ ['--sw' as string]: item.col }}>
-            {rows.map((st) =>
-              counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ width: `${seg(counts[st])}%` }} /> : null,
-            )}
-          </div>
-          <div className="det-sub" style={{ marginTop: 8 }}>
-            Barcha holatlar boʻyicha taqsimot
-          </div>
+      <div className="det-win">
+        <div className="dw-n">
+          {wr === null ? '–' : wr}
+          {wr === null ? null : <small>%</small>}
         </div>
+        <div className="dw-l">Yutuq darajasi</div>
+        <MeterBar pct={wr} label="Yutuq" />
       </div>
-      <div className="det-rows" style={{ ['--sw' as string]: item.col }}>
+      <div className="stackbar" style={{ ['--sw' as string]: 'var(--text-1)' }}>
+        {rows.map((st) =>
+          counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ width: `${seg(counts[st])}%` }} /> : null,
+        )}
+      </div>
+      <div className="det-sub" style={{ marginTop: 8 }}>
+        Barcha holatlar boʻyicha taqsimot
+      </div>
+      <div className="det-rows" style={{ ['--sw' as string]: 'var(--text-1)' }}>
         {rows.map((st) => (
           <div className="r" key={st}>
             <span className={`sw st ${st}`} />
@@ -716,20 +612,6 @@ export function PizzaDetail({
         ))}
       </div>
       {action}
-    </div>
-  )
-}
-
-/** Compact status key for under a pizza — the four fills, in the given hue. */
-export function PizzaKey({ col = 'var(--text-3)' }: { col?: string }) {
-  return (
-    <div className="pie-key" style={{ ['--sw' as string]: col }} aria-hidden="true">
-      {PIZZA_STATUS_ORDER.map((st) => (
-        <span key={st}>
-          <i className={`st ${st}`} />
-          {PIZZA_STATUS_LABEL[st]}
-        </span>
-      ))}
     </div>
   )
 }

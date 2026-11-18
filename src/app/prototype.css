@@ -179,7 +179,7 @@ html, body { height: 100%; }
 .wr-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
 .wr-row .wr-lbl { width: 96px; font-size: 13px; flex: 0 0 96px; }
 .wr-track { flex: 1; height: 8px; border-radius: 99px; background: var(--surface-active); overflow: hidden; }
-.wr-fill { height: 100%; border-radius: 99px; transition: width .7s var(--ease-emph); }
+.wr-fill { height: 100%; border-radius: 99px; background: var(--text-1); transition: width .7s var(--ease-emph); }
 .wr-val { font-family: var(--font-mono); font-size: 12px; font-weight: 500; width: 38px; text-align: right; }
 
 /* ---------- rows / lists ---------- */
@@ -577,11 +577,6 @@ html, body { height: 100%; }
 [data-sonner-toast][data-type='warning'] { background: var(--status-warning-solid) !important; color: var(--status-warning-on) !important; }
 
 /* ---------- dial gauge (proto/dial-geometry.ts) ---------- */
-.dial { position: relative; flex: none; }
-.dial svg { display: block; overflow: visible; }
-.dial-ov { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 3%; text-align: center; }
-.dial-n { display: flex; align-items: baseline; gap: 2px; line-height: 1; font-weight: 600; color: var(--text-1); }
-.dial-u { font-weight: 500; color: var(--text-2); letter-spacing: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion='on']) .rise, :root:not([data-motion='on']) .rise-c { animation: none !important; transition: none !important; opacity: 1 !important; }
@@ -642,31 +637,7 @@ html, body { height: 100%; }
 .side-scrim { display: none; }
 .menu-btn { display: none; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border-subtle); background: var(--surface); place-items: center; color: var(--text-2); flex: none; }
 
-/* ---------- pizza chart (radial won/lost wedges) ---------- */
-.pie-wrap { max-width: 100%; height: auto; overflow: visible; display: block; margin: 0 auto; }
-.cring { fill: none; stroke: var(--pie-track, #c8cee1); stroke-width: 1; stroke-dasharray: 3 5; opacity: .7; }
-.cring.edge { stroke: var(--pie-track-edge, #aeb6d6); stroke-dasharray: none; opacity: .85; }
-.csep { stroke: var(--pie-seam, #1a2350); stroke-width: 1.4; stroke-dasharray: 1.5 4; stroke-linecap: round; opacity: .8; }
-.cwedge { cursor: pointer; transform-box: view-box; transform-origin: 170px 170px; transition: filter .26s var(--ease), transform .26s var(--ease); }
-.cwedge:hover { filter: brightness(1.06); }
-.cwedge.sel { filter: drop-shadow(0 4px 9px rgba(18, 24, 58, .18)); }
-.cwedge:focus { outline: none; }
-.pie-wrap.has-sel .cwedge:not(.sel) { filter: blur(2.6px); }
-.pie-wrap.has-sel .cwedge:not(.sel):hover { filter: blur(.6px); }
-/* numbers are deliberately quiet: small mono, no weight fights with the shapes */
-.ctot { font-family: var(--font-mono); font-weight: 600; font-size: 10px; fill: #fff; text-anchor: middle; }
-.cwon { font-family: var(--font-mono); font-weight: 600; font-size: 9px; fill: #fff; stroke: rgba(18, 24, 58, .3); stroke-width: .6; paint-order: stroke; text-anchor: middle; }
-.cnum { font-family: var(--font-mono); font-weight: 500; font-size: 8.5px; fill: var(--pie-lost-ink, #454f78); stroke: var(--surface); stroke-opacity: .8; stroke-width: 1.5; paint-order: stroke; text-anchor: middle; }
-.cband { pointer-events: all; }
-.csplit { fill: var(--surface); pointer-events: none; }
-.cband.lost { fill-opacity: var(--pie-lost-op, .34); }
-.pie-hub { fill: var(--surface); stroke: var(--border-subtle); }
-[data-theme='dark'] {
-  --pie-track: #39406a; --pie-track-edge: #4a5386; --pie-seam: #8fa1e8; --pie-lost-ink: #c9d3f5; --pie-lost-op: .5;
-}
-.petal-legend { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-2); font-weight: 500; }
-.petal-legend span { display: inline-flex; align-items: center; }
-.petal-legend i { width: 11px; height: 11px; border-radius: 4px; display: inline-block; margin-right: 6px; }
+/* ---------- distribution filter select ---------- */
 .pie-filter { font-family: inherit; font-weight: 600; font-size: 12px; color: var(--text-2); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 27px 6px 11px; cursor: pointer; -webkit-appearance: none; appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235c6489' stroke-width='2.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 9px center; transition: border-color .16s, box-shadow .16s; }
@@ -676,21 +647,16 @@ html, body { height: 100%; }
 /* ---------- pizza detail panel ---------- */
 .det-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .det-head .k { font-size: 12px; color: var(--text-3); font-weight: 600; }
-.det-head .sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
 .det-name { font-size: 19px; font-weight: 600; margin: 2px 0; color: var(--text-1); }
 .det-sub { color: var(--text-3); font-size: 13px; }
-.det-ring { display: flex; align-items: center; gap: 16px; margin: 14px 0 6px; }
 .stackbar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin: 14px 0 4px; background: var(--surface-inset); }
 .stackbar i { display: block; height: 100%; transition: width .5s var(--ease); }
 /* the four statuses, drawn in one hue (--sw) — same fills as the pizza bands */
-.st { --st-soft: color-mix(in srgb, var(--sw, #3b5bdb) 16%, transparent); }
-.st.won { background: var(--sw, #3b5bdb); }
-.st.lost { background: color-mix(in srgb, var(--sw, #3b5bdb) calc(var(--pie-lost-op, .34) * 100%), transparent); }
-.st.neutral { background: repeating-linear-gradient(45deg, var(--sw, #3b5bdb) 0 1.5px, var(--st-soft) 1.5px 3.6px); }
-.st.pending { background: color-mix(in srgb, var(--sw, #3b5bdb) 16%, transparent); border: 1.2px dashed var(--sw, #3b5bdb); box-sizing: border-box; }
-.pie-key { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--text-3); }
-.pie-key span { display: inline-flex; align-items: center; gap: 5px; }
-.pie-key i { width: 12px; height: 9px; border-radius: 3px; display: inline-block; }
+.st { --st-soft: color-mix(in srgb, var(--sw, var(--text-1)) 16%, transparent); }
+.st.won { background: var(--sw, var(--text-1)); }
+.st.lost { background: color-mix(in srgb, var(--sw, var(--text-1)) 34%, transparent); }
+.st.neutral { background: repeating-linear-gradient(45deg, var(--sw, var(--text-1)) 0 1.5px, var(--st-soft) 1.5px 3.6px); }
+.st.pending { background: color-mix(in srgb, var(--sw, var(--text-1)) 16%, transparent); border: 1.2px dashed var(--sw, var(--text-1)); box-sizing: border-box; }
 .det-rows .r { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); }
 .det-rows .r:last-child { border-bottom: 0; }
 .det-rows .r .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
@@ -1042,7 +1008,7 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .look-prev.calm .lp-rows i { background: #FFFFFF; border-bottom: 1px solid rgba(23, 23, 23, .08); border-radius: 0; }
 
 /* ---------- Statistika chart card: the pie and its section list are ONE card (no separate «nothing selected» card, no tiles row) ---------- */
-.pie-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.pie-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
 @media (max-width: 1000px) { .pie-split { grid-template-columns: 1fr; gap: 16px; } }
 .pie-right .pr-h { font-size: 13px; color: var(--text-3); margin-bottom: 8px; }
 .sect-list { display: flex; flex-direction: column; border-top: 1px solid var(--border-subtle); }
@@ -1083,3 +1049,46 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 
 /* KPI corner icon: hidden unless a look shows it */
 .kpi-ico { display: none; }
+
+/* outcome bars: a ranked list; bar length = the slice's total against the largest, segments = the four outcomes in one ink */
+.ob { display: flex; flex-direction: column; gap: 10px; }
+.ob-key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--text-3); }
+.ob-key span { display: inline-flex; align-items: center; gap: 6px; }
+.ob-key i { width: 14px; height: 9px; border-radius: 2px; display: inline-block; box-sizing: border-box; }
+.ob-rows { display: flex; flex-direction: column; }
+.ob-row { display: grid; grid-template-columns: minmax(84px, 140px) minmax(0, 1fr) 32px; align-items: center; gap: 12px; width: 100%; padding: 9px 8px; margin: 0 -8px; border: 0; border-radius: 8px; background: none; color: var(--text-1); font: inherit; text-align: left; cursor: pointer; box-sizing: content-box; transition: background .15s var(--ease); }
+.ob-row + .ob-row { box-shadow: 0 -1px 0 var(--border-subtle); }
+.ob-row:hover { background: var(--surface-hover, var(--surface-inset)); }
+.ob-row.on { background: var(--surface-active); }
+.ob-row:focus-visible { outline: 2px solid var(--text-1); outline-offset: -2px; }
+.ob-name { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-row.on .ob-name { color: var(--text-1); font-weight: 600; }
+.ob-track { display: block; height: 14px; border-radius: 3px; background: var(--surface-inset); overflow: hidden; }
+.ob-bar { display: flex; height: 100%; gap: 1px; transition: width .6s var(--ease-emph, var(--ease)); }
+.ob-bar i { display: block; height: 100%; min-width: 2px; }
+.ob-n { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.ob-key .st.pending, .ob-bar .st.pending { background: transparent; }
+
+/* single goal = a progress bar: neutral track, ink fill */
+.meter { height: 6px; border-radius: 99px; background: var(--surface-active); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 99px; background: var(--text-1); transition: width .5s var(--ease-emph, var(--ease)); }
+.det-win { margin: 14px 0 6px; }
+.det-win .dw-n { font-family: var(--font-mono); font-size: 30px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.det-win .dw-n small { font-size: 15px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.det-win .dw-l { font-size: 12px; color: var(--text-3); margin: 6px 0 8px; }
+.co-win { margin: -2px 0 12px; }
+
+/* score: number over a bar, limits as hairline ticks (workers 60/90, health 80) */
+.score { flex: none; max-width: 100%; }
+.score-n { font-size: 24px; font-weight: 600; line-height: 1; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.score-n small { font-size: 12px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.score-bar { position: relative; margin-top: 8px; }
+.score-tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--text-3); opacity: .7; }
+.score-l { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+.score-big .score-n { font-size: 56px; }
+.score-big .score-n small { font-size: 22px; }
+.score-big .meter { height: 8px; }
+.score-scale { position: relative; height: 16px; margin-top: 6px; font-size: 10.5px; color: var(--text-3); }
+.score-scale span { position: absolute; top: 0; transform: translateX(-50%); }
+.score-scale span:first-child { transform: none; }
+.score-scale span:last-child { transform: translateX(-100%); }

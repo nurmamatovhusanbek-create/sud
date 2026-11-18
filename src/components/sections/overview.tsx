@@ -27,10 +27,9 @@ import {
   Kpi,
   BarChart,
   EmptyBlock,
-  Pizza,
+  OutcomeBars,
+  MeterBar,
   PizzaDetail,
-  PizzaKey,
-  WinRing,
   grp,
   initials,
   familyBadgeClass,
@@ -98,10 +97,7 @@ function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
         <div className="wr-row" key={c.key}>
           <span className="wr-lbl">{c.label}</span>
           <div className="wr-track">
-            <div
-              className="wr-fill"
-              style={{ width: `${c.rate ?? 0}%`, background: (c.rate ?? 0) >= 60 ? 'var(--pos-base)' : (c.rate ?? 0) >= 40 ? 'var(--warn-base)' : 'var(--neg-base)' }}
-            />
+            <div className="wr-fill" style={{ width: `${c.rate ?? 0}%` }} />
           </div>
           <span className="wr-val">{c.rate === null ? '–' : `${c.rate}%`}</span>
         </div>
@@ -111,8 +107,6 @@ function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
 }
 
 // ---- v18: side-by-side comparison (inside Statistika) --------------------------
-
-const BAND_HEX = (wr: number | null) => (wr === null ? '#7d86ab' : wr >= 60 ? '#0f9070' : wr >= 40 ? '#3b5bdb' : '#c04a68')
 
 /** One compact company dashboard: identity + KPIs + interactive pizza + bars. */
 function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | null }) {
@@ -125,7 +119,6 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
   )
   const [selIdx, setSelIdx] = useState(-1)
   const sel = selIdx >= 0 && selIdx < items.length ? items[selIdx] : null
-  const rb = rating ? (/^A/i.test(rating) ? 'b-pos' : /^B/i.test(rating) ? 'b-warn' : 'b-neg') : null
 
   return (
     <div className="cmp-co">
@@ -135,17 +128,18 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           <b>{d.company.name || d.company.tin}</b>
           <div className="faint mono" style={{ fontSize: 10.5 }}>STIR {grp(d.company.tin)}</div>
         </div>
-        <span style={{ flex: 1 }} />
-        <WinRing pct={wr} col={BAND_HEX(wr)} size={60} />
+      </div>
+      <div className="co-win">
+        <MeterBar pct={wr} label="Yutuq" />
       </div>
       <div className="co-kpis">
         <div className="co-kpi"><div className="k">Jami ishlar</div><div className="v">{s.total}</div></div>
-        <div className="co-kpi"><div className="k">Yutuq</div><div className="v" style={{ color: BAND_HEX(wr) }}>{winRateText(s.win, s.lose)}</div></div>
+        <div className="co-kpi"><div className="k">Yutuq</div><div className="v">{winRateText(s.win, s.lose)}</div></div>
         <div className="co-kpi"><div className="k">Jarayonda</div><div className="v">{s.pending}</div></div>
         <div className="co-kpi">
           <div className="k">Reyting</div>
           <div className="v" style={{ fontFamily: 'var(--font-sans)' }}>
-            {rating ? <span className={`badge ${rb}`}>{rating}</span> : <span className="faint">-</span>}
+            {rating ? <span className="badge b-neu">{rating}</span> : <span className="faint">-</span>}
           </div>
         </div>
       </div>
@@ -166,18 +160,10 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
         </select>
       </div>
       {items.length ? (
-        <Pizza items={items} selected={selIdx} onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))} />
+        <OutcomeBars items={items} selected={selIdx} onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))} />
       ) : (
         <div className="empty" style={{ padding: 26 }}><h3>Maʼlumot yoʻq</h3></div>
       )}
-      {items.length > 0 && (
-        <div className="petal-legend" style={{ justifyContent: 'center', marginTop: 2 }}>
-          {items.map((it) => (
-            <span key={it.label}><i style={{ background: it.col }} />{it.label}</span>
-          ))}
-        </div>
-      )}
-      {items.length > 0 && <PizzaKey />}
       <div className="cmp-det">
         {sel ? (
           <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />
@@ -425,15 +411,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         {pieItems.length ? (
           <div className="pie-split">
             <div className="pie-left">
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
-                <Pizza items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
-              </div>
-              <div className="petal-legend">
-                {pieItems.map((it) => (
-                  <span key={it.label}><i style={{ background: it.col }} />{it.label}</span>
-                ))}
-              </div>
-              <PizzaKey />
+              <OutcomeBars items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
             </div>
             <div className="pie-right">
               {pieSelClamped ? (

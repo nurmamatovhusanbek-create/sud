@@ -69,7 +69,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/rating/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
-| `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
+| `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, lib/report/model.ts | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, core/public-orders.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
