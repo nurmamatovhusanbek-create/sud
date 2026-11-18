@@ -418,27 +418,26 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
       </div>
 
       {/* pizza + detail — the v18 heart of Statistika */}
-      <div className="dash" style={{ gridTemplateColumns: '1.5fr 1fr', alignItems: 'stretch' }}>
-        <div className="p-card rise-c">
-          <div className="card-h">
-            <div className="ico"><BarChart3 /></div>
-            <h2>Sud ishlari taqsimoti</h2>
-            <div className="sp" />
-            <select
-              className="pie-filter"
-              value={pieMode}
-              aria-label="Filtr"
-              onChange={(e) => {
-                setPieMode(e.target.value as 'court' | 'turkum')
-                setPieSel(-1)
-              }}
-            >
-              <option value="court">Sud turi boʻyicha</option>
-              <option value="turkum">Turkum boʻyicha</option>
-            </select>
-          </div>
-          {pieItems.length ? (
-            <>
+      <div className="p-card rise-c">
+        <div className="card-h">
+          <h2>Sud ishlari taqsimoti</h2>
+          <div className="sp" />
+          <select
+            className="pie-filter"
+            value={pieMode}
+            aria-label="Filtr"
+            onChange={(e) => {
+              setPieMode(e.target.value as 'court' | 'turkum')
+              setPieSel(-1)
+            }}
+          >
+            <option value="court">Sud turi boʻyicha</option>
+            <option value="turkum">Turkum boʻyicha</option>
+          </select>
+        </div>
+        {pieItems.length ? (
+          <div className="pie-split">
+            <div className="pie-left">
               <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
                 <Pizza items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
               </div>
@@ -448,73 +447,51 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
                 ))}
               </div>
               <PizzaKey />
-            </>
-          ) : (
-            <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
-          )}
-        </div>
-        <div className="p-card rise-c">
-          {pieSelClamped ? (
-            <PizzaDetail
-              item={pieSelClamped}
-              kind={pieKind}
-              action={
-                <button
-                  className="btn btn-outline btn-sm"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 14 }}
-                  onClick={() => goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)}
-                >
-                  Ishlarni koʻrish
-                </button>
-              }
-            />
-          ) : (
-            <EmptyBlock
-              icon={<BarChart3 />}
-              title="Boʻlim tanlanmagan"
-              hint={pieMode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* mini filter cards → Sud ishlari. No inline grid override: inherit the
-          responsive .kpis columns/gap so this row reflows in sync with the KPI
-          row above (2-up ≤1080, 1-up ≤560) instead of staying a cramped 4-up.
-          Vertical gap is owned by .stat-flow (the root), not per-block. */}
-      <div className="kpis">
-        {[
-          { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
-          { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
-          { id: 'administrative', label: "Maʼmuriy", n: courtCounts.administrative },
-        ].map((c) => (
-          <div
-            key={c.id}
-            className="p-card mini fcard"
-            title={`${c.label} ishlarni koʻrsatish`}
-            onClick={() => goCasesFiltered(c.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && goCasesFiltered(c.id)}
-          >
-            <div className="lab">{c.label}</div>
-            <div className="val tnum">{c.n}</div>
-            <div className="foot faint">{c.label} sudlari boʻyicha</div>
+            </div>
+            <div className="pie-right">
+              {pieSelClamped ? (
+                <PizzaDetail
+                  item={pieSelClamped}
+                  kind={pieKind}
+                  action={
+                    <button
+                      className="btn btn-outline btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', marginTop: 14 }}
+                      onClick={() => goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)}
+                    >
+                      Ishlarni koʻrish
+                    </button>
+                  }
+                />
+              ) : (
+                <>
+                  <div className="pr-h">Sud turi boʻyicha ishlar</div>
+                  <div className="sect-list">
+                    {[
+                      { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
+                      { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
+                      { id: 'administrative', label: 'Maʼmuriy', n: courtCounts.administrative },
+                    ].map((c) => (
+                      <button key={c.id} type="button" className="sect-row" onClick={() => goCasesFiltered(c.id)}>
+                        <span className="sr-name">{c.label}</span>
+                        <span className="sr-n">{c.n}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                      </button>
+                    ))}
+                    <button type="button" className="sect-row all" onClick={() => goCasesFiltered()}>
+                      <span className="sr-name">Barcha ishlar</span>
+                      <span className="sr-n">{courtCounts.economic + courtCounts.civil + courtCounts.administrative}</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                    </button>
+                  </div>
+                  <p className="faint pr-hint">Tafsilot uchun diagrammadan boʻlimni tanlang.</p>
+                </>
+              )}
+            </div>
           </div>
-        ))}
-        <div
-          className="p-card mini fcard"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, textAlign: 'center' }}
-          onClick={() => goCasesFiltered()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && goCasesFiltered()}
-        >
-          <span className="arrow" style={{ width: 34, height: 34, background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 10, display: 'grid', placeItems: 'center' }}>
-            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-          </span>
-          <b style={{ fontSize: 13 }}>Barcha ishlar</b>
-        </div>
+        ) : (
+          <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
+        )}
       </div>
 
       <div className="p-card rise-c">

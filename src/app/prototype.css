@@ -341,9 +341,9 @@ html, body { height: 100%; }
 .alert.err > svg { color: var(--neg-base); }
 .alert.info { background: var(--info-soft); border-color: var(--info-line); }
 .alert.info > svg { color: var(--info-base); }
-.empty { text-align: center; padding: 44px 20px; color: var(--text-3); }
-.empty .ico { width: 54px; height: 54px; border-radius: var(--r-lg); background: var(--surface-inset); display: grid; place-items: center; margin: 0 auto 14px; }
-.empty .ico svg { width: 26px; height: 26px; }
+.empty { text-align: center; padding: 28px 20px; color: var(--text-3); }
+.empty .ico { width: 40px; height: 40px; border-radius: 10px; background: var(--surface-inset); display: grid; place-items: center; margin: 0 auto 10px; }
+.empty .ico svg { width: 20px; height: 20px; }
 .empty h3 { font-size: 15px; color: var(--text-1); margin: 0 0 4px; }
 .empty p { margin: 0 0 14px; font-size: 13px; max-width: 40ch; margin-inline: auto; }
 .sk { position: relative; overflow: hidden; background: var(--surface-inset); border-radius: 8px; }
@@ -1040,3 +1040,29 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .look-prev.calm .lp-main b { background: #171717; opacity: .8; border-radius: 3px; }
 .look-prev.calm .lp-tiles i { background: #FFFFFF; border: 1px solid rgba(23, 23, 23, .08); border-radius: 6px; }
 .look-prev.calm .lp-rows i { background: #FFFFFF; border-bottom: 1px solid rgba(23, 23, 23, .08); border-radius: 0; }
+
+/* ---------- Statistika chart card: the pie and its section list are ONE card (no separate «nothing selected» card, no tiles row) ---------- */
+.pie-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+@media (max-width: 1000px) { .pie-split { grid-template-columns: 1fr; gap: 16px; } }
+.pie-right .pr-h { font-size: 13px; color: var(--text-3); margin-bottom: 8px; }
+.sect-list { display: flex; flex-direction: column; border-top: 1px solid var(--border-subtle); }
+.sect-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 4px; border-bottom: 1px solid var(--border-subtle); text-align: left; font-size: 14px; font-weight: 500; color: var(--text-1); transition: background-color .15s var(--ease); }
+.sect-row:hover { background: var(--surface-hover); }
+.sect-row .sr-name { flex: 1; }
+.sect-row .sr-n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 500; }
+.sect-row svg { width: 16px; height: 16px; color: var(--text-3); flex: none; }
+.sect-row.all { font-weight: 600; }
+.pr-hint { font-size: 12px; margin: 12px 0 0; }
+/* a card title is a title: no icon beside it (the icon repeated on every card and said nothing) */
+.card-h .ico { display: none; }
+
+/* ---------- lists and toolbars: rows are table rows, a toolbar is two clear rows ---------- */
+.filterbar.fb-stack { flex-direction: column; align-items: stretch; gap: 12px; }
+.fb-row { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+.fb-row .f-search { flex: 1 1 280px; max-width: 440px; }
+.fb-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.list { gap: 0; }
+.lrow { border-radius: 0; border-bottom: 1px solid var(--border-subtle); padding: 14px 8px; }
+.list > .lrow:last-child { border-bottom: 0; }
+.lrow[data-case] .lead { display: none; }
+.card-h h2, .card-h h3 { font-weight: 600; }

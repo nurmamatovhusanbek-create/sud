@@ -713,33 +713,30 @@ export function CasesSection() {
 
   return (
     <div className="p-card rise-c">
-      <div className="filterbar">
-        <div className="f-search">
-          <Search />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
+      <div className="filterbar fb-stack">
+        <div className="fb-row">
+          <div className="f-search">
+            <Search />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
+          </div>
+          <div className="fb-actions">
+            <SortMenu value={sort} onChange={setSort} />
+            <button className="btn btn-outline btn-sm" disabled={printing || filtered.length === 0} onClick={printList}>
+              {printing ? <span className="spinner" /> : <Download />}
+              <span>PDF</span>
+            </button>
+            <button className="btn btn-outline btn-sm" disabled={exporting || filtered.length === 0} onClick={exportExcel}>
+              {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
+              <span>Excel</span>
+            </button>
+          </div>
         </div>
-        <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
-        {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
-          <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
-        ) : null}
-        <SortMenu value={sort} onChange={setSort} />
-        <div style={{ flex: 1 }} />
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={printing || filtered.length === 0}
-          onClick={printList}
-        >
-          {printing ? <span className="spinner" /> : <Download />}
-          <span>PDF</span>
-        </button>
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={exporting || filtered.length === 0}
-          onClick={exportExcel}
-        >
-          {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
-          <span>Excel</span>
-        </button>
+        <div className="fb-row">
+          <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+          {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
+            <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
+          ) : null}
+        </div>
       </div>
 
       {anyLoading ? (
