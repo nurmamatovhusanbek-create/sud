@@ -59,7 +59,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/primitives.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts |
+| `dates.ts` | components/proto/primitives.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
@@ -98,7 +98,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +21 |  |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +21 | lib/__tests__/ui-boundary.test.ts |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, hooks/use-stream.ts, lib/api-client.ts, +4 |  |
 | `billing.ts` | api/bills/route, lib/bills-snapshot.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts, lib/__tests__/bills-snapshot.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
@@ -170,7 +170,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
-| `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 |  |
+| `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 | lib/__tests__/ui-boundary.test.ts |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
 | `theme-boot.ts` | app/layout.tsx, lib/motion.ts, lib/theme.ts | lib/__tests__/motion.test.ts, lib/__tests__/theme.test.ts |
 | `theme.ts` | components/shell/app-shell.tsx | lib/__tests__/theme.test.ts |
@@ -178,7 +178,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `update-check.ts` | api/settings/version/route | lib/__tests__/update-check.test.ts |
 | `update-wait.ts` | components/views/settings-view.tsx | lib/__tests__/update-wait.test.ts |
 | `use-registry.ts` | components/company/context-bar.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, components/views/watchlist.tsx |  |
-| `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx |  |
+| `utils.ts` | components/shell/app-shell.tsx, components/ui/button.tsx, components/ui/pagination.tsx, components/ui/skeleton.tsx, components/ui/tooltip.tsx | lib/__tests__/ui-boundary.test.ts |
 | `version-server.ts` | api/settings/update/route, api/settings/version/route |  |
 | `version.ts` | api/settings/version/route, components/views/settings-view.tsx |  |
 | `vlm-client.ts` | lib/billing.ts, lib/vlm-pool.ts, lib/vlm-test.ts | lib/__tests__/vlm-pool.test.ts, lib/__tests__/vlm.test.ts |

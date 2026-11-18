@@ -1,0 +1,119 @@
+{
+  "src/components/company/context-bar.tsx": [
+    "@/lib/enrich",
+    "@/lib/hard-refresh",
+    "@/lib/registry",
+    "@/lib/report",
+    "@/lib/store",
+    "@/lib/use-registry"
+  ],
+  "src/components/proto/case-orders.tsx": [
+    "@/lib/api-client"
+  ],
+  "src/components/proto/doc-preview.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents"
+  ],
+  "src/components/sections/bills.tsx": [
+    "@/lib/api-client",
+    "@/lib/bills-cache",
+    "@/lib/hard-refresh",
+    "@/lib/store"
+  ],
+  "src/components/sections/cases.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents",
+    "@/lib/hard-refresh",
+    "@/lib/store"
+  ],
+  "src/components/sections/hearings.tsx": [
+    "@/lib/api-client",
+    "@/lib/hard-refresh",
+    "@/lib/store"
+  ],
+  "src/components/sections/overview.tsx": [
+    "@/lib/api-client",
+    "@/lib/bills-cache",
+    "@/lib/hard-refresh",
+    "@/lib/registry",
+    "@/lib/store"
+  ],
+  "src/components/sections/profile.tsx": [
+    "@/lib/api-client",
+    "@/lib/hard-refresh",
+    "@/lib/registry",
+    "@/lib/store"
+  ],
+  "src/components/shell/app-shell.tsx": [
+    "@/lib/api-client",
+    "@/lib/registry",
+    "@/lib/store",
+    "@/lib/use-registry"
+  ],
+  "src/components/shell/command-palette.tsx": [
+    "@/lib/api-client",
+    "@/lib/registry",
+    "@/lib/store",
+    "@/lib/use-registry"
+  ],
+  "src/components/shell/presence-beat.tsx": [
+    "@/lib/api-client",
+    "fetch()"
+  ],
+  "src/components/views/custom-templates.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents"
+  ],
+  "src/components/views/doc-bulk.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents"
+  ],
+  "src/components/views/doc-editor.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents"
+  ],
+  "src/components/views/doc-profiles.tsx": [
+    "@/lib/documents"
+  ],
+  "src/components/views/documents-view.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents",
+    "@/lib/store"
+  ],
+  "src/components/views/launcher.tsx": [
+    "@/lib/api-client",
+    "@/lib/enrich",
+    "@/lib/registry",
+    "@/lib/store",
+    "@/lib/use-registry"
+  ],
+  "src/components/views/orders-settings.tsx": [
+    "@/lib/api-client"
+  ],
+  "src/components/views/orders-view.tsx": [
+    "@/lib/api-client"
+  ],
+  "src/components/views/pretenzia-view.tsx": [
+    "@/lib/api-client",
+    "@/lib/documents",
+    "@/lib/pretenzia"
+  ],
+  "src/components/views/security-settings.tsx": [
+    "@/lib/api-client"
+  ],
+  "src/components/views/settings-view.tsx": [
+    "@/lib/api-client",
+    "fetch()"
+  ],
+  "src/components/views/vlm-settings.tsx": [
+    "@/lib/api-client",
+    "fetch()"
+  ],
+  "src/components/views/watchlist.tsx": [
+    "@/lib/api-client",
+    "@/lib/enrich",
+    "@/lib/registry",
+    "@/lib/store",
+    "@/lib/use-registry"
+  ]
+}
