@@ -209,3 +209,6 @@
 
 /* ---------- 10. case table: ink, no colour ---------- */
 [data-look='premium'] .lhead { font-weight: 500; }
+
+/* ---------- 12. the stat strip is one clean surface: no hairlines between the tiles (each tile is marked by its icon) ---------- */
+[data-look='premium'] .kpis { gap: 0; background: var(--surface); }
