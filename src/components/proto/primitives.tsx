@@ -11,6 +11,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import { daysUntil } from '@/core/dates'
 import { motionReduced } from '@/lib/motion'
+import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 import { clampPct, type DialZones } from './dial-geometry'
@@ -120,9 +121,9 @@ export function CountUp({ value, suffix = '', className, id }: { value: number; 
 }
 
 /**
- * Dial — a score as a NUMBER over a PROGRESS BAR (a single goal is a progress bar, never a gauge). The figure counts up once on
- * mount and glides to a new value; the bar is one ink fill on a neutral track. `zones` only draw the limits as hairline ticks
- * (e.g. workers: 60 / 90) with their values under the bar on big instances: no colour band, the number is the signal.
+ * Dial — a score as a NUMBER over a RULER of hairline ticks that light up to the value (an instrument, not a pie or a ring). The figure
+ * counts up once on mount and glides to a new value; lit ticks are ink, the rest a quiet step. `zones` mark their limits with taller
+ * ticks (workers 60 / 90, health 80) and, on big instances, print them under the ruler: no colour band, the number is the signal.
  * `pct = null` draws an empty bar with «–». Same props as the old gauge, so every call site keeps working.
  */
 /** worker success rate: < 60 dead · 60–89 slow · ≥ 90 healthy (the badges and dots use the same limits) */
@@ -174,7 +175,10 @@ export function Dial({
   }, [target, id])
 
   const big = size > 150
+  const n = big ? 50 : 24 // ticks on the ruler: one every 2 (or ~4) points
   const limits = (zones ?? []).map(([v]) => v).filter((v) => v < 100)
+  const limitTick = new Set(limits.map((v) => Math.round((v / 100) * n)))
+  const lit = (shown / 100) * n
   return (
     <div
       className={`score${big ? ' score-big' : ''}`}
@@ -187,12 +191,9 @@ export function Dial({
         {pct === null ? '–' : Math.round(shown)}
         {unit && pct !== null ? <small>{unit}</small> : null}
       </div>
-      <div className="score-bar" aria-hidden>
-        <div className="meter">
-          <i style={{ width: `${pct === null ? 0 : shown}%` }} />
-        </div>
-        {limits.map((v) => (
-          <span key={v} className="score-tick" style={{ left: `${v}%` }} />
+      <div className="ruler" aria-hidden>
+        {Array.from({ length: n + 1 }, (_, i) => (
+          <i key={i} className={`${pct !== null && i < lit ? 'on' : ''}${limitTick.has(i) ? ' lim' : i % 5 === 0 ? ' maj' : ''}`} />
         ))}
       </div>
       {big ? (
@@ -488,130 +489,134 @@ import {
   PIZZA_STATUS_LABEL,
   PIZZA_STATUS_ORDER,
   type PizzaItem,
+  type PizzaStatus,
 } from '@/components/proto/pizza-geometry'
 import { winRate } from '@/core/rates'
 
 /**
- * OutcomeBars — the case distribution as a RANKED LIST WITH BARS (a share is a list with bars, never a pie): one row per slice
- * (court type or category), longest first. The bar's length is the slice's total against the largest slice; inside it the four
- * outcomes are stacked in ONE ink: solid (yutgan), tint (yutqazgan), hatch (neytral), dashed outline (jarayonda), so density and
- * pattern carry the status and no hue is needed. Controlled like the old pizza: `selected` is an index into `items` (-1 = none),
- * `onSelect` reports a row; the parent toggles it.
+ * OutcomeBoard — the case distribution, built to be read in one glance (no pie, no legend to decode).
+ *   HERO   the answer for the selected slice (or all cases): a huge win rate, ONE thick strip of every case (won solid ·
+ *          lost tint · neutral hatched · in progress dashed outline) and four stat columns under it that are the legend AND
+ *          the numbers (icon, count, share), so a one-pixel segment is never the only place a figure lives.
+ *   TILES  one per slice (court type / category), each with its own composition drawn to 100 % so slices compare by SHAPE;
+ *          picking a tile re-aims the hero, picking it again goes back to «all».
+ * Everything is ONE ink: the premium look has no hue, so contrast, density and the status icon carry the meaning.
+ * Controlled like the old pizza: `selected` is an index into `items` (-1 = all), `onSelect` reports a tile.
  */
-export function OutcomeBars({
+const OUTCOME_FAMILY: Record<PizzaStatus, StatusFamilyKey> = { won: 'win', lost: 'lose', neutral: 'neutral', pending: 'pending' }
+
+function OutcomeStrip({ counts, total, size }: { counts: Record<PizzaStatus, number>; total: number; size: 'lg' | 'sm' }) {
+  return (
+    <span className={`ob-strip ${size}`} style={{ ['--sw' as string]: 'var(--text-1)' }} aria-hidden="true">
+      {total === 0 ? <i className="empty" /> : null}
+      {PIZZA_STATUS_ORDER.map((st) => (counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ flexGrow: counts[st] }} /> : null))}
+    </span>
+  )
+}
+
+export function OutcomeBoard({
   items,
-  onSelect,
   selected = -1,
+  onSelect,
+  kind,
+  tilesLabel,
+  action,
 }: {
   items: PizzaItem[]
-  onSelect?: (item: PizzaItem, index: number) => void
   selected?: number
+  onSelect?: (item: PizzaItem, index: number) => void
+  /** e.g. «Sud turi» — names the slice kind in the hero */
+  kind: string
+  tilesLabel: string
+  action?: React.ReactNode
 }) {
-  const max = Math.max(1, ...items.map(pizzaTotal))
-  const order = items.map((_, i) => i).sort((x, y) => pizzaTotal(items[y]) - pizzaTotal(items[x]))
+  const sel = selected >= 0 && selected < items.length ? items[selected] : null
+  const all = useMemo<PizzaItem>(
+    () => ({
+      label: 'Barchasi',
+      full: 'Barcha ishlar',
+      col: '',
+      pill: '',
+      won: items.reduce((n, it) => n + it.won, 0),
+      lost: items.reduce((n, it) => n + it.lost, 0),
+      neutral: items.reduce((n, it) => n + (it.neutral ?? 0), 0),
+      pending: items.reduce((n, it) => n + (it.pending ?? 0), 0),
+    }),
+    [items],
+  )
+  const subject = sel ?? all
+  const counts = pizzaCounts(subject)
+  const total = pizzaTotal(subject)
+  const decided = subject.won + subject.lost
+  const wr = winRate(subject.won, subject.lost) // the ONE app-wide definition: won ÷ (won + lost)
+
   return (
-    <div className="ob" style={{ ['--sw' as string]: 'var(--text-1)' }}>
-      <div className="ob-key" aria-hidden="true">
-        {PIZZA_STATUS_ORDER.map((st) => (
-          <span key={st}>
-            <i className={`st ${st}`} />
-            {PIZZA_STATUS_LABEL[st]}
-          </span>
-        ))}
+    <div className="ob2">
+      <div className="ob2-hero">
+        <div className="ob2-head">
+          {sel ? <span className="ob2-kind">{kind}</span> : null}
+          <b className="ob2-name">{subject.full}</b>
+          <span className="ob2-total mono">{total} ish</span>
+          <span style={{ flex: 1 }} />
+          {action}
+        </div>
+        <div className="ob2-fig">
+          <div className="ob2-win">
+            <div className="ob2-pct mono">
+              {wr === null ? '–' : <CountUp value={wr} id={`ob-wr-${subject.id ?? subject.label}`} />}
+              {wr === null ? null : <small>%</small>}
+            </div>
+            <div className="ob2-cap">
+              {wr === null ? 'Hal qilingan ish yoʻq' : `Yutuq darajasi · ${decided} ta hal qilingan ishdan ${subject.won} tasi`}
+            </div>
+          </div>
+          <div className="ob2-main">
+            <OutcomeStrip counts={counts} total={total} size="lg" />
+            <div className="ob2-stats">
+              {PIZZA_STATUS_ORDER.map((st) => (
+                <div key={st} className={`ob2-stat${counts[st] === 0 ? ' zero' : ''}`} style={{ ['--sw' as string]: 'var(--text-1)' }}>
+                  <div className="ob2-stat-h">
+                    <StatusIcon family={OUTCOME_FAMILY[st]} size={14} />
+                    <span>{PIZZA_STATUS_LABEL[st]}</span>
+                    <i className={`st ${st} ob2-sw`} />
+                  </div>
+                  <div className="ob2-stat-n mono">
+                    {counts[st]}
+                    <small>{total ? `${Math.round((counts[st] / total) * 100)}%` : ''}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="ob-rows">
-        {order.map((i) => {
-          const it = items[i]
-          const counts = pizzaCounts(it)
-          const total = pizzaTotal(it)
+      <div className="ob2-tiles-h">{tilesLabel}</div>
+      <div className="ob2-tiles">
+        {items.map((it, i) => {
+          const c = pizzaCounts(it)
+          const t = pizzaTotal(it)
+          const r = winRate(it.won, it.lost)
           return (
             <button
               type="button"
               key={it.id ?? it.label}
-              className={`ob-row${selected === i ? ' on' : ''}`}
+              className={`ob2-tile${selected === i ? ' on' : ''}`}
               aria-pressed={selected === i}
               onClick={() => onSelect?.(it, i)}
             >
-              <span className="ob-name">{it.label}</span>
-              <span className="ob-track">
-                <span className="ob-bar" style={{ width: `${(total / max) * 100}%` }}>
-                  {PIZZA_STATUS_ORDER.map((st) => (counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ flex: counts[st] }} /> : null))}
-                </span>
+              <span className="ob2-tile-h">
+                <span className="ob2-tile-name">{it.label}</span>
+                <span className="ob2-tile-n mono">{t}</span>
               </span>
-              <span className="ob-n">{total}</span>
+              <OutcomeStrip counts={c} total={t} size="sm" />
+              <span className="ob2-tile-f">
+                <span>Yutuq</span>
+                <b className="mono">{r === null ? '–' : `${r}%`}</b>
+              </span>
             </button>
           )
         })}
       </div>
-    </div>
-  )
-}
-
-/** A single goal is a progress bar: ink fill on a neutral track. `pct = null` draws the empty track. */
-export function MeterBar({ pct, label }: { pct: number | null; label?: string }) {
-  return (
-    <div className="meter" role="img" aria-label={pct === null ? (label ?? 'Maʼlumot yoʻq') : `${label ? `${label}: ` : ''}${Math.round(pct)}%`}>
-      <i style={{ width: `${pct === null ? 0 : Math.max(0, Math.min(100, pct))}%` }} />
-    </div>
-  )
-}
-
-/** Detail panel body for one selected pizza wedge (prototype pieDetailHtml). */
-export function PizzaDetail({
-  item,
-  kind,
-  action,
-}: {
-  item: PizzaItem
-  kind: string
-  action?: React.ReactNode
-}) {
-  // «Jami» is ALL cases and the bands/rows below break it into its four statuses, drawn exactly
-  // like the pie (the slice's hue; solid · tint · hatch · dashed). The win rate is the ONE app-wide
-  // definition (core/rates.ts): won ÷ (won + lost) — neutral and in-progress cases are not in it.
-  const counts = pizzaCounts(item)
-  const total = pizzaTotal(item)
-  const decided = item.won + item.lost
-  const wr = winRate(item.won, item.lost)
-  const seg = (v: number) => (total ? (v / total) * 100 : 0)
-  const rows = PIZZA_STATUS_ORDER.filter((st) => counts[st] > 0 || st === 'won' || st === 'lost')
-
-  return (
-    <div>
-      <div className="det-head">
-        <span className="k">{kind}</span>
-      </div>
-      <div className="det-name">{item.full}</div>
-      <div className="det-sub">
-        Jami {total} ish ·{' '}
-        {wr === null ? 'hal qilingan ish yoʻq' : `yutuq ${wr}% (${decided} ta hal qilingan ishdan)`}
-      </div>
-      <div className="det-win">
-        <div className="dw-n">
-          {wr === null ? '–' : wr}
-          {wr === null ? null : <small>%</small>}
-        </div>
-        <div className="dw-l">Yutuq darajasi</div>
-        <MeterBar pct={wr} label="Yutuq" />
-      </div>
-      <div className="stackbar" style={{ ['--sw' as string]: 'var(--text-1)' }}>
-        {rows.map((st) =>
-          counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ width: `${seg(counts[st])}%` }} /> : null,
-        )}
-      </div>
-      <div className="det-sub" style={{ marginTop: 8 }}>
-        Barcha holatlar boʻyicha taqsimot
-      </div>
-      <div className="det-rows" style={{ ['--sw' as string]: 'var(--text-1)' }}>
-        {rows.map((st) => (
-          <div className="r" key={st}>
-            <span className={`sw st ${st}`} />
-            <span className="nm">{PIZZA_STATUS_LABEL[st]}</span>
-            <span className="vl tnum">{counts[st]}</span>
-          </div>
-        ))}
-      </div>
-      {action}
     </div>
   )
 }

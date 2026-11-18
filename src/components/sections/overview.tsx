@@ -27,9 +27,7 @@ import {
   Kpi,
   BarChart,
   EmptyBlock,
-  OutcomeBars,
-  MeterBar,
-  PizzaDetail,
+  OutcomeBoard,
   grp,
   initials,
   familyBadgeClass,
@@ -75,37 +73,6 @@ const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band
   neutral: { icon: <StatusIcon family="neutral" size={20} />, label: 'Neytral', band: 'neutral', text: "Neytral yakunlangan" },
 }
 
-function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
-  const byCourt = useMemo(() => {
-    const map = new Map<string, { win: number; lose: number }>()
-    for (const c of cases) {
-      const e = map.get(c.courtType) || { win: 0, lose: 0 }
-      if (c.classification === 'win') e.win++
-      else if (c.classification === 'lose') e.lose++
-      map.set(c.courtType, e)
-    }
-    return [...map.entries()].map(([k, v]) => ({
-      key: k,
-      label: k === 'economic' ? 'Iqtisodiy' : k === 'civil' ? 'Fuqarolik' : k === 'administrative' ? "Maʼmuriy" : k,
-      rate: calcWinRate(v.win, v.lose), // won ÷ (won + lost); null = nothing decided
-    }))
-  }, [cases])
-  if (!byCourt.length) return <div className="faint" style={{ fontSize: 12.5 }}>Maʼlumot yoʻq</div>
-  return (
-    <div>
-      {byCourt.map((c) => (
-        <div className="wr-row" key={c.key}>
-          <span className="wr-lbl">{c.label}</span>
-          <div className="wr-track">
-            <div className="wr-fill" style={{ width: `${c.rate ?? 0}%` }} />
-          </div>
-          <span className="wr-val">{c.rate === null ? '–' : `${c.rate}%`}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ---- v18: side-by-side comparison (inside Statistika) --------------------------
 
 /** One compact company dashboard: identity + KPIs + interactive pizza + bars. */
@@ -118,7 +85,6 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
     [d.cases, mode],
   )
   const [selIdx, setSelIdx] = useState(-1)
-  const sel = selIdx >= 0 && selIdx < items.length ? items[selIdx] : null
 
   return (
     <div className="cmp-co">
@@ -128,9 +94,6 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           <b>{d.company.name || d.company.tin}</b>
           <div className="faint mono" style={{ fontSize: 10.5 }}>STIR {grp(d.company.tin)}</div>
         </div>
-      </div>
-      <div className="co-win">
-        <MeterBar pct={wr} label="Yutuq" />
       </div>
       <div className="co-kpis">
         <div className="co-kpi"><div className="k">Jami ishlar</div><div className="v">{s.total}</div></div>
@@ -160,21 +123,16 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
         </select>
       </div>
       {items.length ? (
-        <OutcomeBars items={items} selected={selIdx} onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))} />
+        <OutcomeBoard
+          items={items}
+          selected={selIdx}
+          onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))}
+          kind={mode === 'court' ? 'Sud turi' : 'Turkum'}
+          tilesLabel={mode === 'court' ? 'Sud turi boʻyicha' : 'Turkum boʻyicha'}
+        />
       ) : (
         <div className="empty" style={{ padding: 26 }}><h3>Maʼlumot yoʻq</h3></div>
       )}
-      <div className="cmp-det">
-        {sel ? (
-          <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />
-        ) : (
-          <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: '10px 4px' }}>
-            {mode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
-          </div>
-        )}
-      </div>
-      <div className="co-sub" style={{ marginTop: 14 }}>Sud turi boʻyicha yutuq</div>
-      <WrRows cases={d.cases} />
     </div>
   )
 }
@@ -300,13 +258,6 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   const [pieSel, setPieSel] = useState(-1)
   const pieSelClamped = pieSel >= 0 && pieSel < pieItems.length ? pieItems[pieSel] : null
 
-  // court mini-card counts
-  const courtCounts = useMemo(() => {
-    const m = { economic: 0, civil: 0, administrative: 0 }
-    for (const c of data.cases) if (c.courtType in m) m[c.courtType as keyof typeof m]++
-    return m
-  }, [data.cases])
-
   // Bills cache (written by the Bills section stream) — KPI 4
   const billsV = useBillsVersion()
   const bt = billsTotals(stir)
@@ -360,7 +311,6 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   }
   const nh = isoParts(nextHearing?.isoDate as string | undefined)
 
-  const pieKind = pieMode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'
 
   return (
     <div className="stat-flow">
@@ -409,51 +359,25 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           </select>
         </div>
         {pieItems.length ? (
-          <div className="pie-split">
-            <div className="pie-left">
-              <OutcomeBars items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
-            </div>
-            <div className="pie-right">
-              {pieSelClamped ? (
-                <PizzaDetail
-                  item={pieSelClamped}
-                  kind={pieKind}
-                  action={
-                    <button
-                      className="btn btn-outline btn-sm"
-                      style={{ width: '100%', justifyContent: 'center', marginTop: 14 }}
-                      onClick={() => goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)}
-                    >
-                      Ishlarni koʻrish
-                    </button>
-                  }
-                />
-              ) : (
-                <>
-                  <div className="pr-h">Sud turi boʻyicha ishlar</div>
-                  <div className="sect-list">
-                    {[
-                      { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
-                      { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
-                      { id: 'administrative', label: 'Maʼmuriy', n: courtCounts.administrative },
-                    ].map((c) => (
-                      <button key={c.id} type="button" className="sect-row" onClick={() => goCasesFiltered(c.id)}>
-                        <span className="sr-name">{c.label}</span>
-                        <span className="sr-n">{c.n}</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                      </button>
-                    ))}
-                    <button type="button" className="sect-row all" onClick={() => goCasesFiltered()}>
-                      <span className="sr-name">Barcha ishlar</span>
-                      <span className="sr-n">{courtCounts.economic + courtCounts.civil + courtCounts.administrative}</span>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                    </button>
-                  </div>
-                  <p className="faint pr-hint">Tafsilot uchun diagrammadan boʻlimni tanlang.</p>
-                </>
-              )}
-            </div>
-          </div>
+          <OutcomeBoard
+            items={pieItems}
+            selected={pieSel}
+            onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))}
+            kind={pieMode === 'court' ? 'Sud turi' : 'Turkum'}
+            tilesLabel={pieMode === 'court' ? 'Sud turi boʻyicha' : 'Turkum boʻyicha'}
+            action={
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() =>
+                  pieSelClamped
+                    ? goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)
+                    : goCasesFiltered()
+                }
+              >
+                Ishlarni koʻrish
+              </button>
+            }
+          />
         ) : (
           <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
         )}
@@ -482,10 +406,12 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         <div className="p-card rise-c">
           <div className="card-h">
             <div className="ico"><Scale /></div>
-            <h2>Sud turi boʻyicha yutuq</h2>
+            <h2>Solishtirish</h2>
           </div>
-          <WrRows cases={data.cases} />
-          <button className="btn btn-outline btn-sm" style={{ width: '100%', marginTop: 14 }} onClick={onOpenCompare}>
+          <p className="faint" style={{ fontSize: 13, margin: '0 0 14px', lineHeight: 1.5 }}>
+            Ikkinchi kompaniyani tanlang: ikkalasining natijalari yonma-yon, bir xil shkalada chiqadi.
+          </p>
+          <button className="btn btn-outline btn-sm" style={{ width: '100%' }} onClick={onOpenCompare}>
             <Users />
             <span>Boshqa kompaniya bilan solishtirish</span>
           </button>
