@@ -82,6 +82,21 @@ bootstrap), so the defence against script injection is escaping, not CSP; any LO
 trusts `origin/main` of the repository; a VLM / worker host is checked when it is saved, not pinned at connection time (DNS TOCTOU);
 the scraping workers see every request in plaintext and can forge answers: the owner confirmed (Nov 2026) that the six default workers, on the Cloudflare accounts `nurmamatovhusanbek`, `uzwebfox` and `najimsheikh071`, are theirs or trusted. A worker on ANY OTHER account is flagged «Begona hisob» in Settings › Workerlar and with a warning when it is added (`core/worker-trust.ts`; name more trusted accounts with `TRUSTED_WORKER_ACCOUNTS`). Keep the pool to workers you control.
 
+## Penetration test, Nov 2026 (second round: HAR import, Tozalash, pacing, WAF breaker)
+
+Method: raw-socket and HTTP attacks on an isolated copy (own `HOME`, orders dir, no backup): forged Host (HTTP/1.0 without Host), cross-site
+`Sec-Fetch-Site`/`Origin` on every new route, junk / traversal ids, malformed JSON, 25 MB PDF and 40 MB HAR uploads, 102 MB over-limit body, a HAR with
+20 000 fake order files, a 200 000-deep JSON; `bun audit`; secret and dangerous-sink grep; every route is `guard()`-wrapped.
+
+| # | Severity | Finding | Fix | Regression test |
+|---|---|---|---|---|
+| 1 | **Medium** (integrity) | Next cuts a request body at **10 MB without an error** (`Request body exceeded 10MB … Only the first 10MB will be available`). `/api/public-orders/import` answered `200` and stored the first 10 MB of a 25 MB PDF as the order file (a corrupt file reported as success); a HAR over 10 MB was cut mid-JSON | `experimental.proxyClientMaxBodySize: "300mb"` in `next.config.ts` (above the routes' own 100 MB / 256 MB limits, which now answer `413`) | `server/__tests__/body-limit.test.ts` |
+| 2 | Low | A crafted HAR with thousands of fake order files made the app write thousands of files (disk fill; the person has to pick the file themselves) | at most `MAX_HAR_FILES` (500) order files per HAR, else `422 too_many` | route check |
+| 3 | Info (accepted) | A request that DECLARES a huge `Content-Length` and sends no body is held open by Next while it buffers (no early `413`); needs a passing Host check and, from a browser, a same-origin request, so only a local process can do it | none: a local process can already do more | – |
+
+Checked and found sound: forged Host and cross-site refused on every new route; junk ids in `hidden` ignored (only valid ids counted), traversal ids refused
+with 400/404; malformed JSON gives 4xx, never 500; deeply nested JSON gives `422 not_har`; a HAR is only read (no request to any site, cookies and tokens never parsed).
+
 ## Checklist before merging
 
 `bun run typecheck` · `bun run lint` · `bun test src/core src/lib src/server` · `bun run map:check` · `bun run audit` (after dependency changes).

@@ -9,6 +9,8 @@ export const runtime = 'nodejs'
 
 /** A HAR saved with content holds every file of the session; a long one is a few tens of MB. */
 export const MAX_HAR_BYTES = 256 * 1024 * 1024
+/** a browser session that opened orders holds a handful of order files; thousands is a crafted file filling the disk */
+export const MAX_HAR_FILES = 500
 
 /**
  * POST /api/public-orders/import-har   body: the .har file itself
@@ -36,6 +38,7 @@ export const POST = guard(
         : 'HAR faylda qaror fayli topilmadi: Network ochiq turib qarorni oching, soʻng HAR ni saqlang'
       return jsonFail(why, 'no_order_file', 422)
     }
+    if (found.files.length > MAX_HAR_FILES) return jsonFail(`HAR faylda juda koʻp qaror fayli (${found.files.length}); bir martada ${MAX_HAR_FILES} tagacha`, 'too_many', 422)
     const saved: { id: string; size: number }[] = []
     try {
       for (const f of found.files) {

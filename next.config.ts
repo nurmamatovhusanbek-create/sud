@@ -81,6 +81,13 @@ const nextConfig: NextConfig & { agentRules?: boolean } = {
   devIndicators: {
     position: "bottom-right",
   },
+  // Next buffers a request body for the proxy (src/proxy.ts) and, by default, cuts it at 10 MB WITHOUT an error: «Request body
+  // exceeded 10MB … Only the first 10MB will be available». The order-import routes then stored the first 10 MB of a 25 MB PDF as
+  // if it were the whole file (pentest finding). The cap must be above every route's own limit (import: 100 MB, import-har:
+  // 256 MB), so that a too-big body is refused by the route with a clear 413 and a smaller one arrives whole.
+  experimental: {
+    proxyClientMaxBodySize: "300mb",
+  },
   // The document engine reads the .docx templates from the filesystem at
   // request time. Trace them into the standalone build so the route can find
   // them in production (dev reads straight from the project tree).
