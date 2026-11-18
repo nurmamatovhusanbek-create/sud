@@ -303,7 +303,7 @@ export function WatchlistView() {
           )}
         </span>
       </div>
-      <div className="p-card rise-c">
+      <div className={shownRows.length === 0 ? 'p-card rise-c' : 'rise-c'}>
         {shownRows.length === 0 ? (
           <EmptyBlock icon={<CalendarDays />} title="Majlis yoʻq" hint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
         ) : (

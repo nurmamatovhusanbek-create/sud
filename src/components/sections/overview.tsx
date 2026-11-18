@@ -392,27 +392,23 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   return (
     <div className="stat-flow">
       <div className="kpis">
-        <Kpi label="Jami sud ishlari" icon={<Gavel />} foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
+        <Kpi label="Jami sud ishlari" foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
           <span>{s.total}</span>
         </Kpi>
         <Kpi
           label="Yutuq darajasi"
-          icon={<Trophy />}
-          ink
           foot={winRate === null ? 'Hal qilingan ish yoʻq' : <>{s.win} yutgan / {s.win + s.lose} ta hal qilingan ishdan</>}
         >
           <span>{winRateText(s.win, s.lose)}</span>
         </Kpi>
         <Kpi
           label="Kutilayotgan majlis"
-          icon={<CalendarDays />}
           foot={upcomingCount !== null ? <>{upcomingCount} ta majlis belgilangan</> : 'Majlislar boʻlimida yuklanadi'}
         >
           <span>{upcomingCount ?? '-'}</span>
         </Kpi>
         <Kpi
           label="Umumiy qarzdorlik"
-          icon={<Timer />}
           foot={bt.loaded ? (bt.overdue > 0 ? 'BPI orqali undiruv' : 'Qarzdorlik yoʻq') : "Toʻlovlar boʻlimida yuklanadi"}
         >
           <span style={{ fontSize: 18, color: bt.overdue > 0 ? 'var(--neg-text)' : undefined }}>

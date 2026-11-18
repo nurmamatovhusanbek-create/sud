@@ -868,13 +868,13 @@ function HealthTab() {
           </div>
           <div className="health-grid" style={{ marginTop: 8 }}>
             <div>
-              <div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', fontWeight: 600 }}>
+              <div className="lbl" style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
                 Jami soʻrov
               </div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>{totalReqs}</div>
             </div>
             <div>
-              <div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', fontWeight: 600 }}>
+              <div className="lbl" style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
                 Oʻrtacha javob
               </div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>
@@ -883,7 +883,7 @@ function HealthTab() {
               </div>
             </div>
             <div>
-              <div className="lbl" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', fontWeight: 600 }}>
+              <div className="lbl" style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
                 Faol worker
               </div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 600, marginTop: 4 }}>

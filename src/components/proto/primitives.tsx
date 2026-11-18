@@ -266,27 +266,22 @@ export function Spark({ values, failIdx = [], px = 2.2 }: { values: number[]; fa
   )
 }
 
-/** KPI card — prototype .kpi (+ .ink variant). */
+/** KPI tile: a label, one figure and what it compares to. No icon, no fill (they only decorate). */
 export function Kpi({
   label,
-  icon,
-  ink,
   children,
   foot,
   valueSize,
 }: {
   label: string
-  icon?: React.ReactNode
-  ink?: boolean
   children: React.ReactNode
   foot?: React.ReactNode
   valueSize?: number
 }) {
   return (
-    <div className={`kpi ${ink ? 'ink' : ''}`}>
+    <div className="kpi">
       <div className="kpi-top">
         <div className="lbl">{label}</div>
-        {icon ? <div className="kpi-ico">{icon}</div> : null}
       </div>
       <div className="val" style={valueSize ? { fontSize: valueSize } : undefined}>
         {children}

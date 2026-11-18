@@ -341,11 +341,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="side-spacer" />
-        <button className="sysstat" onClick={() => { setSideOpen(false); setSurface('settings') }}>
+        <button
+          className="sysstat"
+          data-state={!workerStat ? 'checking' : workerStat.total === 0 || workerStat.alive === 0 ? 'down' : workerStat.alive < workerStat.total ? 'degraded' : 'ok'}
+          onClick={() => { setSideOpen(false); setSurface('settings') }}
+        >
           <span className="pulse" />
           <span>
             <b>{workerStat ? `${workerStat.alive}/${workerStat.total} worker faol` : 'Workerlar tekshirilmoqda'}</b>
-            <small>Tarmoq holati · sogʻlom</small>
+            <small>{!workerStat ? 'Tarmoq holati' : workerStat.total === 0 ? 'Worker sozlanmagan' : workerStat.alive === 0 ? 'Hech biri javob bermayapti' : workerStat.alive < workerStat.total ? `${workerStat.total - workerStat.alive} tasi javob bermayapti` : 'Hammasi ishlayapti'}</small>
           </span>
         </button>
         <div className="side-foot">

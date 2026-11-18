@@ -18,22 +18,22 @@
 
 :root {
   /* 1. NEUTRAL RAMP — the monochrome spine (raw; do not use directly) */
-  /* Indigo-biased neutral ramp (v18 "Sud Signal") — grays lean navy, not cool. */
+  /* Graphite ramp: surfaces and text are neutral; the content (statuses, charts, the hearing) carries the colour. */
   --ramp-0:    #FFFFFF;
-  --ramp-25:   #FAFBFF;
-  --ramp-50:   #F4F5FD;
-  --ramp-100:  #EDEEF6;
-  --ramp-150:  #E6E9F5;
-  --ramp-200:  #DADFF0;
-  --ramp-300:  #C4CCE8;
-  --ramp-400:  #AAB3D8;
-  --ramp-500:  #98A0C4;
-  --ramp-600:  #5C6489;
-  --ramp-700:  #414A78;
-  --ramp-800:  #2C3873;
-  --ramp-900:  #1F2547;
-  --ramp-950:  #1A2350;
-  --ramp-1000: #1A2350;   /* navy — the dark accent in light mode (v18 --navy) */
+  --ramp-25:   #FAFAFA;
+  --ramp-50:   #F4F4F5;
+  --ramp-100:  #EEEEF0;
+  --ramp-150:  #E8E8EB;
+  --ramp-200:  #DEDEE2;
+  --ramp-300:  #C9C9CF;
+  --ramp-400:  #A9A9B0;
+  --ramp-500:  #8A8A91;
+  --ramp-600:  #525252;
+  --ramp-700:  #404043;
+  --ramp-800:  #2B2B2E;
+  --ramp-900:  #171717;
+  --ramp-950:  #111112;
+  --ramp-1000: #171717;   /* navy — the dark accent in light mode (v18 --navy) */
 
   /* Brand hue — the ONE interactive color (indigo→blue). */
   --brand-900: #1a2350; --brand-700: #2c3873; --brand-600: #3b5bdb;
@@ -42,8 +42,8 @@
   --brand-ink: #2f49b0;
 
   /* 2. SIGNAL HUES — raw status palette (do not use directly) */
-  /* v18 semantics: ONLY green (won/paid) + rose (lost/overdue). Pending/active
-     and "info" use the BRAND BLUE — there is no orange in this system. */
+  /* Semantics: green = won / paid, rose = lost / overdue, amber = pending / due soon,
+     brand blue = information and selection. */
   --signal-positive-500: #0f9070;
   --signal-positive-600: #0c785d;
   --signal-positive-tint:#e3f2ec;
@@ -54,10 +54,10 @@
   --signal-negative-tint:#f7e7ec;
   --signal-negative-line:#eec3ce;
 
-  --signal-warning-500: #3b5bdb;
-  --signal-warning-600: #2f49b0;
-  --signal-warning-tint:#e7ecfd;
-  --signal-warning-line:#d3ddfb;
+  --signal-warning-500: #b4690e;
+  --signal-warning-600: #8a5100;
+  --signal-warning-tint:#fbf0dc;
+  --signal-warning-line:#efd6a8;
 
   --signal-info-500: #3b5bdb;
   --signal-info-600: #2f49b0;
@@ -65,7 +65,7 @@
   --signal-info-line:#d3ddfb;
 
   /* 3. SEMANTIC ROLES — components consume these */
-  --bg-canvas:        #eef0fa;
+  --bg-canvas:        #F6F6F7;
   --bg-sunken:        var(--ramp-150);
   --surface:          var(--ramp-0);
   --surface-raised:   var(--ramp-0);
@@ -76,13 +76,13 @@
 
   --text-1:  var(--ramp-900);
   --text-2:  var(--ramp-600);
-  --text-3:  #626A91;   /* AA (≥4.5:1) on every light surface; was ramp-500 #98A0C4 = 2.3:1 */
+  --text-3:  #6B6B70;   /* muted: ≥4.5:1 on every light surface (white 5.3, #F4F4F5 4.9) */
   --text-disabled: var(--ramp-400);
   --text-inverse:  var(--ramp-0);
 
-  --border-subtle:  var(--ramp-150);
-  --border-default: var(--ramp-200);
-  --border-strong:  var(--ramp-300);
+  --border-subtle:  rgba(23,23,23,0.08);
+  --border-default: rgba(23,23,23,0.13);
+  --border-strong:  rgba(23,23,23,0.24);
   --border-focus:   var(--brand);
 
   /* --accent is the high-emphasis DARK fill (v18 navy): primary buttons, ink
@@ -94,10 +94,8 @@
   --accent-soft:     var(--brand-100);
   --accent-ring:     rgba(59,91,219,0.28);
 
-  /* Brand tile — indigo gradient that ties company-card monograms to the navy
-     sidebar. A fixed brand surface (like .side): stays navy in both themes, so
-     it is intentionally NOT redefined under dark mode. */
-  --brand-tile: linear-gradient(135deg, #1a2350, #2c3873);
+  /* Company-card monogram tile: one flat ink tone in both themes (no gradient). */
+  --brand-tile: #26262a;
 
   --status-positive-solid: var(--signal-positive-500);
   --status-positive-on:    #ffffff;
@@ -137,9 +135,9 @@
   /* 4. RADIUS */
   --radius-pill: 999px;
   --radius-xl:   20px;
-  --radius-lg:   16px;
-  --radius-md:   12px;
-  --radius-sm:   9px;
+  --radius-lg:   14px;
+  --radius-md:   10px;
+  --radius-sm:   8px;
   --radius-xs:   6px;
   --radius-dot:  50%;
 
@@ -163,34 +161,34 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --type-display-size: 32px;  --type-display-lh: 1.08; --type-display-w: 700; --type-display-tr: -0.02em;
-  --type-h1-size: 22px;       --type-h1-lh: 1.2;       --type-h1-w: 680;     --type-h1-tr: -0.01em;
-  --type-h2-size: 18px;       --type-h2-lh: 1.25;      --type-h2-w: 650;     --type-h2-tr: -0.006em;
-  --type-h3-size: 15px;       --type-h3-lh: 1.3;       --type-h3-w: 620;     --type-h3-tr: 0;
-  --type-body-size: 14px;     --type-body-lh: 1.5;     --type-body-w: 450;   --type-body-tr: 0;
-  --type-body-sm-size: 13px;  --type-body-sm-lh: 1.45; --type-body-sm-w: 450;
-  --type-label-size: 12px;    --type-label-lh: 1.3;    --type-label-w: 560;
-  --type-caption-size: 11px;  --type-caption-lh: 1.3;  --type-caption-w: 600; --type-caption-tr: 0.06em;
+  --type-display-size: 32px;  --type-display-lh: 1.1;  --type-display-w: 500;  --type-display-tr: -0.02em;
+  --type-h1-size: 24px;       --type-h1-lh: 1.2;       --type-h1-w: 500;      --type-h1-tr: 0;
+  --type-h2-size: 18px;       --type-h2-lh: 1.25;      --type-h2-w: 500;      --type-h2-tr: 0;
+  --type-h3-size: 15px;       --type-h3-lh: 1.3;       --type-h3-w: 500;      --type-h3-tr: 0;
+  --type-body-size: 14px;     --type-body-lh: 1.5;     --type-body-w: 400;   --type-body-tr: 0;
+  --type-body-sm-size: 13px;  --type-body-sm-lh: 1.45; --type-body-sm-w: 400;
+  --type-label-size: 12px;    --type-label-lh: 1.3;    --type-label-w: 500;
+  --type-caption-size: 12px;  --type-caption-lh: 1.3;  --type-caption-w: 400; --type-caption-tr: 0;
   --type-mono-size: 13px;     --type-mono-lh: 1.4;     --type-mono-w: 500;    --type-mono-tr: 0.01em;
   --type-mono-lg-size: 15px;  --type-mono-lh-lg: 1.3;  --type-mono-w-lg: 600;
 
-  --weight-regular: 450;
+  --weight-regular: 400;
   --weight-medium:  500;
   --weight-semibold:600;
-  --weight-bold:    700;
+  --weight-bold:    600;
 
   /* 7. ELEVATION — cards defined by SHADOW, not heavy borders */
   --elev-0: none;
-  --elev-1: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
+  --elev-1: 0 1px 2px rgba(0,0,0,0.05);
   --elev-2: 0 2px 4px -2px rgba(16,24,40,0.05), 0 4px 8px -2px rgba(16,24,40,0.07);
   --elev-3: 0 4px 8px -4px rgba(16,24,40,0.06), 0 12px 24px -6px rgba(16,24,40,0.10);
   --elev-4: 0 8px 16px -8px rgba(16,24,40,0.10), 0 24px 48px -12px rgba(16,24,40,0.18);
-  --elev-focus: 0 0 0 3px var(--accent-ring);
+  --elev-focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand);
   --elev-focus-danger: 0 0 0 3px rgba(196,54,47,0.22);
 
   /* 8. MOTION — restrained; motion explains state, never decorates */
   --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-exit:       cubic-bezier(0.4, 0, 1, 1);
   --dur-1: 120ms;
   --dur-2: 200ms;
@@ -241,27 +239,27 @@
  * DARK MODE — deep indigo-navy canvas, brand-blue accents (v18-aligned).
  * ====================================================================== */
 [data-theme='dark'] {
-  --ramp-0:    #12162b;
-  --ramp-25:   #161b33;
-  --ramp-50:   #1b2140;
-  --ramp-100:  #222a4d;
-  --ramp-150:  #2b3357;
-  --ramp-200:  #353e66;
-  --ramp-300:  #464f7d;
-  --ramp-400:  #5c6489;
-  --ramp-500:  #8b93b8;
-  --ramp-600:  #aab3d8;
-  --ramp-700:  #c4cce8;
-  --ramp-800:  #dadff0;
-  --ramp-900:  #edeef6;
-  --ramp-950:  #f4f5fd;
-  --ramp-1000: #eef1fd;   /* light — dark-mode high-emphasis fill */
+  --ramp-0:    #19191b;
+  --ramp-25:   #1d1d20;
+  --ramp-50:   #232325;
+  --ramp-100:  #2a2a2d;
+  --ramp-150:  #323235;
+  --ramp-200:  #3c3c40;
+  --ramp-300:  #4d4d52;
+  --ramp-400:  #66666c;
+  --ramp-500:  #85858b;
+  --ramp-600:  #a1a1a6;
+  --ramp-700:  #bdbdc2;
+  --ramp-800:  #d6d6d9;
+  --ramp-900:  #ededed;
+  --ramp-950:  #f4f4f4;
+  --ramp-1000: #ededed;   /* light — dark-mode high-emphasis fill */
 
   --brand:     #6d84ec;   /* brighter blue for dark backgrounds */
   --brand-ink: #a9b8f5;
 
-  --bg-canvas:       #0c0f22;
-  --bg-sunken:       #080a18;
+  --bg-canvas:       #141415;
+  --bg-sunken:       #0f0f10;
   --surface:         var(--ramp-0);
   --surface-raised:  var(--ramp-25);
   --surface-overlay: var(--ramp-50);
@@ -273,16 +271,16 @@
   --text-2: var(--ramp-600);
   --text-3: var(--ramp-500);
   --text-disabled: var(--ramp-400);
-  --text-inverse:  #0c0f22;
+  --text-inverse:  #141415;
 
-  --border-subtle:  rgba(255,255,255,0.07);
-  --border-default: rgba(255,255,255,0.11);
-  --border-strong:  rgba(255,255,255,0.18);
+  --border-subtle:  rgba(237,237,237,0.08);
+  --border-default: rgba(237,237,237,0.12);
+  --border-strong:  rgba(237,237,237,0.22);
 
   --accent:          var(--ramp-1000);
   --accent-hover:    var(--ramp-800);
   --accent-pressed:  var(--ramp-700);
-  --accent-contrast: #12162b;
+  --accent-contrast: #141415;
   --accent-soft:     rgba(109,132,236,0.18);
   --accent-ring:     rgba(109,132,236,0.40);
 
@@ -301,12 +299,12 @@
   --status-negative-base:  #e06784;
 
   /* No orange — pending/active/warn use the brand blue. */
-  --status-warning-solid: #6d84ec;
-  --status-warning-on:    #ffffff;
-  --status-warning-soft:  rgba(109,132,236,0.18);
-  --status-warning-text:  #a9b8f5;
-  --status-warning-line:  rgba(109,132,236,0.34);
-  --status-warning-base:  #6d84ec;
+  --status-warning-solid: #d99a2b;
+  --status-warning-on:    #141415;
+  --status-warning-soft:  rgba(217,154,43,0.16);
+  --status-warning-text:  #efbf6b;
+  --status-warning-line:  rgba(217,154,43,0.34);
+  --status-warning-base:  #d99a2b;
 
   --status-info-solid: #6d84ec;
   --status-info-on:    #ffffff;
@@ -517,7 +515,7 @@
   .t-h2 { font-size: var(--type-h2-size); line-height: var(--type-h2-lh); font-weight: var(--type-h2-w); letter-spacing: var(--type-h2-tr); }
   .t-h3 { font-size: var(--type-h3-size); line-height: var(--type-h3-lh); font-weight: var(--type-h3-w); }
   .t-label { font-size: var(--type-label-size); line-height: var(--type-label-lh); font-weight: var(--type-label-w); }
-  .t-caption { font-size: var(--type-caption-size); line-height: var(--type-caption-lh); font-weight: var(--type-caption-w); letter-spacing: var(--type-caption-tr); text-transform: uppercase; }
+  .t-caption { font-size: var(--type-caption-size); line-height: var(--type-caption-lh); font-weight: var(--type-caption-w); letter-spacing: var(--type-caption-tr); }
   .t-caption-plain { font-size: var(--type-caption-size); line-height: var(--type-caption-lh); font-weight: var(--type-caption-w); letter-spacing: 0; }
   .t-body-sm { font-size: var(--type-body-sm-size); line-height: var(--type-body-sm-lh); font-weight: var(--type-body-sm-w); }
 

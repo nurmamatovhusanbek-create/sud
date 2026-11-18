@@ -386,18 +386,18 @@ export function BillsSection() {
       {mode === 'stir' && (
         <>
           <div className="kpis" style={{ marginBottom: 18 }}>
-            <Kpi label="Jami kvitansiya" icon={<Receipt />}>
+            <Kpi label="Jami kvitansiya">
               <CountUp value={summary.count} id={`bills-count-${stir}`} />
             </Kpi>
-            <Kpi label="Toʻlangan" icon={<Check />} foot={<><span className="p-dot d-pos" />Toʻliq</>}>
+            <Kpi label="Toʻlangan" foot={<><span className="p-dot d-pos" />Toʻliq</>}>
               <CountUp value={summary.paid} id={`bills-paid-${stir}`} />
             </Kpi>
-            <Kpi label="Qisman / Muddati oʻtgan" icon={<Timer />} foot={<><span className="p-dot d-neg" />Eʼtibor talab</>}>
+            <Kpi label="Qisman / Muddati oʻtgan" foot={<><span className="p-dot d-neg" />Eʼtibor talab</>}>
               <span>
                 <CountUp value={summary.partial} id={`bills-partial-${stir}`} /> / <span style={{ color: 'var(--neg-text)' }}><CountUp value={summary.overdue} id={`bills-overdue-${stir}`} /></span>
               </span>
             </Kpi>
-            <Kpi label="Umumiy summa" icon={<Wallet />} valueSize={18}>
+            <Kpi label="Umumiy summa" valueSize={18}>
               <span>{formatSum(summary.totalSum)}</span>
             </Kpi>
           </div>

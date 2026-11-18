@@ -311,7 +311,7 @@ export function OrdersView() {
           Qarorlar <span className="g2">arxivi</span>
         </h1>
         <p>
-          Eʼlon qilingan sud qarorlari: yangi ish raqamini qidirib yuklab oling, arxivdan qidiring va qaysilari kompyuteringizga yuklab olinganini koʻring.
+          Eʼlon qilingan sud qarorlari: arxivdan qidiring va qaysilari kompyuteringizga yuklab olinganini koʻring.
           {data ? ` Yuklangan PDF: ${data.savedPdfs} ta · roʻyxatdagi qarorlar: ${data.stored} ta.` : ''}
         </p>
       </div>
