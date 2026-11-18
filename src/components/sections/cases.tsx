@@ -770,7 +770,7 @@ export function CasesSection() {
               return (
                 <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
                   <div className="lead">
-                    <StatusIcon family={fam} size={26} />
+                    <StatusIcon family={fam} size={28} />
                   </div>
                   <div className="main-c">
                     <b className="mono">{c.caseNumber}</b>
