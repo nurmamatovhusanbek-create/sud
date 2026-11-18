@@ -190,7 +190,7 @@ html, body { height: 100%; }
 .lrow .main-c .sub { font-size: 12px; color: var(--text-3); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lrow .amt { font-family: var(--font-mono); font-weight: 500; font-size: 14px; text-align: right; white-space: nowrap; }
 .lrow .amt small { display: block; font-size: 12px; color: var(--text-3); font-weight: 500; }
-.lrow .kebab { color: var(--text-3); width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: 0 0 28px; }
+.lrow .kebab { color: var(--text-3); width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex: 0 0 34px; }
 .lrow .kebab:hover { background: var(--surface-active); }
 .lrow .kebab svg { width: 16px; height: 16px; }
 .lrow .chev { color: var(--text-3); flex: 0 0 auto; display: grid; place-items: center; }
@@ -770,7 +770,7 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .doc-crumb-ico svg { width: 17px; height: 17px; }
 
 /* ---- list sort picker (SortMenu) ------------------------------------------- */
-.sortsel { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-2); transition: border-color .15s, box-shadow .15s; }
+.sortsel { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 10px 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-2); transition: border-color .15s, box-shadow .15s; }
 .sortsel svg { width: 15px; height: 15px; color: var(--text-3); flex: 0 0 auto; }
 .sortsel select { border: none; background: none; outline: none; color: var(--text-1); font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; padding-right: 2px; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
 /* inner glow only — an inset ring that hugs the box, so nothing overflows */
@@ -1108,3 +1108,10 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
   .dstrip.dgrid .dfield { border-left: none; border-top: 1px solid var(--border-subtle); }
   .dstrip.dgrid .dfield:first-child { border-top: none; }
 }
+
+/* ONE ROW, ONE HEIGHT: a button beside a field is exactly as tall as the field (owner rule). The row sets the height, the button follows:
+   hero search 48 · filter rows 38 (search, select, buttons) · company header actions 42 (the round icon buttons). A new row of controls
+   gets a line here; .btn-xs stays 28 only where it sits in text, never beside a field. Audit: see docs/design-notes.md › «Form controls». */
+.hero-search .btn { height: 48px; }
+.filterbar .btn:not(.btn-xs), .fb-row .btn:not(.btn-xs) { height: 38px; }
+.ctx-actions .btn { height: 42px; }
