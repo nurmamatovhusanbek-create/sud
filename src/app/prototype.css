@@ -145,7 +145,6 @@ html, body { height: 100%; }
 .kpi .lbl { font-size: 12px; color: var(--text-3); font-weight: 500; }
 .kpi .val { font-size: 28px; font-weight: 500; margin-top: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi .foot { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); }
-[data-theme='dark'] 
 .dash { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; }
 @media (max-width: 1000px) { .dash { grid-template-columns: 1fr; } }
 
