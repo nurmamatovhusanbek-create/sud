@@ -199,7 +199,8 @@
 
 /* ---------- 9. stat tiles: a big quiet outline icon in the corner says what the tile counts, before you read it ---------- */
 [data-look='premium'] .kpi { overflow: hidden; }
-[data-look='premium'] .kpi-ico { display: block; position: absolute; right: -52px; top: 50%; width: 132px; height: 132px; margin-top: -66px; opacity: .92; pointer-events: none; }
+/* the half that shows fades out toward the tile's edge instead of being chopped by it (a hard cut at the divider looked like a glitch) */
+[data-look='premium'] .kpi-ico { display: block; position: absolute; right: -52px; top: 50%; width: 132px; height: 132px; margin-top: -66px; opacity: .92; pointer-events: none; -webkit-mask-image: linear-gradient(to right, #000 0%, #000 32%, transparent 62%); mask-image: linear-gradient(to right, #000 0%, #000 32%, transparent 62%); }
 [data-look='premium'] .kpi-ico svg { width: 100%; height: 100%; fill: url(#sud-ico-grad); }
 /* the visible half must be the half that says what the icon is: mirror the ones whose identity sits on the right (gavel head, wallet clasp) */
 [data-look='premium'] .kpi-ico svg[data-ico='gavel'], [data-look='premium'] .kpi-ico svg[data-ico='wallet'], [data-look='premium'] .kpi-ico svg[data-ico='users'] { transform: scaleX(-1); }
