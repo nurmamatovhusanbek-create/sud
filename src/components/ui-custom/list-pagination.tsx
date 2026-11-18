@@ -9,6 +9,7 @@
  */
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { SelectField } from '@/components/ui-custom/select-field'
 import {
   Pagination,
   PaginationContent,
@@ -46,9 +47,11 @@ interface ListPaginationProps {
   onPageSize: (size: number) => void
   /** Hide the whole control when the list is short. */
   hideWhenSinglePage?: boolean
+  /** The copy ABOVE a long list (so the person need not scroll down to turn the page): no top margin, a little room below. */
+  top?: boolean
 }
 
-export function ListPagination({ page, pageSize, total, onPage, onPageSize, hideWhenSinglePage = true }: ListPaginationProps) {
+export function ListPagination({ page, pageSize, total, onPage, onPageSize, hideWhenSinglePage = true, top = false }: ListPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   if (hideWhenSinglePage && totalPages <= 1) return null
 
@@ -63,32 +66,20 @@ export function ListPagination({ page, pageSize, total, onPage, onPageSize, hide
   return (
     <div
       className="filterbar"
-      style={{ marginBottom: 0, marginTop: 14, alignItems: 'center', gap: 12 }}
+      style={{ marginBottom: top ? 10 : 0, marginTop: top ? 0 : 14, alignItems: 'center', gap: 12 }}
     >
       <span className="faint" style={{ fontSize: 12 }}>
         {from}–{to} / {total}
       </span>
       <label className="faint" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         Sahifa
-        <select
-          className="mono"
-          value={pageSize}
-          onChange={(e) => onPageSize(Number(e.target.value) || DEFAULT_PAGE_SIZE)}
-          style={{
-            background: 'var(--surface-active)',
-            color: 'var(--text-1)',
-            border: '1px solid var(--line)',
-            borderRadius: 8,
-            padding: '3px 6px',
-            fontSize: 12,
-          }}
-        >
+        <SelectField size="sm" mono value={pageSize} ariaLabel="Sahifadagi qatorlar soni" onChange={(v) => onPageSize(Number(v) || DEFAULT_PAGE_SIZE)}>
           {PAGE_SIZE_OPTIONS.map((n) => (
             <option key={n} value={n}>
               {n}
             </option>
           ))}
-        </select>
+        </SelectField>
       </label>
       <div style={{ flex: 1 }} />
       <Pagination style={{ margin: 0, width: 'auto' }}>

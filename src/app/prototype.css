@@ -213,6 +213,17 @@ html, body { height: 100%; }
 .f-search input { border: none; background: none; outline: none; flex: 1; min-width: 0; font-size: 13px; color: var(--text-1); }
 .f-search input::placeholder { color: var(--text-3); }
 .f-search:focus-within { box-shadow: 0 0 0 3px var(--accent-ring); }
+/* dropdown in a filter row: looks like .f-search (see ui-custom/select-field) */
+.f-select { position: relative; display: inline-flex; align-items: center; height: 38px; border-radius: var(--radius-md); background: var(--surface-inset); flex: 0 0 auto; }
+.f-select.tall { height: 40px; }
+.f-select select { -webkit-appearance: none; -moz-appearance: none; appearance: none; height: 100%; border: none; background: none; outline: none; border-radius: inherit; padding: 0 34px 0 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--text-1); cursor: pointer; }
+.f-select select option { background: var(--surface); color: var(--text-1); }
+.f-select svg { position: absolute; right: 11px; width: 15px; height: 15px; color: var(--text-3); pointer-events: none; }
+.f-select.sm { height: 34px; border-radius: 10px; }
+.f-select.sm select { padding: 0 28px 0 11px; font-size: 12px; }
+.f-select.sm svg { right: 9px; width: 13px; height: 13px; }
+.f-select:focus-within { box-shadow: 0 0 0 3px var(--accent-ring); }
+.f-select select:focus-visible { box-shadow: none; }
 .f-search input:focus-visible { box-shadow: none; }
 /* v18 segmented control: rounded-rect track + bordered, with a white .thumb
    that slides under the active option (positioned by the Seg component). The
@@ -243,7 +254,7 @@ html, body { height: 100%; }
 .cc-head { display: flex; align-items: flex-start; gap: 12px; }
 .cc-id { min-width: 0; flex: 1; }
 .cc-id .nm { font-size: 15px; font-weight: 700; color: var(--text-1); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cc-id .tin { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); letter-spacing: .03em; margin-top: 3px; }
+.cc-id .tin { white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-3); letter-spacing: .03em; margin-top: 3px; }
 .cc-div { height: 1px; background: var(--border-subtle); margin: 14px 0; }
 .cc-cols { display: grid; grid-template-columns: 1fr 1fr; }
 .cc-col { min-width: 0; }
@@ -261,9 +272,11 @@ html, body { height: 100%; }
 .lt.b-warn { border-color: var(--warn-line); }
 .lt.b-neg { border-color: var(--neg-line); }
 .lt.b-neu { border-color: var(--neu-line); }
-/* v206: watchlist card actions — in-flow header tools instead of absolute
-   overlays (they used to cover the rating badge). Hover-reveal kept. */
-.ccard-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+/* hover tools sit in the card's top-right corner, OUT of the header's flow: in-flow they took 58px of the name/STIR column even while
+   invisible, so the STIR wrapped onto two lines on the narrow Kuzatuv cards. They only show on hover, over a solid chip. */
+.ccard-tools { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; flex-wrap: nowrap; transition: background .15s; }
+.ccard:hover .ccard-tools { background: var(--surface); }
+@media (hover: none) { .ccard-tools { background: var(--surface); } }
 .ccard-act { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: .15s; flex: 0 0 auto; }
 .ccard:hover .ccard-act { opacity: 1; }
 .ccard-act:hover { background: var(--surface-active); color: var(--text-1); }

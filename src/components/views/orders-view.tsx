@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
+import { SelectField } from '@/components/ui-custom/select-field'
 import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { courtTypeOfCase, ORDERS_GAP_SECONDS_DEFAULT, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
 import { useOrdersJob } from '@/lib/use-orders-job'
@@ -369,7 +370,7 @@ export function OrdersView() {
           <h2>Yangi qaror qidirish va yuklab olish</h2>
         </div>
         <div className="filterbar" style={{ marginBottom: 0 }}>
-          <div className="f-search" style={{ flex: '1 1 300px', minWidth: 240 }}>
+          <div className="f-search" style={{ flex: '1 1 300px', minWidth: 240, height: 40 }}>
             <Search />
             <input
               value={newNumber}
@@ -383,17 +384,12 @@ export function OrdersView() {
               spellCheck={false}
             />
           </div>
-          <select
-            value={newCourtShown}
-            onChange={(e) => setNewCourt(e.target.value as PublicCourtType)}
-            aria-label="Sud turi"
-            style={{ height: 40, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--surface-inset)', color: 'var(--text-1)', padding: '0 10px', fontSize: 13 }}
-          >
+          <SelectField size="tall" value={newCourtShown} ariaLabel="Sud turi" onChange={(v) => setNewCourt(v as PublicCourtType)}>
             <option value="ECONOMIC">Iqtisodiy</option>
             <option value="CIVIL">Fuqarolik</option>
             <option value="ADMINISTRATIVE">Maʼmuriy</option>
             <option value="CRIMINAL">Jinoyat</option>
-          </select>
+          </SelectField>
           <button className="btn btn-primary" disabled={!newValid || looking} onClick={() => void search()} title="Bu ish raqamini public.sud.uz dan qidirib, topilgan qarorlarni arxivga qoʻshadi">
             {looking ? <Loader2 className="spin" /> : <Search />}
             <span>{looking ? 'Qidirilmoqda…' : 'Qidirish'}</span>
@@ -440,13 +436,16 @@ export function OrdersView() {
             />
           </div>
           <Seg options={COURT_SEG} value={court} onChange={reset(setCourt)} />
-          <Seg options={INSTANCE_SEG} value={instance} onChange={reset(setInstance)} />
-          <Seg options={statusOptions} value={status} onChange={(k) => reset(setStatus)(k as LibraryStatus)} />
           <div style={{ flex: 1 }} />
           <button className="btn btn-outline btn-sm" onClick={() => setTick((n) => n + 1)} title="Roʻyxatni qayta oʻqish">
             <RefreshCw />
             <span>Yangilash</span>
           </button>
+        </div>
+        {/* second row: stage and download state, so the refresh button never ends up alone on a line of its own */}
+        <div className="filterbar">
+          <Seg options={INSTANCE_SEG} value={instance} onChange={reset(setInstance)} />
+          <Seg options={statusOptions} value={status} onChange={(k) => reset(setStatus)(k as LibraryStatus)} />
         </div>
 
         {failed && !data ? (
@@ -513,6 +512,7 @@ export function OrdersView() {
                 </span>
               </div>
             )}
+            <ListPagination top page={safePage} pageSize={pageSize} total={total} hideWhenSinglePage={false} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1) }} />
             <div className="list">
               {items.map((o) => (
                 <div className="lrow" key={o.id} data-order={o.caseNumber} style={{ cursor: 'default' }}>

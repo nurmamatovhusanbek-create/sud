@@ -136,8 +136,8 @@ export function OrdersTab() {
             {job.ongoing > 0 && <div className="kv"><span className="k">Hali koʻrilayotgan (qaror yoʻq)</span><span className="mono">{num(job.ongoing)}</span></div>}
             {job.errors > 0 && <div className="kv"><span className="k">Xatolar</span><span className="mono">{num(job.errors)}</span></div>}
             {job.current && <div className="kv"><span className="k">Hozir</span><span className="mono">{job.current}</span></div>}
-            {job.lastError && <p className="faint" style={{ fontSize: 12.5, margin: '8px 0 0' }}>Oxirgi xato: {job.lastError} (keyinroq qayta uriniladi)</p>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {job.lastError && <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '12px 0 0' }}>Oxirgi xato: {job.lastError} (keyinroq qayta uriniladi)</p>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
               {job.state === 'running' && (
                 <button className="btn btn-outline" onClick={() => void pausePublicOrdersJob().then(load)}>
                   <Pause /><span>Pauza</span>
