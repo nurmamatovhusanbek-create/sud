@@ -21,4 +21,4 @@ sud-explore4/
 *.har
 
 # ui:shots output (docs/ui-split-plan.md M0)
-ui-shots/
+/ui-shots/
