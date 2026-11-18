@@ -273,6 +273,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `list-pagination.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/views/orders-view.tsx |  |
 | `select-field.tsx` | components/ui-custom/list-pagination.tsx |  |
+| `solid-icons.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/views/launcher.tsx |  |
 | `states.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 
 ## Environment variables

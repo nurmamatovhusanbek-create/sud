@@ -185,3 +185,20 @@
 @media (max-width: 700px) {
   [data-look='premium'] .kpi .val { font-size: 28px; }
 }
+
+/* ---------- 8. one rule for status: a plain ink dot and the word. Colour never carries it (the owner: «colours ruin the vibe») ---------- */
+[data-look='premium'] .badge, [data-look='premium'] .lt { color: var(--text-1); background: transparent; }
+[data-look='premium'] .badge::before, [data-look='premium'] .lt::before, [data-look='premium'] .p-dot { background: var(--text-1); }
+[data-look='premium'] .cc-col .days.warn { color: var(--text-1); }
+[data-look='premium'] .datecard.now { background: var(--surface-inset); border-color: var(--border-default); box-shadow: inset 3px 0 0 var(--text-1); }
+[data-look='premium'] .nav button .pip { background: none; }
+
+/* ---------- 9. stat tiles: a big quiet outline icon in the corner says what the tile counts, before you read it ---------- */
+[data-look='premium'] .kpi { overflow: hidden; }
+[data-look='premium'] .kpi-ico { display: block; position: absolute; right: -8px; top: -8px; width: 104px; height: 104px; color: var(--text-1); opacity: .08; pointer-events: none; }
+[data-look='premium'] .kpi-ico svg { width: 100%; height: 100%; }
+[data-look='premium'] .kpi .lbl { font-size: 13px; color: var(--text-2); font-weight: 500; }
+[data-look='premium'] .kpi .foot { color: var(--text-2); }
+
+/* ---------- 10. case table: ink, no colour ---------- */
+[data-look='premium'] .lhead { font-weight: 500; }

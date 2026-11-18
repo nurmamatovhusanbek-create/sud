@@ -23,7 +23,8 @@ import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSo
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
-import { assignRoles, type PartyRole } from '@/core/classify'
+import { assignRoles, classifyOutcome, type PartyRole } from '@/core/classify'
+import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import { isOngoingFirstInstance, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValuesFor, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
@@ -759,26 +760,31 @@ export function CasesSection() {
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
           <div className="list">
-            {paged.map(({ c, courtType }, i) => (
-              <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
-                <div className="lead">
-                  <Gavel />
-                </div>
-                <div className="main-c">
-                  <b className="mono">{c.caseNumber}</b>
-                  <div className="sub">
-                    {c.courtName || '-'} · {c.judge || '-'}
-                    {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}
+            <div className="lhead" aria-hidden="true"><span /><span>Ish raqami va sud</span><span>Holat</span><span>Sana</span><span /></div>
+            {paged.map((m, i) => {
+              const { c, courtType } = m
+              const role = roleOf(m)
+              // the shape of the status: still being heard / granted / rejected / returned or otherwise closed
+              const fam: StatusFamilyKey = !c.result?.trim() ? 'pending' : role ? classifyOutcome(role, c.result) : 'unknown'
+              const word = c.result?.trim() || (c.caseStatus ? statusEn(c.caseStatus) || c.caseStatus : '')
+              return (
+                <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openCaseDetail(c.caseNumber, courtType, company ?? undefined)}>
+                  <div className="lead">
+                    <StatusIcon family={fam} size={26} />
                   </div>
+                  <div className="main-c">
+                    <b className="mono">{c.caseNumber}</b>
+                    <div className="sub">
+                      {c.courtName || '-'} · {c.judge || '-'}
+                      {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}
+                    </div>
+                  </div>
+                  <div className="c-word" title={word}>{word || '-'}</div>
+                  <div className="c-date">{c.hearingDate || c.dateFiled || ''}</div>
+                  <span className="chev">›</span>
                 </div>
-                {c.caseStatus ? <span className={`badge ${familyBadgeClass('neutral')}`}>{statusEn(c.caseStatus) || c.caseStatus}</span> : null}
-                <div className="amt">
-                  {c.claimAmount || '-'}
-                  <small>{c.hearingDate || c.dateFiled || ''}</small>
-                </div>
-                <span className="chev">›</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <ListPagination
             page={safePage}

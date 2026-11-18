@@ -21,21 +21,8 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { stillAhead } from '@/core/dates'
-import {
-  Activity,
-  BarChart3,
-  CalendarDays,
-  CircleX,
-  Clock,
-  Gavel,
-  Minus,
-  Receipt,
-  Scale,
-  Timer,
-  Trophy,
-  Users,
-  Wallet,
-} from 'lucide-react'
+import { Activity, BarChart3, CalendarDays, CircleX, Clock, Gavel, Minus, Receipt, Scale, Timer, Trophy, Users, Wallet } from 'lucide-react'
+import { SolidIcon, StatusIcon } from '@/components/ui-custom/solid-icons'
 import {
   Kpi,
   BarChart,
@@ -83,10 +70,10 @@ const fmtSumShort = (tiyins: number): string => formatSum(tiyins).split(',')[0]
 
 /** Decision-row metadata — the prototypeʼs CASE_META (icon/label/band/text). */
 const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band: string; text: string }> = {
-  win: { icon: <Trophy />, label: 'Yutgan', band: 'positive', text: "Yutgan" },
-  lose: { icon: <CircleX />, label: 'Yutqazgan', band: 'negative', text: "Yutqazgan" },
-  pending: { icon: <Clock />, label: 'Jarayonda', band: 'warning', text: "Koʻrib chiqilmoqda" },
-  neutral: { icon: <Minus />, label: 'Neytral', band: 'neutral', text: "Neytral yakunlangan" },
+  win: { icon: <StatusIcon family="win" size={20} />, label: 'Yutgan', band: 'positive', text: "Yutgan" },
+  lose: { icon: <StatusIcon family="lose" size={20} />, label: 'Yutqazgan', band: 'negative', text: "Yutqazgan" },
+  pending: { icon: <StatusIcon family="pending" size={20} />, label: 'Jarayonda', band: 'warning', text: "Koʻrib chiqilmoqda" },
+  neutral: { icon: <StatusIcon family="neutral" size={20} />, label: 'Neytral', band: 'neutral', text: "Neytral yakunlangan" },
 }
 
 function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
@@ -392,23 +379,23 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   return (
     <div className="stat-flow">
       <div className="kpis">
-        <Kpi label="Jami sud ishlari" foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
+        <Kpi label="Jami sud ishlari" icon={<SolidIcon name="gavel" />} foot={<>{s.win} yutgan · {s.lose} yutqazgan · {s.total - s.win - s.lose} boshqa</>}>
           <span>{s.total}</span>
         </Kpi>
         <Kpi
-          label="Yutuq darajasi"
+          label="Yutuq darajasi" icon={<SolidIcon name="trophy" />}
           foot={winRate === null ? 'Hal qilingan ish yoʻq' : <>{s.win} yutgan / {s.win + s.lose} ta hal qilingan ishdan</>}
         >
           <span>{winRateText(s.win, s.lose)}</span>
         </Kpi>
         <Kpi
-          label="Kutilayotgan majlis"
+          label="Kutilayotgan majlis" icon={<SolidIcon name="calendar-blank" />}
           foot={upcomingCount !== null ? <>{upcomingCount} ta majlis belgilangan</> : 'Majlislar boʻlimida yuklanadi'}
         >
           <span>{upcomingCount ?? '-'}</span>
         </Kpi>
         <Kpi
-          label="Umumiy qarzdorlik"
+          label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />}
           foot={bt.loaded ? (bt.overdue > 0 ? 'BPI orqali undiruv' : 'Qarzdorlik yoʻq') : "Toʻlovlar boʻlimida yuklanadi"}
         >
           <span style={{ fontSize: 18, color: bt.overdue > 0 ? 'var(--neg-text)' : undefined }}>

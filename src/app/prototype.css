@@ -1064,5 +1064,22 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .list { gap: 0; }
 .lrow { border-radius: 0; border-bottom: 1px solid var(--border-subtle); padding: 14px 8px; }
 .list > .lrow:last-child { border-bottom: 0; }
-.lrow[data-case] .lead { display: none; }
 .card-h h2, .card-h h3 { font-weight: 600; }
+
+/* ---------- case rows: a real table (named columns that line up from row to row; no amount column: the court site does not give it) ---------- */
+.lrow[data-case], .lhead { display: grid; grid-template-columns: 28px minmax(0, 1fr) 230px 108px 14px; gap: 16px; align-items: center; }
+.lhead { padding: 8px 8px 10px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--border-subtle); }
+.lrow[data-case] .lead { display: grid; width: 28px; height: 28px; background: none; border-radius: 0; color: var(--text-1); }
+.lrow[data-case] .c-word { font-size: 13px; font-weight: 500; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow[data-case] .c-date { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.lrow[data-case] .chev { color: var(--text-3); text-align: right; }
+@media (max-width: 860px) {
+  .lhead { display: none; }
+  .lrow[data-case] { grid-template-columns: 28px minmax(0, 1fr) auto; row-gap: 4px; }
+  .lrow[data-case] .c-word { grid-column: 2; grid-row: 2; }
+  .lrow[data-case] .c-date { grid-column: 3; grid-row: 1; text-align: right; }
+  .lrow[data-case] .chev { display: none; }
+}
+
+/* KPI corner icon: hidden unless a look shows it */
+.kpi-ico { display: none; }

@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
+import { SolidIcon } from '@/components/ui-custom/solid-icons'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
 import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming } from '@/lib/registry'
@@ -276,11 +277,11 @@ export function Launcher() {
       </div>
 
       <div className="kpis" style={{ marginTop: 24 }}>
-        <Kpi label="Kompaniyalar" foot="Kuzatuv + soʻnggi">
+        <Kpi label="Kompaniyalar" icon={<SolidIcon name="users" />} foot="Kuzatuv + soʻnggi">
           <CountUp value={companies.length} id="lnch-companies" />
         </Kpi>
         <Kpi
-          label="Jami sud ishlari"
+          label="Jami sud ishlari" icon={<SolidIcon name="gavel" />}
           foot={
             <>
               <span className={`p-dot ${statusCounts.active > 0 ? 'd-pos' : 'd-warn'}`} />
@@ -291,7 +292,7 @@ export function Launcher() {
           <CountUp value={totCases} id="lnch-cases" />
         </Kpi>
         <Kpi
-          label="Yaqin majlislar"
+          label="Yaqin majlislar" icon={<SolidIcon name="calendar-blank" />}
           foot={
             <>
               <span className="p-dot d-warn" />
@@ -306,7 +307,7 @@ export function Launcher() {
         >
           <CountUp value={nearHearings} id="lnch-hearings" />
         </Kpi>
-        <Kpi label="Umumiy qarzdorlik" foot={`${overdueCompanies} kompaniyada`}>
+        <Kpi label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />} foot={`${overdueCompanies} kompaniyada`}>
           <>
             <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
             <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}> mln soʻm</span>

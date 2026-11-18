@@ -266,20 +266,23 @@ export function Spark({ values, failIdx = [], px = 2.2 }: { values: number[]; fa
   )
 }
 
-/** KPI tile: a label, one figure and what it compares to. No icon, no fill (they only decorate). */
+/** KPI tile: a label, one figure and what it compares to. The icon is a large corner watermark that says what the tile counts (Premium look; hidden in Tinch). */
 export function Kpi({
   label,
+  icon,
   children,
   foot,
   valueSize,
 }: {
   label: string
+  icon?: React.ReactNode
   children: React.ReactNode
   foot?: React.ReactNode
   valueSize?: number
 }) {
   return (
     <div className="kpi">
+      {icon ? <div className="kpi-ico" aria-hidden="true">{icon}</div> : null}
       <div className="kpi-top">
         <div className="lbl">{label}</div>
       </div>

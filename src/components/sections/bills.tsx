@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
+import { SolidIcon } from '@/components/ui-custom/solid-icons'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
@@ -386,18 +387,18 @@ export function BillsSection() {
       {mode === 'stir' && (
         <>
           <div className="kpis" style={{ marginBottom: 18 }}>
-            <Kpi label="Jami kvitansiya">
+            <Kpi label="Jami kvitansiya" icon={<SolidIcon name="receipt" />}>
               <CountUp value={summary.count} id={`bills-count-${stir}`} />
             </Kpi>
-            <Kpi label="Toʻlangan" foot={<><span className="p-dot d-pos" />Toʻliq</>}>
+            <Kpi label="Toʻlangan" icon={<SolidIcon name="check-circle" />} foot={<><span className="p-dot d-pos" />Toʻliq</>}>
               <CountUp value={summary.paid} id={`bills-paid-${stir}`} />
             </Kpi>
-            <Kpi label="Qisman / Muddati oʻtgan" foot={<><span className="p-dot d-neg" />Eʼtibor talab</>}>
+            <Kpi label="Qisman / Muddati oʻtgan" icon={<SolidIcon name="timer" />} foot={<><span className="p-dot d-neg" />Eʼtibor talab</>}>
               <span>
                 <CountUp value={summary.partial} id={`bills-partial-${stir}`} /> / <span style={{ color: 'var(--neg-text)' }}><CountUp value={summary.overdue} id={`bills-overdue-${stir}`} /></span>
               </span>
             </Kpi>
-            <Kpi label="Umumiy summa" valueSize={18}>
+            <Kpi label="Umumiy summa" icon={<SolidIcon name="wallet" />} valueSize={18}>
               <span>{formatSum(summary.totalSum)}</span>
             </Kpi>
           </div>
