@@ -88,9 +88,9 @@
 /* ---- 5. loading: a calm ink shimmer on skeletons (live, so it may loop: transform only), content then rises in ---- */
 [data-look='premium'] .sk::after { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text-1) 7%, transparent), transparent); animation: pm-sweep 1.5s var(--ease-standard) infinite; }
 
-/* the loading card: the bar fills with transform (scaleX, set by the component), a quiet ink sweep runs over it while it is live, the
+/* the loading card: the bar is revealed with clip-path (a rounded leading edge, set by the component), a quiet ink sweep runs over it while it is live, the
    active phase slides in as it becomes current, a finished phase's check pops, and the percentage beside it counts up with the bar */
-[data-look='premium'] .stream-fill { transition: transform var(--dur-4) var(--ease-emphasized); }
+[data-look='premium'] .stream-fill { transition: clip-path var(--dur-4) var(--ease-emphasized); }
 [data-look='premium'] .stream-fill::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-contrast) 38%, transparent), transparent); animation: pm-sweep 1.6s var(--ease-standard) infinite; }
 [data-look='premium'] .phase.active { animation: pm-nudge var(--dur-3) var(--ease-emphasized) backwards; }
 [data-look='premium'] .phase.done .pd svg { animation: pm-tick var(--dur-3) var(--ease-emphasized) backwards; }
