@@ -313,11 +313,10 @@ The interface was redone with the method of **unslop** by Damir Sokolovsky ([@he
 
 Two looks, chosen in Settings › Koʻrinish (default «Premium»). Mechanism: `lib/look` + `LOOK_BOOT_SCRIPT` put `data-look` on `<html>` before paint; `app/look-premium.css` re-points the tokens (light and dark) and restyles under `[data-look='premium']`; the markup is shared with «Tinch».
 
-History, so it is not repeated: «Tinch» (graphite, hairlines) was judged flat and tiring; the first attempt at something livelier («Yorqin»: six rotating pastel hues on KPI tiles, nav chips and monograms, pastel hero panels) was judged a mess: *more colours is not a premium look and gives no identity*. «Premium» keeps the calm structure (ledger rows, one stat strip, dot-and-word statuses) and gets its identity from restraint:
+**History, so it is not repeated.** «Tinch» (graphite, hairlines) was judged flat and tiring. Attempt 1, «Yorqin» (six rotating pastel hues on tiles, chips and monograms): *a mess; more colours is not a premium look and gives no identity*. Attempt 2 (serif titles, ivory canvas, brass accent, ornament): *not our font; it reads as a product or beauty site, and we are a legal/registry tool*. «Premium» is the third approach: identity from precision, not decoration.
 
-- **Three materials.** Ink `#0F1A2E` (sidebar, primary buttons, monograms), ivory `#F4F1EA` canvas with `#FFFDF8` surfaces (never a pure-white page, text at 4.5:1 or better), brass `#B38A3E` (decoration only: active marker, the 40 px hairline above a page title, the star, the active tab underline; as small text only the darker `--gold-tx`).
-- **Type.** Newsreader (variable, SIL OFL, self-hosted) for page titles, section titles, company names and figures only; Plus Jakarta Sans for the rest.
-- **One signature.** A thin brass rule above each page title and one outlined eight-point star (inline SVG data URI, same-origin, low opacity) at the far edge of the header; the active page in the sidebar carries a brass bar.
-- **Colour means something.** Won/paid green, lost/overdue burgundy, pending gold, info ink-blue: muted jewel tones, dot-and-word, never a decorative hue.
-- **Dark mode** is ink (`#0E1626`) with ivory text and the same brass, not black and not a second palette.
-
+- **Materials.** Ink `#0E1830` (sidebar, primary buttons, monograms); cool white surfaces `#FFFFFF` on a faintly tinted canvas `#F2F4F8`; ONE blue `#2755D4` (selection, the 3 px marker on the active page, links, focus ring, the underline of the active tab). Nothing else is coloured except meaning: won/paid green, lost/overdue burgundy, pending amber (muted, dot-and-word).
+- **Type.** IBM Plex Sans (400/500/600, self-hosted, SIL OFL) for the interface; IBM Plex Mono for identifiers (STIR, case numbers) and figures; every figure `tabular-nums`, so columns of numbers align like a ledger. Page titles 600 with -0.02em tracking, 28-36 px. See the `ʻ` rule in AGENTS.md.
+- **Shapes.** Radii 8 (controls, monogram), 10, 12 (cards), 16; hairline borders; one soft shadow level; no ornament, no gradient, no blur.
+- **Structure** is the calm one: ledger rows for companies, one stat strip, dot-and-word statuses, flat underlined options. Only skin and type differ.
+- **Dark mode** is ink `#0C1322` with cool-white text and the same blue lifted to `#8FB0FF`; the primary button inverts to off-white.

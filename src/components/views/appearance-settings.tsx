@@ -11,7 +11,7 @@ import { useMotion, type Motion } from '@/lib/motion'
 import { useTheme } from '@/lib/theme'
 
 const LOOKS: { id: Look; name: string; text: string }[] = [
-  { id: 'premium', name: 'Premium', text: 'Toʻq koʻk, fil suyagi rangi va bitta tilla aksent. Sarlavhalarda serif harf. Tinch va nafis.' },
+  { id: 'premium', name: 'Premium', text: 'Toʻq koʻk, toza oq va bitta koʻk aksent. IBM Plex harflari, raqamlar ustun boʻyicha tekis. Aniq va jiddiy.' },
   { id: 'calm', name: 'Tinch', text: 'Kulrang va ingichka chiziqlar, rang faqat maʼno uchun. Eng zich koʻrinish.' },
 ]
 
@@ -30,7 +30,6 @@ function Preview({ look }: { look: Look }) {
       </div>
       <div className="lp-main">
         <b />
-        {look === 'premium' ? <u /> : null}
         <div className="lp-tiles"><i /><i /><i /></div>
         <div className="lp-rows"><i /><i /></div>
       </div>
