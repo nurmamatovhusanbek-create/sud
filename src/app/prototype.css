@@ -247,15 +247,17 @@ html, body { height: 100%; }
 .cc-id .tin { white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .cc-div { display: none; }
 .cc-cols { display: contents; }
-.cc-col { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.cc-col { min-width: 0; display: flex; align-items: center; gap: 12px; }
 .cc-col + .cc-col { padding-left: 0; }
 .cc-col .k { display: none; }
 .cc-col .v { display: flex; align-items: baseline; gap: 8px; }
 .cc-col .num { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text-1); }
-.cc-col .mo { font-size: 13px; color: var(--text-3); font-weight: 500; }
 .cc-col .none { font-size: 15px; color: var(--text-3); }
-.cc-col .days { font-size: 12px; color: var(--text-3); margin: 0; }
-.cc-col .days.warn { color: var(--warn-text); }
+.cc-when { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cc-when-t { min-width: 0; line-height: 1.25; }
+.cc-left { font-size: 13px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.cc-left.near { color: var(--text-1); font-weight: 600; }
+.cc-wd { font-size: 12px; color: var(--text-3); }
 /* rating letter pill — the only signal color on the card body */
 .lt { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
 .lt::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -300,13 +302,13 @@ html, body { height: 100%; }
 .datecard { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-md); background: var(--surface-inset); min-width: 230px; flex: 1; cursor: pointer; transition: background-color .15s var(--ease); text-align: left; }
 .datecard:hover { background: var(--surface-active); }
 .datecard.now { background: var(--status-warning-soft); box-shadow: inset 3px 0 0 var(--status-warning-solid); }
-.datecard .dc-date { text-align: center; line-height: 1; flex: 0 0 auto; }
-.datecard .dc-date .d { font-family: var(--font-mono); font-size: 24px; font-weight: 600; }
-.datecard .dc-date .m { font-size: 12px; margin-top: 2px; opacity: .7; }
 .datecard .dc-body { min-width: 0; }
-.datecard .dc-body b { font-size: 14px; font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.datecard .dc-body span { font-size: 12px; opacity: .7; display: block; margin-top: 2px; }
-.datecard .dc-time { margin-left: auto; font-family: var(--font-mono); font-size: 13px; font-weight: 500; flex: 0 0 auto; }
+.datecard .dc-body b { font-size: 14px; font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.datecard .dc-body span { font-size: 12.5px; color: var(--text-2); display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.datecard .dc-when { margin-left: auto; flex: 0 0 auto; text-align: right; }
+.datecard .dc-time { font-family: var(--font-mono); font-size: 16px; font-weight: 600; line-height: 1.1; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.datecard .dc-left { font-size: 12px; color: var(--text-3); margin-top: 4px; white-space: nowrap; }
+.datecard .dc-left.near { color: var(--text-1); font-weight: 600; }
 
 /* ---------- profile ---------- */
 .dstrip { display: flex; flex-wrap: wrap; border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
@@ -1115,3 +1117,14 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .hero-search .btn { height: 48px; }
 .filterbar .btn:not(.btn-xs), .fb-row .btn:not(.btn-xs) { height: 38px; }
 .ctx-actions .btn { height: 42px; }
+
+/* ---- the shared date tile (proto/date-tile): a calendar leaf, month on an ink band, day big; inverted when the date is close ---- */
+.dtile { display: inline-flex; flex-direction: column; flex: none; width: 52px; height: 58px; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--surface); font-style: normal; }
+.dtile .dt-m { display: grid; place-items: center; height: 18px; font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; background: var(--text-1); color: var(--surface); }
+.dtile .dt-d { flex: 1; display: grid; place-items: center; font-family: var(--font-mono); font-size: 24px; font-weight: 600; line-height: 1; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.dtile.near { border-color: var(--text-1); }
+.dtile.near .dt-d { background: var(--text-1); color: var(--surface); }
+.dtile.near .dt-m { background: var(--surface); color: var(--text-1); }
+.dtile.sm { width: 38px; height: 44px; border-radius: 8px; }
+.dtile.sm .dt-m { height: 14px; font-size: 9.5px; }
+.dtile.sm .dt-d { font-size: 17px; }

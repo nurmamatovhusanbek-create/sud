@@ -135,7 +135,7 @@
 [data-look='premium'] .kpi .val { font-size: 34px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; margin-top: 10px; }
 [data-look='premium'] .kpi .lbl { color: var(--text-3); font-weight: 500; }
 [data-look='premium'] .cc-col .num { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-[data-look='premium'] .kpi .val, [data-look='premium'] .cc-col .num, [data-look='premium'] .datecard .dc-date .d { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+[data-look='premium'] .kpi .val, [data-look='premium'] .cc-col .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
 /* ---------- 3. sidebar: solid ink, white text, a blue marker on the active page ---------- */
 [data-look='premium'] .side { background: var(--ink); color: #C9C9CD; border-right: 0; }
@@ -163,7 +163,6 @@
 /* ---------- 4. companies: the ledger; an ink monogram, mono identifiers ---------- */
 [data-look='premium'] .ccard .mono-tile { width: 34px; height: 34px; border-radius: 8px; font-size: 12px; font-weight: 600; background: var(--ink); color: #FFFFFF; }
 [data-look='premium'] .cc-id .tin { letter-spacing: 0.02em; }
-[data-look='premium'] .cc-col .days.warn { color: var(--warn-text); font-weight: 600; }
 
 /* ---------- 5. buttons: ink fill, one per view ---------- */
 [data-look='premium'] .btn { font-weight: 500; }
@@ -198,8 +197,7 @@
 /* ---------- 8. one rule for status: a plain ink dot and the word. Colour never carries it (the owner: «colours ruin the vibe») ---------- */
 [data-look='premium'] .badge, [data-look='premium'] .lt { color: var(--text-1); background: transparent; }
 [data-look='premium'] .badge::before, [data-look='premium'] .lt::before, [data-look='premium'] .p-dot { background: var(--text-1); }
-[data-look='premium'] .cc-col .days.warn { color: var(--text-1); }
-[data-look='premium'] .datecard.now { background: var(--surface-inset); border-color: var(--border-default); box-shadow: inset 3px 0 0 var(--text-1); }
+[data-look='premium'] .datecard.now { background: var(--surface); border-color: var(--text-1); box-shadow: none; }
 [data-look='premium'] .nav button .pip { background: none; }
 
 /* ---------- 9. stat tiles: a big quiet outline icon in the corner says what the tile counts, before you read it ---------- */

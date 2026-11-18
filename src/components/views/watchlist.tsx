@@ -11,6 +11,7 @@ import { winRate } from '@/core/rates'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
+import { DateTile, HearingWhen } from '@/components/proto/date-tile'
 import { useAppStore } from '@/lib/store/app-store'
 import { refreshRating } from '@/lib/enrich'
 import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
@@ -250,11 +251,6 @@ export function WatchlistView() {
     toast.success('Kuzatuvdan olib tashlandi')
   }
 
-  const isoParts = (iso: string) => {
-    const [, m, d] = iso.split('-').map(Number)
-    return { d: String(d).padStart(2, '0'), m: MONTHS[m - 1] ?? '' }
-  }
-
   return (
     <div>
       <div className="hero" style={{ marginBottom: 0 }}>
@@ -293,23 +289,20 @@ export function WatchlistView() {
         ) : (
           <div className="datecards" style={{ flexDirection: 'column' }}>
             {shownRows.map((h, i) => {
-              const p = isoParts(h.isoDate)
               // Prototype: .now marks hearings inside the 7-day alert window
               const near = alerts.some((a) => a.stir === h.stir && a.isoDate === h.isoDate)
               return (
                 <div key={`${h.stir}-${i}`} className={`datecard ${near ? 'now' : ''}`} onClick={() => openCompany(h.stir, { name: h.name }, 'hearings')}>
-                  <div className="dc-date">
-                    <div className="d">{p.d}</div>
-                    <div className="m">{p.m}</div>
-                  </div>
+                  <DateTile iso={h.isoDate} near={near} />
                   <div className="dc-body">
-                    <b>{(h.name || h.stir).slice(0, 24)} · {h.court || 'Sud'}</b>
+                    <b>{h.name || h.stir}</b>
                     <span>
-                      Ish {h.caseNumber || '-'}
+                      {h.court || 'Sud'}
+                      {h.caseNumber ? ` · Ish ${h.caseNumber}` : ''}
                       {h.judge ? ` · ${h.judge}` : ''}
                     </span>
                   </div>
-                  <div className="dc-time">{h.time || ''}</div>
+                  <HearingWhen iso={h.isoDate} time={h.time} />
                 </div>
               )
             })}

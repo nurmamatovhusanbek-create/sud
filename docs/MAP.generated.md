@@ -59,7 +59,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/primitives.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
+| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
@@ -222,6 +222,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `brand-mark.tsx` | components/proto/drawer.tsx, components/shell/app-shell.tsx |  |
 | `case-orders.tsx` | components/sections/cases.tsx |  |
+| `date-tile.tsx` | components/proto/primitives.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/views/watchlist.tsx |  |
 | `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render.ts | core/__tests__/dial.test.ts |
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |

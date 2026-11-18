@@ -34,6 +34,7 @@ import {
 } from '@/components/proto/primitives'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
+import { DateTile, HearingWhen, dateParts } from '@/components/proto/date-tile'
 import { courtItems, turkumItems, type PizzaItem } from '@/components/proto/pizza-geometry'
 import { winRate as calcWinRate, winRateText } from '@/core/rates'
 import { useResource } from '@/hooks/use-resource'
@@ -303,13 +304,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
     setSection('cases')
   }
 
-  const isoParts = (iso?: string) => {
-    if (!iso) return null
-    const [y, m, d] = iso.split('-').map(Number)
-    const days = Math.ceil((new Date(y, m - 1, d).getTime() - Date.now()) / 86_400_000)
-    return { d: String(d).padStart(2, '0'), m: MONTHS[m - 1] ?? '', days }
-  }
-  const nh = isoParts(nextHearing?.isoDate as string | undefined)
+  const nh = dateParts(nextHearing?.isoDate as string | undefined)
 
 
   return (
@@ -422,24 +417,18 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
             <h2>Keyingi majlis</h2>
           </div>
           {nh && nextHearing ? (
-            <>
-              <div className="datecard now" data-goto="hearings" onClick={() => setSection('hearings')}>
-                <div className="dc-date">
-                  <div className="d">{nh.d}</div>
-                  <div className="m">{nh.m}</div>
-                </div>
-                <div className="dc-body">
-                  <b>{(nextHearing.courtName as string) || (nextHearing.courtTypeLabel as string) || 'Sud'}</b>
-                  <span>Ish {(nextHearing.caseNumber as string) || '-'}</span>
-                </div>
-                <div className="dc-time">{(nextHearing.hearingTime as string) || ''}</div>
+            <div className="datecard now" data-goto="hearings" onClick={() => setSection('hearings')}>
+              <DateTile iso={nextHearing.isoDate as string} near />
+              <div className="dc-body">
+                <b>{(nextHearing.courtName as string) || (nextHearing.courtTypeLabel as string) || 'Sud'}</b>
+                <span>
+                  {dateParts(nextHearing.isoDate as string)?.weekday}
+                  {` · Ish ${(nextHearing.caseNumber as string) || '-'}`}
+                  {nextHearing.judge ? ` · sudya ${nextHearing.judge as string}` : ''}
+                </span>
               </div>
-              <div className="faint" style={{ fontSize: 12, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Clock style={{ width: 13, height: 13 }} />
-                {nh.days >= 0 ? `${nh.days} kun qoldi` : 'Oʻtkazib yuborilgan'}
-                {nextHearing.judge ? ` · sudya ${nextHearing.judge as string}` : ''}
-              </div>
-            </>
+              <HearingWhen iso={nextHearing.isoDate as string} time={nextHearing.hearingTime as string} />
+            </div>
           ) : (
             <EmptyBlock icon={<CalendarDays />} title="Majlis yoʻq" />
           )}

@@ -9,14 +9,12 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
-import { daysUntil } from '@/core/dates'
+import { dateParts, DateTile, daysLabel, isNear } from './date-tile'
 import { motionReduced } from '@/lib/motion'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import type { StatusFamily } from '@/core/status'
 import { ratingBandFamily } from '@/core/status'
 import { clampPct, type DialZones } from './dial-geometry'
-
-const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
 export type Band = 'pos' | 'neg' | 'warn' | 'info' | 'neu'
 
@@ -438,15 +436,9 @@ export function CardStats({
   rating?: string | null
   hearingIso?: string | null
 }) {
-  const hearing = (() => {
-    if (!hearingIso) return null
-    const [y, m, d] = hearingIso.split('-').map(Number)
-    if (!y || !m || !d) return null
-    // a hearing that has passed is not «keyingi»: a cached list outlives its dates (core/dates › stillAhead)
-    const days = daysUntil(hearingIso)
-    if (days === null || days < 0) return null
-    return { d: String(d).padStart(2, '0'), mo: MONTHS[m - 1] ?? '', days }
-  })()
+  // a hearing that has passed is not «keyingi»: a cached list outlives its dates (core/dates › stillAhead)
+  const hearing = dateParts(hearingIso)
+  const upcoming = hearing && hearing.days !== null && hearing.days >= 0 ? hearing : null
   return (
     <>
       <div className="cc-div" />
@@ -460,16 +452,14 @@ export function CardStats({
         </div>
         <div className="cc-col">
           <div className="k">Keyingi majlis</div>
-          {hearing ? (
-            <>
-              <div className="v">
-                <span className="num">{hearing.d}</span>
-                <span className="mo">{hearing.mo}</span>
+          {upcoming ? (
+            <div className="cc-when">
+              <DateTile iso={hearingIso} size="sm" />
+              <div className="cc-when-t">
+                <div className={`cc-left${isNear(upcoming.days) ? ' near' : ''}`}>{daysLabel(upcoming.days)}</div>
+                <div className="cc-wd">{upcoming.weekday}</div>
               </div>
-              {hearing.days >= 0 ? (
-                <div className={`days${hearing.days <= 7 ? ' warn' : ''}`}>{hearing.days} kun qoldi</div>
-              ) : null}
-            </>
+            </div>
           ) : (
             <div className="v">
               <span className="none">Majlis yoʻq</span>

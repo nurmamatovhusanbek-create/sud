@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { stillAhead } from '@/core/dates'
 import { CalendarDays, FileSpreadsheet } from 'lucide-react'
 import { EmptyBlock, SkRows, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
+import { DateTile, HearingWhen } from '@/components/proto/date-tile'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { PartialBanner } from '@/components/ui-custom/states'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
@@ -192,10 +193,7 @@ export function HearingsSection() {
                 className={`datecard ${near ? 'now' : ''}`}
                 onClick={() => openCase((h.caseNumber as string) || '', (h.courtType as string) || 'economic')}
               >
-                <div className="dc-date">
-                  <div className="d">{p.day}</div>
-                  <div className="m">{p.month}</div>
-                </div>
+                <DateTile iso={iso} near={near} />
                 <div className="dc-body">
                   <b>{(h.courtName as string) || (h.courtTypeLabel as string) || 'Sud'}</b>
                   <span>
@@ -204,7 +202,7 @@ export function HearingsSection() {
                     {(h.judge as string) ? ` · ${h.judge as string}` : ''}
                   </span>
                 </div>
-                <div className="dc-time">{(h.hearingTime as string) || ''}</div>
+                <HearingWhen iso={iso} time={h.hearingTime as string} />
               </div>
             )
           })}
