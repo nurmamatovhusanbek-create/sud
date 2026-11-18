@@ -20,10 +20,8 @@ import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
-import { SelectField } from '@/components/ui-custom/select-field'
-import { downloadPublicOrderPdf, fetchPublicOrders, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
-import { courtTypeOfCase, ORDERS_GAP_SECONDS_DEFAULT, normalizeCaseNumber, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus, type PublicCourtType } from '@/core/public-orders'
-import { useOrdersJob } from '@/lib/use-orders-job'
+import { downloadPublicOrderPdf, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { ORDERS_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: '', label: 'Barchasi' },
@@ -40,7 +38,6 @@ const INSTANCE_SEG: { key: string; label: string }[] = [
   { key: 'INSPECTION', label: 'Taftish' },
 ]
 
-const CASE_RE = /^\d+-[\d-]+\/\d+$/
 const p2 = (n: number) => String(n).padStart(2, '0')
 const dmy = (t: number): string => {
   const d = new Date(t)
@@ -65,17 +62,8 @@ export function OrdersView() {
   const [sel, setSel] = useState<Map<string, LibraryItem>>(new Map()) // orders ticked in «Yuklanmagan» / «Mavjud emas» (by file id)
   const first = useRef(true)
 
-  // ---- «Yangi qaror qidirish» --------------------------------------------------------------------------------------
-  const [newNumber, setNewNumber] = useState('')
-  const [newCourt, setNewCourt] = useState<PublicCourtType | ''>('')
-  const [looking, setLooking] = useState(false)
-  const [searched, setSearched] = useState<string | null>(null) // the case number whose search just finished
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
   const stopRef = useRef(false) // «Toʻxtatish»: the running bulk download stops after the order in flight
-  const { job } = useOrdersJob()
-  const newNorm = normalizeCaseNumber(newNumber)
-  const newValid = CASE_RE.test(newNorm)
-  const newCourtShown = newCourt || courtTypeOfCase(newNorm) || 'ECONOMIC'
 
   // local read; typing is debounced and a newer request cancels the older one
   useEffect(() => {
@@ -104,40 +92,6 @@ export function OrdersView() {
   useEffect(() => {
     if (data && safePage !== page) setPage(safePage)
   }, [data, safePage, page])
-
-  // while the searched case is being looked up, re-read every 3 s; when it ends show what was found
-  const running = job?.state === 'running'
-  useEffect(() => {
-    if (!looking) return
-    if (!running) {
-      const t = setTimeout(() => {
-        setLooking(false)
-        setSearched(newNorm)
-        // show exactly what the search found: that case, every state
-        setQ(newNorm)
-        setCourt('')
-        setInstance('')
-        setStatus('all')
-        setPage(1)
-        setTick((n) => n + 1)
-      }, 1500) // the queue may not have picked the case up yet: give it a moment before calling it finished
-      return () => clearTimeout(t)
-    }
-    const t = setInterval(() => setTick((n) => n + 1), 3000)
-    return () => clearInterval(t)
-  }, [looking, running, newNorm])
-
-  const search = async () => {
-    setSearched(null)
-    setLooking(true)
-    const r = await fetchPublicOrders([{ caseNumber: newNorm, courtType: newCourtShown }], { force: true })
-    if (!r.ok) {
-      setLooking(false)
-      toast.error(r.error)
-      return
-    }
-    toast.success('Qidirilmoqda — public.sud.uz dan olinmoqda (orqa fonda)')
-  }
 
   // ---- opening / downloading ---------------------------------------------------------------------------------------
   const open = async (o: LibraryItem, retryAuto = false) => {
@@ -348,8 +302,6 @@ export function OrdersView() {
     setPage(1)
   }
   const filtered = !!(q.trim() || court || instance)
-  // the banner under the search: only while the list shows that very case
-  const showResult = searched !== null && normalizeCaseNumber(q) === searched && !!data
 
   return (
     <div>
@@ -362,64 +314,6 @@ export function OrdersView() {
           Eʼlon qilingan sud qarorlari: yangi ish raqamini qidirib yuklab oling, arxivdan qidiring va qaysilari kompyuteringizga yuklab olinganini koʻring.
           {data ? ` Yuklangan PDF: ${data.savedPdfs} ta · roʻyxatdagi qarorlar: ${data.stored} ta.` : ''}
         </p>
-      </div>
-
-      <div className="p-card rise-c" style={{ marginBottom: 14 }}>
-        <div className="card-h">
-          <div className="ico"><Download /></div>
-          <h2>Yangi qaror qidirish va yuklab olish</h2>
-        </div>
-        <div className="filterbar" style={{ marginBottom: 0 }}>
-          <div className="f-search" style={{ flex: '1 1 300px', minWidth: 240, height: 40 }}>
-            <Search />
-            <input
-              value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newValid && !looking) void search()
-              }}
-              placeholder="Ish raqami: 4-1001-2615/40333"
-              aria-label="Yangi qaror uchun ish raqami"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
-          <SelectField size="tall" value={newCourtShown} ariaLabel="Sud turi" onChange={(v) => setNewCourt(v as PublicCourtType)}>
-            <option value="ECONOMIC">Iqtisodiy</option>
-            <option value="CIVIL">Fuqarolik</option>
-            <option value="ADMINISTRATIVE">Maʼmuriy</option>
-            <option value="CRIMINAL">Jinoyat</option>
-          </SelectField>
-          <button className="btn btn-primary" disabled={!newValid || looking} onClick={() => void search()} title="Bu ish raqamini public.sud.uz dan qidirib, topilgan qarorlarni arxivga qoʻshadi">
-            {looking ? <Loader2 className="spin" /> : <Search />}
-            <span>{looking ? 'Qidirilmoqda…' : 'Qidirish'}</span>
-          </button>
-        </div>
-        <p className="faint" style={{ fontSize: 12, lineHeight: 1.5, margin: '8px 0 0' }}>
-          2024 dan oldingi va keyingi qarorlar ikkalasi ham qidiriladi (jinoyat ishlari ham). Topilgan qarorlar quyidagi roʻyxatda chiqadi; PDF ni “Yuklab olish” bilan saqlaysiz.
-          {newNumber && !newValid ? ' Ish raqami shu koʻrinishda boʻlsin: 4-1001-2615/40333.' : ''}
-        </p>
-        {showResult && (
-          <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', marginTop: 10 }}>
-            {data!.counts.all === 0 ? (
-              <span>
-                <b className="mono">{searched}</b> boʻyicha public.sud.uz da eʼlon qilingan qaror topilmadi (ish hali koʻrilayotgan boʻlishi yoki qaror eʼlon qilinmagan boʻlishi mumkin).
-              </span>
-            ) : (
-              <>
-                <span>
-                  <b className="mono">{searched}</b>: {data!.counts.all} ta qaror topildi{todo.length ? `, ${todo.length} tasi hali yuklanmagan` : ' — hammasi yuklangan'}.
-                </span>
-                {todo.length > 0 && (
-                  <button className="btn btn-primary btn-sm" disabled={!!bulk} onClick={() => void downloadAll()}>
-                    {bulk ? <Loader2 className="spin" /> : <Download />}
-                    <span>{bulk ? `Yuklanmoqda ${bulk.done}/${bulk.total}…` : `Hammasini yuklab olish (${todo.length})`}</span>
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="p-card rise-c">

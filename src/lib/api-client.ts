@@ -449,10 +449,6 @@ export function getPublicOrders(caseNumber: string, signal?: AbortSignal) {
   return request<PublicOrdersData>(`/api/public-orders/orders?caseNumber=${encodeURIComponent(caseNumber)}`, signal)
 }
 
-export function getPublicOrdersStatus(signal?: AbortSignal) {
-  return request<PublicOrdersStatus>('/api/public-orders/status', signal)
-}
-
 /** public.sud.uz wants a person to verify the download: the order has to be saved by hand and given to the app. */
 export class ManualOrderError extends Error {
   constructor(message: string) {
@@ -601,7 +597,6 @@ export async function fetchPublicOrders(
     })
     const json = await res.json().catch(() => null)
     if (json?.ok === true && json.data) {
-      window.dispatchEvent(new CustomEvent('sud:orders-job')) // wake the global loader
       return { ok: true, data: json.data }
     }
     return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
@@ -609,37 +604,6 @@ export async function fetchPublicOrders(
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
   }
 }
-
-/** DETECT: how many of these cases would really need a look. Free (local records only), queues and starts nothing. */
-export async function planPublicOrders(
-  cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],
-): Promise<ApiResult<{ need: number; ongoing: number; known: number }>> {
-  try {
-    const res = await fetch('/api/public-orders/fetch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ action: 'plan', cases }),
-    })
-    const json = await res.json().catch(() => null)
-    if (json?.ok === true && json.data) return { ok: true, data: json.data }
-    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
-  } catch {
-    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
-  }
-}
-
-async function jobAction(action: 'pause' | 'resume' | 'cancel' | 'retry'): Promise<void> {
-  try {
-    await fetch('/api/public-orders/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action }) })
-  } catch { /* the loader refreshes anyway */ }
-  window.dispatchEvent(new CustomEvent('sud:orders-job'))
-}
-/** Pause keeps the queue and its order; resume continues from there; cancel drops what is left. */
-export const pausePublicOrdersJob = () => jobAction('pause')
-export const resumePublicOrdersJob = () => jobAction('resume')
-export const cancelPublicOrdersJob = () => jobAction('cancel')
-/** Re-queue the cases whose lookup failed (no page refresh needed). */
-export const retryPublicOrdersJob = () => jobAction('retry')
 
 export function getPublicOrdersCache(signal?: AbortSignal) {
   return request<OrdersCacheStats>('/api/public-orders/cache', signal)

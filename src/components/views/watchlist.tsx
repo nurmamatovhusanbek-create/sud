@@ -8,8 +8,8 @@
  */
 
 import { winRate } from '@/core/rates'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { AlertTriangle, CalendarDays, ChevronDown, Eye, FileText, Pause, Play, Plus, RefreshCw, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { useAppStore } from '@/lib/store/app-store'
 import { refreshRating } from '@/lib/enrich'
@@ -17,7 +17,6 @@ import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orde
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
 import { toast } from 'sonner'
-import { OrdersControl } from '@/components/views/orders-control'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 
@@ -338,7 +337,6 @@ export function WatchlistView() {
         <h2>Kuzatuvdagi kompaniyalar</h2>
         <span className="count">{items.length}</span>
         <div className="sp" />
-        <OrdersControl companies={items.length} registryVersion={rv} />
         <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
           {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
           <span>Yangilash</span>

@@ -13,13 +13,9 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 | | `company-job.ts` | the queue: `planCases` (DETECT, free), `enqueueCases` (SCRAPE), pause/resume/cancel/`retryFailed`; `globalThis.__publicOrdersJob`; `MAX_QUEUE` |
 | | `store.ts`, `data-dir.ts` | shard files + `checked.jsonl` in `~/.sud-tizimi/public-orders` (`PUBLIC_ORDERS_DIR`); `cacheStats` |
 | API | `app/api/public-orders/{fetch,status,orders,file,cache,import,library}` | `fetch`: `{action: start|plan|pause|resume|cancel|retry}`; `import`: the hand-over of a PDF (below) |
-| Client | `lib/orders-watchlist.ts` | Kuzatuv run (`checkWatchlistOrders`), `planWatchlistOrders`, pause/resume, opt-in switch (`sud-orders-auto`, default OFF) |
-| | `lib/use-orders-job.ts` | ONE shared status poll for every consumer |
 | | `lib/registry.ts` | `meta.orderCases` (compact case list) written whenever stats are read → Kuzatuv can DETECT without scraping |
-| UI | `shell/orders-loader.tsx` | the pill: only while scraping; announces the end with a toast |
-| | `shell/orders-auto-check.tsx` | opt-in idle watcher (3 min without input, ≤ once / 6 h) |
-| | `views/orders-control.tsx` | Kuzatuv button + status line + switch |
-| | `views/orders-settings.tsx` | Settings › Qarorlar control panel only (queue, cache numbers) |
+| UI | `proto/case-orders.tsx` | the case drawer: published orders from the local records + the per-case «Tekshirish» (live; blocked while the site's firewall refuses scripts) |
+| | `views/orders-settings.tsx` | Settings › Qarorlar: the cache and backup numbers only |
 | | `views/orders-view.tsx`, `proto/order-handover.tsx` | the **Qarorlar page** (sidebar, below Statistika; surface `orders`): filter bar like Sud ishlari (search, court type, instance, download state: Yuklangan / Yuklanmagan / Mavjud emas / Hammasi), `.lrow` list, shared `ListPagination`; server-side filter + paging (`core/public-orders` `searchLibrary`; `GET /library?q&status=saved|gone|never|all&court&instance&page&size` = `store.allOrders` + `pdf-store.listPdfs` + `pdf-store.syncDownloads`); «Yuklangan · size · date» when the PDF is on disk; click = open (fetched if missing, same hand-over as the drawer); the «Yangi qaror qidirish va yuklab olish» card on top looks ONE typed case number up on public.sud.uz (both back ends) and lists what it found; «Yuklab olish» / «Hammasini yuklab olish» save the PDFs (`downloadPublicOrderPdf`: the server stores them, nothing opens); each row has an explicit button (**Ochish** / **Yuklab olish** / **Qayta yuklash**), rows are not clickable |
 | | `proto/case-orders.tsx` | drawer cards «Eʼlon qilingan / qilinmagan» |
 | | `sections/cases.tsx` | «Qarorlar · N» button, drawer wiring, `orderJobCase` |
@@ -47,12 +43,10 @@ app: [MAP.md](./MAP.md). Security of the job endpoints: [SECURITY.md](./SECURITY
 ## Flow
 
 ```
-click «Qarorlarni tekshirish» (Kuzatuv) ─► checkWatchlistOrders ─► getStats per company ─► POST /fetch {start,cases}
-list «Qarorlar · N» / drawer «Tekshirish» ───────────────────────────────────────────────► POST /fetch {start,cases}
-                                                                        planCases (planCheck + ongoing filter)
-                                                                        └─► queue ─► loop: lookupCase ─► source ─► store
-GET /status ◄── use-orders-job (one poll while running) ──► pill · Kuzatuv line · Settings · «Qarorlar · N»
-end of run (running→done/error) ─► toast (+ «Qayta urinish» → POST /fetch {retry})
+drawer «Tekshirish» ─► POST /fetch {start,cases}   (the Kuzatuv / list bulk checks and the idle auto-check were removed)
+                                              planCases (planCheck + ongoing filter)
+                                              └─► queue ─► loop: lookupCase ─► source ─► store
+a person-saved HAR / PDF ─► POST /import-har | /import ─► files/ + shards (the way new orders come in while the site refuses scripts)
 ```
 
 ## Tests

@@ -1,26 +1,16 @@
 'use client'
 
 /**
- * Settings › Qarorlar — the control panel of the published-orders feature (there is no library copy any more:
- * orders are fetched only for the cases the owner cares about, once, and kept). Three cards (the search of the stored
- * orders lives on its own page, views/orders-view.tsx):
- *  1. Automatic check of the Kuzatuv companies (idle switch, run now, pause/resume)
- *  2. The queue that is (or was) working: progress, pause / resume / cancel
- *  3. What the local cache holds and where it lives (it is never deleted: only added to and updated)
+ * Settings › Qarorlar — what the local orders cache holds and where it lives (it is never deleted: only added to and updated),
+ * and where its protected second copy is. The searchable list of the stored orders is its own page (views/orders-view.tsx).
+ * (The automatic / background checking of the Kuzatuv companies and its queue controls were removed: public.sud.uz refuses
+ * scripts, so they could not work; orders come in through the HAR import and the case drawer's own check.)
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { Database, ListChecks, Pause, Play, RefreshCw, X } from 'lucide-react'
-import {
-  cancelPublicOrdersJob,
-  getPublicOrdersCache,
-  pausePublicOrdersJob,
-  resumePublicOrdersJob,
-  retryPublicOrdersJob,
-} from '@/lib/api-client'
-import { autoEnabled, checkWatchlistOrders, lastAutoRun, pauseWatchlistCheck, resumeWatchlistCheck, runnerSnapshot, setAutoEnabled, subscribeRunner } from '@/lib/orders-watchlist'
-import type { CaseJobStatus, OrdersCacheStats } from '@/lib/public-orders/types'
-import { useOrdersJob } from '@/lib/use-orders-job'
+import { useCallback, useEffect, useState } from 'react'
+import { Database } from 'lucide-react'
+import { getPublicOrdersCache } from '@/lib/api-client'
+import type { OrdersCacheStats } from '@/lib/public-orders/types'
 
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 const p2 = (n: number) => String(n).padStart(2, '0')
@@ -31,140 +21,18 @@ const dmyHm = (t: number | string | null): string => {
 }
 const size = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
 
-const STATE: Record<CaseJobStatus['state'], { text: string; cls: string }> = {
-  idle: { text: 'Boʻsh', cls: 'b-neu' },
-  running: { text: 'Ishlamoqda', cls: 'b-info' },
-  paused: { text: 'Pauza', cls: 'b-warn' },
-  error: { text: 'Xato', cls: 'b-neg' },
-  done: { text: 'Tayyor', cls: 'b-pos' },
-}
-
 export function OrdersTab() {
-  const { job, reload } = useOrdersJob() // the shared queue store: one poll for the whole app
   const [cache, setCache] = useState<OrdersCacheStats | null>(null)
-  const [auto, setAuto] = useState(true)
-  const [lastAuto, setLastAuto] = useState(0)
-  const runner = useSyncExternalStore(subscribeRunner, runnerSnapshot, runnerSnapshot)
-
   const loadCache = useCallback(async () => {
     const c = await getPublicOrdersCache()
     if (c.ok) setCache(c.data)
   }, [])
-  const load = useCallback(async () => {
-    await Promise.all([reload(), loadCache()])
-  }, [reload, loadCache])
-
-  useEffect(() => {
-    setAuto(autoEnabled())
-    setLastAuto(lastAutoRun())
-  }, [runner.phase])
-
-  // the cache numbers are read on open, whenever the queue changes state, and every 15 s while it works
-  // (not on every 2.5 s status tick — that is what tripped the rate limit)
-  const busy = job?.state === 'running' || (job?.state === 'paused' && job.current !== null) || runner.phase === 'collecting'
   useEffect(() => {
     void loadCache()
-  }, [loadCache, job?.state])
-  useEffect(() => {
-    if (!busy) return
-    const t = setInterval(() => void loadCache(), 15_000)
-    return () => clearInterval(t)
-  }, [busy, loadCache])
-
-  const st = STATE[job?.state ?? 'idle']
-  const collecting = runner.phase === 'collecting'
-  const queued = job ? job.remaining : 0
+  }, [loadCache])
 
   return (
     <div className="dash" style={{ gridTemplateColumns: '1fr' }}>
-      <div className="p-card rise-c">
-        <div className="card-h">
-          <div className="ico"><RefreshCw /></div>
-          <h2>Kuzatuvdagi kompaniyalar qarorlari</h2>
-        </div>
-        <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
-          Kuzatuvdagi kompaniyalarning ishlari boʻyicha public.sud.uz da eʼlon qilingan qarorlar orqa fonda yuklanadi. Eʼlon qilingan qaror oʻzgarmaydi, shuning uchun
-          bir marta olinadi va qayta soʻralmaydi; ish oʻzgarganda (masalan apellyatsiya berilganda) yoki eʼlon kechikkan boʻlsa (3, 14, 45 kundan keyin) qayta tekshiriladi.
-          Hali birinchi instansiyada koʻrilayotgan ishlarda qaror boʻlmaydi, ular tekshirilmaydi.
-        </p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', margin: '0 0 12px' }}>
-          <input
-            type="checkbox"
-            checked={auto}
-            onChange={(e) => {
-              setAuto(e.target.checked)
-              setAutoEnabled(e.target.checked)
-            }}
-          />
-          Ilova ishlatilmayotganda oʻzi tekshirsin (3 daqiqa boʻsh turgandan keyin, 6 soatda koʻpi bilan bir marta). Oʻchiq boʻlsa hech narsa oʻzi boshlanmaydi
-        </label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-primary"
-            onClick={() => (!collecting ? void checkWatchlistOrders({ auto: false }) : runner.paused ? void resumeWatchlistCheck() : void pauseWatchlistCheck())}
-          >
-            {!collecting ? <RefreshCw /> : runner.paused ? <Play /> : <Pause />}
-            <span>{!collecting ? 'Hozir tekshirish' : runner.paused ? 'Davom ettirish' : 'Pauza'}</span>
-          </button>
-        </div>
-        <div className="kv" style={{ marginTop: 14 }}>
-          <span className="k">Oxirgi avtomatik tekshiruv</span>
-          <span className="mono">{dmyHm(lastAuto || null)}</span>
-        </div>
-        {collecting && (
-          <div className="kv">
-            <span className="k">Ishlar yigʻilmoqda{runner.paused ? ' (pauza)' : ''}</span>
-            <span className="mono">{runner.done}/{runner.total} kompaniya</span>
-          </div>
-        )}
-      </div>
-
-      <div className="p-card rise-c">
-        <div className="card-h">
-          <div className="ico"><ListChecks /></div>
-          <h2>Navbat</h2>
-          <div className="sp" />
-          <span className={`badge ${st.cls}`}>{st.text}</span>
-        </div>
-        {job && job.total > 0 ? (
-          <>
-            <div className="kv"><span className="k">Ishlar</span><span className="mono">{job.done}/{job.total}</span></div>
-            <div className="kv"><span className="k">Qolgan</span><span className="mono">{num(queued)}</span></div>
-            <div className="kv"><span className="k">Public.sud.uz dan soʻralgan</span><span className="mono">{num(job.searched)}</span></div>
-            <div className="kv"><span className="k">Yangi qarorlar</span><span className="mono">{num(job.found)}</span></div>
-            {job.known > 0 && <div className="kv"><span className="k">Allaqachon maʼlum (soʻralmaydi)</span><span className="mono">{num(job.known)}</span></div>}
-            {job.ongoing > 0 && <div className="kv"><span className="k">Hali koʻrilayotgan (qaror yoʻq)</span><span className="mono">{num(job.ongoing)}</span></div>}
-            {job.errors > 0 && <div className="kv"><span className="k">Xatolar</span><span className="mono">{num(job.errors)}</span></div>}
-            {job.current && <div className="kv"><span className="k">Hozir</span><span className="mono">{job.current}</span></div>}
-            {job.lastError && <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '12px 0 0' }}>Oxirgi xato: {job.lastError} (keyinroq qayta uriniladi)</p>}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-              {job.state === 'running' && (
-                <button className="btn btn-outline" onClick={() => void pausePublicOrdersJob().then(load)}>
-                  <Pause /><span>Pauza</span>
-                </button>
-              )}
-              {job.state === 'paused' && (
-                <button className="btn btn-outline" onClick={() => void resumePublicOrdersJob().then(load)}>
-                  <Play /><span>Davom ettirish</span>
-                </button>
-              )}
-              {job.state !== 'running' && job.state !== 'paused' && job.failed > 0 && (
-                <button className="btn btn-outline" onClick={() => void retryPublicOrdersJob().then(load)}>
-                  <RefreshCw /><span>Xatoli ishlarni qayta urinish ({job.failed})</span>
-                </button>
-              )}
-              {(job.state === 'running' || job.state === 'paused') && queued > 0 && (
-                <button className="btn btn-outline" onClick={() => void cancelPublicOrdersJob().then(load)}>
-                  <X /><span>Qolganini bekor qilish</span>
-                </button>
-              )}
-            </div>
-          </>
-        ) : (
-          <p className="faint" style={{ fontSize: 12.5, margin: '2px 0 0' }}>Hozir yuklanayotgan qaror yoʻq.</p>
-        )}
-      </div>
-
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Database /></div>

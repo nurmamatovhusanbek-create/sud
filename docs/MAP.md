@@ -13,7 +13,7 @@ named in §2 → **(6)** update the docs named in §6 → `bun run typecheck && 
 ```
 components/  views · sections · shell · proto(UI kit) · company        ← React, 'use client'
    │  use
-lib/ client half: api-client · registry · enrich · orders-watchlist · use-orders-job · use-registry · cache · store/app-store
+lib/ client half: api-client · registry · enrich · use-registry · cache · store/app-store
    │  fetch('/api/*')  — the ONLY way client code reaches data (same-origin, CSP)
 app/api/**/route.ts   every route = guard(handler, opts)   ← src/server/{middleware,security,config,envelope}.ts
    │
@@ -43,8 +43,8 @@ core/                 PURE functions (no I/O, no React): classify · rates · st
 | **Majlislar (hearings)** | `sections/hearings`, `views/watchlist` (alerts) | `registry` (`hearingMetaPatch`, `futureUpcoming`, `upcomingOf`) | `upcoming-hearings`(+export) | `sources` (upcoming) | `lib/__tests__/registry-hearings` |
 | **To'lovlar (bills)** | `sections/bills`, `bills-helpers` | `bills-cache`, `hooks/use-stream` | `bills`(+export) | `lib/billing`, `core/billing-format` | `lib/__tests__/billing-search`, `net/__tests__` |
 | **Kompaniya profili (orginfo + chamber)** | `sections/profile` | `api-client` | `company-info`, `company` | `lib/orginfo`, `lib/chamber` | `lib/__tests__/orginfo-fetch` |
-| **Kuzatuv (watchlist)** | `views/watchlist`, `views/orders-control` | `registry`, `orders-watchlist` | – | – | – |
-| **Published court orders (Qarorlar)** | `proto/case-orders`, `proto/order-handover`, `shell/orders-loader`, `shell/orders-auto-check`, `views/orders-control`, `views/orders-settings`, `views/orders-view` (sidebar page «Qarorlar», surface `orders`) | `orders-watchlist`, `use-orders-job`, `api-client` | `public-orders/{fetch,status,orders,file,cache}` | `lib/public-orders/*`, `core/public-orders` | `core/__tests__/public-orders`, `lib/public-orders/__tests__/*` — **details: [orders.md](./orders.md)** |
+| **Kuzatuv (watchlist)** | `views/watchlist` | `registry` | – | – | – |
+| **Published court orders (Qarorlar)** | `proto/case-orders`, `proto/order-handover`, `views/orders-settings` (cache + backup numbers only), `views/orders-view` (sidebar page «Qarorlar», surface `orders`) | `api-client` | `public-orders/{fetch,status,orders,file,cache}` | `lib/public-orders/*`, `core/public-orders` | `core/__tests__/public-orders`, `lib/public-orders/__tests__/*` — **details: [orders.md](./orders.md)** |
 | **Documents (visa/IIO/court .docx)** | `views/documents-view`, `views/doc-editor`, `proto/doc-preview`, `proto/letterhead` | `api-client` | `documents/{generate,template}` | `lib/documents/{registry,fill.shared,fill.server,banner,derive,from-case,script,script-pref}`, `core/{translit,uz-alphabet}` (old ⇄ new 2026 Latin alphabet ⇄ Cyrillic: «Yozuv» switch) | `lib/documents/__tests__`, `core/__tests__/{uz-alphabet,translit}` |
 | **Talabnoma (demand letters)** | `views/pretenzia-view` | `lib/pretenzia/{parse,render}` | `pretenzia/generate` | `lib/pretenzia/fill.server`, `core/pretenzia` | `core/__tests__/pretenzia` |
 | **Settings (update, workers, health, orders panel)** | `views/settings-view`, `views/orders-settings` | `api-client` (`privilegedHeaders`) | `settings/*`, `tor-status` | `workers-config`, `health-registry`, `tor`, `version-server`, `update-check`, `update-wait` | `server/__tests__/security`, `lib/__tests__/update-check`, `lib/__tests__/update-wait` |
@@ -52,7 +52,7 @@ core/                 PURE functions (no I/O, no React): classify · rates · st
 | **Security (host/CSRF/privileged)** | – | `api-client` headers | all | `server/{security,middleware,config}` | `server/__tests__/{security,routes}` — **[SECURITY.md](./SECURITY.md)** |
 
 Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all component CSS: `.drawer*/.dw-*`, `.ccard`, `.kpis`,
-`.orders-loader`, `.dedit*/.dprev*`, `.cband/.cnum`…). Never hardcode hex in components.
+`.dedit*/.dprev*`, `.cband/.cnum`…). Never hardcode hex in components.
 
 ## 3. One concept, several places — change ALL of them
 
@@ -62,7 +62,7 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 | **Company enrichment (stats+hearings → registry meta)** | `lib/enrich.ts` (launcher refresh) **and** a local copy `enrichCompany` inside `views/watchlist.tsx` (throws, forced runs sequential) **and** `sections/overview.tsx` (~line 678) and `sections/hearings.tsx` (hearings only) | What they write: the company FACTS (`name`, `status`, `rating`, `score`: `companyFactsPatch` + `patchRecord` in `registry.ts`, from EVERY answer, also a partial one, also `sections/profile.tsx`) and, only from a COMPLETE stats answer, `cases`, `orderCases`, `winRate`; plus `upcoming`+`nextHearing*`. The rating also has its OWN fast path: `/api/rating` → `lib/rating-service` (chamber only, ~1 s, 30-min memory cache, failures never cached) → `lib/enrich` `refreshRating`, started in parallel with the stats by the enrichment copies and by `company/context-bar` on open, so it never waits for the court searches. The rating carries `meta.ratingAt` (when chamber was read): `patchRecord` refuses an OLDER reading (stats served from a day-old snapshot, `meta.fetchedAt`) over a newer one, and the header takes the rating the registry HOLDS, never an answer's own. A chamber failure is `ratingFailed` (`getCompanyRatingDetailed`): such a stats/info answer is never snapshotted for the day. Keep field sets identical; use `hearingMetaPatch` / `orderCasesPatch` from `registry.ts`. |
 | **Upcoming hearings** | write: `hearingMetaPatch` (registry) from enrich/watchlist/hearings; read: `futureUpcoming`/`upcomingOf`/`daysUntilIso` in launcher KPI + card, `shell/app-shell` bell, `views/watchlist` alerts/list | Only hearings ≥ today count. An EMPTY server answer is never written (server swallows failures). One hearing per company was the old bug: always use the list. |
 | **Win rate / outcome** | `core/rates.ts` (`winRate`), `core/classify.ts` (`classifyOutcome`) — imported by stats, overview, watchlist, enrich, report, pizza | Never re-inline. |
-| **Order job case shape + signature** | `core/public-orders.ts` `orderJobCase` / `caseSignature` — used by `orders-watchlist.ts` and `sections/cases.tsx` | ONE shape or screens ping-pong «changed». |
+| **Order job case shape + signature** | `core/public-orders.ts` `orderJobCase` / `caseSignature` — used by the case drawer's check (`proto/case-orders`) and `sections/cases.tsx` | ONE shape or screens ping-pong «changed». |
 | **Ongoing-first-instance rule** | `core/public-orders.ts` `isOngoingFirstInstance` — used by `company-job.ts` (`planCases`) and `sections/cases.tsx` (drawer note) | – |
 | **Hard refresh + data age** | button/R key: `company/context-bar` + `app/page.tsx` → `lib/hard-refresh` (`hardRefreshWithToast` → `lib/enrich` `enrichCompanyDetailed(force)`); age label: sections call `lib/data-age` `reportAge` with `meta.fetchedAt` (via `hooks/use-resource` `meta`), header shows the oldest (`core/age`) | The event `sud:company-refreshed` makes the active section `reload()` (read, NOT force: the scrape already happened). `sud:force-section` = a section-level retry (forces). Snapshot resources use `persist:false` (no browser copy). A PARTIAL stats answer must never be written to registry meta or counted as a refresh. |
 | **Hearing date `dd.mm.yyyy` ordering** | `sections/cases.tsx` (`hearingKey`, `pickUpcoming`), `core/dates.ts`, `sources/index.ts` (upcoming iso) | Never compare as strings. |
@@ -77,8 +77,7 @@ Style/tokens: `app/globals.css` (tokens, dark) + `app/prototype.css` (all compon
 
 | Store | Lifetime | Key / holder | Who writes |
 |---|---|---|---|
-| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sud-orders-auto` (idle switch, default off), `sud-orders-auto-last`, `sb-cache-v169:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / orders-watchlist / use-resource |
-| Browser `sessionStorage` | tab session | `sud-orders-pill-hidden` (run id whose pill was hidden) | orders-loader |
+| Browser `localStorage` | permanent | `sud-registry-v1` (companies+meta), `sb-cache-v169:*` (5-min response cache, `lib/cache.ts`; partial answers are not cached) | registry / use-resource |
 | Zustand `app-store` | page | active company, section, surface, `docPrefill` | components |
 | Server memory (`globalThis`) | process | `__publicOrdersJob` (queue), health pools (`__sudHealthPools`, live cooldowns only), `__sudHealthStore` (request history, mirrored to disk), metrics | company-job / cf-worker-pool / health-store |
 | Worker health history (disk) | `~/.sud-tizimi/worker-health.json` (0600; `WORKER_HEALTH_FILE`) | hourly buckets 35 d → daily buckets forever + last 300 raw records per worker×origin; flushed every 15 s and on exit | `lib/health-store` (server) · `lib/health-span` (pure, also read by Settings) · `/api/settings/health` |

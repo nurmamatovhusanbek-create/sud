@@ -24,7 +24,7 @@ import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { openProtoDrawer, closeProtoDrawer, DwSection, DwKv, DwFig, type DwRow } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { assignRoles, type PartyRole } from '@/core/classify'
-import { isOngoingFirstInstance, orderJobCase, type KnownDecision } from '@/core/public-orders'
+import { isOngoingFirstInstance, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValuesFor, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
 import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
@@ -33,8 +33,7 @@ import { useResource } from '@/hooks/use-resource'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { dateKey, daysUntil } from '@/core/dates'
-import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx, fetchPublicOrders, planPublicOrders } from '@/lib/api-client'
-import { useOrdersJob } from '@/lib/use-orders-job'
+import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
@@ -664,28 +663,6 @@ export function CasesSection() {
     )
   }, [searched, roleFilter, roleOf, sort])
 
-  // DETECT (free, nothing is scraped or queued): how many of the listed cases would really need a look at public.sud.uz —
-  // shown as a count on the «Qarorlar» button; the button is what starts the work
-  const { job: ordersJob } = useOrdersJob()
-  const [ordersPending, setOrdersPending] = useState<number | null>(null)
-  const ordersJobState = ordersJob?.state
-  useEffect(() => {
-    if (!filtered.length) {
-      setOrdersPending(null)
-      return
-    }
-    let stop = false
-    const t = setTimeout(() => {
-      void planPublicOrders(filtered.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus }))).then((r) => {
-        if (!stop) setOrdersPending(r.ok ? r.data.need : null)
-      })
-    }, 800) // partial loads (one court type at a time) coalesce into one call
-    return () => {
-      stop = true
-      clearTimeout(t)
-    }
-  }, [filtered, ordersJobState])
-
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
@@ -734,16 +711,6 @@ export function CasesSection() {
     })()
   }
 
-  const downloadOrders = () => {
-    void (async () => {
-      const r = await fetchPublicOrders(filtered.map(({ c, courtType }) => orderJobCase({ caseNumber: c.caseNumber, courtType, result: c.result, caseStatus: c.caseStatus })))
-      if (!r.ok) toast.error(r.error)
-      else if (r.data.queued === 0 && r.data.job.state === 'running') toast.success('Tekshiruv boshlandi — boshqa ishingizni davom ettiring')
-      else if (r.data.queued === 0) toast.info(r.data.ongoing || r.data.known ? `Yangi tekshiradigan ish yoʻq${r.data.known ? `: ${r.data.known} ta ish allaqachon maʼlum` : ''}${r.data.ongoing ? `${r.data.known ? ', ' : ': '}${r.data.ongoing} ta hali birinchi instansiyada koʻrilmoqda` : ''}` : 'Tekshiradigan ish yoʻq')
-      else toast.success(`${r.data.queued} ta ish tekshiruvga qoʻyildi${r.data.ongoing ? `, ${r.data.ongoing} tasi hali koʻrilmoqda (qaror yoʻq)` : ''}${r.data.known ? `, ${r.data.known} tasi allaqachon maʼlum` : ''} — boshqa ishingizni davom ettiring`)
-    })()
-  }
-
   return (
     <div className="p-card rise-c">
       <div className="filterbar">
@@ -772,15 +739,6 @@ export function CasesSection() {
         >
           {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
           <span>Excel</span>
-        </button>
-        <button
-          className="btn btn-outline btn-sm"
-          disabled={filtered.length === 0}
-          onClick={downloadOrders}
-          title="Roʻyxatdagi ishlarning eʼlon qilingan qarorlarini orqa fonda yuklash"
-        >
-          <FileText />
-          <span>Qarorlar{ordersPending ? ` · ${ordersPending}` : ''}</span>
         </button>
       </div>
 
