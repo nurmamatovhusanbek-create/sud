@@ -25,7 +25,7 @@ export type SolidName = keyof typeof PATHS
 
 export function SolidIcon({ name, size, className }: { name: SolidName; size?: number; className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" className={className} focusable="false">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" className={className} focusable="false" data-ico={name}>
       {PATHS[name].map((d, i) => (
         <path key={i} d={d} />
       ))}
@@ -46,4 +46,18 @@ const STATUS_ICON: Record<StatusFamilyKey, SolidName> = {
 /** The icon of a case status: granted / rejected / returned or otherwise closed / still being heard. Always ink: the shape says it, not a colour. */
 export function StatusIcon({ family, size = 24, className }: { family: StatusFamilyKey; size?: number; className?: string }) {
   return <SolidIcon name={STATUS_ICON[family]} size={size} className={className} />
+}
+
+/** One shared gradient for the big tile icons (mounted once by the shell; the stops read the look's --ico-a / --ico-b tokens). */
+export function IconGradientDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="sud-ico-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: 'var(--ico-a, currentColor)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--ico-b, currentColor)' }} />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
 }

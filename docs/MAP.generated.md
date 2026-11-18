@@ -273,7 +273,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `list-pagination.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/views/orders-view.tsx |  |
 | `select-field.tsx` | components/ui-custom/list-pagination.tsx |  |
-| `solid-icons.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/views/launcher.tsx |  |
+| `solid-icons.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx, components/views/launcher.tsx |  |
 | `states.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 
 ## Environment variables
@@ -338,6 +338,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-buyrugini-bekor-qilish` | lib/documents/registry.ts |
 | `sud-doc-letterhead-v1` | components/proto/letterhead.tsx |
 | `sud-doc-script` | lib/documents/script-pref.ts |
+| `sud-ico-grad` | components/ui-custom/solid-icons.tsx |
 | `sud-majlisini-qoldirish` | lib/documents/registry.ts |
 | `sud-registry-v1` | lib/registry.ts |
 | `sud-saved-companies` | lib/registry.ts |

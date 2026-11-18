@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from '@/lib/theme'
 import { useMotion } from '@/lib/motion'
+import { IconGradientDefs } from '@/components/ui-custom/solid-icons'
 import {
   BarChart3,
   Bell,
@@ -304,6 +305,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-frame">
+      <IconGradientDefs />
       <a className="skip-link" href="#main">Asosiy qismga oʻtish</a>
       {sideOpen && <div className="side-scrim" onClick={() => setSideOpen(false)} aria-hidden />}
       <aside className={cn('side', sideOpen && 'open')} aria-label="Global navigatsiya">
