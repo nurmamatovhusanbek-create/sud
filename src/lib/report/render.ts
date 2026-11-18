@@ -186,22 +186,22 @@ function monthly(points: { label: string; count: number }[], t: ReportTheme): st
 // ---- HTML pieces -------------------------------------------------------------
 
 /** "PROCAB" MChJ → “PROCAB” MChJ — paired straight quotes become typographic ones. */
-const displayName = (name: string) => name.replace(/"([^"]*)"/g, '“$1”')
+export const displayName = (name: string) => name.replace(/"([^"]*)"/g, '“$1”')
 
 /** «1,2 mlrd» → numeral + small unit; «325 700» (grouped digits) stays whole. */
-function figure(v: string): string {
+export function figure(v: string): string {
   const m = /^(.+?) (mln|mlrd)$/.exec(v)
   return m ? `${h(m[1])}<small>${h(m[2])}</small>` : h(v)
 }
 
-const sec = (title: string, right = '') => `<div class="rp-sh"><span>${h(title)}</span>${right ? `<em>${h(right)}</em>` : ''}</div>`
+export const sec = (title: string, right = '') => `<div class="rp-sh"><span>${h(title)}</span>${right ? `<em>${h(right)}</em>` : ''}</div>`
 
-const railGroup = (title: string, body: string) => (body ? `<div class="rp-rg"><h3>${h(title)}</h3>${body}</div>` : '')
+export const railGroup = (title: string, body: string) => (body ? `<div class="rp-rg"><h3>${h(title)}</h3>${body}</div>` : '')
 
-const railDl = (rows: { label: string; value: string; mono?: boolean }[]) =>
+export const railDl = (rows: { label: string; value: string; mono?: boolean }[]) =>
   rows.length ? `<dl>${rows.map((r) => `<div><dt>${h(r.label)}</dt><dd${r.mono ? ' class="m"' : ''}>${h(r.value)}</dd></div>`).join('')}</dl>` : ''
 
-const note = (n: { section: string; message: string }) => `<div class="rp-note"><b>${h(n.section)}:</b> maʼlumot olinmadi</div>`
+export const note = (n: { section: string; message: string }) => `<div class="rp-note"><b>${h(n.section)}:</b> maʼlumot olinmadi</div>`
 
 // ---- the rail (left column) --------------------------------------------------
 
@@ -393,7 +393,7 @@ export function reportCss(t: ReportTheme, fontStack: string, monoStack: string):
     @bottom-left { content: ""; width: ${RAIL_W}; background: ${t.rail.bg}; }
     @bottom-right { content: counter(page) " / " counter(pages); font: 500 7.5pt ${fontStack}; color: ${t.t3}; padding-right: 15mm; vertical-align: top; padding-top: 2mm; } }
 
-  .rp-sheet { position: relative; width: 210mm; margin: 0 auto; }
+  .rp-sheet { position: relative; isolation: isolate; width: 210mm; margin: 0 auto; }
   /* the rail colour behind the left column + the pinned footer: fixed = repeats on every printed page */
   .rp-bg { position: absolute; z-index: -1; top: 0; bottom: 0; left: 0; width: ${RAIL_W}; background: var(--rail); }
   .rp-pin { position: absolute; bottom: 4mm; font-size: 6.4pt; line-height: 1.3; }

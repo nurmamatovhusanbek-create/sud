@@ -53,9 +53,9 @@
   --accent-ring:     rgba(17, 17, 20, 0.28);
   --brand-tile: #111114;
 
-  --status-positive-solid: #1F7A55; --status-positive-soft: #E3F0EA; --status-positive-text: #165C40; --status-positive-line: #BBD8C9; --status-positive-base: #1F7A55;
+  --status-positive-solid: #111114; --status-positive-soft: #ECECEF; --status-positive-text: #111114; --status-positive-line: #D6D6DA; --status-positive-base: #111114;
   --status-negative-solid: #B03A48; --status-negative-soft: #F7E4E7; --status-negative-text: #8F2B38; --status-negative-line: #E6BFC5; --status-negative-base: #B03A48;
-  --status-warning-solid:  #B27A16; --status-warning-soft:  #F8EDD3; --status-warning-text:  #77510C; --status-warning-line:  #E7D2A0; --status-warning-base:  #B27A16;
+  --status-warning-solid:  #111114; --status-warning-soft:  #ECECEF; --status-warning-text:  #111114; --status-warning-line:  #D6D6DA; --status-warning-base:  #111114;
   --status-info-solid:     #111114; --status-info-soft:     #ECECEF; --status-info-text:     #111114; --status-info-line:     #D6D6DA; --status-info-base:     #111114;
   --status-neutral-soft: #EEEEF0; --status-neutral-text: #565760; --status-neutral-line: #DADADE;
 
@@ -110,9 +110,9 @@
   --accent-ring:     rgba(237, 237, 237, 0.45);
   --brand-tile: #2A2A2E;
 
-  --status-positive-solid: #4CC38A; --status-positive-soft: rgba(76, 195, 138, 0.14); --status-positive-text: #86D8B1; --status-positive-line: rgba(76, 195, 138, 0.30); --status-positive-base: #4CC38A;
+  --status-positive-solid: #EDEDED; --status-positive-soft: rgba(237, 237, 237, 0.10); --status-positive-text: #EDEDED; --status-positive-line: rgba(237, 237, 237, 0.24); --status-positive-base: #EDEDED;
   --status-negative-solid: #E5484D; --status-negative-soft: rgba(229, 72, 77, 0.14);  --status-negative-text: #F08A8D; --status-negative-line: rgba(229, 72, 77, 0.30);  --status-negative-base: #E5484D;
-  --status-warning-solid:  #D9A648; --status-warning-soft:  rgba(217, 166, 72, 0.14); --status-warning-text:  #EBC987; --status-warning-line:  rgba(217, 166, 72, 0.30);  --status-warning-base:  #D9A648;
+  --status-warning-solid:  #EDEDED; --status-warning-soft:  rgba(237, 237, 237, 0.10); --status-warning-text:  #EDEDED; --status-warning-line:  rgba(237, 237, 237, 0.24); --status-warning-base:  #EDEDED;
   --status-info-solid:     #EDEDED; --status-info-soft:     rgba(237, 237, 237, 0.10); --status-info-text:    #EDEDED; --status-info-line:    rgba(237, 237, 237, 0.24); --status-info-base:    #EDEDED;
   --status-neutral-soft: rgba(237, 237, 237, 0.08); --status-neutral-text: #A1A1A6; --status-neutral-line: rgba(237, 237, 237, 0.14);
 
@@ -220,3 +220,15 @@
 @media (max-width: 700px) {
   [data-look='premium'] .kpi-ico { width: 84px; height: 84px; right: -34px; margin-top: -42px; opacity: .7; -webkit-mask-image: linear-gradient(to right, #000 0%, #000 16%, transparent 50%); mask-image: linear-gradient(to right, #000 0%, #000 16%, transparent 50%); }
 }
+
+/* ---------- 12. state dots: ink, told apart by SHAPE (owner: «make the green tick and worker dots ink too») ----------
+   good = solid · partly = half filled · bad / off = hollow ring · unknown = quiet grey. The word beside the dot always says it too. */
+[data-look='premium'] .d-pos { background: var(--text-1); }
+[data-look='premium'] .d-warn { background: linear-gradient(90deg, var(--text-1) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--text-1); }
+[data-look='premium'] .d-neg { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-1); }
+[data-look='premium'] .sysstat .pulse { background: #FFFFFF; }
+[data-look='premium'] .sysstat .pulse::after { background: #FFFFFF; }
+[data-look='premium'] .sysstat[data-state='checking'] .pulse, [data-look='premium'] .sysstat[data-state='checking'] .pulse::after { background: #8D8D93; }
+[data-look='premium'] .sysstat[data-state='degraded'] .pulse { background: linear-gradient(90deg, #FFFFFF 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px #FFFFFF; }
+[data-look='premium'] .sysstat[data-state='down'] .pulse { background: transparent; box-shadow: inset 0 0 0 1.5px #FFFFFF; }
+[data-look='premium'] .sysstat[data-state='degraded'] .pulse::after, [data-look='premium'] .sysstat[data-state='down'] .pulse::after { display: none; }

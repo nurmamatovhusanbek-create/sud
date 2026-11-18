@@ -470,7 +470,7 @@ function TorCard() {
     void check(false)
   }, [check])
 
-  const color = state === 'active' ? 'var(--pos-base)' : state === 'inactive' ? 'var(--neg-base)' : 'var(--warn-base)'
+  const dot = state === 'active' ? 'd-pos' : state === 'inactive' ? 'd-neg' : 'd-warn'
   const label = state === 'active' ? 'Tor faol' : state === 'inactive' ? "Tor oʻchiq" : 'Tekshirilmoqda…'
 
   return (
@@ -479,7 +479,7 @@ function TorCard() {
         <div className="ico"><Shield /></div>
         <h2>Tor</h2>
         <div className="sp" />
-        <span className="p-dot" style={{ background: color }} />
+        <span className={`p-dot ${dot}`} />
         <span className="faint" style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
       </div>
       <p className="faint" style={{ fontSize: 12.5, margin: '0 0 12px' }}>

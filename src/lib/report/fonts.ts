@@ -23,7 +23,10 @@ export interface FontRule {
 
 export interface FontKit {
   css: string
+  /** Plus Jakarta Sans (the «calm» edition and the glyphs Plex lacks) */
   sans: string
+  /** IBM Plex Sans (the «premium» edition, tried before `sans`) */
+  plexSans: string
   mono: string
 }
 
@@ -46,13 +49,14 @@ export function fontKitFromRules(rules: FontRule[], fallbackBase: string): FontK
   return {
     css: kept.map((r) => absolute(r.cssText, r.base || fallbackBase)).join('\n'),
     sans: families(/jakarta/i).join(', '),
-    mono: families(/plex/i).join(', '),
+    plexSans: families(/plex.*sans/i).join(', '),
+    mono: families(/plex.*mono/i).join(', '),
   }
 }
 
 /** Browser: read the app's own @font-face rules. Never throws — the report just uses system fonts. */
 export function collectFontKit(): FontKit {
-  const empty: FontKit = { css: '', sans: '', mono: '' }
+  const empty: FontKit = { css: '', sans: '', plexSans: '', mono: '' }
   if (typeof document === 'undefined') return empty
   try {
     const rules: FontRule[] = []

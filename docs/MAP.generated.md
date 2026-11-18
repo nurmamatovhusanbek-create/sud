@@ -57,21 +57,21 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
-| `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
+| `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +3 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
+| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +4 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +11 | core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
-| `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
+| `rates.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/rates.test.ts |
 | `schemas/index.ts` | api/company-info/route, api/court-cases/route, api/rating/route, api/snapshot/route, api/stats/route, api/upcoming-hearings/route, sources/index.ts |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, lib/report/model.ts | core/__tests__/status.test.ts |
 | `translit.ts` | core/classify.ts, core/public-orders.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
-| `trend.ts` | components/sections/overview.tsx, lib/report/model.ts | core/__tests__/trend.test.ts |
+| `trend.ts` | components/sections/overview.tsx, lib/report/model.ts, lib/report/render-ink.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
 | `worker-trust.ts` | lib/workers-config.ts | core/__tests__/worker-trust.test.ts |
@@ -133,7 +133,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `health-span.ts` | components/views/settings-view.tsx, lib/health-store.ts | lib/__tests__/health-store.test.ts |
 | `health-store.ts` | api/settings/health/route, lib/cf-worker-pool.ts, lib/health-registry.ts | lib/__tests__/health-store.test.ts |
 | `identity.ts` | app/page.tsx |  |
-| `look.ts` | components/views/appearance-settings.tsx | lib/__tests__/look.test.ts |
+| `look.ts` | components/views/appearance-settings.tsx, lib/report/doc.ts, lib/report/generate.ts | lib/__tests__/look.test.ts |
 | `motion.ts` | components/proto/primitives.tsx, components/proto/scrape-progress.tsx, components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/motion.test.ts |
 | `net/chain-fetch.ts` | lib/billing.ts, lib/public-orders/source.ts | lib/net/__tests__/chain-fetch.test.ts |
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
@@ -145,7 +145,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
-| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/xss.test.ts |
+| `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/report/__tests__/xss.test.ts |
 | `public-orders/company-job.ts` | api/presence/route, api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
 | `public-orders/data-dir.ts` | lib/public-orders/hidden-store.ts, lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
@@ -163,11 +163,12 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/waf.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/waf.test.ts |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
 | `registry.ts` | components/company/context-bar.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, components/shell/command-palette.tsx, components/views/launcher.tsx, +7 | lib/__tests__/company-facts.test.ts, lib/__tests__/registry-hearings.test.ts, lib/__tests__/storage-quota.test.ts |
-| `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
+| `report/doc.ts` | lib/report/generate.ts | lib/report/__tests__/render-ink.test.ts, lib/report/__tests__/render.test.ts |
 | `report/fonts.ts` | lib/report/generate.ts | lib/report/__tests__/render.test.ts |
 | `report/generate.ts` | components/company/context-bar.tsx |  |
-| `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
-| `report/render.ts` | lib/report/doc.ts | lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
+| `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render-ink.test.ts, lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
+| `report/render-ink.ts` | lib/report/doc.ts | lib/report/__tests__/render-ink.test.ts |
+| `report/render.ts` | lib/report/doc.ts, lib/report/render-ink.ts | lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
 | `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
@@ -223,12 +224,12 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `brand-mark.tsx` | components/proto/drawer.tsx, components/shell/app-shell.tsx |  |
 | `case-orders.tsx` | components/sections/cases.tsx |  |
 | `date-tile.tsx` | components/proto/primitives.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx, components/views/watchlist.tsx |  |
-| `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render.ts | core/__tests__/dial.test.ts |
+| `dial-geometry.ts` | components/proto/primitives.tsx, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/dial.test.ts |
 | `doc-preview.tsx` | components/views/doc-editor.tsx |  |
 | `drawer.tsx` | app/page.tsx, components/proto/case-orders.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/views/settings-view.tsx |  |
 | `letterhead.tsx` | components/views/doc-editor.tsx, components/views/documents-view.tsx, components/views/pretenzia-view.tsx |  |
 | `order-handover.tsx` | components/proto/case-orders.tsx, components/views/orders-view.tsx |  |
-| `pizza-geometry.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, lib/report/model.ts, lib/report/render.ts | core/__tests__/pizza.test.ts |
+| `pizza-geometry.ts` | components/proto/primitives.tsx, components/sections/overview.tsx, lib/report/model.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/pizza.test.ts |
 | `primitives.tsx` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/command-palette.tsx, +5 |  |
 | `scrape-progress.tsx` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 

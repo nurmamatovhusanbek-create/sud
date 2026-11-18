@@ -199,6 +199,6 @@ describe('fontKitFromRules', () => {
     expect(dev.css).not.toContain('localhost:3000/media/') // what resolving against the page produced
   })
   test('no rules → empty kit (the report falls back to system fonts)', () => {
-    expect(fontKitFromRules([], 'http://x/')).toEqual({ css: '', sans: '', mono: '' })
+    expect(fontKitFromRules([], 'http://x/')).toEqual({ css: '', sans: '', plexSans: '', mono: '' })
   })
 })

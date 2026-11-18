@@ -6,6 +6,8 @@ import { formatDmy } from '@/core/dates'
 import { escapeHtml as h } from '@/lib/print'
 import type { ReportModel } from './model'
 import { renderReportBody, renderReportFooter, renderReportWatermark, reportCss, reportTheme } from './render'
+import { inkCss, inkTheme, renderInkBody, renderInkWatermark } from './render-ink'
+import type { Look } from '@/lib/look'
 
 export interface ReportDocOpts {
   dark?: boolean
@@ -14,9 +16,14 @@ export interface ReportDocOpts {
   /** the family name(s) those rules define, tried before the system stack */
   fontFamily?: string
   fontMono?: string
+  /** the app's own sans (IBM Plex Sans), tried first in the «premium» edition */
+  fontPlexSans?: string
+  /** which edition: «premium» = ink / near-white (the app's default look), «calm» = the navy Dossier. Default «calm» (the original). */
+  look?: Look
 }
 
 const SYSTEM_STACK = '"Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+const PREMIUM_STACK = '"IBM Plex Sans", "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 const MONO_STACK = '"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace'
 
 /**
@@ -29,16 +36,19 @@ const MONO_STACK = '"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Cons
  */
 export function buildReportDoc(m: ReportModel, opts: ReportDocOpts = {}): string {
   const dark = !!opts.dark
-  const t = reportTheme(dark)
-  const stack = opts.fontFamily ? `${opts.fontFamily}, ${SYSTEM_STACK}` : SYSTEM_STACK
+  const ink = opts.look === 'premium'
+  const t = ink ? inkTheme(dark) : reportTheme(dark)
+  // premium: IBM Plex Sans first, Plus Jakarta Sans for what Plex lacks (ʻ ʼ); calm: Plus Jakarta Sans
+  const sans = ink ? [opts.fontPlexSans, opts.fontFamily].filter(Boolean).join(', ') : opts.fontFamily
+  const stack = sans ? `${sans}, ${ink ? PREMIUM_STACK : SYSTEM_STACK}` : ink ? PREMIUM_STACK : SYSTEM_STACK
   const mono = opts.fontMono ? `${opts.fontMono}, ${MONO_STACK}` : MONO_STACK
   const title = `Kompaniya hisoboti ${m.stir} ${formatDmy(m.generatedAt)}`
-  const body = renderReportBody(m, t)
+  const body = ink ? renderInkBody(m, t) : renderReportBody(m, t)
   const foot = renderReportFooter(m)
-  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${h(title)}</title><style>${opts.fontFaceCss ?? ''}${reportCss(t, stack, mono)}</style></head><body>
+  return `<!doctype html><html lang="uz" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${h(title)}</title><style>${opts.fontFaceCss ?? ''}${ink ? inkCss(t, stack, mono) : reportCss(t, stack, mono)}</style></head><body>
 <div class="rp-sheet">
 <div class="rp-bg"></div>
-${renderReportWatermark(t)}
+${ink ? renderInkWatermark(t) : renderReportWatermark(t)}
 <div class="rp-pin rp-pin-l">${foot.rail}</div><div class="rp-pin rp-pin-r">${foot.main}</div>
 <table class="rp">
 <colgroup><col class="l"><col></colgroup>

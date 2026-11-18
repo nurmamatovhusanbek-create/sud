@@ -20,6 +20,7 @@ import type { ApiResult, CompanyInfoData, CompanyStats, CourtCase, UpcomingHeari
 import { getCached, setCached } from '@/lib/cache'
 import { escapeHtml, isDarkTheme, openPrintWindow, palette, printIntoWindow } from '@/lib/print'
 import { getRecord } from '@/lib/registry'
+import { getLook } from '@/lib/look'
 import { buildReportDoc } from './doc'
 import { collectFontKit } from './fonts'
 import { buildReportModel } from './model'
@@ -156,7 +157,7 @@ export async function openCompanyReport(stir: string): Promise<void> {
       failed,
     })
     const fonts = collectFontKit()
-    const html = buildReportDoc(model, { dark, fontFaceCss: fonts.css, fontFamily: fonts.sans, fontMono: fonts.mono })
+    const html = buildReportDoc(model, { dark, look: getLook(), fontFaceCss: fonts.css, fontFamily: fonts.sans, fontPlexSans: fonts.plexSans, fontMono: fonts.mono })
 
     printIntoWindow(w, html)
     toast.success('Hisobot tayyor', {
