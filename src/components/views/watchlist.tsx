@@ -265,22 +265,6 @@ export function WatchlistView() {
         <p>Belgilangan kompaniyalar bo&apos;yicha yaqinlashayotgan majlislar, yutuq va reyting · bir qarashda.</p>
       </div>
 
-      {alerts.length > 0 && (
-        <div className="alert warn" style={{ marginTop: 18 }}>
-          <AlertTriangle />
-          <div className="at">
-            <b>{alerts.length} ta majlis 7 kun ichida</b>
-            <p>
-              {alertSummary
-                .map(({ row: a, n }) => {
-                  const p = isoParts(a.isoDate)
-                  return `${(a.name || a.stir).slice(0, 16)} · ${p.d} ${p.m}${n > 1 ? ` ×${n}` : ''}`
-                })
-                .join(' · ')}
-            </p>
-          </div>
-        </div>
-      )}
 
       <div
         className="section-head sh-click"
@@ -337,12 +321,12 @@ export function WatchlistView() {
         <h2>Kuzatuvdagi kompaniyalar</h2>
         <span className="count">{items.length}</span>
         <div className="sp" />
-        <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
+        <button className="btn btn-ghost btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
           {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
           <span>Yangilash</span>
         </button>
         <button
-          className="btn btn-outline btn-sm"
+          className="btn btn-primary btn-sm"
           onClick={() => {
             setCommandPurpose('add')
             setCommandOpen(true)
@@ -353,6 +337,13 @@ export function WatchlistView() {
         </button>
       </div>
       <div className="ccards">
+        {items.length > 0 && (
+          <div className="ccards-head">
+            <span>Kompaniya</span>
+            <span>Reyting</span>
+            <span>Keyingi majlis</span>
+          </div>
+        )}
         {items.map((c) => (
           <RemovableCard key={c.stir} rec={c} onUnwatch={unwatch} onRefresh={refreshCompany} />
         ))}

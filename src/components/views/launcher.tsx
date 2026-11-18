@@ -307,10 +307,10 @@ export function Launcher() {
           <CountUp value={nearHearings} id="lnch-hearings" />
         </Kpi>
         <Kpi label="Umumiy qarzdorlik" foot={`${overdueCompanies} kompaniyada`}>
-          <span style={{ fontSize: 19 }}>
+          <>
             <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
-            <span style={{ fontSize: 13, color: 'var(--text-3)' }}> mln soʻm</span>
-          </span>
+            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}> mln soʻm</span>
+          </>
         </Kpi>
       </div>
 
@@ -319,10 +319,10 @@ export function Launcher() {
         <span className="count">{filtered.length}</span>
         <div className="sp" />
         <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
+          <button className="btn btn-ghost btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
             {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
           </button>
-          <button className="btn btn-outline btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
+          <button className="btn btn-ghost btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
             <Trash2 />Tozalash
           </button>
           <Seg
@@ -337,6 +337,13 @@ export function Launcher() {
         </div>
       </div>
       <div className="ccards">
+        {filtered.length > 0 && (
+          <div className="ccards-head">
+            <span>Kompaniya</span>
+            <span>Reyting</span>
+            <span>Keyingi majlis</span>
+          </div>
+        )}
         {filtered.map((c, i) => (
           <div key={c.stir} className="rise" style={{ ['--i' as string]: Math.min(i, 10) }}>
             <CompanyCard rec={c} onRefresh={refreshOne} onDelete={deleteOne} />

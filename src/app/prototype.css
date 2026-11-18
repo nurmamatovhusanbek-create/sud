@@ -69,6 +69,7 @@ html, body { height: 100%; }
 
 /* ---------- primitives ---------- */
 .eyebrow { font-size: 12px; color: var(--text-3); font-weight: 500; }
+.hero .eyebrow { display: none; }
 .faint { color: var(--text-3); }
 .muted { color: var(--text-2); }
 .p-row { display: flex; align-items: center; gap: 10px; }
@@ -76,15 +77,16 @@ html, body { height: 100%; }
 .d-pos { background: var(--pos-base); } .d-neg { background: var(--neg-base); }
 .d-warn { background: var(--warn-base); } .d-info { background: var(--info-base); }
 .d-neu { background: var(--neu-base); }
-.badge { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 0; font-size: 12px; font-weight: 500; white-space: nowrap; background: transparent; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .badge svg { width: 12px; height: 12px; }
 .badge.solid.b-pos { background: var(--pos-solid); color: #fff; }
 .badge.solid.b-neg { background: var(--neg-solid); color: #fff; }
-.b-pos { background: var(--pos-soft); color: var(--pos-text); }
-.b-neg { background: var(--neg-soft); color: var(--neg-text); }
-.b-warn { background: var(--warn-soft); color: var(--warn-text); }
-.b-info { background: var(--info-soft); color: var(--info-text); }
-.b-neu { background: var(--neu-soft); color: var(--neu-text); }
+.b-pos { background: transparent; color: var(--pos-text); }
+.b-neg { background: transparent; color: var(--neg-text); }
+.b-warn { background: transparent; color: var(--warn-text); }
+.b-info { background: transparent; color: var(--info-text); }
+.b-neu { background: transparent; color: var(--neu-text); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; transition: background .15s, color .15s, transform .2s var(--spring), box-shadow .15s; border: 1px solid transparent; }
 .btn:active { transform: scale(.96); }
 .btn svg { width: 16px; height: 16px; }
@@ -137,11 +139,11 @@ html, body { height: 100%; }
 .section-head .sp { flex: 1; }
 
 /* ---------- KPI ---------- */
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-.kpi { position: relative; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); padding: 18px; transition: transform .25s var(--ease-emph), box-shadow .25s; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px; background: var(--border-subtle); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; }
+.kpi { position: relative; background: var(--surface); padding: 20px 24px; }
 [data-theme='dark'] .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .kpi .lbl { font-size: 12px; color: var(--text-3); font-weight: 500; }
-.kpi .val { font-family: var(--font-mono); font-size: 27px; font-weight: 600; margin-top: 8px; line-height: 1; }
+.kpi .val { font-size: 28px; font-weight: 500; margin-top: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi .foot { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); }
 [data-theme='dark'] 
 .dash { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; }
@@ -220,53 +222,52 @@ html, body { height: 100%; }
 /* v18 segmented control: rounded-rect track + bordered, with a white .thumb
    that slides under the active option (positioned by the Seg component). The
    :not(.has-thumb) fallback covers raw .seg markup with no thumb element. */
-.seg { display: inline-flex; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: 10px; padding: 3px; position: relative; }
-.seg button { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-2); position: relative; z-index: 1; transition: color .2s; }
-.seg button.on { color: var(--text-1); }
-.seg:not(.has-thumb) button.on { background: var(--surface); box-shadow: var(--elev-1); }
-.seg .thumb { position: absolute; border-radius: 8px; background: var(--surface); box-shadow: var(--elev-1); transition: left .28s var(--ease-emph), top .28s var(--ease-emph), width .28s var(--ease-emph), height .28s var(--ease-emph); z-index: 0; }
+.seg { display: inline-flex; gap: 2px; position: relative; }
+.seg button { padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-2); position: relative; z-index: 1; transition: background-color .15s var(--ease), color .15s var(--ease); }
+.seg button:hover { background: var(--surface-hover); color: var(--text-1); }
+.seg button.on { color: var(--text-1); background: var(--surface-active); }
+.seg .thumb { display: none; }
 
 /* ---------- company cards ---------- */
 /* 4-up on desktop, aligned with the KPI row above (same breakpoints) so the
    two grids share column edges regardless of how many companies are listed. */
-.ccards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.ccards { display: block; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; }
+.ccards-head { display: grid; grid-template-columns: minmax(0, 1fr) 160px 220px; gap: 16px; padding: 10px 20px; font-size: 12px; color: var(--text-3); border-bottom: 1px solid var(--border-subtle); }
 /* Cards fill their grid cell so every card in a row is the same height even
    when one has a "N kun qoldi" sub-line and another shows "Majlis yoʻq".
    The launcher wraps each card in a .rise div, so that must stretch too.
    min-width:0 lets the column shrink so long company names ellipsize instead
    of forcing the grid to overflow the screen. */
-.ccards > .rise { height: 100%; min-width: 0; }
-.ccard { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--r-lg); padding: 18px; cursor: pointer; box-shadow: var(--elev-1); transition: transform .25s var(--ease-emph), box-shadow .25s; position: relative; height: 100%; }
-.ccard:hover { border-color: var(--border-strong); }
+.ccards > .rise { min-width: 0; }
+.ccards > .rise:not(:last-child) .ccard, .ccards > .ccard:not(:last-child) { border-bottom: 1px solid var(--border-subtle); }
+.ccard { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 160px 220px; align-items: center; gap: 16px; padding: 12px 20px; cursor: pointer; background: transparent; transition: background-color .15s var(--ease); }
+.ccard:hover { background: var(--surface-hover); }
 /* mono-tile: default ink; on a company card it's the indigo brand tile. */
 .mono-tile { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-contrast); display: grid; place-items: center; font-weight: 600; font-size: 15px; flex: 0 0 auto; }
-.ccard .mono-tile { background: var(--brand-tile); color: #fff; }
+.ccard .mono-tile { width: 32px; height: 32px; border-radius: 8px; font-size: 12px; background: var(--surface-inset); color: var(--text-2); }
 /* Option C body: identity (monogram + name + TIN), divider, two columns
    (Reyting | Keyingi majlis). Shared markup via primitives' CardStats. */
-.cc-head { display: flex; align-items: flex-start; gap: 12px; }
+.cc-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .cc-id { min-width: 0; flex: 1; }
 .cc-id .nm { font-size: 15px; font-weight: 600; color: var(--text-1); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cc-id .tin { white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-3); letter-spacing: .03em; margin-top: 3px; }
-.cc-div { height: 1px; background: var(--border-subtle); margin: 14px 0; }
-.cc-cols { display: grid; grid-template-columns: 1fr 1fr; }
-.cc-col { min-width: 0; }
-.cc-col + .cc-col { border-left: 1px solid var(--border-subtle); padding-left: 18px; }
-.cc-col .k { font-size: 12px; color: var(--text-3); font-weight: 500; }
-.cc-col .v { display: flex; align-items: baseline; gap: 8px; margin-top: 7px; }
-.cc-col .num { font-family: var(--font-mono); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text-1); }
+.cc-id .tin { white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.cc-div { display: none; }
+.cc-cols { display: contents; }
+.cc-col { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.cc-col + .cc-col { padding-left: 0; }
+.cc-col .k { display: none; }
+.cc-col .v { display: flex; align-items: baseline; gap: 8px; }
+.cc-col .num { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text-1); }
 .cc-col .mo { font-size: 13px; color: var(--text-3); font-weight: 500; }
 .cc-col .none { font-size: 15px; color: var(--text-3); }
-.cc-col .days { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+.cc-col .days { font-size: 12px; color: var(--text-3); margin: 0; }
 .cc-col .days.warn { color: var(--warn-text); }
 /* rating letter pill — the only signal color on the card body */
-.lt { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: var(--radius-pill); border: 1px solid transparent; }
-.lt.b-pos { border-color: var(--pos-line); }
-.lt.b-warn { border-color: var(--warn-line); }
-.lt.b-neg { border-color: var(--neg-line); }
-.lt.b-neu { border-color: var(--neu-line); }
+.lt { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+.lt::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 /* hover tools sit in the card's top-right corner, OUT of the header's flow: in-flow they took 58px of the name/STIR column even while
    invisible, so the STIR wrapped onto two lines on the narrow Kuzatuv cards. They only show on hover, over a solid chip. */
-.ccard-tools { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; flex-wrap: nowrap; transition: background .15s; }
+.ccard-tools { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 8px; flex-wrap: nowrap; transition: background-color .15s; }
 .ccard:hover .ccard-tools { background: var(--surface); }
 @media (hover: none) { .ccard-tools { background: var(--surface); } }
 .ccard-act { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: .15s; flex: 0 0 auto; }
@@ -737,7 +738,9 @@ html, body { height: 100%; }
 /* ---------- v18 responsive guards ---------- */
 @media (max-width: 1080px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }
-  .ccards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ccards-head { display: none; }
+  .ccard { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .ccard .cc-head { grid-column: 1 / -1; }
   /* The sidebar loses its grid column here, so it MUST become a drawer at the
      same width. (These two used to be split across 1080 / 820: between them the
      sidebar had no column and no drawer treatment, so it sat on top of the page
@@ -751,8 +754,10 @@ html, body { height: 100%; }
   .side-scrim { display: block; position: fixed; inset: 0; z-index: 80; background: var(--overlay-scrim); }
 }
 @media (max-width: 560px) {
-  .kpis { grid-template-columns: 1fr; }
-  .ccards { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi { padding: 16px; }
+  .kpi .val { font-size: 24px; }
+  .ccard { grid-template-columns: 1fr; }
 }
 img, svg { max-width: 100%; }
 
