@@ -24,7 +24,7 @@ export interface CourtCase {
   hearingTime: string
   judge: string
   /** which instance the shown hearing belongs to (absent on older cached rows) */
-  hearingStage?: 'first' | 'appeal' | 'cassation'
+  hearingStage?: 'first' | 'appeal' | 'cassation' | 'inspection'
 }
 
 export interface CaseDetail {
@@ -34,7 +34,7 @@ export interface CaseDetail {
   court: string
   judge: string
   /** the instance `court` and `judge` belong to: the one the case is in now */
-  currentInstance?: 'first' | 'appeal' | 'cassation'
+  currentInstance?: 'first' | 'appeal' | 'cassation' | 'inspection'
   secretary: string
   plaintiff: string
   plaintiffTin: string
@@ -78,6 +78,9 @@ export interface CaseDocument {
 }
 
 export interface InstanceData {
+  /** the court and the judge of THIS instance (each instance has its own; never the first one's) */
+  court?: string
+  judge?: string
   hearings: Hearing[]
   decision: Decision | null
   documents: CaseDocument[]
@@ -92,6 +95,8 @@ export interface FullCaseData {
   firstInstance: InstanceData | null
   appellate: InstanceData | null
   cassation: InstanceData | null
+  /** «Taftish» (supervision): the fourth instance */
+  inspection: InstanceData | null
 }
 
 // ---- Status enums for UI ----
@@ -112,6 +117,7 @@ export const CASE_STATUSES: Record<string, { en: string; color: string }> = {
   'Апелляцияда': { en: 'Apellyatsiyada', color: '#6d3db5' },
   'Кассацияда': { en: 'Kassatsiyada', color: '#4a1d96' },
   'Назоратда': { en: 'Nazoratda', color: '#b91c1c' },
+  'Тафтишда': { en: 'Taftishda', color: '#b91c1c' },
   'Ижро этилмоқда': { en: 'Ijro etilmoqda', color: '#0e7490' },
   // Latin keys — match synthetic / Latin API responses
   'Ish yurituvda': { en: 'Ish yurituvda', color: '#2563a8' },
@@ -122,6 +128,7 @@ export const CASE_STATUSES: Record<string, { en: string; color: string }> = {
   'Apellyatsiyada': { en: 'Apellyatsiyada', color: '#6d3db5' },
   'Kassatsiyada': { en: 'Kassatsiyada', color: '#4a1d96' },
   'Nazoratda': { en: 'Nazoratda', color: '#b91c1c' },
+  'Taftishda': { en: 'Taftishda', color: '#b91c1c' },
   'Ijro etilmoqda': { en: 'Ijro etilmoqda', color: '#0e7490' },
 }
 

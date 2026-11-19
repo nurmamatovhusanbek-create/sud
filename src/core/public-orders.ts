@@ -201,9 +201,12 @@ export function orderFilePath(pdfId: string): string | null {
 
 /** A decision the court-case data (jadval) already gives us, per instance — with or without a published PDF. */
 export interface KnownDecision {
-  instance: 'FIRST' | 'APPEAL' | 'CASSATION'
+  instance: 'FIRST' | 'APPEAL' | 'CASSATION' | 'INSPECTION'
   date: string
   text: string
+  /** the court and judge OF THIS INSTANCE (from the case data), when known */
+  court?: string
+  judge?: string
 }
 
 export interface CaseOrdersView {
@@ -259,7 +262,7 @@ export interface CaseCheck {
 // ---- which cases can have an order at all? ---------------------------------------------------
 
 const EMPTY_RESULT = /^[\s\-–—.]*$/
-const APPEAL_STATUS = /апелл|apell|кассац|kassats|назорат|nazorat/i
+const APPEAL_STATUS = /апелл|apell|кассац|kassats|назорат|nazorat|тафтиш|taftish/i
 const ONGOING_STATUS = /юритув|yurituv|кўриб\s*чиқ|ko[ʻʼ'’`]?rib\s*chiq|қабул|qabul/i
 
 /**

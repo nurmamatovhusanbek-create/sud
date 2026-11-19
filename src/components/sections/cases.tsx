@@ -40,7 +40,7 @@ import { dateKey, daysUntil } from '@/core/dates'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
-import type { CourtType, CourtCase, FullCaseData, Hearing, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
+import type { CourtType, CourtCase, FullCaseData, Hearing, InstanceData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
 import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
 import { toast } from 'sonner'
@@ -80,6 +80,8 @@ function hearingKey(h: { date?: string; time?: string }): string {
 const byHearingDate = (a: { date?: string; time?: string }, b: { date?: string; time?: string }) =>
   hearingKey(a).localeCompare(hearingKey(b))
 
+const INSTANCE_NAME = { appeal: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' } as const
+
 /** The earliest hearing that has not been held AND is not in the past. A past hearing
  *  still marked "scheduled" (postponed / status never updated) is not "next". */
 function pickUpcoming<T extends { date?: string; status?: string | null }>(sorted: T[]): T | undefined {
@@ -93,6 +95,7 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
   const fi = d.firstInstance
   const ap = d.appellate
   const ca = d.cassation
+  const ins = d.inspection
   const kv = (k: string, v: string | undefined | null) =>
     `<div class="pr-kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v || '-')}</span></div>`
 
@@ -100,6 +103,7 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
     ...(fi?.hearings ?? []),
     ...(ap?.hearings ?? []),
     ...(ca?.hearings ?? []),
+    ...(ins?.hearings ?? []),
   ].sort(byHearingDate)
 
   // The next hearing = the earliest one not yet held and not in the past. When one
@@ -108,7 +112,7 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
   const nextHearing = pickUpcoming(allHearings)
 
   // Only the most recent decision is meaningful on a one-page sheet.
-  const decisions = [fi?.decision, ap?.decision, ca?.decision].filter(Boolean)
+  const decisions = [fi?.decision, ap?.decision, ca?.decision, ins?.decision].filter(Boolean)
   const lastDecision = decisions[decisions.length - 1]
 
   const nextSec = nextHearing
@@ -327,6 +331,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     const fi = d.firstInstance
     const ap = d.appellate
     const ca = d.cassation
+    const ins = d.inspection
     const close = () => closeProtoDrawer()
 
     // One hearing list across instances, oldest → newest. The first one not yet
@@ -335,6 +340,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       ...(fi?.hearings ?? []),
       ...(ap?.hearings ?? []),
       ...(ca?.hearings ?? []),
+      ...(ins?.hearings ?? []),
     ].sort(byHearingDate)
     const upcoming = pickUpcoming(allHearings)
     const history = upcoming ? allHearings.filter((h) => h !== upcoming) : allHearings
@@ -343,23 +349,33 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     // the decisions the court-case data already gives us, per instance (the library adds PDFs to some of them)
     const knownDecisions: KnownDecision[] = (
       [
-        ['FIRST', fi?.decision],
-        ['APPEAL', ap?.decision],
-        ['CASSATION', ca?.decision],
+        ['FIRST', fi],
+        ['APPEAL', ap],
+        ['CASSATION', ca],
+        ['INSPECTION', ins],
       ] as const
-    ).flatMap(([instance, dec]) => (dec && (dec.text || dec.date) ? [{ instance, date: dec.date || '', text: dec.text || '' }] : []))
+    ).flatMap(([instance, inst]) => {
+      const dec = inst?.decision
+      const c = inst?.court && inst.court !== '-' ? inst.court : undefined
+      const j = inst?.judge && inst.judge !== '-' ? inst.judge : undefined
+      return dec && (dec.text || dec.date) ? [{ instance, date: dec.date || '', text: dec.text || '', court: c, judge: j }] : []
+    })
 
-    const steps: { name: string; state: string; done: boolean }[] = [
+    // the four instances, each with ITS OWN court and judge (a case in appeal is not the first judge's)
+    const who = (inst: InstanceData | null | undefined) =>
+      [inst?.court, inst?.judge].filter((x) => x && x !== '-').join(' · ')
+    const steps: { name: string; state: string; done: boolean; who: string }[] = [
       { name: 'Birinchi', inst: fi },
       { name: 'Apellyatsiya', inst: ap },
       { name: 'Kassatsiya', inst: ca },
+      { name: 'Taftish', inst: ins },
     ].map(({ name, inst }) => {
       const done = (inst?.hearings.length ?? 0) > 0 || !!inst?.decision
-      return { name, done, state: done ? (inst?.decision?.text ? 'Koʻrib chiqilgan' : inst?.appellateOutcome || 'Yozuv bor') : 'Yoʻq' }
+      return { name, done, who: done ? who(inst) : '', state: done ? (inst?.decision?.text ? 'Koʻrib chiqilgan' : inst?.appellateOutcome || 'Yozuv bor') : 'Yoʻq' }
     })
 
     const rows: DwRow[] = [
-      [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${g.currentInstance === 'cassation' ? 'Kassatsiya' : 'Apellyatsiya'}` : 'Sudya', g?.judge],
+      [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${INSTANCE_NAME[g.currentInstance]}` : 'Sudya', g?.judge],
       ['Kotib', g?.secretary],
       ['Ish turi', g?.caseType],
       ['Daʼvo predmeti', g?.claimSubject],
@@ -455,6 +471,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
               <div className={`dw-step${st.done ? ' done' : ''}`} key={st.name}>
                 <b>{st.name}</b>
                 <span>{st.state}</span>
+                {st.who ? <span className="dw-step-who" title={st.who}>{st.who}</span> : null}
               </div>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { currentInstance, pickHearing, stageOfInstance } from '../hearing-pick'
+import { currentInstance, pickHearing, reviewOf, stageOfInstance, stageOfRow } from '../hearing-pick'
 
 const NOW = new Date(2026, 9, 5, 9, 0) // 5 Oct 2026, local
 
@@ -80,5 +80,43 @@ describe('currentInstance: the judge and court of the instance the case is in no
   })
   test('junk reviews are ignored', () => {
     expect(currentInstance({ ...first, reviews: [null, 'x', 5] as never }).stage).toBe('first')
+  })
+})
+
+describe('Taftish (the fourth instance) and the library names', () => {
+  test('Cyrillic, Latin and enum spellings of Taftish / Nazorat', () => {
+    for (const t of ['Тафтиш инстанцияси', 'Назорат инстанцияси', 'Taftish instansiyasi', 'INSPECTION', 'supervision']) expect(stageOfInstance(t)).toBe('inspection')
+  })
+  test('CASSATION_REPEATED is cassation, APPEAL is appeal', () => {
+    expect(stageOfInstance('CASSATION_REPEATED')).toBe('cassation')
+    expect(stageOfInstance('APPEAL')).toBe('appeal')
+    expect(stageOfInstance('FIRST')).toBe('first')
+  })
+  test('a case in taftish: the taftish judge and court, above cassation and appeal', () => {
+    const r = currentInstance({
+      instance: 'Биринчи инстанция', court: 'First court', responsible: 'Karimov',
+      reviews: [
+        { instance: 'Тафтиш инстанцияси', court: 'Taftish court', responsible: 'Tashev' },
+        { instance: 'Кассация инстанцияси', court: 'Kassatsiya court', responsible: 'Valiyev' },
+        { instance: 'Апелляция инстанцияси', court: 'Appeal court', responsible: 'Aliyev' },
+      ],
+    })
+    expect(r).toEqual({ stage: 'inspection', judge: 'Tashev', court: 'Taftish court' })
+  })
+  test('a row that is itself an appeal row: its own judge, not "first"', () => {
+    expect(stageOfRow({ instance: 'Апелляция инстанцияси' })).toBe('appeal')
+    expect(currentInstance({ instance: 'Апелляция инстанцияси', court: 'Appeal court', responsible: 'Aliyev' })).toEqual({ stage: 'appeal', judge: 'Aliyev', court: 'Appeal court' })
+  })
+  test('reviewOf: the latest of several entries of one kind (a repeated cassation)', () => {
+    const r = reviewOf({ reviews: [
+      { instance: 'Кассация инстанцияси', hearing_date: '01.03.2026', responsible: 'Old' },
+      { instance: 'Кассация инстанцияси', hearing_date: '09.09.2026', responsible: 'New' },
+    ] }, 'cassation')
+    expect(r?.responsible).toBe('New')
+    expect(reviewOf({ reviews: [] }, 'inspection')).toBeNull()
+  })
+  test('pickHearing carries the Taftish hearing with its own judge', () => {
+    const h = pickHearing({ hearing_date: '01.01.2026', responsible: 'Karimov', reviews: [{ instance: 'Тафтиш инстанцияси', hearing_date: '06.10.2026', responsible: 'Tashev', court: 'Taftish court' }] }, NOW)
+    expect(h).toMatchObject({ stage: 'inspection', judge: 'Tashev', court: 'Taftish court' })
   })
 })

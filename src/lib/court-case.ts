@@ -94,8 +94,8 @@ import { fetchViaWorkers } from './net/worker-fetch'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
-import type { CourtType, SearchMode, CourtCase, FullCaseData, InstanceData } from './court-case-types'
-import { currentInstance, pickHearing } from '@/core/hearing-pick'
+import type { CourtType, SearchMode, CourtCase, FullCaseData, Hearing, InstanceData } from './court-case-types'
+import { currentInstance, pickHearing, reviewOf, stageOfRow, type HearingStage } from '@/core/hearing-pick'
 import { daysUntil } from '@/core/dates'
 
 // ---- Status enums for UI ----
@@ -464,7 +464,8 @@ async function searchCourtCasesInternal(
         merged.push(item)
       } else if (!isAhead(merged[i].hearingDate) && isAhead(item.hearingDate)) {
         // the two APIs disagree: keep the row that knows the hearing still ahead
-        merged[i] = { ...merged[i], hearingDate: item.hearingDate, hearingTime: item.hearingTime, judge: item.judge || merged[i].judge, hearingStage: item.hearingStage }
+        // the court and judge come WITH the hearing (an appeal hearing in the first court's row would show the wrong judge)
+        merged[i] = { ...merged[i], hearingDate: item.hearingDate, hearingTime: item.hearingTime, judge: item.judge, courtName: item.hearingStage && item.hearingStage !== 'first' ? item.courtName : merged[i].courtName, hearingStage: item.hearingStage }
       }
     }
   }
@@ -609,12 +610,16 @@ function mapJadvalCase(raw: any): CourtCase {
  */
 function hearingFields(raw: any): Pick<CourtCase, 'hearingDate' | 'hearingTime' | 'judge' | 'hearingStage'> & { courtName?: string } {
   const h = pickHearing(raw)
-  if (!h) return { hearingDate: '', hearingTime: '', judge: raw.responsible || '' }
+  if (!h) {
+    // no hearing known: the row still names the court and judge of the instance the case is in NOW (a case in appeal is not the first judge's)
+    const now = currentInstance(raw)
+    return { hearingDate: '', hearingTime: '', judge: now.judge, ...(now.stage !== 'first' && now.court ? { courtName: now.court } : {}) }
+  }
   const review = h.stage !== 'first'
   return {
     hearingDate: h.date,
     hearingTime: h.time,
-    judge: review ? h.judge : raw.responsible || '', // each instance has its own judge: a review without one shows none, not the first instance's
+    judge: h.judge, // each instance has its own judge: a review without one shows none, not the first instance's
     hearingStage: h.stage,
     ...(review && h.court ? { courtName: h.court } : {}),
   }
@@ -646,7 +651,7 @@ export async function getCaseDetails(
   // jadvalapi's findByNumber returns 400 for most court types.
   const raw = jadvalData?.[0] || jadvalApiData?.[0]
   if (!raw) {
-    return { general: null, firstInstance: null, appellate: null, cassation: null }
+    return { general: null, firstInstance: null, appellate: null, cassation: null, inspection: null }
   }
 
   const detailRaw = jadvalData?.[0] || jadvalApiData?.[0]
@@ -654,31 +659,24 @@ export async function getCaseDetails(
   // Fall back to jadvalapi only when jadval.sud.uz returned nothing.
   const hearingsRaw = jadvalData?.length ? jadvalData : (jadvalApiData || [])
 
-  const hearings = hearingsRaw
-    .map((h: any) => ({
-      date: h.hearing_date || '',
-      time: h.hearing_time || '',
-      status: h.status_name || h.instance || '',
-      postponementReason: h.postpone_reason || '',
-      courtroom: h.courtroom || '',
-      judge: h.responsible || '',
-    }))
-    // Drop phantom hearing entries where every key field is empty (the API
-    // sometimes returns a bare {message, statusCode} object on errors, or a
-    // case row with no scheduled hearing yet).
-    .filter(
-      (h: any) =>
-        h.date || h.time || h.judge || h.status || h.courtroom,
-    )
-    // Normalise empty strings back to '—' for display consistency.
-    .map((h: any) => ({
-      date: h.date || '-',
-      time: h.time || '-',
-      status: h.status || '-',
-      postponementReason: h.postponementReason,
-      courtroom: h.courtroom,
-      judge: h.judge || '-',
-    }))
+  // every hearing row belongs to ONE instance: a row of jadval.sud.uz can itself be an appeal / cassation / taftish row, and its judge is
+  // that instance's judge, so the rows are sorted by their own `instance` and never all counted as the first instance's
+  const toHearing = (h: any) => ({
+    date: h.hearing_date || '',
+    time: h.hearing_time || '',
+    status: h.status_name || h.instance || '',
+    postponementReason: h.postpone_reason || '',
+    courtroom: h.courtroom || '',
+    judge: h.responsible || '',
+  })
+  // Drop phantom hearing entries where every key field is empty (the API sometimes returns a bare {message, statusCode} object on
+  // errors, or a case row with no scheduled hearing yet); normalise empty strings back to '-' for display consistency.
+  const clean = (h: ReturnType<typeof toHearing>) =>
+    h.date || h.time || h.judge || h.status || h.courtroom
+      ? { ...h, date: h.date || '-', time: h.time || '-', status: h.status || '-', judge: h.judge || '-' }
+      : null
+  const rowsOf = (stage: HearingStage) => hearingsRaw.filter((h: any) => stageOfRow(h) === stage)
+  const hearings = rowsOf('first').map(toHearing).map(clean).filter((h: any) => h !== null) as Hearing[]
 
   const d = detailRaw || raw
   const now = currentInstance(d) // the court and the judge of the instance the case is in now, not of the first one
@@ -707,6 +705,8 @@ export async function getCaseDetails(
       prosecutor: '-',
     },
     firstInstance: {
+      court: stageOfRow(d) === 'first' ? String(d.court || '') : undefined,
+      judge: stageOfRow(d) === 'first' ? String(d.responsible || '') : undefined,
       hearings,
       decision: decisionText ? {
         date: d.reg_date || '-',
@@ -719,57 +719,56 @@ export async function getCaseDetails(
       } : null,
       documents: [],
     },
-    appellate: parseReviewInstance(raw, 'апелляция'),
-    cassation: parseReviewInstance(raw, 'кассация'),
+    appellate: parseReviewInstance(raw, hearingsRaw, 'appeal'),
+    cassation: parseReviewInstance(raw, hearingsRaw, 'cassation'),
+    inspection: parseReviewInstance(raw, hearingsRaw, 'inspection'),
   }
 }
 
 /**
- * Parse a review entry from the API response as an appeal or cassation instance.
- * The jadvalapi findByNumber response includes a `reviews` array that contains
- * appeal/cassation instances. Each review has an `instance` field whose value
- * is the Cyrillic-Uzbek phrase "Apellyatsiya instansiyasi" or "Kassatsiya
- * instansiyasi" (written in Cyrillic in the API response). We match on the
- * Cyrillic lowercase fragments "apellyatsiya" / "kassatsiya" — those are the
- * only forms the API ever emits, so no Latin fallback is needed here.
+ * One review instance (appeal, cassation or taftish) of a case. Its data comes from the nested `reviews[]` entry of that kind (the latest one when
+ * there are several, e.g. a repeated cassation) and from any row of jadval.sud.uz that is itself an entry of that instance. The `instance` text is
+ * Cyrillic-Uzbek («Апелляция инстанцияси», «Кассация…», «Тафтиш…»); `stageOfInstance` also knows the Latin spellings. Court and judge are
+ * THIS instance's own: an instance without a judge yet has none, it never borrows the first instance's.
  */
-function parseReviewInstance(raw: any, type: 'апелляция' | 'кассация'): InstanceData | null {
-  const reviews = raw?.reviews
-  if (!Array.isArray(reviews) || reviews.length === 0) return null
+function parseReviewInstance(raw: any, rows: any[], stage: Exclude<HearingStage, 'first'>): InstanceData | null {
+  const nested = reviewOf(raw ?? {}, stage)
+  const own = rows.filter((r: any) => stageOfRow(r) === stage)
+  const sources = [...(nested ? [nested] : []), ...own] as any[]
+  if (!sources.length) return null
 
-  // Find the review matching this instance type
-  const review = reviews.find((r: any) => {
-    const inst = (r.instance || '').toLowerCase()
-    return inst.includes(type)
-  })
-  if (!review) return null
+  const hearings = sources
+    .map((r) => ({
+      date: r.hearing_date || '-',
+      time: r.hearing_time || '-',
+      status: r.status_name || r.instance || '-',
+      postponementReason: r.postpone_reason || '',
+      courtroom: r.courtroom || '',
+      judge: r.responsible || '-',
+    }))
+    .filter((h) => h.date !== '-' || h.time !== '-' || h.judge !== '-' || h.courtroom)
 
-  const reviewHearings = [
-    {
-      date: review.hearing_date || '-',
-      time: review.hearing_time || '-',
-      status: review.status_name || review.instance || '-',
-      postponementReason: review.postpone_reason || '',
-      courtroom: review.courtroom || '',
-      judge: review.responsible || '-',
-    },
-  ]
+  const withResult = sources.find((r) => r.result && r.result !== '—' && r.result !== '-')
+  const decision = withResult
+    ? {
+        date: withResult.reg_date || '-',
+        text: withResult.result || '-',
+        type: withResult.result || '-',
+        awardedAmount: '-',
+        stateDutyRecovered: '-',
+        enforcedDate: '-',
+        appealDeadline: '-',
+      }
+    : null
 
-  const reviewDecision = review.result && review.result !== '—' && review.result !== '-' ? {
-    date: review.reg_date || '-',
-    text: review.result || '-',
-    type: review.result || '-',
-    awardedAmount: '-',
-    stateDutyRecovered: '-',
-    enforcedDate: '-',
-    appealDeadline: '-',
-  } : null
-
+  const head = sources[0]
   return {
-    hearings: reviewHearings,
-    decision: reviewDecision,
+    court: String(head.court || ''),
+    judge: String(head.responsible || ''),
+    hearings,
+    decision,
     documents: [],
-    appellant: review.claiment || review.claimant || undefined,
+    appellant: head.claiment || head.claimant || undefined,
   }
 }
 

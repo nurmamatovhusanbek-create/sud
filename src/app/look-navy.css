@@ -907,7 +907,7 @@
 :root[data-look='navy'] .dw-quote + .dw-quote { margin-top: 12px; }
 :root[data-look='navy'] .dw-quote .d { font: 700 11.5px var(--font-mono); color: var(--text-3); letter-spacing: .02em; }
 :root[data-look='navy'] .dw-quote p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text-1); overflow-wrap: anywhere; }
-:root[data-look='navy'] .dw-track { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:root[data-look='navy'] .dw-track { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 :root[data-look='navy'] .dw-step { position: relative; padding-top: 24px; text-align: center; min-width: 0; }
 :root[data-look='navy'] .dw-step::before { content: ""; position: absolute; top: 4px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border-strong); z-index: 1; }
 :root[data-look='navy'] .dw-step::after { content: ""; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--border-default); }

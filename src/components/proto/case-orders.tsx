@@ -27,7 +27,7 @@ const dmy = (iso: string | null): string => (iso && /^\d{4}-\d{2}-\d{2}$/.test(i
 function Quote({ d }: { d: KnownDecision }) {
   return (
     <div className="dw-quote">
-      <div className="d">{d.date || '-'}</div>
+      <div className="d">{d.date || '-'}{[d.court, d.judge].filter(Boolean).length ? ` · ${[d.court, d.judge].filter(Boolean).join(' · ')}` : ''}</div>
       <p>{d.text || '-'}</p>
     </div>
   )

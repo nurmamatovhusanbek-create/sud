@@ -13,7 +13,7 @@
 
 import { dateKey, daysUntil, formatDmy, parseYmd } from './dates'
 
-export type HearingStage = 'first' | 'appeal' | 'cassation'
+export type HearingStage = 'first' | 'appeal' | 'cassation' | 'inspection'
 
 export interface PickedHearing {
   /** `dd.mm.yyyy`, the app's contract */
@@ -29,11 +29,15 @@ type Raw = Record<string, unknown>
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 
-/** `instance` is Cyrillic-Uzbek («Апелляция инстанцияси»); Latin spellings match too. */
+/**
+ * `instance` is Cyrillic-Uzbek («Апелляция инстанцияси»); Latin spellings and the library's enum names match too.
+ * The fourth instance is «Taftish» (the site's INSPECTION; Cyrillic «Тафтиш», and the case status calls it «Назорат»: supervision).
+ */
 export function stageOfInstance(instance: unknown): HearingStage {
   const s = str(instance).toLowerCase()
-  if (/касс|kass/.test(s)) return 'cassation'
-  if (/апел|apel|appel/.test(s)) return 'appeal'
+  if (/тафтиш|назорат|надзор|taftish|nazorat|inspect|supervis/.test(s)) return 'inspection'
+  if (/касс|kass|cass/.test(s)) return 'cassation'
+  if (/апел|apel|appel|appeal/.test(s)) return 'appeal'
   return 'first'
 }
 
@@ -69,7 +73,7 @@ export function pickHearing(raw: Raw, now: Date = new Date()): PickedHearing | n
   return found.reduce((a, b) => (key(b) > key(a) ? b : a))
 }
 
-const RANK: Record<HearingStage, number> = { first: 0, appeal: 1, cassation: 2 }
+const RANK: Record<HearingStage, number> = { first: 0, appeal: 1, cassation: 2, inspection: 3 }
 
 export interface CurrentInstance {
   stage: HearingStage
@@ -85,12 +89,30 @@ export interface CurrentInstance {
  * yet gives '' (the UI shows «-») rather than borrowing the first one's name.
  */
 export function currentInstance(raw: Raw): CurrentInstance {
-  let best: { stage: HearingStage; src: Raw } = { stage: 'first', src: raw }
-  const reviews = Array.isArray(raw.reviews) ? raw.reviews : []
-  for (const r of reviews) {
-    if (!r || typeof r !== 'object') continue
-    const stage = stageOfInstance((r as Raw).instance)
-    if (stage !== 'first' && RANK[stage] > RANK[best.stage]) best = { stage, src: r as Raw }
+  let best: { stage: HearingStage; src: Raw } = { stage: stageOfRow(raw), src: raw }
+  for (const stage of ['appeal', 'cassation', 'inspection'] as const) {
+    const r = reviewOf(raw, stage)
+    if (r && RANK[stage] > RANK[best.stage]) best = { stage, src: r }
   }
   return { stage: best.stage, judge: str(best.src.responsible), court: str(best.src.court) || (best.stage === 'first' ? '' : str(raw.court)) }
+}
+
+/** The review entry of one instance. A case can have several of the same kind (a repeated cassation): the one with the latest date wins. */
+export function reviewOf(raw: Raw, stage: Exclude<HearingStage, 'first'>): Raw | null {
+  const reviews = Array.isArray(raw.reviews) ? raw.reviews : []
+  const key = (r: Raw) => dateKey(str(r.hearing_date) || str(r.reg_date)) || ''
+  let best: Raw | null = null
+  for (const r of reviews) {
+    if (!r || typeof r !== 'object' || stageOfInstance((r as Raw).instance) !== stage) continue
+    if (!best || key(r as Raw) > key(best)) best = r as Raw
+  }
+  return best
+}
+
+/**
+ * The instance a ROW itself is in. A row from jadval.sud.uz may be a review of its own (its `instance` says «Апелляция…») rather than the
+ * first-instance row with `reviews[]` inside; its judge and court then belong to that instance, not to the first one.
+ */
+export function stageOfRow(raw: Raw): HearingStage {
+  return stageOfInstance(raw.instance)
 }
