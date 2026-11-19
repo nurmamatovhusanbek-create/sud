@@ -59,9 +59,10 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, lib/api-client.ts, lib/api-types.ts, lib/billing.ts | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +4 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
+| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, core/instance-track.ts, lib/court-case.ts, +5 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
+| `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +11 | core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |

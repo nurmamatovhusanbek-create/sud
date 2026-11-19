@@ -464,7 +464,15 @@ html, body { height: 100%; }
 .dw-step::after { content: ""; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--border-default); }
 .dw-step:last-child::after { display: none; }
 .dw-step.done::before { background: var(--dw-a); border-color: var(--dw-a); }
-.dw-step.done::after { background: var(--dw-a); }
+.dw-step.link-solid::after { background: var(--dw-a); }
+.dw-step.link-dash::after { background: repeating-linear-gradient(90deg, var(--dw-a) 0 5px, transparent 5px 9px); }
+/* the instances are not a fixed chain (core/instance-track): a skipped one is a hollow dashed dot that the line jumps over, an open window is an
+   inked ring with its days left, the instance the case is in now gets a crisp outer ring */
+.dw-step.skipped::before { border-style: dashed; border-color: var(--text-3); background: var(--surface); }
+.dw-step.skipped b, .dw-step.skipped span { color: var(--text-3); }
+.dw-step.open::before { border-color: var(--dw-a); }
+.dw-step.open span { color: var(--text-1); font-weight: 500; }
+.dw-step.cur::before { outline: 2px solid var(--dw-a); outline-offset: 2px; }
 .dw-step b { display: block; font-size: 13px; font-weight: 600; }
 .dw-step span { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); }
 .dw-step.done span { color: var(--text-2); }

@@ -26,6 +26,7 @@ import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
+import { buildTrack, TRACK_NAME } from '@/core/instance-track'
 import { assignRoles, classifyOutcome, type Classification, type PartyRole } from '@/core/classify'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import { isOngoingFirstInstance, type KnownDecision } from '@/core/public-orders'
@@ -36,7 +37,7 @@ import { ListPagination, clampPage } from '@/components/ui-custom/list-paginatio
 import { useResource } from '@/hooks/use-resource'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
-import { dateKey, daysUntil } from '@/core/dates'
+import { dateKey, daysUntil, parseYmd } from '@/core/dates'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
@@ -362,18 +363,23 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       return dec && (dec.text || dec.date) ? [{ instance, date: dec.date || '', text: dec.text || '', court: c, judge: j }] : []
     })
 
-    // the four instances, each with ITS OWN court and judge (a case in appeal is not the first judge's)
+    // the four instances, each with ITS OWN court and judge. They are not a fixed chain (an appeal can be skipped, taftish follows
+    // whichever came last), so a never-used instance reads «Oʻtkazilgan» / «N kun qoldi» / «Berilmagan», not like a gap (core/instance-track)
     const who = (inst: InstanceData | null | undefined) =>
       [inst?.court, inst?.judge].filter((x) => x && x !== '-').join(' · ')
-    const steps: { name: string; state: string; done: boolean; who: string }[] = [
-      { name: 'Birinchi', inst: fi },
-      { name: 'Apellyatsiya', inst: ap },
-      { name: 'Kassatsiya', inst: ca },
-      { name: 'Taftish', inst: ins },
-    ].map(({ name, inst }) => {
-      const done = (inst?.hearings.length ?? 0) > 0 || !!inst?.decision
-      return { name, done, who: done ? who(inst) : '', state: done ? (inst?.decision?.text ? 'Koʻrib chiqilgan' : inst?.appellateOutcome || 'Yozuv bor') : 'Yoʻq' }
-    })
+    // the day a ruling was made: the last hearing of the instance (the case data's own decision date is the REGISTRATION date)
+    const rulingDay = (inst: InstanceData | null | undefined): string | undefined => {
+      const days = (inst?.hearings ?? []).map((h) => h.date).filter((x) => parseYmd(x))
+      return days.sort((x, y) => dateKey(x).localeCompare(dateKey(y))).pop() || (inst?.decision?.date && parseYmd(inst.decision.date) ? inst.decision.date : undefined)
+    }
+    const insts = { first: fi, appeal: ap, cassation: ca, inspection: ins } as const
+    const track = buildTrack(
+      Object.fromEntries(
+        Object.entries(insts).map(([k, inst]) => [k, { has: (inst?.hearings.length ?? 0) > 0 || !!inst?.decision, decided: !!inst?.decision, decisionDate: inst?.decision ? rulingDay(inst) : undefined }]),
+      ),
+      { courtType, current: g?.currentInstance },
+    )
+    const steps = track.map((st) => ({ ...st, name: TRACK_NAME[st.key], who: st.state === 'done' ? who(insts[st.key]) : '' }))
 
     const rows: DwRow[] = [
       [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${INSTANCE_NAME[g.currentInstance]}` : 'Sudya', g?.judge],
@@ -469,9 +475,9 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
         <DwSection title="Instansiyalar">
           <div className="dw-track">
             {steps.map((st) => (
-              <div className={`dw-step${st.done ? ' done' : ''}`} key={st.name}>
+              <div className={`dw-step ${st.state}${st.current ? ' cur' : ''} link-${st.link}`} key={st.key} title={st.hint}>
                 <b>{st.name}</b>
-                <span>{st.state}</span>
+                <span>{st.note}</span>
                 {st.who ? <span className="dw-step-who" title={st.who}>{st.who}</span> : null}
               </div>
             ))}

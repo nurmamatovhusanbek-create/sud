@@ -913,7 +913,13 @@
 :root[data-look='navy'] .dw-step::after { content: ""; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--border-default); }
 :root[data-look='navy'] .dw-step:last-child::after { display: none; }
 :root[data-look='navy'] .dw-step.done::before { background: var(--dw-a); border-color: var(--dw-a); }
-:root[data-look='navy'] .dw-step.done::after { background: var(--dw-a); }
+:root[data-look='navy'] .dw-step.link-solid::after { background: var(--dw-a); }
+:root[data-look='navy'] .dw-step.link-dash::after { background: repeating-linear-gradient(90deg, var(--dw-a) 0 5px, transparent 5px 9px); }
+:root[data-look='navy'] .dw-step.skipped::before { border-style: dashed; border-color: var(--text-3); background: var(--surface); }
+:root[data-look='navy'] .dw-step.skipped b, :root[data-look='navy'] .dw-step.skipped span { color: var(--text-3); }
+:root[data-look='navy'] .dw-step.open::before { border-color: var(--dw-a); }
+:root[data-look='navy'] .dw-step.open span { color: var(--text-1); font-weight: 600; }
+:root[data-look='navy'] .dw-step.cur::before { outline: 2px solid var(--dw-a); outline-offset: 2px; }
 :root[data-look='navy'] .dw-step b { display: block; font-size: 12.5px; font-weight: 700; }
 :root[data-look='navy'] .dw-step span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
 :root[data-look='navy'] .dw-step.done span { color: var(--text-2); }
