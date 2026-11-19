@@ -37,6 +37,8 @@ export const WORKSPACE_NAV: { key: SectionKey | 'kuzatuv' | 'orders'; label: str
   { key: 'orders', label: 'Qarorlar' },
 ]
 export type CaseCourtFilter = 'all' | 'economic' | 'civil' | 'administrative'
+/** the outcome filter Statistika hands to Sud ishlari (same classes as the outcome board: won, lost, neutral, in progress) */
+export type CaseOutcomeFilter = 'all' | 'win' | 'lose' | 'neutral' | 'pending'
 
 export type GlobalSurface = 'main' | 'watchlist' | 'settings' | 'documents' | 'orders'
 export type CommandPurpose = 'search' | 'add'
@@ -49,6 +51,7 @@ interface AppState {
   commandOpen: boolean
   /** v18: one-shot court filter for Sud ishlari (mini cards + pizza «Ishlarni koʻrish»). */
   caseCourtFilter: CaseCourtFilter
+  caseOutcomeFilter: CaseOutcomeFilter
   /** Values to prefill a court petition with (set from a case drawer; Hujjatlar consumes and clears it). */
   docPrefill: { docId: string; values: Record<string, string> } | null
   /** 'add' mode: choosing a company in the palette adds it to the watchlist. */
@@ -63,6 +66,7 @@ interface AppState {
   patchCompany: (patch: Partial<Company>) => void
   setSection: (s: SectionKey) => void
   setCaseCourtFilter: (f: CaseCourtFilter) => void
+  setCaseOutcomeFilter: (f: CaseOutcomeFilter) => void
   goLauncher: () => void
   setSurface: (s: GlobalSurface) => void
   setDocPrefill: (p: AppState['docPrefill']) => void
@@ -80,6 +84,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   commandOpen: false,
   commandPurpose: 'search',
   caseCourtFilter: 'all',
+  caseOutcomeFilter: 'all',
   pendingSection: null,
 
   openCompany: (stir, seed, section) => {
@@ -114,6 +119,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSection: (section) => set({ section }),
   setCaseCourtFilter: (caseCourtFilter) => set({ caseCourtFilter }),
+  setCaseOutcomeFilter: (caseOutcomeFilter) => set({ caseOutcomeFilter }),
   goLauncher: () => set({ view: 'launcher', surface: 'main' }),
   setSurface: (surface) => set({ surface }),
   setDocPrefill: (docPrefill) => set({ docPrefill }),

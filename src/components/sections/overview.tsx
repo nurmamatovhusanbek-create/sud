@@ -336,6 +336,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   }, [data.cases])
   const setSection = useAppStore((s) => s.setSection)
   const setCaseCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
+  const setCaseOutcomeFilter = useAppStore((s) => s.setCaseOutcomeFilter)
   const s = data.summary
   const winRate = calcWinRate(s.win, s.lose)
   const trend = monthlyTrend(data.cases)
@@ -390,8 +391,9 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
   }
 
   /** «Ishlarni koʻrish» / mini cards → Sud ishlari pre-filtered. */
-  const goCasesFiltered = (court?: string, query?: string) => {
+  const goCasesFiltered = (court?: string, query?: string, outcome?: 'win' | 'lose' | 'neutral' | 'pending') => {
     if (court) setCaseCourtFilter(court as 'economic' | 'civil' | 'administrative')
+    if (outcome) setCaseOutcomeFilter(outcome)
     if (query) window.dispatchEvent(new CustomEvent('sud:cases-query', { detail: { query } }))
     setSection('cases')
   }
@@ -551,9 +553,16 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
             onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))}
             kind={pieMode === 'court' ? 'Sud turi' : 'Turkum'}
             tilesLabel={pieMode === 'court' ? 'Sud turi boʻyicha' : 'Turkum boʻyicha'}
+            onOutcome={(st) =>
+              goCasesFiltered(
+                pieMode === 'court' ? pieSelClamped?.id : undefined,
+                pieMode === 'turkum' ? pieSelClamped?.full : undefined,
+                ({ won: 'win', lost: 'lose', neutral: 'neutral', pending: 'pending' } as const)[st],
+              )
+            }
             action={
               <button
-                className="btn btn-outline btn-sm"
+                className="btn btn-outline btn-xs"
                 onClick={() =>
                   pieSelClamped
                     ? goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)

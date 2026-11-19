@@ -20,13 +20,13 @@
 import { CopyText } from '@/components/ui-custom/copy-text'
 import { getLook, useLook } from '@/lib/look'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2, X } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
-import { assignRoles, classifyOutcome, type PartyRole } from '@/core/classify'
+import { assignRoles, classifyOutcome, type Classification, type PartyRole } from '@/core/classify'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import { isOngoingFirstInstance, type KnownDecision } from '@/core/public-orders'
 import { caseToDocValuesFor, PREFILLABLE_DOCS } from '@/lib/documents/from-case'
@@ -80,6 +80,7 @@ function hearingKey(h: { date?: string; time?: string }): string {
 const byHearingDate = (a: { date?: string; time?: string }, b: { date?: string; time?: string }) =>
   hearingKey(a).localeCompare(hearingKey(b))
 
+const OUTCOME_WORD: Record<Classification, string> = { win: 'Yutgan', lose: 'Yutqazgan', neutral: 'Neytral', pending: 'Jarayonda' }
 const INSTANCE_NAME = { appeal: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' } as const
 
 /** The earliest hearing that has not been held AND is not in the past. A past hearing
@@ -509,6 +510,9 @@ export function CasesSection() {
   const company = useAppStore((s) => s.activeCompany)
   const storeCourtFilter = useAppStore((s) => s.caseCourtFilter)
   const setStoreCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
+  const storeOutcomeFilter = useAppStore((s) => s.caseOutcomeFilter)
+  const setStoreOutcomeFilter = useAppStore((s) => s.setCaseOutcomeFilter)
+  const [outcomeFilter, setOutcomeFilter] = useState<'all' | Classification>('all')
   const [courtFilter, setCourtFilter] = useState<string>('all')
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | PartyRole | 'unknown'>('all')
@@ -543,6 +547,17 @@ export function CasesSection() {
       setStoreCourtFilter('all')
     }
   }, [storeCourtFilter, setStoreCourtFilter])
+
+  // Statistika's outcome board: a click on «Jarayonda» (or a segment of the strip) lands here with that outcome, one-shot like the court filter
+  useEffect(() => {
+    if (storeOutcomeFilter !== 'all') {
+      setOutcomeFilter(storeOutcomeFilter)
+      setRoleFilter('all')
+      if (storeCourtFilter === 'all') setCourtFilter('all') // no slice picked on the board: all courts, not whatever was set before
+      setPage(1)
+      setStoreOutcomeFilter('all')
+    }
+  }, [storeOutcomeFilter, storeCourtFilter, setStoreOutcomeFilter])
 
   // v18: turkum mode «Ishlarni koʻrish» pre-fills the text query
   useEffect(() => {
@@ -678,20 +693,23 @@ export function CasesSection() {
     [roleCounts],
   )
 
+  // the same class the Statistika board counts (core/classify classifyOutcome; a case whose side is unknown counts as the plaintiff's, like there)
+  const outcomeOf = useCallback((m: MergedRow): Classification => classifyOutcome(roleOf(m) ?? 'plaintiff', m.c.result), [roleOf])
   const filtered = useMemo(() => {
-    const list = roleFilter === 'all' ? searched : searched.filter((m) => (roleOf(m) ?? 'unknown') === roleFilter)
+    const byRole = roleFilter === 'all' ? searched : searched.filter((m) => (roleOf(m) ?? 'unknown') === roleFilter)
+    const list = outcomeFilter === 'all' ? byRole : byRole.filter((m) => outcomeOf(m) === outcomeFilter)
     return applySort(
       list,
       sort,
       ({ c }) => parseSortDate(c.hearingDate || c.dateFiled),
       ({ c }) => c.caseNumber || '',
     )
-  }, [searched, roleFilter, roleOf, sort])
+  }, [searched, roleFilter, roleOf, outcomeFilter, outcomeOf, sort])
 
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
-  }, [query, courtFilter, roleFilter, sort, stir])
+  }, [query, courtFilter, roleFilter, outcomeFilter, sort, stir])
 
   const safePage = clampPage(page, filtered.length, pageSize)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -762,6 +780,12 @@ export function CasesSection() {
           {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
             <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
           ) : null}
+          {outcomeFilter !== 'all' ? (
+            <button className="btn btn-outline btn-sm out-chip" onClick={() => setOutcomeFilter('all')} title="Natija filtrini olib tashlash">
+              <span>Natija: {OUTCOME_WORD[outcomeFilter]}</span>
+              <X />
+            </button>
+          ) : null}
           <SortMenu value={sort} onChange={setSort} />
           <div style={{ flex: 1 }} />
           <button className="btn btn-outline btn-sm" disabled={printing || filtered.length === 0} onClick={printList}>
@@ -797,6 +821,12 @@ export function CasesSection() {
           {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
             <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
           ) : null}
+          {outcomeFilter !== 'all' ? (
+            <button className="btn btn-outline btn-sm out-chip" onClick={() => setOutcomeFilter('all')} title="Natija filtrini olib tashlash">
+              <span>Natija: {OUTCOME_WORD[outcomeFilter]}</span>
+              <X />
+            </button>
+          ) : null}
         </div>
       </div>
       )}
@@ -816,7 +846,7 @@ export function CasesSection() {
       ) : merged.length === 0 ? (
         <EmptyBlock icon={<Gavel />} title="Ish topilmadi" hint="Tanlangan sud turlarida bu STIR boʻyicha ish topilmadi." />
       ) : filtered.length === 0 ? (
-        <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint={roleFilter === 'all' ? 'Boshqa soʻz bilan qidirib koʻring.' : 'Bu tomon boʻyicha ish topilmadi. «Ikkala tomon» ni tanlang.'} />
+        <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint={outcomeFilter !== 'all' ? 'Natija filtrini olib tashlang yoki boshqa sud turini tanlang.' : roleFilter === 'all' ? 'Boshqa soʻz bilan qidirib koʻring.' : 'Bu tomon boʻyicha ish topilmadi. «Ikkala tomon» ni tanlang.'} />
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />

@@ -578,11 +578,47 @@ import { winRate } from '@/core/rates'
  */
 const OUTCOME_FAMILY: Record<PizzaStatus, StatusFamilyKey> = { won: 'win', lost: 'lose', neutral: 'neutral', pending: 'pending' }
 
-function OutcomeStrip({ counts, total, size }: { counts: Record<PizzaStatus, number>; total: number; size: 'lg' | 'sm' }) {
+function OutcomeStrip({
+  counts,
+  total,
+  size,
+  hot,
+  onHot,
+  onPick,
+}: {
+  counts: Record<PizzaStatus, number>
+  total: number
+  size: 'lg' | 'sm'
+  /** the outcome under the pointer (or focus) in the stat row: the others in the strip step back */
+  hot?: PizzaStatus | null
+  onHot?: (st: PizzaStatus | null) => void
+  /** makes each segment a button that opens its cases */
+  onPick?: (st: PizzaStatus) => void
+}) {
   return (
-    <span className={`ob-strip ${size}`} style={{ ['--sw' as string]: 'var(--text-1)' }} aria-hidden="true">
+    <span className={`ob-strip ${size}`} style={{ ['--sw' as string]: 'var(--text-1)' }} data-hot={hot ?? undefined} aria-hidden={onPick ? undefined : 'true'}>
       {total === 0 ? <i className="empty" /> : null}
-      {PIZZA_STATUS_ORDER.map((st) => (counts[st] > 0 ? <i key={st} className={`st ${st}`} style={{ flexGrow: counts[st] }} /> : null))}
+      {PIZZA_STATUS_ORDER.map((st) =>
+        counts[st] > 0 ? (
+          onPick ? (
+            <button
+              type="button"
+              key={st}
+              className={`st ${st}${hot === st ? ' hot' : ''}`}
+              style={{ flexGrow: counts[st] }}
+              title={`${PIZZA_STATUS_LABEL[st]}: ${counts[st]} ta ishni koʻrish`}
+              aria-label={`${PIZZA_STATUS_LABEL[st]}: ${counts[st]} ta ishni koʻrish`}
+              onClick={() => onPick(st)}
+              onMouseEnter={() => onHot?.(st)}
+              onMouseLeave={() => onHot?.(null)}
+              onFocus={() => onHot?.(st)}
+              onBlur={() => onHot?.(null)}
+            />
+          ) : (
+            <i key={st} className={`st ${st}`} style={{ flexGrow: counts[st] }} />
+          )
+        ) : null,
+      )}
     </span>
   )
 }
@@ -594,16 +630,20 @@ export function OutcomeBoard({
   kind,
   tilesLabel,
   action,
+  onOutcome,
 }: {
   items: PizzaItem[]
   selected?: number
   onSelect?: (item: PizzaItem, index: number) => void
+  /** opens the cases of one outcome (for the selected slice, or all): makes the strip's segments and the four counts clickable */
+  onOutcome?: (status: PizzaStatus) => void
   /** e.g. «Sud turi» — names the slice kind in the hero */
   kind: string
   tilesLabel: string
   action?: React.ReactNode
 }) {
   const sel = selected >= 0 && selected < items.length ? items[selected] : null
+  const [hot, setHot] = useState<PizzaStatus | null>(null)
   const all = useMemo<PizzaItem>(
     () => ({
       label: 'Barchasi',
@@ -644,21 +684,45 @@ export function OutcomeBoard({
             </div>
           </div>
           <div className="ob2-main">
-            <OutcomeStrip key={subject.id ?? subject.label} counts={counts} total={total} size="lg" />
+            <OutcomeStrip key={subject.id ?? subject.label} counts={counts} total={total} size="lg" hot={hot} onHot={setHot} onPick={onOutcome} />
             <div className="ob2-stats">
-              {PIZZA_STATUS_ORDER.map((st) => (
-                <div key={st} className={`ob2-stat${counts[st] === 0 ? ' zero' : ''}`} style={{ ['--sw' as string]: 'var(--text-1)' }}>
-                  <div className="ob2-stat-h">
-                    <StatusIcon family={OUTCOME_FAMILY[st]} size={14} />
-                    <span>{PIZZA_STATUS_LABEL[st]}</span>
-                    <i className={`st ${st} ob2-sw`} />
+              {PIZZA_STATUS_ORDER.map((st) => {
+                const inner = (
+                  <>
+                    <i className={`st ${st} ob2-sw`} aria-hidden="true" />
+                    <span className="ob2-stat-h">
+                      <StatusIcon family={OUTCOME_FAMILY[st]} size={14} />
+                      <span>{PIZZA_STATUS_LABEL[st]}</span>
+                      {onOutcome && counts[st] > 0 ? <span className="ob2-go" aria-hidden="true">Koʻrish ›</span> : null}
+                    </span>
+                    <span className="ob2-stat-n mono">
+                      <CountUp value={counts[st]} />
+                      <small>{total ? `${Math.round((counts[st] / total) * 100)}%` : ''}</small>
+                    </span>
+                  </>
+                )
+                const cls = `ob2-stat${counts[st] === 0 ? ' zero' : ''}${hot === st ? ' hot' : ''}`
+                return onOutcome && counts[st] > 0 ? (
+                  <button
+                    type="button"
+                    key={st}
+                    className={cls}
+                    style={{ ['--sw' as string]: 'var(--text-1)' }}
+                    title={`${PIZZA_STATUS_LABEL[st]}: ${counts[st]} ta ishni koʻrish`}
+                    onClick={() => onOutcome(st)}
+                    onMouseEnter={() => setHot(st)}
+                    onMouseLeave={() => setHot(null)}
+                    onFocus={() => setHot(st)}
+                    onBlur={() => setHot(null)}
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={st} className={cls} style={{ ['--sw' as string]: 'var(--text-1)' }}>
+                    {inner}
                   </div>
-                  <div className="ob2-stat-n mono">
-                    <CountUp value={counts[st]} />
-                    <small>{total ? `${Math.round((counts[st] / total) * 100)}%` : ''}</small>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
