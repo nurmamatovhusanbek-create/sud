@@ -18,6 +18,7 @@
  */
 
 import { CopyText } from '@/components/ui-custom/copy-text'
+import { getLook, useLook } from '@/lib/look'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
@@ -295,7 +296,8 @@ function HearingHistory({ items }: { items: Hearing[] }) {
 function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { stir?: string; name?: string }, nav?: DrawerOpts['nav']) {
   const EYEBROW = 'Ish tafsiloti'
   // a case detail is list + detail: it DOCKS beside the list (wide screens) and the list steps through it (↑ ↓ / k j)
-  const BASE: DrawerOpts = { eyebrow: EYEBROW, dock: true, rowKey: `${courtType}|${caseNumber}`, nav }
+  const navy = getLook() === 'navy' // the original look: a slide-over above the page, no stepping through the list
+  const BASE: DrawerOpts = navy ? { eyebrow: EYEBROW } : { eyebrow: EYEBROW, dock: true, rowKey: `${courtType}|${caseNumber}`, nav }
   openProtoDrawer(
     <CopyText text={caseNumber} tag="span" />,
     <div style={{ marginTop: 22 }}><SkRows n={5} /></div>,
@@ -486,6 +488,7 @@ interface MergedRow {
 }
 
 export function CasesSection() {
+  const { look } = useLook()
   const company = useAppStore((s) => s.activeCompany)
   const storeCourtFilter = useAppStore((s) => s.caseCourtFilter)
   const setStoreCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
@@ -732,6 +735,28 @@ export function CasesSection() {
 
   return (
     <div className="p-card rise-c">
+      {look === 'navy' ? (
+        <div className="filterbar">
+          <div className="f-search">
+            <Search />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ish raqami, sudya, tomon yoki bosqich…" />
+          </div>
+          <Seg options={COURT_SEG} value={courtFilter} onChange={setCourtFilter} />
+          {roleCounts.plaintiff + roleCounts.defendant > 0 || roleFilter !== 'all' ? (
+            <Seg options={roleOptions} value={roleFilter} onChange={(k) => setRoleFilter(k as 'all' | PartyRole | 'unknown')} />
+          ) : null}
+          <SortMenu value={sort} onChange={setSort} />
+          <div style={{ flex: 1 }} />
+          <button className="btn btn-outline btn-sm" disabled={printing || filtered.length === 0} onClick={printList}>
+            {printing ? <span className="spinner" /> : <Download />}
+            <span>PDF</span>
+          </button>
+          <button className="btn btn-outline btn-sm" disabled={exporting || filtered.length === 0} onClick={exportExcel}>
+            {exporting ? <span className="spinner" /> : <FileSpreadsheet />}
+            <span>Excel</span>
+          </button>
+        </div>
+      ) : (
       <div className="filterbar fb-stack">
         <div className="fb-row">
           <div className="f-search">
@@ -757,6 +782,7 @@ export function CasesSection() {
           ) : null}
         </div>
       </div>
+      )}
 
       {anyLoading ? (
         merged.length === 0 ? (
@@ -778,6 +804,29 @@ export function CasesSection() {
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
           <div className="list">
+            {look === 'navy' ? (
+              paged.map(({ c, courtType }, i) => (
+                <div className="lrow" key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openAt(i)}>
+                  <div className="lead">
+                    <Gavel />
+                  </div>
+                  <div className="main-c">
+                    <CopyText text={c.caseNumber} />
+                    <div className="sub">
+                      {c.courtName || '-'} · {c.judge || '-'}
+                      {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}
+                    </div>
+                  </div>
+                  {c.caseStatus ? <span className={`badge ${familyBadgeClass('neutral')}`}>{statusEn(c.caseStatus) || c.caseStatus}</span> : null}
+                  <div className="amt">
+                    {formatClaimAmount(c.claimAmount) || '-'}
+                    <small>{c.hearingDate || c.dateFiled || ''}</small>
+                  </div>
+                  <span className="chev">›</span>
+                </div>
+              ))
+            ) : (
+              <>
             <div className="lhead" aria-hidden="true"><span /><span>Ish raqami va sud</span><span>Holat</span><span>Sana</span><span /></div>
             {paged.map((m, i) => {
               const { c, courtType } = m
@@ -803,6 +852,8 @@ export function CasesSection() {
                 </div>
               )
             })}
+              </>
+            )}
           </div>
           <ListPagination
             page={safePage}

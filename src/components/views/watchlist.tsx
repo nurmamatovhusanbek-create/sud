@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CalendarDays, ChevronDown, Eye, Plus, RefreshCw, X } from 'lucide-react'
 import { EmptyBlock, CardStats, grp, initials } from '@/components/proto/primitives'
 import { DateTile, HearingWhen } from '@/components/proto/date-tile'
+import { useLook } from '@/lib/look'
 import { useAppStore } from '@/lib/store/app-store'
 import { refreshRating } from '@/lib/enrich'
 import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
@@ -75,6 +76,7 @@ function RemovableCard({ rec, onUnwatch, onRefresh }: { rec: CompanyRecord; onUn
 }
 
 export function WatchlistView() {
+  const { look } = useLook()
   const openCompany = useAppStore((s) => s.openCompany)
   const setCommandOpen = useAppStore((s) => s.setCommandOpen)
   const setCommandPurpose = useAppStore((s) => s.setCommandPurpose)
@@ -262,6 +264,23 @@ export function WatchlistView() {
       </div>
 
 
+      {look === 'navy' && alerts.length > 0 && (
+        <div className="alert warn" style={{ marginTop: 18 }}>
+          <AlertTriangle />
+          <div className="at">
+            <b>{alerts.length} ta majlis 7 kun ichida</b>
+            <p>
+              {alertSummary
+                .map(({ row: a, n }) => {
+                  const [, m, d] = a.isoDate.split('-').map(Number)
+                  return `${(a.name || a.stir).slice(0, 16)} · ${String(d).padStart(2, '0')} ${MONTHS[m - 1] ?? ''}${n > 1 ? ` ×${n}` : ''}`
+                })
+                .join(' · ')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div
         className="section-head sh-click"
         role="button"
@@ -283,7 +302,7 @@ export function WatchlistView() {
           )}
         </span>
       </div>
-      <div className={shownRows.length === 0 ? 'p-card rise-c' : 'rise-c'}>
+      <div className={shownRows.length === 0 || look === 'navy' ? 'p-card rise-c' : 'rise-c'}>
         {shownRows.length === 0 ? (
           <EmptyBlock icon={<CalendarDays />} title="Majlis yoʻq" hint="Kuzatuvdagi kompaniyalar boʻyicha rejalashtirilgan majlis topilmadi." />
         ) : (
@@ -295,12 +314,24 @@ export function WatchlistView() {
                 <div key={`${h.stir}-${i}`} className={`datecard ${near ? 'now' : ''}`} onClick={() => openCompany(h.stir, { name: h.name }, 'hearings')}>
                   <DateTile iso={h.isoDate} near={near} />
                   <div className="dc-body">
-                    <b>{h.name || h.stir}</b>
-                    <span>
-                      {h.court || 'Sud'}
-                      {h.caseNumber ? ` · Ish ${h.caseNumber}` : ''}
-                      {h.judge ? ` · ${h.judge}` : ''}
-                    </span>
+                    {look === 'navy' ? (
+                      <>
+                        <b>{(h.name || h.stir).slice(0, 24)} · {h.court || 'Sud'}</b>
+                        <span>
+                          Ish {h.caseNumber || '-'}
+                          {h.judge ? ` · ${h.judge}` : ''}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <b>{h.name || h.stir}</b>
+                        <span>
+                          {h.court || 'Sud'}
+                          {h.caseNumber ? ` · Ish ${h.caseNumber}` : ''}
+                          {h.judge ? ` · ${h.judge}` : ''}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <HearingWhen iso={h.isoDate} time={h.time} />
                 </div>
@@ -314,12 +345,12 @@ export function WatchlistView() {
         <h2>Kuzatuvdagi kompaniyalar</h2>
         <span className="count">{items.length}</span>
         <div className="sp" />
-        <button className="btn btn-ghost btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
+        <button className={`btn ${look === 'navy' ? 'btn-outline' : 'btn-ghost'} btn-sm`} onClick={() => void refreshAll()} disabled={refreshingAll || items.length === 0}>
           {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}
           <span>Yangilash</span>
         </button>
         <button
-          className="btn btn-primary btn-sm"
+          className={`btn ${look === 'navy' ? 'btn-outline' : 'btn-primary'} btn-sm`}
           onClick={() => {
             setCommandPurpose('add')
             setCommandOpen(true)

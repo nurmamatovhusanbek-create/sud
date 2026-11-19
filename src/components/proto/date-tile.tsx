@@ -9,6 +9,7 @@
  * Two colours only (premium look): closeness is told by the inverted tile and a heavier countdown, never by a hue.
  */
 import { daysUntil } from '@/core/dates'
+import { useLook } from '@/lib/look'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 const WEEKDAYS = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba']
@@ -47,8 +48,18 @@ export function daysLabel(days: number | null): string {
 export const isNear = (days: number | null): boolean => days !== null && days >= 0 && days <= NEAR_DAYS
 
 export function DateTile({ iso, size = 'md', near }: { iso: string | null | undefined; size?: 'md' | 'sm'; near?: boolean }) {
+  const { look } = useLook()
   const p = dateParts(iso)
   if (!p) return null
+  // «Moviy»: the original date block of a datecard, a big day over the month, no tile
+  if (look === 'navy') {
+    return (
+      <div className="dc-date">
+        <div className="d">{p.day}</div>
+        <div className="m">{p.month}</div>
+      </div>
+    )
+  }
   const close = near ?? isNear(p.days)
   return (
     <span className={`dtile ${size}${close ? ' near' : ''}`} aria-hidden="true">
@@ -60,7 +71,9 @@ export function DateTile({ iso, size = 'md', near }: { iso: string | null | unde
 
 /** time over countdown, right-aligned: the «when» half of a hearing row */
 export function HearingWhen({ iso, time }: { iso: string | null | undefined; time?: string | null }) {
+  const { look } = useLook()
   const p = dateParts(iso)
+  if (look === 'navy') return <div className="dc-time">{time || ''}</div>
   const label = p ? daysLabel(p.days) : ''
   return (
     <div className="dc-when">

@@ -16,11 +16,16 @@ import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { getCompanyInfo } from '@/lib/api-client'
 import { useAppStore } from '@/lib/store/app-store'
+import { useLook } from '@/lib/look'
 import { patchMeta, patchRecord, companyFactsPatch, getRecord } from '@/lib/registry'
+import { ratingBandFamily } from '@/core/status'
+import { bandFromFamily } from '@/components/proto/primitives'
 import type { CompanyInfoData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
 
 export function ProfileSection() {
+  const { look } = useLook()
+  const navy = look === 'navy'
   const company = useAppStore((s) => s.activeCompany)
   const patchCompany = useAppStore((s) => s.patchCompany)
   const setSection = useAppStore((s) => s.setSection)
@@ -97,6 +102,7 @@ export function ProfileSection() {
   const rating = view.data.rating
   const founders = (c?.founders as { name?: string; share?: string }[] | undefined) || []
   const score = typeof rating?.score === 'number' ? Math.min(100, rating.score) : null
+  const ratingBand = bandFromFamily((rating?.category ? ratingBandFamily(rating.category) : null) ?? 'neutral')
 
   const quick = [
     { key: 'bills', label: "Toʻlovlar", icon: <Receipt /> },
@@ -107,9 +113,9 @@ export function ProfileSection() {
   return (
     <div>
       {view.status === 'partial' && <PartialBanner errors={view.partialErrors} onRetry={() => void refetch()} />}
-      <div className="dash prof-grid" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
-        <div className="rise-c prof-main">
-          <div className="dstrip">
+      <div className={`dash${navy ? '' : ' prof-grid'}`} style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+        <div className={`rise-c${navy ? '' : ' prof-main'}`}>
+          <div className="dstrip" style={navy ? { marginBottom: 16 } : undefined}>
             <div className="dfield">
               <div className="k"><Building2 />Manzil</div>
               <div className="v">{c?.address || '-'}</div>
@@ -120,7 +126,7 @@ export function ProfileSection() {
             </div>
           </div>
 
-          <div className="dstrip dgrid">
+          <div className={`dstrip${navy ? '' : ' dgrid'}`} style={navy ? { marginBottom: 16 } : undefined}>
             <div className="dfield">
               <div className="k"><CalendarDays />Roʻyxatdan oʻtgan</div>
               <div className="v mono">{c?.registeredDate || '-'}</div>
@@ -137,7 +143,7 @@ export function ProfileSection() {
               <div className="k"><Mail />Email</div>
               <div className="v mono">{c?.email || '-'}</div>
             </div>
-            <div className="dfield wide">
+            <div className={`dfield${navy ? '' : ' wide'}`} style={navy ? { minWidth: '100%' } : undefined}>
               <div className="k"><Factory />OKED faoliyat turi</div>
               <div className="v">
                 {rating?.okedCode ? `${rating.okedCode} · ` : ''}
@@ -146,7 +152,7 @@ export function ProfileSection() {
             </div>
           </div>
 
-          <div className="prof-quick">
+          <div className={navy ? undefined : 'prof-quick'} style={navy ? { marginTop: 16 } : undefined}>
             <div className="eyebrow" style={{ marginBottom: 8 }}>Tezkor amallar</div>
             <div className="p-row" style={{ gap: 8, flexWrap: 'wrap' }}>
               {quick.map((q) => (
@@ -159,6 +165,45 @@ export function ProfileSection() {
           </div>
         </div>
 
+        {navy ? (
+        <div className="p-card rise-c">
+          <div className="card-h">
+            <div className="ico"><Star /></div>
+            <h2>Chamber reytingi</h2>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+            {score !== null ? (
+              <Dial pct={score} size={200} band={ratingBand} label="Ishonch balli" id="profile-score" />
+            ) : (
+              <Dial pct={null} size={200} label="Ball mavjud emas" />
+            )}
+            {rating?.category ? (
+              <span
+                className={`badge ${ratingBand === 'pos' ? 'b-pos' : ratingBand === 'warn' ? 'b-warn' : ratingBand === 'neg' ? 'b-neg' : 'b-neu'}`}
+                style={{ height: 28, fontSize: 13 }}
+              >
+                Kategoriya {rating.category}
+              </span>
+            ) : (
+              <span className="badge b-neu" style={{ height: 28, fontSize: 13 }}>Kategoriya yoʻq</span>
+            )}
+            <div className="faint" style={{ fontSize: 12 }}>{c?.thsht || '-'}</div>
+            <div className="faint" style={{ fontSize: 11 }}>admin.chamber.uz · Pudratchi reytingi</div>
+          </div>
+          {founders.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="eyebrow" style={{ marginBottom: 6 }}>Taʼsischilar</div>
+              {founders.map((f, i) => (
+                <div className="founder" key={i}>
+                  <div className="av">{initials(f.name || '-')}</div>
+                  <b style={{ flex: 1, fontSize: 13 }}>{f.name || '-'}</b>
+                  <span className="mono faint">{f.share || '-'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        ) : (
         <div className="p-card rise-c prof-score">
           <div className="card-h">
             <h2>Chamber reytingi</h2>
@@ -188,6 +233,7 @@ export function ProfileSection() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

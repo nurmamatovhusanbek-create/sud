@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTheme } from '@/lib/theme'
 import { useMotion } from '@/lib/motion'
+import { useLook } from '@/lib/look'
 import { IconGradientDefs } from '@/components/ui-custom/solid-icons'
 import {
   BarChart3,
@@ -106,6 +107,7 @@ function counterpartyFor(stir: string, caseNumber?: string, fallback?: string): 
 }
 
 function BellPopover() {
+  const { look } = useLook()
   const openCompany = useAppStore((s) => s.openCompany)
   const [open, setOpen] = useState(false)
   const rv = useRegistryVersion()
@@ -164,15 +166,32 @@ function BellPopover() {
                       openCompany(a.stir, { name: a.name }, 'hearings')
                     }}
                   >
-                    <DateTile iso={a.isoDate} size="sm" near />
-                    <div className="nt">
-                      <b>{party}</b>
-                      <span>
-                        {a.court || 'Sud'}
-                        {a.time ? ` · ${a.time}` : ''}
-                      </span>
-                      <span className="nd">{daysLabel(dateParts(a.isoDate)?.days ?? null)}</span>
-                    </div>
+                    {look === 'navy' ? (
+                      <>
+                        <div className="ni b-warn">
+                          <CalendarDays />
+                        </div>
+                        <div className="nt">
+                          <b>{party}</b>
+                          <span>
+                            {`${String(a.isoDate.split('-')[2]).padStart(2, '0')}.${String(a.isoDate.split('-')[1]).padStart(2, '0')}`} · {a.court || ''}
+                            {a.time ? ` · ${a.time}` : ''}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <DateTile iso={a.isoDate} size="sm" near />
+                        <div className="nt">
+                          <b>{party}</b>
+                          <span>
+                            {a.court || 'Sud'}
+                            {a.time ? ` · ${a.time}` : ''}
+                          </span>
+                          <span className="nd">{daysLabel(dateParts(a.isoDate)?.days ?? null)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })

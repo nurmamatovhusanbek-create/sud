@@ -7,10 +7,12 @@
  * All colors flow through the semantic tokens (color = signal only).
  */
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ArrowDownUp } from 'lucide-react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ArrowDownUp, CalendarDays, Check, Gavel, Receipt, Timer, Trophy, Users, Wallet } from 'lucide-react'
 import { dateParts, DateTile, daysLabel, isNear } from './date-tile'
 import { motionReduced } from '@/lib/motion'
+import { useLook } from '@/lib/look'
+import { ClassicDial } from './classic'
 import { countAt, countDuration } from '@/lib/count-tween'
 import { thumbVars, useThumb } from '@/lib/use-thumb'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
@@ -135,7 +137,24 @@ export const HEALTH_ZONES: DialZones = [[80, 'warn'], [100, 'pos']]
 
 const dialSeen = new Map<string, number>() // keyed dials remember where they were, so a remount doesn't replay from 0
 
-export function Dial({
+/** The score gauge: the ruler in Premium, the original hairline needle dial in «Moviy» (proto/classic). */
+export function Dial(props: DialProps) {
+  const { look } = useLook()
+  return look === 'navy' ? <ClassicDial {...props} /> : <RulerDial {...props} />
+}
+
+type DialProps = {
+  pct: number | null
+  size: number
+  /** kept for call-site compatibility; the ruler is not coloured by a band (the needle dial of «Moviy» is) */
+  band?: Band
+  zones?: DialZones | null
+  label?: string
+  unit?: string
+  id?: string
+}
+
+function RulerDial({
   pct,
   size,
   zones = null,
@@ -272,20 +291,58 @@ export function Spark({ values, failIdx = [], px = 2.2 }: { values: number[]; fa
   )
 }
 
-/** KPI tile: a label, one figure and what it compares to. The icon is a large corner watermark that says what the tile counts (Premium look; hidden in the navy look). */
+/**
+ * KPI tile. Premium: a label, one figure and what it compares to; the icon is a large corner watermark (solid family) that says what the
+ * tile counts. «Moviy» (the original): a card with a small outline icon chip beside the label, and the `ink` tile (navy, white figure) for
+ * the number that matters most. The caller passes ONE solid icon; the original's outline twin is looked up by its name.
+ */
+const CLASSIC_KPI_ICON: Record<string, React.ReactNode> = {
+  gavel: <Gavel />,
+  trophy: <Trophy />,
+  'calendar-blank': <CalendarDays />,
+  wallet: <Wallet />,
+  users: <Users />,
+  receipt: <Receipt />,
+  timer: <Timer />,
+  'check-circle': <Check />,
+}
+
 export function Kpi({
   label,
   icon,
+  ink,
+  classic,
   children,
   foot,
   valueSize,
 }: {
   label: string
   icon?: React.ReactNode
+  /** the outline icon of «Moviy» when it is not the default twin of `icon` */
+  classic?: React.ReactNode
+  /** the tile that matters most: navy with a white figure in «Moviy» (the other looks ignore it) */
+  ink?: boolean
   children: React.ReactNode
   foot?: React.ReactNode
   valueSize?: number
 }) {
+  const { look } = useLook()
+  if (look === 'navy') {
+    const name = React.isValidElement(icon) ? (icon.props as { name?: string }).name : undefined
+    const chip = classic ?? (name ? CLASSIC_KPI_ICON[name] : null)
+    return (
+      <div className={`kpi ${ink ? 'ink' : ''}`}>
+        <div className="kpi-top">
+          <div className="lbl">{label}</div>
+          {chip ? <div className="kpi-ico">{chip}</div> : null}
+        </div>
+        <div className="val" style={valueSize ? { fontSize: valueSize } : undefined}>
+          {children}
+        </div>
+        {foot ? <div className="foot">{foot}</div> : null}
+      </div>
+    )
+  }
   return (
     <div className="kpi">
       {icon ? <div className="kpi-ico" aria-hidden="true">{icon}</div> : null}
@@ -312,9 +369,10 @@ export function Seg({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const { thumb, ready } = useThumb(ref, [value, options])
+  const { look } = useLook()
   return (
     <div className={`seg${thumb ? ' has-thumb' : ''}${ready ? ' thumb-ready' : ''}`} ref={ref}>
-      {thumb && <span className="thumb" style={thumbVars(thumb)} />}
+      {thumb && <span className="thumb" style={look === 'navy' ? { left: thumb.x, top: thumb.y, width: thumb.w, height: thumb.h } : thumbVars(thumb)} />}
       {options.map((o) => (
         <button key={o.key} className={value === o.key ? 'on' : ''} onClick={() => onChange(o.key)}>
           {o.label}
@@ -430,6 +488,40 @@ export function CardStats({
   // a hearing that has passed is not «keyingi»: a cached list outlives its dates (core/dates › stillAhead)
   const hearing = dateParts(hearingIso)
   const upcoming = hearing && hearing.days !== null && hearing.days >= 0 ? hearing : null
+  const { look } = useLook()
+  if (look === 'navy') {
+    // the original: day + month, and an amber «N kun qoldi» line when it is within a week
+    return (
+      <>
+        <div className="cc-div" />
+        <div className="cc-cols">
+          <div className="cc-col">
+            <div className="k">Reyting</div>
+            <div className="v">
+              <span className="num">{score != null ? score : '—'}</span>
+              {rating ? <span className={`lt ${familyBadgeClass(ratingBandFamily(rating) ?? 'neutral')}`}>{rating}</span> : null}
+            </div>
+          </div>
+          <div className="cc-col">
+            <div className="k">Keyingi majlis</div>
+            {upcoming ? (
+              <>
+                <div className="v">
+                  <span className="num">{upcoming.day}</span>
+                  <span className="mo">{upcoming.month}</span>
+                </div>
+                <div className={`days${upcoming.days !== null && upcoming.days <= 7 ? ' warn' : ''}`}>{upcoming.days} kun qoldi</div>
+              </>
+            ) : (
+              <div className="v">
+                <span className="none">Majlis yoʻq</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    )
+  }
   return (
     <>
       <div className="cc-div" />

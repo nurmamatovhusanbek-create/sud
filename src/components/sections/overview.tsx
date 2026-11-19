@@ -20,6 +20,8 @@
  */
 
 import { CopyText } from '@/components/ui-custom/copy-text'
+import { useLook } from '@/lib/look'
+import { Pizza, PizzaDetail, PizzaKey, WinRing } from '@/components/proto/classic'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { stillAhead } from '@/core/dates'
 import { Activity, BarChart3, CalendarDays, CircleX, Clock, Gavel, Minus, Receipt, Scale, Timer, Trophy, Users, Wallet } from 'lucide-react'
@@ -68,6 +70,9 @@ function useBillsVersion(): number {
 /** Integer soʻm formatting for the KPI cards. */
 const fmtSumShort = (tiyins: number): string => formatSum(tiyins).split(',')[0]
 
+/** the outline icons of the original look (the newer looks use the solid status icons above) */
+const CLASSIC_DECISION_ICON: Record<string, React.ReactNode> = { win: <Trophy />, lose: <CircleX />, pending: <Clock />, neutral: <Minus /> }
+
 /** Decision-row metadata — the prototypeʼs CASE_META (icon/label/band/text). */
 const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band: string; text: string }> = {
   win: { icon: <StatusIcon family="win" size={20} />, label: 'Yutgan', band: 'positive', text: "Yutgan" },
@@ -78,8 +83,12 @@ const DECISION_META: Record<string, { icon: React.ReactNode; label: string; band
 
 // ---- v18: side-by-side comparison (inside Statistika) --------------------------
 
+const BAND_HEX = (wr: number | null) => (wr === null ? '#7d86ab' : wr >= 60 ? '#0f9070' : wr >= 40 ? '#3b5bdb' : '#c04a68')
+
 /** One compact company dashboard: identity + KPIs + interactive pizza + bars. */
 function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | null }) {
+  const { look } = useLook()
+  const navy = look === 'navy'
   const s = d.summary
   const wr = calcWinRate(s.win, s.lose)
   const [mode, setMode] = useState<'court' | 'turkum'>('court')
@@ -88,6 +97,8 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
     [d.cases, mode],
   )
   const [selIdx, setSelIdx] = useState(-1)
+  const sel = selIdx >= 0 && selIdx < items.length ? items[selIdx] : null
+  const rb = rating ? (/^A/i.test(rating) ? 'b-pos' : /^B/i.test(rating) ? 'b-warn' : 'b-neg') : null
 
   return (
     <div className="cmp-co">
@@ -97,15 +108,21 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           <b>{d.company.name || d.company.tin}</b>
           <div className="faint mono" style={{ fontSize: 10.5 }}>STIR {grp(d.company.tin)}</div>
         </div>
+        {navy ? (
+          <>
+            <span style={{ flex: 1 }} />
+            <WinRing pct={wr} col={BAND_HEX(wr)} size={60} />
+          </>
+        ) : null}
       </div>
       <div className="co-kpis">
         <div className="co-kpi"><div className="k">Jami ishlar</div><div className="v">{s.total}</div></div>
-        <div className="co-kpi"><div className="k">Yutuq</div><div className="v">{winRateText(s.win, s.lose)}</div></div>
+        <div className="co-kpi"><div className="k">Yutuq</div><div className="v" style={navy ? { color: BAND_HEX(wr) } : undefined}>{winRateText(s.win, s.lose)}</div></div>
         <div className="co-kpi"><div className="k">Jarayonda</div><div className="v">{s.pending}</div></div>
         <div className="co-kpi">
           <div className="k">Reyting</div>
           <div className="v" style={{ fontFamily: 'var(--font-sans)' }}>
-            {rating ? <span className="badge b-neu">{rating}</span> : <span className="faint">-</span>}
+            {rating ? <span className={`badge ${navy ? rb : 'b-neu'}`}>{rating}</span> : <span className="faint">-</span>}
           </div>
         </div>
       </div>
@@ -125,6 +142,35 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
           <option value="turkum">Turkum</option>
         </select>
       </div>
+      {navy ? (
+        <>
+          {items.length ? (
+            <Pizza items={items} selected={selIdx} onSelect={(_, i) => setSelIdx((prev) => (prev === i ? -1 : i))} />
+          ) : (
+            <div className="empty" style={{ padding: 26 }}><h3>Maʼlumot yoʻq</h3></div>
+          )}
+          {items.length > 0 && (
+            <div className="petal-legend" style={{ justifyContent: 'center', marginTop: 2 }}>
+              {items.map((it) => (
+                <span key={it.label}><i style={{ background: it.col }} />{it.label}</span>
+              ))}
+            </div>
+          )}
+          {items.length > 0 && <PizzaKey />}
+          <div className="cmp-det">
+            {sel ? (
+              <PizzaDetail item={sel} kind={mode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'} />
+            ) : (
+              <div className="faint" style={{ fontSize: 12.5, textAlign: 'center', padding: '10px 4px' }}>
+                {mode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
+              </div>
+            )}
+          </div>
+          <div className="co-sub" style={{ marginTop: 14 }}>Sud turi boʻyicha yutuq</div>
+          <WrRows cases={d.cases} />
+        </>
+      ) : (
+        <>
       {items.length ? (
         <OutcomeBoard
           items={items}
@@ -135,6 +181,8 @@ function CompanyStatsCol({ d, rating }: { d: CompanyStats; rating?: string | nul
         />
       ) : (
         <div className="empty" style={{ padding: 26 }}><h3>Maʼlumot yoʻq</h3></div>
+      )}
+        </>
       )}
     </div>
   )
@@ -243,7 +291,49 @@ function ComparePanel({ base, onClose }: { base: CompanyStats; onClose: () => vo
 
 // ---- Statistika body -----------------------------------------------------------
 
+/** «Sud turi boʻyicha yutuq»: the original rows (a bar per court type) of the navy look. */
+function WrRows({ cases }: { cases: CompanyStats['cases'] }) {
+  const byCourt = useMemo(() => {
+    const map = new Map<string, { win: number; lose: number }>()
+    for (const c of cases) {
+      const e = map.get(c.courtType) || { win: 0, lose: 0 }
+      if (c.classification === 'win') e.win++
+      else if (c.classification === 'lose') e.lose++
+      map.set(c.courtType, e)
+    }
+    return [...map.entries()].map(([k, v]) => ({
+      key: k,
+      label: k === 'economic' ? 'Iqtisodiy' : k === 'civil' ? 'Fuqarolik' : k === 'administrative' ? "Maʼmuriy" : k,
+      rate: calcWinRate(v.win, v.lose), // won ÷ (won + lost); null = nothing decided
+    }))
+  }, [cases])
+  if (!byCourt.length) return <div className="faint" style={{ fontSize: 12.5 }}>Maʼlumot yoʻq</div>
+  return (
+    <div>
+      {byCourt.map((c) => (
+        <div className="wr-row" key={c.key}>
+          <span className="wr-lbl">{c.label}</span>
+          <div className="wr-track">
+            <div
+              className="wr-fill"
+              style={{ width: `${c.rate ?? 0}%`, background: (c.rate ?? 0) >= 60 ? 'var(--pos-base)' : (c.rate ?? 0) >= 40 ? 'var(--warn-base)' : 'var(--neg-base)' }}
+            />
+          </div>
+          <span className="wr-val">{c.rate === null ? '–' : `${c.rate}%`}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir: string; onOpenCompare: () => void }) {
+  const { look } = useLook()
+  // court mini-card counts («Moviy»: the cards under the pizza)
+  const courtCounts = useMemo(() => {
+    const m = { economic: 0, civil: 0, administrative: 0 }
+    for (const c of data.cases) if (c.courtType in m) m[c.courtType as keyof typeof m]++
+    return m
+  }, [data.cases])
   const setSection = useAppStore((s) => s.setSection)
   const setCaseCourtFilter = useAppStore((s) => s.setCaseCourtFilter)
   const s = data.summary
@@ -316,7 +406,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           <CountUp value={s.total} id={`ov-total-${stir}`} />
         </Kpi>
         <Kpi
-          label="Yutuq darajasi" icon={<SolidIcon name="trophy" />}
+          label="Yutuq darajasi" icon={<SolidIcon name="trophy" />} ink
           foot={winRate === null ? 'Hal qilingan ish yoʻq' : <>{s.win} yutgan / {s.win + s.lose} ta hal qilingan ishdan</>}
         >
           {winRate === null ? <span>{winRateText(s.win, s.lose)}</span> : <CountUp value={winRate} suffix="%" id={`ov-wr-${stir}`} />}
@@ -328,7 +418,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           {upcomingCount === null ? <span>-</span> : <CountUp value={upcomingCount} id={`ov-up-${stir}`} />}
         </Kpi>
         <Kpi
-          label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />}
+          label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />} classic={<Timer />}
           foot={bt.loaded ? (bt.overdue > 0 ? 'BPI orqali undiruv' : 'Qarzdorlik yoʻq') : "Toʻlovlar boʻlimida yuklanadi"}
         >
           <span style={{ fontSize: 18, color: bt.overdue > 0 ? 'var(--neg-text)' : undefined }}>
@@ -337,6 +427,105 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </Kpi>
       </div>
 
+      {look === 'navy' ? (
+        <>
+          {/* the original: the pizza (radial stack) with its detail panel, then the mini court cards */}
+          <div className="dash" style={{ gridTemplateColumns: '1.5fr 1fr', alignItems: 'stretch' }}>
+            <div className="p-card rise-c">
+              <div className="card-h">
+                <div className="ico"><BarChart3 /></div>
+                <h2>Sud ishlari taqsimoti</h2>
+                <div className="sp" />
+                <select
+                  className="pie-filter"
+                  value={pieMode}
+                  aria-label="Filtr"
+                  onChange={(e) => {
+                    setPieMode(e.target.value as 'court' | 'turkum')
+                    setPieSel(-1)
+                  }}
+                >
+                  <option value="court">Sud turi boʻyicha</option>
+                  <option value="turkum">Turkum boʻyicha</option>
+                </select>
+              </div>
+              {pieItems.length ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
+                    <Pizza items={pieItems} selected={pieSel} onSelect={(_, i) => setPieSel((prev) => (prev === i ? -1 : i))} />
+                  </div>
+                  <div className="petal-legend">
+                    {pieItems.map((it) => (
+                      <span key={it.label}><i style={{ background: it.col }} />{it.label}</span>
+                    ))}
+                  </div>
+                  <PizzaKey />
+                </>
+              ) : (
+                <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
+              )}
+            </div>
+            <div className="p-card rise-c">
+              {pieSelClamped ? (
+                <PizzaDetail
+                  item={pieSelClamped}
+                  kind={pieMode === 'court' ? 'Tanlangan sud turi' : 'Tanlangan turkum'}
+                  action={
+                    <button
+                      className="btn btn-outline btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', marginTop: 14 }}
+                      onClick={() => goCasesFiltered(pieMode === 'court' ? pieSelClamped.id : undefined, pieMode === 'turkum' ? pieSelClamped.full : undefined)}
+                    >
+                      Ishlarni koʻrish
+                    </button>
+                  }
+                />
+              ) : (
+                <EmptyBlock
+                  icon={<BarChart3 />}
+                  title="Boʻlim tanlanmagan"
+                  hint={pieMode === 'court' ? 'Maʼlumotlarni koʻrish uchun sud turini tanlang.' : 'Maʼlumotlarni koʻrish uchun kategoriyani tanlang.'}
+                />
+              )}
+            </div>
+          </div>
+          <div className="kpis">
+            {[
+              { id: 'economic', label: 'Iqtisodiy', n: courtCounts.economic },
+              { id: 'civil', label: 'Fuqarolik', n: courtCounts.civil },
+              { id: 'administrative', label: "Maʼmuriy", n: courtCounts.administrative },
+            ].map((c) => (
+              <div
+                key={c.id}
+                className="p-card mini fcard"
+                title={`${c.label} ishlarni koʻrsatish`}
+                onClick={() => goCasesFiltered(c.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && goCasesFiltered(c.id)}
+              >
+                <div className="lab">{c.label}</div>
+                <div className="val tnum">{c.n}</div>
+                <div className="foot faint">{c.label} sudlari boʻyicha</div>
+              </div>
+            ))}
+            <div
+              className="p-card mini fcard"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, textAlign: 'center' }}
+              onClick={() => goCasesFiltered()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && goCasesFiltered()}
+            >
+              <span className="arrow" style={{ width: 34, height: 34, background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 10, display: 'grid', placeItems: 'center' }}>
+                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </span>
+              <b style={{ fontSize: 13 }}>Barcha ishlar</b>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
       {/* pizza + detail — the v18 heart of Statistika */}
       <div className="p-card rise-c">
         <div className="card-h">
@@ -379,6 +568,8 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           <EmptyBlock icon={<BarChart3 />} title="Maʼlumot yoʻq" hint="Bu STIR boʻyicha tasniflangan ish topilmadi." />
         )}
       </div>
+        </>
+      )}
 
       <div className="p-card rise-c">
         <div className="card-h">
@@ -399,6 +590,49 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
         </div>
       </div>
 
+      {look === 'navy' ? (
+        <div className="dash" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="p-card rise-c">
+            <div className="card-h">
+              <div className="ico"><Scale /></div>
+              <h2>Sud turi boʻyicha yutuq</h2>
+            </div>
+            <WrRows cases={data.cases} />
+            <button className="btn btn-outline btn-sm" style={{ width: '100%', marginTop: 14 }} onClick={onOpenCompare}>
+              <Users />
+              <span>Boshqa kompaniya bilan solishtirish</span>
+            </button>
+          </div>
+          <div className="p-card rise-c">
+            <div className="card-h">
+              <div className="ico"><CalendarDays /></div>
+              <h2>Keyingi majlis</h2>
+            </div>
+            {nh && nextHearing ? (
+              <>
+                <div className="datecard now" data-goto="hearings" onClick={() => setSection('hearings')}>
+                  <div className="dc-date">
+                    <div className="d">{nh.day}</div>
+                    <div className="m">{nh.month}</div>
+                  </div>
+                  <div className="dc-body">
+                    <b>{(nextHearing.courtName as string) || (nextHearing.courtTypeLabel as string) || 'Sud'}</b>
+                    <span>Ish {(nextHearing.caseNumber as string) || '-'}</span>
+                  </div>
+                  <div className="dc-time">{(nextHearing.hearingTime as string) || ''}</div>
+                </div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock style={{ width: 13, height: 13 }} />
+                  {nh.days !== null && nh.days >= 0 ? `${nh.days} kun qoldi` : 'Oʻtkazib yuborilgan'}
+                  {nextHearing.judge ? ` · sudya ${nextHearing.judge as string}` : ''}
+                </div>
+              </>
+            ) : (
+              <EmptyBlock icon={<CalendarDays />} title="Majlis yoʻq" />
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="dash" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="p-card rise-c">
           <div className="card-h">
@@ -436,6 +670,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
           )}
         </div>
       </div>
+      )}
 
       <div className="section-head" style={{ margin: '22px 0 14px' }}>
         <h2>So&apos;nggi faoliyat</h2>
@@ -491,7 +726,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
               const meta = DECISION_META[c.classification] ?? DECISION_META.neutral
               return (
                 <div className="lrow" key={c.caseNumber} data-case={c.caseNumber} onClick={() => openCase(c.caseNumber, c.courtType)}>
-                  <div className={`lead ${c.classification === 'win' ? 'ink' : ''}`}>{meta.icon}</div>
+                  <div className={`lead ${c.classification === 'win' ? 'ink' : ''}`}>{look === 'navy' ? (CLASSIC_DECISION_ICON[c.classification] ?? CLASSIC_DECISION_ICON.neutral) : meta.icon}</div>
                   <div className="main-c">
                     <CopyText text={c.caseNumber} />
                     <div className="sub">{c.result?.trim() || meta.text}</div>

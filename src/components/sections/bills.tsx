@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
 import { SolidIcon } from '@/components/ui-custom/solid-icons'
+import { getLook } from '@/lib/look'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
@@ -154,9 +155,8 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
     subline,
     {
       eyebrow: 'Toʻlov kvitansiyasi',
-      dock: true,
-      rowKey: b.number,
-      nav,
+      // the original look keeps the receipt a slide-over above the page; the others dock it beside the list
+      ...(getLook() === 'navy' ? {} : { dock: true, rowKey: b.number, nav }),
       footer: (
         <>
           <button className={`btn ${openCase ? 'btn-outline' : 'btn-primary'}`} onClick={printReceipt}>

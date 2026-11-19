@@ -13,6 +13,7 @@
  */
 
 import { motionReduced } from '@/lib/motion'
+import { useLook } from '@/lib/look'
 
 const EXPECTED_MS = 12_000
 
@@ -22,6 +23,7 @@ export interface ScrapeCfg {
 }
 
 export function ScrapeProgress({ title, phases, elapsed }: ScrapeCfg & { elapsed: number | null }) {
+  const { look } = useLook()
   const ms = elapsed ?? 0
   const step = Math.min(phases.length - 1, Math.floor(ms / (EXPECTED_MS / phases.length)))
   const pct = Math.min(96, 4 + Math.round((ms / EXPECTED_MS) * 88))
@@ -54,14 +56,16 @@ export function ScrapeProgress({ title, phases, elapsed }: ScrapeCfg & { elapsed
             </div>
           </div>
           <span style={{ flex: 1 }} />
-          <span className="scrape-pct mono" aria-hidden="true">
-            {pct}
-            <small>%</small>
-          </span>
+          {look === 'navy' ? null : (
+            <span className="scrape-pct mono" aria-hidden="true">
+              {pct}
+              <small>%</small>
+            </span>
+          )}
           <span className="spinner" />
         </div>
         <div className="stream-bar">
-          <div className="stream-fill" style={{ clipPath: `inset(0 ${100 - pct}% 0 0 round 99px)`, transition: reduced ? 'none' : undefined }} />
+          <div className="stream-fill" style={look === 'navy' ? { width: `${pct}%`, transition: reduced ? 'none' : undefined } : { clipPath: `inset(0 ${100 - pct}% 0 0 round 99px)`, transition: reduced ? 'none' : undefined }} />
         </div>
         <div className="phases">
           {phases.map((p, i) => (

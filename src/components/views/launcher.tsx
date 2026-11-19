@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { BarChart3, CalendarDays, Gavel, RefreshCw, Search, Trash2, Users, Wallet, X } from 'lucide-react'
 import { SolidIcon } from '@/components/ui-custom/solid-icons'
+import { useLook } from '@/lib/look'
 import { useAppStore } from '@/lib/store/app-store'
 import { detectSearchMode } from '@/core/search-mode'
 import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilIso, futureUpcoming } from '@/lib/registry'
@@ -81,6 +82,7 @@ function CompanyCard({ rec, onRefresh, onDelete }: {
 const noopSubscribe = () => () => {}
 
 export function Launcher() {
+  const { look } = useLook()
   const openCompany = useAppStore((s) => s.openCompany)
   const setSection = useAppStore((s) => s.setSection)
   const [query, setQuery] = useState('')
@@ -227,8 +229,13 @@ export function Launcher() {
   return (
     <div>
       <div className="hero">
+        <div className="eyebrow">Kompaniyalarni kuzatish tizimi</div>
         <h1>
-          Kompaniyani toping
+          {look === 'navy' ? (
+            <>Kompaniyani <span className="g2">toping,</span> hammasini <span className="g2">bir joyda</span> koʻring.</>
+          ) : (
+            'Kompaniyani toping'
+          )}
         </h1>
         <p>
           STIR (9 xonali), kvitansiya (12 xonali) yoki ish raqamini kiriting. Toʻlovlar, sud ishlari, majlislar va
@@ -277,7 +284,7 @@ export function Launcher() {
       </div>
 
       <div className="kpis" style={{ marginTop: 24 }}>
-        <Kpi label="Kompaniyalar" icon={<SolidIcon name="users" />} foot="Kuzatuv + soʻnggi">
+        <Kpi label="Kompaniyalar" icon={<SolidIcon name="users" />} ink foot="Kuzatuv + soʻnggi">
           <CountUp value={companies.length} id="lnch-companies" />
         </Kpi>
         <Kpi
@@ -308,10 +315,10 @@ export function Launcher() {
           <CountUp value={nearHearings} id="lnch-hearings" />
         </Kpi>
         <Kpi label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />} foot={`${overdueCompanies} kompaniyada`}>
-          <>
+          <span style={look === 'navy' ? { fontSize: 19 } : undefined}>
             <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
-            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}> mln soʻm</span>
-          </>
+            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: look === 'navy' ? undefined : 400 }}> mln soʻm</span>
+          </span>
         </Kpi>
       </div>
 
@@ -320,10 +327,10 @@ export function Launcher() {
         <span className="count">{filtered.length}</span>
         <div className="sp" />
         <div className="p-row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
+          <button className={`btn ${look === 'navy' ? 'btn-outline' : 'btn-ghost'} btn-sm`} onClick={() => void refreshAll()} disabled={refreshingAll || filtered.length === 0}>
             {refreshingAll ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <RefreshCw />}Yangilash
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
+          <button className={`btn ${look === 'navy' ? 'btn-outline' : 'btn-ghost'} btn-sm`} onClick={clearSearched} disabled={searchedCount === 0} title="Qidirilgan kompaniyalarni tozalash (Kuzatuvdagilar qoladi)">
             <Trash2 />Tozalash
           </button>
           <Seg
