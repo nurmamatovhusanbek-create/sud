@@ -328,8 +328,8 @@ export interface LibraryItem extends StoredOrder {
   size: number
   /** when the PDF was (last) saved (ms), 0 for `never` */
   savedAt: number
-  /** the person cleared it from the lists («Tozalash»): out of the lists and counts, but its record is kept and a search still finds it.
-   *  Only while it is NOT downloaded: a downloaded order is never hidden. */
+  /** the person cleared it from the lists («Tozalash» / «Oʻchirish»): out of the lists and counts, but its record is kept and a search still finds it.
+   *  A downloaded order can be cleared too: only its row goes; the PDF stays on disk and opens in one click from the «Tozalangan» view. */
   hidden: boolean
 }
 
@@ -381,7 +381,7 @@ export function searchLibrary(
     const f = o.pdfId ? saved.get(key) : undefined
     const h = o.pdfId && !f ? history.get(key) : undefined
     const state: LibraryState = f ? 'saved' : h ? 'gone' : 'never'
-    matched.push({ ...o, state, downloaded: !!f, size: (f ?? h)?.size ?? 0, savedAt: (f ?? h)?.savedAt ?? 0, hidden: !f && !!o.pdfId && !!opts.hidden?.has(key) })
+    matched.push({ ...o, state, downloaded: !!f, size: (f ?? h)?.size ?? 0, savedAt: (f ?? h)?.savedAt ?? 0, hidden: !!o.pdfId && !!opts.hidden?.has(key) })
   }
   // cleared orders stay out of the lists and counts — except when the person SEARCHES (then every match shows, with its
   // download button) or opens the «Tozalangan» view itself

@@ -152,14 +152,17 @@ describe('cleared orders («Tozalash»)', () => {
 
   test('they leave the lists and the counts, and only the hidden view and a search still show them', () => {
     const r = run({ status: 'never' })
-    expect(r.items.map((i) => i.pdfId)).toEqual([D]) // B and C are cleared; A is downloaded (never hidden), so it is not «never» anyway
-    expect(r.counts).toEqual({ all: 2, saved: 1, gone: 0, never: 1, hidden: 2 })
-    expect(run({ status: 'hidden' }).items.map((i) => i.pdfId).sort()).toEqual([B, C].sort())
+    expect(r.items.map((i) => i.pdfId)).toEqual([D]) // B and C are cleared
+    expect(r.counts).toEqual({ all: 1, saved: 0, gone: 0, never: 1, hidden: 3 })
+    expect(run({ status: 'hidden' }).items.map((i) => i.pdfId).sort()).toEqual([A, B, C].sort())
   })
-  test('a downloaded order is never hidden, whatever the set says', () => {
-    const r = run({ status: 'saved' })
-    expect(r.items).toHaveLength(1)
-    expect(r.items[0]).toMatchObject({ pdfId: A, hidden: false })
+  test('a DOWNLOADED order can be cleared too: its row goes, the file stays and is still «saved» (one click opens it from the hidden view)', () => {
+    expect(run({ status: 'saved' }).items).toHaveLength(0)
+    const h = run({ status: 'hidden' }).items.find((i) => i.pdfId === A)
+    expect(h).toMatchObject({ pdfId: A, hidden: true, state: 'saved', downloaded: true })
+    expect(h?.size).toBeGreaterThan(0)
+    // restoring puts it back in the Yuklangan list
+    expect(run({ status: 'saved' }, new Set()).items.map((i) => i.pdfId)).toEqual([A])
   })
   test('a SEARCH finds a cleared order again, with its metadata, marked hidden, ready for «Yuklab olish»', () => {
     const r = run({ q: '2605' })

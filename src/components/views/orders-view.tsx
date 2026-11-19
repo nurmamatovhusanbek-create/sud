@@ -16,7 +16,7 @@
 
 import { CopyText } from '@/components/ui-custom/copy-text'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, X } from 'lucide-react'
+import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
@@ -163,7 +163,7 @@ export function OrdersView() {
     setSel(new Map())
     setTick((t) => t + 1)
     toast.success(`${r.data.changed} ta qaror tozalandi`, {
-      description: 'Roʻyxatdan va sonlardan chiqdi; ish raqami bilan qidirsangiz yana topiladi.',
+      description: 'Roʻyxatdan va sonlardan chiqdi. Yozuvi (va yuklangan PDF fayli) saqlandi: «Tozalangan» boʻlimidan yoki ish raqami bilan qidirib bir bosishda ochasiz.',
       action: { label: 'Qaytarish', onClick: () => void restore(ids) },
       duration: 12000,
     })
@@ -178,7 +178,7 @@ export function OrdersView() {
     toast.success(`${r.data.changed} ta qaror qaytarildi`)
   }
   /** everything in this view that is NOT ticked, across all pages */
-  const clearTheRest = async (state: 'never' | 'gone') => {
+  const clearTheRest = async (state: 'never' | 'gone' | 'saved') => {
     let all: LibraryItem[]
     try {
       all = await collect(state)
@@ -191,7 +191,7 @@ export function OrdersView() {
       toast.info('Tozalanadigan qaror yoʻq')
       return
     }
-    if (!window.confirm(`${sel.size} ta tanlangan qaror qoladi, qolgan ${rest.length} tasi roʻyxatdan tozalanadi (ularning yozuvlari saqlanadi, ish raqami bilan qidirsangiz topiladi). Davom etamizmi?`)) return
+    if (!window.confirm(`${sel.size} ta tanlangan qaror qoladi, qolgan ${rest.length} tasi roʻyxatdan olib tashlanadi (yozuvlari va PDF fayllari saqlanadi, ish raqami bilan qidirsangiz topiladi). Davom etamizmi?`)) return
     await hide(rest.map((o) => o.pdfId))
   }
   const toggle = (o: LibraryItem) =>
@@ -253,7 +253,7 @@ export function OrdersView() {
   }
 
   /** Every order in `state` that matches the current filters, across ALL pages (not only the one on screen). */
-  const collect = async (state: 'never' | 'gone'): Promise<LibraryItem[]> => {
+  const collect = async (state: 'never' | 'gone' | 'saved'): Promise<LibraryItem[]> => {
     const all: LibraryItem[] = []
     for (let pg = 1; pg <= 40; pg++) {
       const r = await getPublicOrdersLibrary({ q: q.trim(), status: state, court, instance, page: pg, size: 100 })
@@ -370,6 +370,21 @@ export function OrdersView() {
                 </button>
               </div>
             )}
+            {status === 'saved' && sel.size > 0 && (
+              <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
+                <span>Tanlangan: <b>{sel.size} ta</b>. Roʻyxatdan olib tashlansa, yozuvi va PDF fayli saqlanadi; «Tozalangan» boʻlimidan bir bosishda ochiladi.</span>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => void hide([...sel.values()].map((o) => o.pdfId))} title="Tanlanganlarni roʻyxatdan olib tashlash (yozuvi va PDF fayli saqlanadi)">
+                    <Trash2 />
+                    <span>Tanlanganlarni oʻchirish</span>
+                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={() => void clearTheRest('saved')} title="Tanlanmaganlarning hammasini (barcha sahifalardan) roʻyxatdan olib tashlash">
+                    <Trash2 />
+                    <span>Qolganlarini oʻchirish</span>
+                  </button>
+                </span>
+              </div>
+            )}
             {(status === 'never' || status === 'gone') && counts && (status === 'never' ? counts.never : counts.gone) > 0 && (
               <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
                 <span>
@@ -412,7 +427,7 @@ export function OrdersView() {
               {items.map((o) => (
                 <div className="lrow" key={o.id} data-order={o.caseNumber} style={{ cursor: 'default' }}>
                   <div className={`lead${o.state === 'saved' ? ' ink' : ''}`}>
-                    {(status === 'never' || status === 'gone') && o.pdfId && o.state !== 'saved' ? (
+                    {(status === 'never' || status === 'gone' ? o.state !== 'saved' : status === 'saved') && o.pdfId ? (
                       <input
                         type="checkbox"
                         checked={sel.has(o.pdfId.toLowerCase())}
@@ -433,6 +448,7 @@ export function OrdersView() {
                     </div>
                   </div>
                   {o.result ? <span className="badge b-neu">{PUBLIC_RESULT_LABEL[o.result] || o.result}</span> : null}
+                  {o.state === 'saved' && o.hidden ? <span className="badge b-neu" title="Roʻyxatdan olib tashlangan; yozuvi va PDF fayli saqlangan">Tozalangan</span> : null}
                   {o.state === 'saved' ? (
                     <span className="badge b-pos">
                       <CheckCircle2 style={{ width: 12, height: 12, marginRight: 4, verticalAlign: '-2px' }} />
@@ -451,6 +467,12 @@ export function OrdersView() {
                     {o.state !== 'never' ? size(o.size) : o.pdfSize ? size(o.pdfSize) : '-'}
                     <small>{o.state === 'saved' ? dmy(o.savedAt) : o.state === 'gone' ? `${dmy(o.savedAt)} · oʻchirilgan` : ''}</small>
                   </div>
+                  {o.state === 'saved' && !o.hidden && o.pdfId && (
+                    <button className="btn btn-outline btn-sm" disabled={!!bulk} onClick={() => void hide([o.pdfId])} title="Roʻyxatdan olib tashlash (yozuvi va PDF fayli saqlanadi; «Tozalangan» boʻlimidan ochiladi)" aria-label={`${o.caseNumber} ni roʻyxatdan oʻchirish`}>
+                      <Trash2 />
+                      <span>Oʻchirish</span>
+                    </button>
+                  )}
                   {o.hidden && (
                     <button className="btn btn-outline btn-sm" disabled={!!bulk} onClick={() => void restore([o.pdfId])} title="Roʻyxatga qaytarish">
                       <RefreshCw />
