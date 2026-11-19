@@ -14,6 +14,7 @@
  * Settings › Qarorlar keeps only the queue / cache control panel.
  */
 
+import { CopyText } from '@/components/ui-custom/copy-text'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -425,7 +426,7 @@ export function OrdersView() {
                     )}
                   </div>
                   <div className="main-c">
-                    <b className="mono">{o.caseNumber}</b>
+                    <CopyText text={o.caseNumber} />
                     <div className="sub">
                       {[PUBLIC_INSTANCE_LABEL[o.instance] || o.instance, o.court, o.judge].filter(Boolean).join(' · ') || '-'}
                       {o.category ? ` · ${o.category}` : ''}

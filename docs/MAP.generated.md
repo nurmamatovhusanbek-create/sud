@@ -106,6 +106,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
+| `count-tween.ts` | components/proto/primitives.tsx | lib/__tests__/count-tween.test.ts |
 | `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
 | `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
@@ -275,6 +276,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `copy-text.tsx` | components/sections/cases.tsx, components/sections/overview.tsx, components/views/orders-view.tsx |  |
 | `list-pagination.tsx` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/views/orders-view.tsx |  |
 | `select-field.tsx` | components/ui-custom/list-pagination.tsx |  |
 | `solid-icons.tsx` | components/proto/primitives.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx, components/views/launcher.tsx |  |

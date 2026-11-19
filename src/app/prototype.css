@@ -1177,3 +1177,10 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 
 /* the sliding indicators (lib/use-thumb) exist in the markup of every look; only Premium draws them (motion-premium.css): elsewhere they take no space */
 .nav .thumb, .set-tabs .thumb { display: none; }
+
+/* a case number that copies itself on click (ui-custom/copy-text): looks like text, answers like a button. Hover is a surface step
+   (never a glow), focus is a crisp outline; the row around it still opens the case. */
+.copy-id { cursor: copy; border-radius: 4px; margin: 0 -3px; padding: 0 3px; transition: background-color .12s var(--ease); }
+.copy-id:hover { background: var(--surface-hover); }
+.copy-id:active { background: var(--surface-active); }
+.copy-id:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

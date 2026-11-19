@@ -11,6 +11,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ArrowDownUp } from 'lucide-react'
 import { dateParts, DateTile, daysLabel, isNear } from './date-tile'
 import { motionReduced } from '@/lib/motion'
+import { countAt, countDuration } from '@/lib/count-tween'
 import { thumbVars, useThumb } from '@/lib/use-thumb'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import type { StatusFamily } from '@/core/status'
@@ -84,21 +85,23 @@ export function CountUp({ value, suffix = '', className, id }: { value: number; 
   const skip = motionReduced() || !Number.isFinite(value)
   const seed = id != null && countCache.has(id) ? (countCache.get(id) as number) : Math.min(value, 0)
   const [display, setDisplay] = useState(skip ? value : seed)
+  // the value on screen RIGHT NOW (unrounded). A retarget in the middle of a count (invoices arriving one by one: 1, 2, 3, 4, 5)
+  // continues from here instead of from where the cancelled count started: that was the «1-2-1-2-3-1-2-3-4» restart.
   const fromRef = useRef(seed)
   useEffect(() => {
     if (id != null) countCache.set(id, value) // remember the target across remounts
-    if (skip) return
+    if (skip) { fromRef.current = value; return }
     const from = fromRef.current
-    if (from === value) { fromRef.current = value; return } // already there — no replay
-    const dur = 750
+    if (from === value) return // already there — no replay
+    const dur = countDuration(value - from)
     const t0 = performance.now()
     let raf = 0
     const step = (t: number) => {
       const p = Math.min(1, (t - t0) / dur)
-      const eased = 1 - Math.pow(1 - p, 3)
-      setDisplay(Math.round(from + (value - from) * eased))
+      const v = p >= 1 ? value : countAt(from, value, p)
+      fromRef.current = v
+      setDisplay(Math.round(v))
       if (p < 1) raf = requestAnimationFrame(step)
-      else fromRef.current = value
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)

@@ -17,11 +17,12 @@
  * a new Excel button downloads a server-built .xlsx (court-cases/export).
  */
 
+import { CopyText } from '@/components/ui-custom/copy-text'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
-import { formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
+import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { assignRoles, classifyOutcome, type PartyRole } from '@/core/classify'
@@ -296,7 +297,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
   // a case detail is list + detail: it DOCKS beside the list (wide screens) and the list steps through it (↑ ↓ / k j)
   const BASE: DrawerOpts = { eyebrow: EYEBROW, dock: true, rowKey: `${courtType}|${caseNumber}`, nav }
   openProtoDrawer(
-    caseNumber,
+    <CopyText text={caseNumber} tag="span" />,
     <div style={{ marginTop: 22 }}><SkRows n={5} /></div>,
     'Yuklanmoqda…',
     BASE,
@@ -306,7 +307,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     const res = await getCaseDetail(courtType, caseNumber)
     if (!res.ok) {
       openProtoDrawer(
-        caseNumber,
+        <CopyText text={caseNumber} tag="span" />,
         <div className="alert err" style={{ marginTop: 22 }}>
           <Gavel />
           <div className="at">
@@ -395,7 +396,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
 
     const statusColor = g?.caseStatus ? CASE_STATUSES[g.caseStatus]?.color : undefined
     openProtoDrawer(
-      caseNumber,
+      <CopyText text={caseNumber} tag="span" />,
       <div>
         {amount && amount !== '-' && (
           <div style={{ marginTop: 22 }}>
@@ -506,7 +507,7 @@ export function CasesSection() {
   useEffect(() => {
     const openCase = (e: Event) => {
       const d = (e as CustomEvent).detail as { caseNumber?: string; courtType?: string }
-      if (d?.caseNumber) openCaseDetail(d.caseNumber, (normalizeCourtType(d.courtType) as CourtType | null) ?? 'economic', company ?? undefined) // billing sends its own codes (CITIZEN …)
+      if (d?.caseNumber) openCaseDetail(d.caseNumber, (courtTypeForCase(d.courtType, d.caseNumber) as CourtType | null) ?? 'economic', company ?? undefined) // billing sends its own codes (CITIZEN, MILITARY …): the case number settles what it cannot
     }
     window.addEventListener('sud:open-case', openCase)
     return () => window.removeEventListener('sud:open-case', openCase)
@@ -790,7 +791,7 @@ export function CasesSection() {
                     <StatusIcon family={fam} size={28} />
                   </div>
                   <div className="main-c">
-                    <b className="mono">{c.caseNumber}</b>
+                    <CopyText text={c.caseNumber} />
                     <div className="sub">
                       {c.courtName || '-'} · {c.judge || '-'}
                       {c.hearingDate && c.hearingDate !== '—' && c.hearingDate !== '-' ? ` · ${c.hearingDate}` : ''}

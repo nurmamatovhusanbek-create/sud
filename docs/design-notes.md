@@ -82,6 +82,11 @@ The launcher is the home surface.
 
 One shared sheet, styled after the themed PDF (navy masthead, eyebrow + title block, accent section labels with a rule, zebra rows, accent-soft key figure). Open it with `openProtoDrawer(title, content, sub, { eyebrow, badges, footer })` and build the body from `DwSection` / `DwKv` / `DwFig` so every panel matches. `DwKv` **drops rows with no value** — never render a «-» row. New panels get the look for free; don't hand-style a one-off.
 
+### Counting numbers, copyable identifiers, receipts from a court the case API lacks
+- **`CountUp` retargets from what is on screen.** Invoices stream in one by one (target 1, 2, 3, 4, 5 while a count is running). The old counter only remembered where a count STARTED, so each cancelled count restarted from there and the figure read «1-2-1-2-3-1-2-3-4». `lib/count-tween` (pure: `countAt`, `countDuration`) is the maths; the component stores the CURRENT unrounded value every frame (`fromRef`) and the next target continues from it. A step of a few units takes ~250-450 ms, a big jump 750 ms. Test: `lib/__tests__/count-tween.test.ts` (monotonic 1 → 5 at several arrival gaps). Both looks use the same component; `Dial` already did this.
+- **A case number copies itself on click** (`ui-custom/copy-text`, `.copy-id` in `prototype.css`): case rows in Sud ishlari, Statistika/Overview and Qarorlar, and the drawer title. The click stops at the number (the rest of the row still opens the case), Enter/Space work, the toast says «Ish raqami nusxalandi». Hover is a surface step, never a glow. Use `CopyText` for any new place that prints a case number.
+- **MILITARY (billing) has no case-API court.** `courtTypeForCase(billingCode, caseNumber)` (`core/billing-format`): a known billing code wins; MILITARY or unknown is settled by the case-number prefix (1- criminal, 2-/3- civil, 4- economic, 5- administrative), and only when that says nothing does the opener fall back to economic. Test: `core/__tests__/court-type.test.ts`.
+
 ### Change colors, spacing, tokens, dark mode
 
 **Where:** `src/app/globals.css` + `src/app/prototype.css`

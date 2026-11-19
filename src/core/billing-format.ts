@@ -108,6 +108,22 @@ export function normalizeCourtType(raw: string | null | undefined): ApiCourtType
   }
 }
 
+/**
+ * The case API court for a receipt's case. Billing's code wins when the case API has an equivalent; MILITARY (and anything unknown)
+ * has none, so the case-number prefix decides (1- criminal, 2-/3- civil, 4- economic, 5- administrative: the same convention as
+ * `remapCourtTypeByCaseNumber`) instead of querying the wrong court with a guess. null when neither says anything.
+ */
+export function courtTypeForCase(rawBillingType: string | null | undefined, caseNumber: string | null | undefined): ApiCourtType | null {
+  const declared = normalizeCourtType(rawBillingType)
+  if (declared) return declared
+  const cn = (caseNumber ?? '').trim()
+  if (cn.startsWith('1-')) return 'criminal'
+  if (cn.startsWith('2-') || cn.startsWith('3-')) return 'civil'
+  if (cn.startsWith('4-')) return 'economic'
+  if (cn.startsWith('5-')) return 'administrative'
+  return null
+}
+
 export function courtTypeLabel(type: string | null | undefined): string {
   if (!type) return '-'
   return COURT_TYPES[type]?.uz ?? type

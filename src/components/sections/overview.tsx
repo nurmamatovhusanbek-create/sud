@@ -19,6 +19,7 @@
  * synthCourts/synthTurkum mocks are gone).
  */
 
+import { CopyText } from '@/components/ui-custom/copy-text'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { stillAhead } from '@/core/dates'
 import { Activity, BarChart3, CalendarDays, CircleX, Clock, Gavel, Minus, Receipt, Scale, Timer, Trophy, Users, Wallet } from 'lucide-react'
@@ -492,7 +493,7 @@ function OverviewBody({ data, stir, onOpenCompare }: { data: CompanyStats; stir:
                 <div className="lrow" key={c.caseNumber} data-case={c.caseNumber} onClick={() => openCase(c.caseNumber, c.courtType)}>
                   <div className={`lead ${c.classification === 'win' ? 'ink' : ''}`}>{meta.icon}</div>
                   <div className="main-c">
-                    <b className="mono">{c.caseNumber}</b>
+                    <CopyText text={c.caseNumber} />
                     <div className="sub">{c.result?.trim() || meta.text}</div>
                   </div>
                   <span className={`badge ${familyBadgeClass(meta.band)}`}>{meta.label}</span>

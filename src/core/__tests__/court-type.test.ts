@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { normalizeCourtType } from '../billing-format'
+import { courtTypeForCase, normalizeCourtType } from '../billing-format'
 
 describe('normalizeCourtType: billing codes → case API court types', () => {
   test('the case API vocabulary passes through, in any case', () => {
@@ -19,5 +19,23 @@ describe('normalizeCourtType: billing codes → case API court types', () => {
   })
   test('surrounding spaces are tolerated', () => {
     expect(normalizeCourtType(' Citizen ')).toBe('civil')
+  })
+})
+
+describe('courtTypeForCase: MILITARY and unknown billing codes are settled by the case number', () => {
+  test('a known billing code wins over the prefix', () => {
+    expect(courtTypeForCase('CITIZEN', '4-1234/2025')).toBe('civil')
+  })
+  test('MILITARY (no equivalent) uses the prefix: 1- criminal, 2-/3- civil, 4- economic, 5- administrative', () => {
+    expect(courtTypeForCase('MILITARY', '1-1234/2025')).toBe('criminal')
+    expect(courtTypeForCase('MILITARY', '2-77/2025')).toBe('civil')
+    expect(courtTypeForCase('MILITARY', '3-77/2025')).toBe('civil')
+    expect(courtTypeForCase('MILITARY', '4-5/2025')).toBe('economic')
+    expect(courtTypeForCase('MILITARY', '5-5/2025')).toBe('administrative')
+  })
+  test('no code and no recognisable prefix → null (the caller chooses), never a guess', () => {
+    expect(courtTypeForCase('MILITARY', 'X-1')).toBeNull()
+    expect(courtTypeForCase(undefined, '')).toBeNull()
+    expect(courtTypeForCase(null, undefined)).toBeNull()
   })
 })
