@@ -4,7 +4,7 @@ import { buildReportModel, type ReportInput } from '../model'
 import { inkTheme } from '../render-ink'
 import { FULL, NOW } from './fixtures'
 
-/** the «premium» edition: the app's two-colour identity. The «calm» edition (navy Dossier) is covered by render.test.ts. */
+/** the «premium» edition: the app's two-colour identity. The «navy» edition (navy Dossier) is covered by render.test.ts. */
 const M = buildReportModel(FULL)
 const ink = (input: ReportInput = FULL, dark = false) => buildReportDoc(buildReportModel(input), { dark, look: 'premium' })
 const NOTHING: ReportInput = { stir: '309922239', generatedAt: NOW, info: null, stats: null, cases: null, hearings: null, bills: null }
@@ -17,11 +17,11 @@ describe('premium edition', () => {
   }
 
   test('the look picks the edition; the default stays the original navy one', () => {
-    const calm = buildReportDoc(M, {})
+    const navy = buildReportDoc(M, {})
     const premium = buildReportDoc(M, { look: 'premium' })
-    expect(calm).toContain('<svg class="rp-gauge"')
-    expect(calm).toContain('<svg class="rp-pie"')
-    expect(buildReportDoc(M, { look: 'calm' })).toBe(calm)
+    expect(navy).toContain('<svg class="rp-gauge"')
+    expect(navy).toContain('<svg class="rp-pie"')
+    expect(buildReportDoc(M, { look: 'navy' })).toBe(navy)
     expect(premium).not.toContain('rp-gauge')
     expect(premium).not.toContain('<svg class="rp-pie"')
     expect(premium).toContain('<svg class="rp-ruler"')

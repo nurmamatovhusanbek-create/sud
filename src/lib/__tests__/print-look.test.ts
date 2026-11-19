@@ -5,10 +5,10 @@ const BODY = '<div class="pr-head"><div><div class="pr-eyebrow">Ish</div><div cl
 
 describe('generic print sheet follows the look', () => {
   test('no DOM (tests, server): the original navy sheet; the premium sheet is asked for', () => {
-    expect(currentLook()).toBe('calm')
-    const calm = buildPrintDoc('t', BODY, false)
-    expect(calm).toContain('data-look="calm"')
-    expect(calm).toContain('--pa:#1a2350')
+    expect(currentLook()).toBe('navy')
+    const navy = buildPrintDoc('t', BODY, false)
+    expect(navy).toContain('data-look="navy"')
+    expect(navy).toContain('--pa:#1a2350')
   })
 
   test('premium: one ink, no navy / indigo, Plex type, sentence-case labels', () => {

@@ -75,7 +75,7 @@ Extract what the CSS already defines into `src/ui/`, with the **same** look firs
 - Token scales instead of one-off numbers: spacing (4/8/12/16/24/32), radius (3), elevation (2), type (6 sizes), motion (`--dur-1…3`, `--ease-out`).
 - **Done when:** every colour, radius and duration in `src/ui` is a token, and M0 diff = 0.
 
-### M5 — Motion layer — DONE for Premium: `app/motion-premium.css` + `lib/__tests__/motion-css.test.ts` (Tinch's motion is still spread over `prototype.css`)
+### M5 — Motion layer — DONE for Premium: `app/motion-premium.css` + `lib/__tests__/motion-css.test.ts` (Moviy's motion is still spread over `prototype.css`)
 - Already done: the operator switch (`lib/motion`, sidebar «Animatsiya»: auto / on / off) and the rule that reduced-motion CSS is gated on it.
 - Add: motion tokens, and a short list of named motions (page enter, list stagger, drawer slide, number count-up, skeleton, status pulse) in ONE file; nothing else may declare `animation`.
   Rules kept from AGENTS.md: forever-running motion animates only `transform`/`opacity`; no blur over animated content.

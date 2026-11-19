@@ -23,7 +23,7 @@ export interface FontRule {
 
 export interface FontKit {
   css: string
-  /** Plus Jakarta Sans (the «calm» edition and the glyphs Plex lacks) */
+  /** Plus Jakarta Sans (the «navy» edition and the glyphs Plex lacks) */
   sans: string
   /** IBM Plex Sans (the «premium» edition, tried before `sans`) */
   plexSans: string

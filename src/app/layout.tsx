@@ -9,6 +9,7 @@ import "./globals.css";
 import "./prototype.css";
 import "./look-premium.css";
 import "./motion-premium.css";
+import "./look-navy.css";
 
 export const metadata: Metadata = {
   title: "Sud tizimi",

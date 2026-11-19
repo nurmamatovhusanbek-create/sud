@@ -5,7 +5,7 @@
  *   bun run ui:shots                      # shoot every screen at 1300 / 960 / 700 px, light + dark, into ui-shots/current
  *   bun run ui:shots -- --accept          # make the current run the accepted one (ui-shots/accepted)
  *   bun run ui:shots -- --only=Kuzatuv    # only screens whose name contains this
- *   bun run ui:shots -- --looks=premium,calm --widths=1300 --themes=light
+ *   bun run ui:shots -- --looks=premium,navy --widths=1300 --themes=light
  *   bun run ui:shots -- --base=http://localhost:3000
  *
  * Needs the app running (bun run dev) and Playwright (not a dependency of the app: install it where you run this; in the cloud sandbox it is

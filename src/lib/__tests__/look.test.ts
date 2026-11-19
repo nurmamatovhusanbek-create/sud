@@ -3,8 +3,9 @@ import { LOOK_BOOT_SCRIPT, LOOK_KEY } from '../theme-boot'
 import { parseLook } from '../look'
 
 describe('look setting', () => {
-  test('only «calm» is the calm look; anything else (the old «vivid» too) is premium', () => {
-    expect(parseLook('calm')).toBe('calm')
+  test('only «navy» is the navy look; anything else (the old «calm» / Tinch and «vivid» too) is premium', () => {
+    expect(parseLook('navy')).toBe('navy')
+    expect(parseLook('calm')).toBe('premium') // Tinch was removed
     for (const x of ['premium', 'vivid', '', null, undefined, 'dark', 1, {}]) expect(parseLook(x)).toBe('premium')
   })
   const run = (stored: Record<string, string>, throws = false) => {
@@ -18,7 +19,8 @@ describe('look setting', () => {
   test('the boot script always sets data-look before the first paint', () => {
     expect(LOOK_BOOT_SCRIPT).toContain(`'${LOOK_KEY}'`)
     expect(run({})).toEqual({ 'data-look': 'premium' })
-    expect(run({ [LOOK_KEY]: 'calm' })).toEqual({ 'data-look': 'calm' })
+    expect(run({ [LOOK_KEY]: 'navy' })).toEqual({ 'data-look': 'navy' })
+    expect(run({ [LOOK_KEY]: 'calm' })).toEqual({ 'data-look': 'premium' })
     expect(run({ [LOOK_KEY]: 'junk' })).toEqual({ 'data-look': 'premium' })
   })
   test('blocked storage still gives the default look', () => {

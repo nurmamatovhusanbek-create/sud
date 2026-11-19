@@ -18,7 +18,7 @@ export interface ReportDocOpts {
   fontMono?: string
   /** the app's own sans (IBM Plex Sans), tried first in the «premium» edition */
   fontPlexSans?: string
-  /** which edition: «premium» = ink / near-white (the app's default look), «calm» = the navy Dossier. Default «calm» (the original). */
+  /** which edition: «premium» = ink / near-white (the app's default look), «navy» = the navy Dossier. Default «navy» (the original). */
   look?: Look
 }
 

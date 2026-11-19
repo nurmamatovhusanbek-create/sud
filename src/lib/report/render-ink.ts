@@ -1,7 +1,7 @@
 /**
  * Company report — the «Premium» edition (selected when the app's look is Premium, the default).
  *
- * Same document, same model, same two-column «Dossier» structure as render.ts (which stays as the «Tinch» edition: navy rail, outcome
+ * Same document, same model, same two-column «Dossier» structure as render.ts (which stays as the «navy» edition: navy rail, outcome
  * hues, pizza, dial). What changes is the identity, to match the app's Premium look:
  *   · ONE ink, no hue: ink rail, near-white (or graphite) paper, neutral greys. The four outcomes are told apart by FILL: won solid ·
  *     lost tint · neutral hatched · in progress dashed outline, so the page reads the same in light, dark and a grey print.

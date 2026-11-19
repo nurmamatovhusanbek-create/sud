@@ -269,7 +269,7 @@ export function Spark({ values, failIdx = [], px = 2.2 }: { values: number[]; fa
   )
 }
 
-/** KPI tile: a label, one figure and what it compares to. The icon is a large corner watermark that says what the tile counts (Premium look; hidden in Tinch). */
+/** KPI tile: a label, one figure and what it compares to. The icon is a large corner watermark that says what the tile counts (Premium look; hidden in the navy look). */
 export function Kpi({
   label,
   icon,

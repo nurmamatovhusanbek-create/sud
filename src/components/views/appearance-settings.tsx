@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Settings › Koʻrinish — how the app looks: the look (Premium / Tinch), light or dark, and animations.
+ * Settings › Koʻrinish — how the app looks: the look (Premium / Moviy), light or dark, and animations.
  * The look only switches tokens and a CSS layer on <html data-look> (lib/look, app/look-premium.css): the screens are the same.
  */
 
@@ -12,7 +12,7 @@ import { useTheme } from '@/lib/theme'
 
 const LOOKS: { id: Look; name: string; text: string }[] = [
   { id: 'premium', name: 'Premium', text: 'Toʻq koʻk, toza oq va bitta koʻk aksent. IBM Plex harflari, raqamlar ustun boʻyicha tekis. Aniq va jiddiy.' },
-  { id: 'calm', name: 'Tinch', text: 'Kulrang va ingichka chiziqlar, rang faqat maʼno uchun. Eng zich koʻrinish.' },
+  { id: 'navy', name: 'Moviy', text: 'Asl koʻrinish: toʻq koʻk va indigo, rang maʼno uchun. Hisobot ham koʻk.' },
 ]
 
 const MOTIONS: { id: Motion; label: string }[] = [

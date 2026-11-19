@@ -25,16 +25,16 @@ export interface Palette {
   pos: string; neg: string
 }
 
-/** which look the document follows: «premium» = ink / near-white (the app's default), «calm» = the navy edition */
-export type PrintLook = 'premium' | 'calm'
+/** which look the document follows: «premium» = ink / near-white (the app's default), «navy» = the original navy edition */
+export type PrintLook = 'premium' | 'navy'
 
-/** The app's look from <html data-look>; «calm» only when asked for, and when there is no DOM (tests, server) the original navy sheet. */
+/** The app's look from <html data-look>; «navy» only when asked for, and when there is no DOM (tests, server) the original navy sheet. */
 export function currentLook(): PrintLook {
-  if (typeof document === 'undefined') return 'calm'
-  return document.documentElement.getAttribute('data-look') === 'calm' ? 'calm' : 'premium'
+  if (typeof document === 'undefined') return 'navy'
+  return document.documentElement.getAttribute('data-look') === 'navy' ? 'navy' : 'premium'
 }
 
-export function palette(dark: boolean, look: PrintLook = 'calm'): Palette {
+export function palette(dark: boolean, look: PrintLook = 'navy'): Palette {
   if (look === 'premium') {
     const ink = dark ? '#EDEDED' : '#111114'
     return {

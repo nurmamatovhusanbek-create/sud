@@ -988,12 +988,13 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 .look-prev.premium .lp-main b { background: #111114; opacity: .9; height: 14px; width: 46%; border-radius: 4px; }
 .look-prev.premium .lp-tiles i { background: #FFFFFF; border: 1px solid rgba(17, 17, 20, .09); border-radius: 8px; }
 .look-prev.premium .lp-rows i { background: #FFFFFF; border: 1px solid rgba(17, 17, 20, .07); border-radius: 6px; }
-.look-prev.calm { background: #F6F6F7; }
-.look-prev.calm .lp-side { background: #FFFFFF; border-right: 1px solid rgba(23, 23, 23, .08); }
-.look-prev.calm .lp-side i { background: #EEEEF0; border-radius: 4px; }
-.look-prev.calm .lp-main b { background: #171717; opacity: .8; border-radius: 3px; }
-.look-prev.calm .lp-tiles i { background: #FFFFFF; border: 1px solid rgba(23, 23, 23, .08); border-radius: 6px; }
-.look-prev.calm .lp-rows i { background: #FFFFFF; border-bottom: 1px solid rgba(23, 23, 23, .08); border-radius: 0; }
+.look-prev.navy { background: #EEF0FA; }
+.look-prev.navy .lp-side { background: linear-gradient(180deg, #1A2350, #232d66); }
+.look-prev.navy .lp-side i { background: rgba(255, 255, 255, .18); border-radius: 6px; }
+.look-prev.navy .lp-side i:nth-child(1) { background: #FFFFFF; width: 70%; }
+.look-prev.navy .lp-main b { background: #1A2350; opacity: .92; border-radius: 6px; }
+.look-prev.navy .lp-tiles i { background: #FFFFFF; border: 1px solid #DADFF0; border-radius: 9px; }
+.look-prev.navy .lp-rows i { background: #FFFFFF; border: 1px solid #E6E9F5; border-radius: 7px; }
 
 /* a card title is a title: no icon beside it (the icon repeated on every card and said nothing) */
 .card-h .ico { display: none; }
@@ -1173,3 +1174,6 @@ textarea.dinput { height: auto; min-height: 60px; padding: 9px 12px; resize: ver
 /* motion off / reduced: no sweep, just a steady line while loading */
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .topload::before { animation: none; transform: none; width: 100%; opacity: .5; } }
 :root[data-motion='off'] .topload::before { animation: none; transform: none; width: 100%; opacity: .5; }
+
+/* the sliding indicators (lib/use-thumb) exist in the markup of every look; only Premium draws them (motion-premium.css): elsewhere they take no space */
+.nav .thumb, .set-tabs .thumb { display: none; }
