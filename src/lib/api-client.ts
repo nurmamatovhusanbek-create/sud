@@ -6,6 +6,7 @@
  */
 
 import { beginActivity } from './net-activity'
+import { normalizeCourtType } from '@/core/billing-format'
 import type { LibraryItem, LibraryStatus, StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
 import type { UzScript } from '@/core/uz-alphabet'
@@ -103,13 +104,13 @@ export function getCompanyInfo(tin: string, opts?: { force?: boolean; signal?: A
 }
 
 export function searchCases(params: { courtType: string; mode: string; value: string }, signal?: AbortSignal, force?: boolean) {
-  const q = new URLSearchParams({ courtType: params.courtType, mode: params.mode, value: params.value })
+  const q = new URLSearchParams({ courtType: normalizeCourtType(params.courtType) ?? params.courtType, mode: params.mode, value: params.value })
   if (force) q.set('force', '1')
   return request<{ cases: CourtCase[] }>(`/api/court-cases?${q}`, signal)
 }
 
 export function getCaseDetail(courtType: string, caseNumber: string, signal?: AbortSignal) {
-  const q = new URLSearchParams({ courtType, detail: caseNumber })
+  const q = new URLSearchParams({ courtType: normalizeCourtType(courtType) ?? courtType, detail: caseNumber })
   return request<FullCaseData>(`/api/court-cases?${q}`, signal)
 }
 

@@ -56,7 +56,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
-| `billing-format.ts` | components/sections/bills.tsx, components/sections/overview.tsx, lib/api-types.ts, lib/billing.ts |  |
+| `billing-format.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, lib/api-client.ts, lib/api-types.ts, lib/billing.ts | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/classify.test.ts |
 | `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, lib/court-case.ts, lib/report/doc.ts, +4 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |

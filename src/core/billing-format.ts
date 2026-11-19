@@ -89,6 +89,25 @@ export const COURT_TYPES: Record<string, { uz: string; ru: string; en: string }>
   MILITARY: { uz: 'Harbiy sud', ru: 'Voennyy sud', en: 'Military court' },
 }
 
+/** the court types the case-search API accepts (core/schemas CourtTypeQuery) */
+export type ApiCourtType = 'economic' | 'civil' | 'criminal' | 'administrative'
+
+/**
+ * Billing (billing.sud.uz) names a court type with ITS OWN codes (ECONOMIC · CITIZEN · ADMINISTRATIVE · CRIMINAL · MILITARY); the case
+ * search and detail API takes economic · civil · criminal · administrative. A receipt that opened its case sent the billing code
+ * straight through and got «courtType notoʻgʻri». This is the ONE translation: case-insensitive, accepts either vocabulary, and returns
+ * null for what the case API has no equivalent for (MILITARY, unknown), so the caller decides the fallback instead of sending garbage.
+ */
+export function normalizeCourtType(raw: string | null | undefined): ApiCourtType | null {
+  switch ((raw ?? '').trim().toLowerCase()) {
+    case 'economic': return 'economic'
+    case 'civil': case 'citizen': return 'civil'
+    case 'criminal': return 'criminal'
+    case 'administrative': return 'administrative'
+    default: return null
+  }
+}
+
 export function courtTypeLabel(type: string | null | undefined): string {
   if (!type) return '-'
   return COURT_TYPES[type]?.uz ?? type
@@ -156,17 +175,25 @@ export function formatSum(tiyins: number | null | undefined): string {
   }).format(sum)
 }
 
+/** «12.09.2026 10:00» (the app's date format; it used to print «12 Sept 2026, 10:00» through toLocaleString('en-GB'): an English month in an Uzbek document) */
 export function formatDate(ts: number | null | undefined): string {
   if (!ts) return '-'
   const d = new Date(ts)
   if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/**
+ * A claim amount as the court site gave it. «272 628 881,58» is already formatted and stays; a bare «1000000» is grouped («1 000 000»);
+ * anything else (text, «-») is returned untouched. Never invents digits.
+ */
+export function formatClaimAmount(raw: string | null | undefined): string {
+  const t = (raw ?? '').trim()
+  const m = /^(\d+)(?:[.,](\d+))?$/.exec(t)
+  if (!m) return t
+  const int = m[1].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return m[2] !== undefined ? `${int},${m[2]}` : int
 }
 
 // ---- Aggregations for the UI ------------------------------------------

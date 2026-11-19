@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2 } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
+import { formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { assignRoles, classifyOutcome, type PartyRole } from '@/core/classify'
@@ -148,7 +149,7 @@ function caseDetailHtml(caseNumber: string, d: FullCaseData): string {
     <div class="pr-sec">Umumiy maʼlumot</div>
     ${kv('Sudya', g?.judge)}
     ${kv('Sud', g?.court)}
-    ${kv('Daʼvo summasi', g?.claimAmount)}
+    ${kv('Daʼvo summasi', formatClaimAmount(g?.claimAmount))}
     ${kv('Ish turi', g?.caseType)}
     ${parties}
     ${decisionSec}`
@@ -174,7 +175,7 @@ function caseListHtml(
             (r) =>
               `<tr><td class="mono">${escapeHtml(r.caseNumber || '-')}</td><td>${escapeHtml(r.courtName || '-')}</td><td>${escapeHtml(
                 r.judge || '-',
-              )}</td><td>${escapeHtml(r.claimAmount || '-')}</td><td>${escapeHtml(statusEn(r.caseStatus) || r.caseStatus || '-')}</td><td>${escapeHtml(
+              )}</td><td>${escapeHtml(formatClaimAmount(r.claimAmount) || '-')}</td><td>${escapeHtml(statusEn(r.caseStatus) || r.caseStatus || '-')}</td><td>${escapeHtml(
                 r.date || '-',
               )}</td></tr>`,
           )
@@ -367,7 +368,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       ['Muddat', g?.deadlineDate, { mono: true }],
       ['Davlat boji', g?.stateDuty, { mono: true }],
     ]
-    const amount = (g?.claimAmount || '').trim()
+    const amount = formatClaimAmount(g?.claimAmount)
     const numeric = /^[\d\s.,]+$/.test(amount)
 
     // hand the scraped case to the petition forms — nothing else needs to be looked up
@@ -505,7 +506,7 @@ export function CasesSection() {
   useEffect(() => {
     const openCase = (e: Event) => {
       const d = (e as CustomEvent).detail as { caseNumber?: string; courtType?: string }
-      if (d?.caseNumber) openCaseDetail(d.caseNumber, (d.courtType as CourtType) || 'economic', company ?? undefined)
+      if (d?.caseNumber) openCaseDetail(d.caseNumber, (normalizeCourtType(d.courtType) as CourtType | null) ?? 'economic', company ?? undefined) // billing sends its own codes (CITIZEN …)
     }
     window.addEventListener('sud:open-case', openCase)
     return () => window.removeEventListener('sud:open-case', openCase)
