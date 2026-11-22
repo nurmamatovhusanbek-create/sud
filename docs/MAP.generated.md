@@ -40,6 +40,9 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/settings/db` | GET (no-rate-limit) |  | `settings/db/route.ts` |
 | `/api/settings/health` | GET (no-rate-limit) | GET /api/settings/health (history now saved on disk: lib/health-store) | `settings/health/route.ts` |
 | `/api/settings/security` | GET | GET /api/settings/security | `settings/security/route.ts` |
+| `/api/settings/telegram/find` | POST | POST /api/settings/telegram/find Body: { token? } | `settings/telegram/find/route.ts` |
+| `/api/settings/telegram` | GET (no-rate-limit), POST, DELETE | GET → status: configured, the channel, the token's id and last four characters (never the token) | `settings/telegram/route.ts` |
+| `/api/settings/telegram/test` | POST | POST /api/settings/telegram/test Body: { token?, chat } | `settings/telegram/test/route.ts` |
 | `/api/settings/update` | POST (privileged) | POST /api/settings/update | `settings/update/route.ts` |
 | `/api/settings/version` | GET (no-rate-limit) | GET /api/settings/version | `settings/version/route.ts` |
 | `/api/settings/vlm` | GET (no-rate-limit), POST, DELETE | GET → status: the saved providers (id, kind, base URL, model, last four characters of the key; never the key) | `settings/vlm/route.ts` |
@@ -84,6 +87,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
+| `telegram.ts` | api/settings/telegram/find/route, api/settings/telegram/route, api/settings/telegram/test/route, components/views/telegram-settings.tsx, hooks/use-telegram.ts, lib/telegram-client.ts, lib/telegram-config.ts, +1 | lib/__tests__/telegram.test.ts |
 | `translit.ts` | core/classify.ts, core/public-orders.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts, lib/report/render-ink.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
@@ -96,8 +100,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, lib/vlm-config.ts, +3 |  |
-| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +21 |  |
-| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +37 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +24 |  |
+| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +40 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `presence.ts` | api/presence/route | server/__tests__/presence.test.ts |
 | `security.ts` | proxy.ts, server/middleware.ts | server/__tests__/security.test.ts |
 
@@ -112,7 +116,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +24 | lib/__tests__/ui-boundary.test.ts |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +25 | lib/__tests__/ui-boundary.test.ts |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-bill-cases.ts, hooks/use-found-cases.ts, hooks/use-resource.ts, +6 |  |
 | `bill-cases.ts` | api/bill-cases/route, api/bills/query/route, api/presence/route, lib/api-types.ts | lib/__tests__/bill-cases.test.ts |
 | `billing.ts` | api/bills/route, lib/bill-cases.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts |
@@ -197,6 +201,9 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 | lib/__tests__/ui-boundary.test.ts |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
+| `telegram-client.ts` | api/settings/telegram/find/route, api/settings/telegram/test/route | lib/__tests__/telegram.test.ts |
+| `telegram-config.ts` | api/settings/telegram/route, lib/telegram-request.ts | lib/__tests__/telegram.test.ts |
+| `telegram-request.ts` | api/settings/telegram/find/route, api/settings/telegram/route, api/settings/telegram/test/route |  |
 | `theme-boot.ts` | app/layout.tsx, lib/look.ts, lib/motion.ts, lib/theme.ts | lib/__tests__/look.test.ts, lib/__tests__/motion.test.ts, lib/__tests__/theme.test.ts |
 | `theme.ts` | components/shell/app-shell.tsx, components/views/appearance-settings.tsx | lib/__tests__/theme.test.ts |
 | `tor.ts` | api/tor-status/route |  |
@@ -228,6 +235,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `use-found-cases.ts` | components/sections/found-cases.tsx |  |
 | `use-resource.ts` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 | `use-stored-bills.ts` | components/sections/bills.tsx |  |
+| `use-telegram.ts` | components/views/telegram-settings.tsx |  |
 
 ### Infra
 
@@ -297,6 +305,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia-view.tsx` | components/views/documents-view.tsx |  |
 | `security-settings.tsx` | components/views/settings-view.tsx |  |
 | `settings-view.tsx` | app/page.tsx |  |
+| `telegram-settings.tsx` | components/views/settings-view.tsx |  |
 | `vlm-settings.tsx` | components/views/settings-view.tsx |  |
 | `watchlist.tsx` | app/page.tsx |  |
 
@@ -352,6 +361,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SUD_AUTO_EXIT` | app/api/presence/route.ts |
 | `SUD_DB` | lib/db.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
+| `TELEGRAM_CONFIG_FILE` | lib/telegram-config.ts |
 | `TOR_ENABLED` | server/config.ts |
 | `TOR_SOCKS_PORT` | server/config.ts |
 | `TRUSTED_WORKER_ACCOUNTS` | lib/workers-config.ts |
@@ -381,6 +391,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-majlisini-qoldirish` | lib/documents/registry.ts |
 | `sud-registry-v1` | lib/registry.ts |
 | `sud-saved-companies` | lib/registry.ts |
+| `sud-sinov.txt` | lib/telegram-client.ts |
 | `sud-tizimi` | lib/public-orders/meta-backup.ts, lib/update-check.ts |
 | `sud-watchlist` | lib/registry.ts |
 | `sud:cases-found` | hooks/use-bill-cases.ts, hooks/use-found-cases.ts |

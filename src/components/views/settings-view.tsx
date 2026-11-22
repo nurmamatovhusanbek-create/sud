@@ -23,6 +23,7 @@ import {
   Palette,
   Plus,
   ScanEye,
+  Send,
   RefreshCw,
   Server,
   Shield,
@@ -42,6 +43,7 @@ import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
 import { DbTab } from '@/components/views/db-settings'
+import { TelegramTab } from '@/components/views/telegram-settings'
 import { AppearanceTab } from '@/components/views/appearance-settings'
 
 // ---- shared shapes --------------------------------------------------------------
@@ -963,7 +965,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'db' | 'security'
+type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'telegram' | 'db' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -1008,6 +1010,10 @@ export function SettingsView() {
           <ScanEye />
           Captcha
         </button>
+        <button className={`set-tab ${tab === 'telegram' ? 'on' : ''}`} onClick={() => setTab('telegram')}>
+          <Send />
+          Telegram
+        </button>
         <button className={`set-tab ${tab === 'db' ? 'on' : ''}`} onClick={() => setTab('db')}>
           <Database />
           Baza
@@ -1024,6 +1030,7 @@ export function SettingsView() {
       {tab === 'health' && <HealthTab />}
       {tab === 'orders' && <OrdersTab />}
       {tab === 'vlm' && <VlmTab />}
+      {tab === 'telegram' && <TelegramTab />}
       {tab === 'db' && <DbTab />}
       {tab === 'security' && <SecurityTab />}
     </div>
