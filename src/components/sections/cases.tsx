@@ -36,6 +36,7 @@ import { docById } from '@/lib/documents/registry'
 import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
+import { BillCasesPanel } from './bill-cases-panel'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { dateKey, daysUntil, formatDmy, parseYmd } from '@/core/dates'
@@ -906,11 +907,7 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
-          {capped && (
-            <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
-              Sud tizimi bu STIR boʻyicha roʻyxatni cheklaydi (yangi tizim 100 ta, eski tizim 200 ta qator): eski ishlar koʻrinmasligi mumkin. Bir marta koʻrilgan ish serverda saqlanadi va roʻyxatdan yoʻqolmaydi.
-            </div>
-          )}
+          <BillCasesPanel stir={stir} capped={capped} />
           <div className="list">
             {look === 'navy' ? (
               paged.map(({ c, courtType }, i) => (

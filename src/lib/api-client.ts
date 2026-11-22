@@ -13,6 +13,8 @@ import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
+  BillCasesEvent,
+  BillCasesStatus,
   BillDetailData,
   BillStreamMessage,
   BillSummary,
@@ -197,6 +199,55 @@ export async function streamBills(stir: string, handlers: StreamHandlers, signal
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return
     handlers.onError?.('Tarmoq xatosi — serverga ulanib boʻlmadi')
+  }
+}
+
+// ---- Cases found through the bills (the court's TIN lists are cut at a row limit) ----
+
+export function getBillCasesStatus(stir: string, signal?: AbortSignal) {
+  return request<BillCasesStatus>(`/api/bill-cases?tin=${stir}`, signal)
+}
+
+/**
+ * Started by a click: reads the company's bills (when needed), then asks the court for up to `limit` of the case numbers the lists lack,
+ * and reports every step. Aborting the signal stops it after the current step; what was found stays.
+ */
+export async function streamBillCases(
+  stir: string,
+  opts: { scan: 'auto' | 'force' | 'skip'; limit: number },
+  onEvent: (e: BillCasesEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    const res = await fetch(`/api/bill-cases?tin=${stir}&scan=${opts.scan}&limit=${opts.limit}`, { method: 'POST', signal, headers: authHeaders(), cache: 'no-store' })
+    if (!res.ok || !res.body) {
+      let msg = `Server xatosi (${res.status})`
+      try {
+        const j = await res.json()
+        if (j?.error) msg = j.error
+      } catch { /* not JSON */ }
+      onEvent({ type: 'error', error: msg })
+      return
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          onEvent(JSON.parse(line) as BillCasesEvent)
+        } catch { /* a broken line is skipped */ }
+      }
+    }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
+    onEvent({ type: 'error', error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' })
   }
 }
 

@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
+import type { BillCase } from '@/core/bill-cases'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 
 const TIN_RE = /^\d{9}$/
@@ -168,6 +169,73 @@ export function patchRow(tin: string, courtType: CourtType, row: CourtCase): boo
   if (!held) file.feeds[keys[0]].items.push(row)
   remember(tin, file)
   return writeAtomic(feedFile(tin), JSON.stringify(file))
+}
+
+/**
+ * Add rows to a feed, creating it when it does not exist (the `<court>|bills` feed: cases found by number from the bills, which no TIN
+ * list shows). By case number, the new row wins.
+ */
+export function addFeedRows(tin: string, key: string, rows: readonly CourtCase[]): boolean {
+  if (!TIN_RE.test(tin) || !rows.length) return false
+  const old = readFeed(tin, key)
+  return writeFeed(tin, key, { t: Date.now(), complete: true, items: mergeRows(old?.items ?? [], rows) })
+}
+
+/** the feed key of the cases found by number from the bills, per court type (court-case merges it into that court's list) */
+export const billsFeedKey = (courtType: CourtType): string => `${courtType}|bills`
+
+// ---------------- the bills' case numbers ----------------
+
+/**
+ * What a scan of a company's bills found: every case number the bills name (with court type and court), how far the scan got, and which
+ * numbers were already asked by number (`tried`: `found` false = the court's APIs know no such case, so it is not asked again for
+ * RETRY_MISSING_MS; a case that was found is simply a row in the bills feed).
+ */
+export interface BillIndex {
+  v: 1
+  tin: string
+  /** when the scan last finished or was last extended (ms) */
+  scannedAt: number
+  totalElements: number
+  totalPages: number
+  pageSize: number
+  /** pages read so far; a scan that stopped early is resumed from here while the totals and the page size still match */
+  pagesDone: number
+  complete: boolean
+  cases: Record<string, BillCase>
+  tried: Record<string, { t: number; found: boolean }>
+}
+
+const billFile = (tin: string): string => path.join(caseStoreDir(), `${tin}.bills.json.gz`)
+
+export function readBillIndex(tin: string): BillIndex | null {
+  if (!TIN_RE.test(tin)) return null
+  const raw = readJson(billFile(tin)) as Partial<BillIndex> | null
+  if (!raw || raw.v !== 1 || raw.tin !== tin || !raw.cases || typeof raw.cases !== 'object') return null
+  return {
+    v: 1, tin,
+    scannedAt: Number(raw.scannedAt) || 0,
+    totalElements: Number(raw.totalElements) || 0,
+    totalPages: Number(raw.totalPages) || 0,
+    pageSize: Number(raw.pageSize) || 0,
+    pagesDone: Number(raw.pagesDone) || 0,
+    complete: raw.complete === true,
+    cases: raw.cases as Record<string, BillCase>,
+    tried: (raw.tried && typeof raw.tried === 'object' ? raw.tried : {}) as BillIndex['tried'],
+  }
+}
+
+export function writeBillIndex(idx: BillIndex): boolean {
+  if (!TIN_RE.test(idx.tin)) return false
+  return writeAtomic(billFile(idx.tin), JSON.stringify(idx))
+}
+
+/** every case number the stored lists of a company hold (all courts, the bills feed included) */
+export function knownCaseNumbers(tin: string): Set<string> {
+  const out = new Set<string>()
+  const file = loadFeeds(tin)
+  if (file) for (const f of Object.values(file.feeds)) for (const r of f.items) if (r.caseNumber) out.add(r.caseNumber)
+  return out
 }
 
 // ---------------- details ----------------

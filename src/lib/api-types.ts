@@ -13,6 +13,7 @@ export type ApiResult<T> =
   | { ok: false; error: string; code?: string; status?: number }
 
 export type { CompanyStats, CourtCase, FullCaseData, BillSummary, EnrichedBill }
+export type { BillCasesEvent, BillCasesStatus } from './bill-cases'
 
 export interface CompanyInfoData {
   company: CompanyInfoPayload['company']
