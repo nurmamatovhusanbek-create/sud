@@ -16,23 +16,38 @@ export interface TgError {
 }
 export type TgReply<T> = { ok: true; result: T } | TgError
 
-async function post<T>(token: string, method: string, body: unknown, timeoutMs = 20_000): Promise<TgReply<T>> {
-  try {
-    const isForm = body instanceof FormData
-    const res = await fetch(`${HOST}/bot${token}/${method}`, {
-      method: 'POST',
-      headers: isForm ? undefined : { 'Content-Type': 'application/json' },
-      body: isForm ? body : JSON.stringify(body ?? {}),
-      signal: AbortSignal.timeout(timeoutMs),
-      cache: 'no-store',
-    })
-    const j = (await res.json().catch(() => null)) as { ok?: boolean; result?: T; error_code?: number; description?: string } | null
-    if (j?.ok) return { ok: true, result: j.result as T }
-    return { ok: false, code: j?.error_code ?? res.status, description: String(j?.description ?? '') }
-  } catch (e) {
-    const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
-    return { ok: false, code: 0, description: timeout ? 'javob kelmadi (vaqt tugadi)' : 'Telegramga ulanib boʻlmadi' }
+async function post<T>(token: string, method: string, body: unknown, timeoutMs = 20_000, tries = 3): Promise<TgReply<T>> {
+  let last: TgError = { ok: false, code: 0, description: 'Telegramga ulanib boʻlmadi' }
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      const isForm = body instanceof FormData
+      const res = await fetch(`${HOST}/bot${token}/${method}`, {
+        method: 'POST',
+        headers: isForm ? undefined : { 'Content-Type': 'application/json' },
+        body: isForm ? body : JSON.stringify(body ?? {}),
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: 'no-store',
+      })
+      const j = (await res.json().catch(() => null)) as { ok?: boolean; result?: T; error_code?: number; description?: string; parameters?: { retry_after?: number } } | null
+      if (j?.ok) return { ok: true, result: j.result as T }
+      last = { ok: false, code: j?.error_code ?? res.status, description: String(j?.description ?? '') }
+      if (last.code === 429 && attempt < tries - 1) {
+        // Telegram says how long to wait; never longer than a minute
+        await new Promise((r) => setTimeout(r, Math.min(60, Math.max(1, j?.parameters?.retry_after ?? 5)) * 1000))
+        continue
+      }
+      if (last.code >= 500 && attempt < tries - 1) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+        continue
+      }
+      return last
+    } catch (e) {
+      const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
+      last = { ok: false, code: 0, description: timeout ? 'javob kelmadi (vaqt tugadi)' : 'Telegramga ulanib boʻlmadi' }
+      if (attempt < tries - 1) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+    }
   }
+  return last
 }
 
 /** download a file Telegram holds (the token is part of the URL: never reported) */
@@ -149,3 +164,50 @@ export async function testTelegram(token: string, chat: string): Promise<TestOut
   return out
 }
 
+
+// ---- what the backup needs: send a file, get it back, pin it, find the pinned one ---------------------------------------------
+
+export type TgResult<T> = { ok: true; value: T } | { ok: false; error: string }
+
+/** Send one file to the channel. Returns the message id and the file id. */
+export async function sendFile(token: string, chat: string, bytes: Uint8Array, filename: string, caption: string): Promise<TgResult<{ messageId: number; fileId: string }>> {
+  const form = new FormData()
+  form.append('chat_id', chat)
+  form.append('disable_notification', 'true')
+  form.append('caption', caption)
+  form.append('document', new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename)
+  const r = await post<{ message_id: number; document?: { file_id: string } }>(token, 'sendDocument', form, 180_000)
+  if (!r.ok) return { ok: false, error: telegramFailure(r.code, r.description) }
+  if (!r.result.document?.file_id) return { ok: false, error: 'Telegram fayl identifikatorini bermadi' }
+  return { ok: true, value: { messageId: r.result.message_id, fileId: r.result.document.file_id } }
+}
+
+/** Bytes of a file the bot can read (Telegram lets a bot read up to 20 MB). */
+export async function getFileBytes(token: string, fileId: string): Promise<TgResult<Uint8Array>> {
+  const f = await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId })
+  if (!f.ok) return { ok: false, error: telegramFailure(f.code, f.description) }
+  if (!f.result.file_path) return { ok: false, error: 'Telegram fayl manzilini bermadi' }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const bytes = await downloadFile(token, f.result.file_path)
+    if (bytes) return { ok: true, value: bytes }
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+  }
+  return { ok: false, error: 'Faylni yuklab boʻlmadi' }
+}
+
+export async function pinMessage(token: string, chat: string, messageId: number): Promise<TgResult<true>> {
+  const r = await post<boolean>(token, 'pinChatMessage', { chat_id: chat, message_id: messageId, disable_notification: true })
+  return r.ok ? { ok: true, value: true } : { ok: false, error: telegramFailure(r.code, r.description) }
+}
+
+export async function deleteMessage(token: string, chat: string, messageId: number): Promise<boolean> {
+  return (await post<boolean>(token, 'deleteMessage', { chat_id: chat, message_id: messageId })).ok
+}
+
+/** The document pinned in the channel (where the newest backup's manifest is kept). */
+export async function pinnedDocument(token: string, chat: string): Promise<TgResult<{ fileId: string; name: string; messageId: number } | null>> {
+  const r = await post<{ pinned_message?: { message_id: number; document?: { file_id: string; file_name?: string } } }>(token, 'getChat', { chat_id: chat })
+  if (!r.ok) return { ok: false, error: telegramFailure(r.code, r.description) }
+  const d = r.result.pinned_message?.document
+  return { ok: true, value: d ? { fileId: d.file_id, name: d.file_name ?? '', messageId: r.result.pinned_message!.message_id } : null }
+}

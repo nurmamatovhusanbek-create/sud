@@ -7,9 +7,60 @@
  */
 
 import { useState } from 'react'
-import { CheckCircle2, FlaskConical, Radar, Send, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, DatabaseBackup, FlaskConical, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
+import { useBackup } from '@/hooks/use-backup'
 import { STEP_LABEL } from '@/core/telegram'
+
+function BackupCard({ configured }: { configured: boolean }) {
+  const { snap, running, start, reload } = useBackup()
+  const [pass, setPass] = useState('')
+  const st = snap?.state
+  const last = snap?.last
+  const ok = pass.length >= 10
+  const go = async (kind: 'backup' | 'restore') => {
+    if (kind === 'restore' && !window.confirm('Kanaldagi eng soʻnggi zaxira yuklab olinadi va sud.restored-….db nomi bilan joriy bazaning yoniga yoziladi. Joriy baza oʻzgarmaydi. Davom etasizmi?')) return
+    if (await start(kind, pass)) setPass('')
+    else void reload()
+  }
+  return (
+    <div className="p-card rise-c" style={{ marginTop: 14 }}>
+      <div className="card-h">
+        <div className="ico"><DatabaseBackup /></div>
+        <h2>Shifrlangan zaxira</h2>
+        {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.chunks} boʻlak{last.pinned ? '' : ' · mahkamlanmagan'}</span>}
+      </div>
+      <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
+        Baza siqiladi, parolingiz bilan AES-256 yordamida shifrlanadi va 19 MB lik boʻlaklar bilan kanalga joylanadi; soʻnggi xabar (manifest) kanalda mahkamlanadi.
+        Telegram faqat tasodifiy baytlarni koʻradi. <b>Parol hech qayerda saqlanmaydi: yoʻqotsangiz zaxirani ochib boʻlmaydi.</b> Yangi kompyuterda botni, kanalni va parolni kiritib «Tiklash» ni bosing.
+      </p>
+      <label className="field" style={{ height: 40 }}>
+        <input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Zaxira paroli (kamida 10 belgi)" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
+      </label>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+        <button className="btn btn-primary" onClick={() => void go('backup')} disabled={!configured || !ok || running}>
+          {running && st?.kind === 'backup' ? <span className="spinner" /> : <DatabaseBackup />}
+          Zaxiralash
+        </button>
+        <button className="btn btn-outline" onClick={() => void go('restore')} disabled={!configured || !ok || running}>
+          {running && st?.kind === 'restore' ? <span className="spinner" /> : <RotateCcw />}
+          Tiklash
+        </button>
+      </div>
+      {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '10px 0 0' }}>Avval yuqorida botni va kanalni saqlang.</p>}
+      {st && st.phase !== 'idle' && (
+        <div className="kv" style={{ marginTop: 14 }}>
+          <span className="k" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {st.phase === 'done' ? <CheckCircle2 size={16} /> : st.phase === 'error' ? <XCircle size={16} /> : <span className="spinner" />}
+            {st.message}
+          </span>
+          {st.total > 1 && running && <span className="badge">{st.done}/{st.total}</span>}
+        </div>
+      )}
+      {st?.phase === 'done' && st.result?.restoredFile && <div className="faint mono" style={{ fontSize: 12, marginTop: 6, wordBreak: 'break-all' }}>{st.result.restoredFile}</div>}
+    </div>
+  )
+}
 
 export function TelegramTab() {
   const { status, busy, out, channels, find, test, save, forget } = useTelegram()
@@ -98,6 +149,7 @@ export function TelegramTab() {
           </div>
         )}
       </div>
+      <BackupCard configured={!!status?.configured} />
     </div>
   )
 }
