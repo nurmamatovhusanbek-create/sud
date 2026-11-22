@@ -85,4 +85,11 @@ CREATE TABLE locator (
 CREATE TABLE locator_shards (tin TEXT PRIMARY KEY, id TEXT NOT NULL, rows INTEGER NOT NULL, at INTEGER NOT NULL);
 `,
   },
+  {
+    // a bill that names no case is of no use here (the owner's decision, Nov 2026): only bills with a case number are kept, and the old ones go
+    v: 5,
+    sql: `
+DELETE FROM bills WHERE case_number IS NULL OR case_number = '';
+`,
+  },
 ]

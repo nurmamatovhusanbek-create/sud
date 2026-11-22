@@ -52,3 +52,15 @@ export const passSize = (i: number): number => PASS_SIZES[Math.min(Math.max(0, i
 
 /** which pass a page size belongs to (0 when unknown) */
 export const passIndexOfSize = (size: number): number => Math.max(0, PASS_SIZES.indexOf(size))
+
+/**
+ * How many distinct bills (with a case) the company has, estimated from two reads of its unstable order (capture-recapture): `prior` bills were
+ * known before a pass, the pass read `seen` distinct ones of which `added` were new, so `seen - added` of them were already known and
+ * N ≈ prior × seen / (seen − added). Null while nothing overlaps (no estimate). `coverage` = known after the pass / N.
+ */
+export function estimateCoverage(prior: number, seen: number, added: number): { total: number; coverage: number } | null {
+  const known = seen - added
+  if (prior <= 0 || seen <= 0 || known <= 0) return null
+  const total = Math.max(prior + added, Math.round((prior * seen) / known))
+  return { total, coverage: Math.min(1, (prior + added) / total) }
+}

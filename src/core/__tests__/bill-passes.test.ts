@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { NOTHING_NEW, PASS_SIZES, STABLE_OVERLAP, passIndexOfSize, passSize, passVerdict } from '../bill-passes'
+import { NOTHING_NEW, PASS_SIZES, STABLE_OVERLAP, estimateCoverage, passIndexOfSize, passSize, passVerdict } from '../bill-passes'
 
 describe('passVerdict', () => {
   test('a pass whose pages did not overlap covered every row once: finished, whatever the pass number', () => {
@@ -45,5 +45,24 @@ describe('pass sizes', () => {
     expect(passSize(99)).toBe(PASS_SIZES.at(-1)!)
     expect(passIndexOfSize(9_000)).toBe(1)
     expect(passIndexOfSize(1234)).toBe(0)
+  })
+})
+
+describe('estimateCoverage (capture-recapture over two reads of an unstable order)', () => {
+  test('a pass that mostly repeats what was known means most of the bills are stored', () => {
+    // 100 known, the pass read 100 distinct of which 5 were new → 95 were known: N ≈ 100 × 100 / 95
+    const e = estimateCoverage(100, 100, 5)!
+    expect(e.total).toBe(105)
+    expect(e.coverage).toBeCloseTo(1, 5)
+  })
+  test('a pass that mostly finds new bills means many are still missing', () => {
+    const e = estimateCoverage(100, 100, 60)! // only 40 of the pass were known
+    expect(e.total).toBe(250)
+    expect(e.coverage).toBeCloseTo(160 / 250, 5)
+  })
+  test('no estimate without an overlap or without a prior read', () => {
+    expect(estimateCoverage(100, 50, 50)).toBeNull()
+    expect(estimateCoverage(0, 50, 0)).toBeNull()
+    expect(estimateCoverage(100, 0, 0)).toBeNull()
   })
 })

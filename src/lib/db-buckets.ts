@@ -29,6 +29,8 @@ const CO = ['tin', 'first_at', 'refreshed_at', 'last_added'] as const
 const list = (cols: readonly string[]) => cols.join(', ')
 const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ')
 
+/** a bill without a case is not kept, so it is not in a backup either (the database has none after migration 5; this is the same rule for rows that arrive otherwise) */
+const WITH_CASE = "case_number IS NOT NULL AND case_number != ''"
 const yearOfMs = (c: string) => `CAST(strftime('%Y', ${c} / 1000, 'unixepoch') AS INTEGER)`
 
 export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists'
@@ -64,8 +66,8 @@ export function listBuckets(db: Db = getDb()): string[] {
     if (db.prepare('SELECT 1 FROM bill_loads WHERE tin = ?').get(tin) || db.prepare('SELECT 1 FROM companies WHERE tin = ?').get(tin)) out.push(`state:${tin}`)
     if (db.prepare('SELECT 1 FROM tried WHERE tin = ? LIMIT 1').get(tin)) out.push(`tried:${tin}`)
     if (listed.has(tin) && feedRows(tin).length) out.push(`lists:${tin}`)
-    if (db.prepare('SELECT 1 FROM bills WHERE tin = ? LIMIT 1').get(tin) || db.prepare('SELECT 1 FROM found_cases WHERE tin = ? LIMIT 1').get(tin) || (listed.has(tin) && feedRows(tin).length)) out.push(`index:${tin}`)
-    for (const r of db.prepare(`SELECT DISTINCT COALESCE(${yearOfMs('issued')}, 0) y FROM bills WHERE tin = ? ORDER BY y`).all(tin)) out.push(`bills:${tin}:${Number(r.y)}`)
+    if (db.prepare(`SELECT 1 FROM bills WHERE tin = ? AND ${WITH_CASE} LIMIT 1`).get(tin) || db.prepare('SELECT 1 FROM found_cases WHERE tin = ? LIMIT 1').get(tin) || (listed.has(tin) && feedRows(tin).length)) out.push(`index:${tin}`)
+    for (const r of db.prepare(`SELECT DISTINCT COALESCE(${yearOfMs('issued')}, 0) y FROM bills WHERE tin = ? AND ${WITH_CASE} ORDER BY y`).all(tin)) out.push(`bills:${tin}:${Number(r.y)}`)
     for (const r of db.prepare('SELECT DISTINCT court, CASE WHEN yymm < 0 THEN 0 ELSE yymm / 100 END y FROM found_cases WHERE tin = ? ORDER BY court, y').all(tin)) out.push(`found:${tin}:${r.court}:${Number(r.y)}`)
   }
   for (const r of db.prepare('SELECT DISTINCT court, CASE WHEN yymm < 0 THEN 0 ELSE yymm / 100 END y FROM case_details ORDER BY court, y').all()) out.push(`details:${r.court}:${Number(r.y)}`)
@@ -91,7 +93,7 @@ export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | n
   switch (b.kind) {
     case 'bills': {
       const where = b.year === 0 ? 'issued IS NULL' : `${yearOfMs('issued')} = ?`
-      take(db.prepare(`SELECT ${list(BILL)} FROM bills WHERE tin = ? AND ${where} ORDER BY number`).all(...(b.year === 0 ? [b.tin] : [b.tin, b.year])), BILL)
+      take(db.prepare(`SELECT ${list(BILL)} FROM bills WHERE tin = ? AND ${WITH_CASE} AND ${where} ORDER BY number`).all(...(b.year === 0 ? [b.tin] : [b.tin, b.year])), BILL)
       break
     }
     case 'found': {
@@ -125,7 +127,7 @@ export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | n
       for (const r of feedRows(b.tin!)) if (!cases.has(r.num)) put(r.num, r.court)
       for (const r of db.prepare("SELECT DISTINCT case_number, ctype FROM bills WHERE tin = ? AND case_number IS NOT NULL AND case_number != ''").all(b.tin)) if (!cases.has(String(r.case_number))) put(String(r.case_number), String(r.ctype ?? ''))
       for (const k of [...cases.keys()].sort()) lines.push(cases.get(k)!)
-      for (const r of db.prepare('SELECT number, issued, case_number FROM bills WHERE tin = ? ORDER BY number').all(b.tin)) {
+      for (const r of db.prepare("SELECT number, issued, case_number FROM bills WHERE tin = ? AND case_number IS NOT NULL AND case_number != '' ORDER BY number").all(b.tin)) {
         lines.push(line(['b', r.number, r.issued == null ? 0 : new Date(Number(r.issued)).getUTCFullYear(), r.case_number ?? '']))
       }
       break
@@ -160,7 +162,8 @@ export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), o
       case 'bills': {
         // into a database that holds a NEWER copy of the company, only the bills it does not have are added; otherwise the bucket wins
         const st = db.prepare(`INSERT OR ${opts.bills === 'keep' ? 'IGNORE' : 'REPLACE'} INTO bills (${list(BILL)}, pass) VALUES (${marks(BILL.length)}, 0)`)
-        for (const r of rows) { n += st.run(...r).changes }
+        const caseAt = BILL.indexOf('case_number')
+        for (const r of rows) { if (r[caseAt]) n += st.run(...r).changes } // a bill without a case is not kept (owner's decision)
         break
       }
       case 'found': {
@@ -226,6 +229,9 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
       if (!line) continue
       let r: unknown[]
       try { r = JSON.parse(line) as unknown[] } catch { continue }
+      // a bill without a case (an older backup holds many) is dropped: it is not kept any more
+      if (b.kind === 'bills' && !r[BILL.indexOf('case_number')]) continue
+      if (b.kind === 'index' && r[0] === 'b' && !r[3]) continue
       const { key, t } = rowKey(b.kind, r)
       const have = rows.get(key)
       if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t })

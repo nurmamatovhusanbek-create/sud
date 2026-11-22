@@ -136,8 +136,8 @@ beforeEach(() => {
   const db = dbm.getDb()
   const bill = db.prepare('INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, ctype, kind, yymm, hay, cat, court) VALUES (?, ?, 0, ?, ?, 100, ?, ?, ?, ?, ?, ?, ?)')
   // random filler so every year bucket is several pieces at the 4 KiB piece size
-  for (let i = 0; i < 300; i++) bill.run(TIN, `a${i}`, 'PAID', ms('2024-03-01') + i, null, 'civil', 'duty', -1, crypto.randomBytes(40).toString('hex'), 'x', 'c')
-  for (let i = 0; i < 300; i++) bill.run(TIN, `b${i}`, 'PAID', ms('2025-03-01') + i, null, 'civil', 'duty', -1, crypto.randomBytes(40).toString('hex'), 'x', 'c')
+  for (let i = 0; i < 300; i++) bill.run(TIN, `a${i}`, 'PAID', ms('2024-03-01') + i, `2-1004-24${10 + (i % 80)}/${i}`, 'civil', 'duty', 2410, crypto.randomBytes(40).toString('hex'), 'x', 'c')
+  for (let i = 0; i < 300; i++) bill.run(TIN, `b${i}`, 'PAID', ms('2025-03-01') + i, `2-1004-25${10 + (i % 80)}/${i}`, 'civil', 'duty', 2510, crypto.randomBytes(40).toString('hex'), 'x', 'c')
   db.prepare('INSERT INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('civil', TIN, '2-1004-2403/1', 2403, 's', 'h', '{"n":1}', 10)
   db.prepare('INSERT INTO case_details (court, num, t, d) VALUES (?, ?, ?, ?)').run('civil', '2-1004-2403/1', 10, crypto.randomBytes(100))
   db.prepare('INSERT INTO bill_loads (tin, total_elements, total_pages, page_size, pass, pages_done, complete, stable, loaded_at) VALUES (?, 600, 1, 10000, 0, 1, 1, 1, 777)').run(TIN)
@@ -282,7 +282,7 @@ describe('a backup never takes data away from the channel', () => {
   const OTHER2 = '201052713'
   const seedOther = () => {
     const db = dbm.getDb()
-    db.prepare('INSERT INTO bills (tin, number, pass, status, issued, amount, hay) VALUES (?, ?, 0, ?, ?, 5, ?)').run(OTHER2, 'z1', 'PAID', ms('2024-02-02'), 'h')
+    db.prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, hay) VALUES (?, ?, 0, ?, ?, 5, '2-1004-2402/5', ?)").run(OTHER2, 'z1', 'PAID', ms('2024-02-02'), 'h')
     db.prepare('INSERT INTO bill_loads (tin, total_elements, total_pages, page_size, pass, pages_done, complete, stable, loaded_at) VALUES (?, 1, 1, 10000, 0, 1, 1, 1, 5)').run(OTHER2)
   }
 
@@ -313,7 +313,7 @@ describe('a backup never takes data away from the channel', () => {
     dbm.closeDb()
     for (const n of fs.readdirSync(DIR)) if (n.startsWith('sud.db')) fs.rmSync(path.join(DIR, n), { force: true })
     // B holds the same company but only one new bill in 2025
-    dbm.getDb().prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, hay) VALUES (?, 'new1', 0, 'PAID', ?, 7, 'h')").run(TIN, ms('2025-06-06'))
+    dbm.getDb().prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, hay) VALUES (?, 'new1', 0, 'PAID', ?, 7, '2-1004-2506/77', 'h')").run(TIN, ms('2025-06-06'))
     await runBackup()
     backup.startRestore(PASS)
     const r = await finished()
@@ -411,7 +411,7 @@ describe('the locator: search the Telegram copy without loading a company', () =
     expect(r.ok && r.index).toMatchObject({ shards: 1, downloaded: 1 })
 
     const cases = index.searchLocator('2-1004-24')
-    expect(cases.hits.map((h) => h.key)).toEqual(['2-1004-2403/1', '2-1004-2403/55'])
+    expect(cases.hits.map((h) => h.key).filter((k) => k.startsWith('2-1004-2403'))).toEqual(['2-1004-2403/1', '2-1004-2403/55'])
     expect(cases.hits[0]).toMatchObject({ kind: 'case', tin: TIN, court: 'civil', year: 24, loaded: true })
     expect(cases.indexed).toBeGreaterThan(600)
 

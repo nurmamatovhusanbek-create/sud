@@ -23,9 +23,9 @@ import { toBillRow } from '@/core/bill-rows'
 import { getCaseLean, type CaseLean } from './court-case'
 import type { CourtCase, CourtType } from './court-case-types'
 import { addFound, feedCaseNumbers, triedStats, writeDetail } from './case-store'
-import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, setKnownFeed, writeBillsPage } from './bills-store'
+import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, readPasses, recordPass, setKnownFeed, writeBillsPage } from './bills-store'
 import { ensureCompany, markRefreshed, readCompany } from './company-meta'
-import { passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
+import { estimateCoverage, passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 
 /** a case the court's APIs did not know is asked again only after this long (the old system's node is flaky: «not found» is not always true) */
 export const RETRY_MISSING_MS = 14 * 24 * 60 * 60_000
@@ -100,6 +100,9 @@ export interface BillCasesStatus {
   firstAt: number
   refreshedAt: number
   lastAdded: number
+  /** what each pass of the load added (evidence that the union converges) and the estimated share of the company's bills with a case that is stored */
+  passes: Array<{ pass: number; size: number; rows: number; added: number; overlap: number; at: number }>
+  coverage: number | null
   /** distinct cases the stored bills name */
   billCases: number
   /** of those: not in the stored lists and not tried (what a fill would ask) */
@@ -158,6 +161,16 @@ export function eventsSince(tin: string, after: number): { events: FoundEvent[];
 }
 
 /** What is known about a company's bills and their cases, from the database only (no site is asked). */
+/** the latest estimate of how much of the company's bills with a case is stored (capture-recapture over the passes), null before a second pass */
+function coverageOf(tin: string): number | null {
+  const p = readPasses(tin)
+  const last = p.at(-1)
+  if (!last || p.length < 2) return null
+  const stored = billCountOf(tin)
+  const est = estimateCoverage(stored - last.added, last.rows - last.overlap, last.added)
+  return est ? Math.round(est.coverage * 1000) / 1000 : null
+}
+
 export function billCasesStatus(tin: string, now: number = Date.now()): BillCasesStatus {
   const meta = readBillsMeta(tin)
   const co = readCompany(tin)
@@ -173,6 +186,8 @@ export function billCasesStatus(tin: string, now: number = Date.now()): BillCase
     firstAt: co?.firstAt ?? 0,
     refreshedAt: co?.refreshedAt ?? 0,
     lastAdded: co?.lastAdded ?? 0,
+    passes: readPasses(tin),
+    coverage: coverageOf(tin),
     billCases: billCaseCount(tin),
     missing: countMissingCases(tin, retryBefore),
     found: tried.found,
@@ -253,10 +268,16 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
       let pass = meta ? (unfinished && mode !== 'refresh' ? meta.pass : meta.pass + 1) : 0
       let passIndex = unfinished && mode !== 'refresh' && meta ? passIndexOfSize(meta.pageSize) : 0
       let page = unfinished && mode !== 'refresh' && meta ? meta.pagesDone : 0
+      // the first offset at which a full-size window had to be split: deeper windows start split (a full-size try there only costs minutes)
+      let splitFrom: number | null = null
       for (;;) {
         if (stopped()) return
         const size = passSize(passIndex)
         const counts = { rows: 0, overlap: 0, added: 0, total: 0 }
+        // every bill number this pass has read (bills WITHOUT a case are not stored, so the database cannot tell a repeat): kept here. A pass resumed in
+        // another process has lost the earlier pages' numbers: it is never called stable (another pass follows)
+        const seen = new Set<string>()
+        const resumedMidPass = page > 0
         let totalPages = 0
         s.pass = passIndex
         for (;;) {
@@ -268,10 +289,12 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
           const parts: Array<Awaited<ReturnType<BillCasesDeps['searchBills']>> | undefined> = [] // answers of a split window, kept across attempts
           for (let attempt = 1; !res; attempt++) {
             try {
-              if (attempt <= SPLIT_AFTER || size % SPLIT !== 0) {
+              const preSplit = splitFrom !== null && page * size >= splitFrom
+              if (size % SPLIT !== 0 || (attempt <= SPLIT_AFTER && !preSplit)) {
                 res = await deps.searchBills(tin, { page, size })
               } else {
                 for (let j = 0; j < SPLIT; j++) parts[j] ??= await deps.searchBills(tin, { page: page * SPLIT + j, size: size / SPLIT })
+                if (splitFrom === null || page * size < splitFrom) splitFrom = page * size
                 const first = parts[0]!
                 res = { ...first, content: parts.flatMap((x) => x?.content ?? []), pageNumber: page, pageSize: size, totalPages: Math.ceil(first.totalElements / size) }
               }
@@ -294,16 +317,24 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
             if (page < totalPages) throw new Error(`billing.sud.uz ${page + 1}-sahifani boʻsh qaytardi`)
             break
           }
-          const rows = res.content.map(toBillRow).filter((r): r is NonNullable<typeof r> => !!r)
-          // against what is stored (before this page is written): distinct bills an EARLIER page of this pass already had, and bills no pass had
-          // (repeats inside a page are one bill used twice)
+          const all = res.content.map(toBillRow).filter((r): r is NonNullable<typeof r> => !!r)
+          // only a bill that names a case is kept: the others are of no use (and about a third of a bank's bills are such)
+          const rows = all.filter((r) => r.caseNumber)
+          // instability: distinct bills of this page that an EARLIER page of this pass already had (repeats inside a page are one bill used twice)
+          const onPage = new Set(all.map((r) => r.number))
+          let repeated = 0
+          for (const nbr of onPage) if (seen.has(nbr)) repeated++
+          for (const nbr of onPage) seen.add(nbr)
+          // novelty: bills with a case that no earlier read stored (before this page is written)
           const ov = pageOverlap(tin, pass, rows.map((r) => r.number))
-          counts.rows += rows.length
-          counts.overlap += ov.overlap
+          counts.rows += all.length
+          counts.overlap += repeated
           counts.added += ov.added
           const last = page + 1 >= totalPages
-          const verdict = last ? passVerdict(counts, passIndex) : { done: false, stable: false }
+          let verdict = last ? passVerdict(counts, passIndex) : { done: false, stable: false }
+          if (last && resumedMidPass && verdict.stable) verdict = { done: false, stable: false }
           writeBillsPage(tin, pass, page, rows, { totalElements: res.totalElements, totalPages, pageSize: size }, verdict, deps.now())
+          if (last) recordPass(tin, { pass: passIndex, size, rows: counts.rows, added: counts.added, overlap: counts.overlap, at: deps.now() })
           s.page = page + 1
           if (last) {
             s.stable = verdict.stable

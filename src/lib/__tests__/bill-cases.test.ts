@@ -137,8 +137,9 @@ describe('load', () => {
     expect(bills.readBillsMeta(TIN)).toMatchObject({ pagesDone: 2, complete: false })
     billFails = {}; billCalls = []; billSizes = []
     expect((await run({ fill: false })).state).toBe('done')
-    expect(billCalls).toEqual([2])
-    expect(billSizes).toEqual([10_000])
+    // the pass was resumed in another run: its earlier pages' numbers are lost, so it is never called stable and ONE more pass (other page size) follows
+    expect(billCalls).toEqual([2, 0, 1, 2])
+    expect(billSizes).toEqual([10_000, 9_000, 9_000, 9_000])
     expect(bills.readBillsMeta(TIN)?.complete).toBe(true)
   })
 
@@ -150,7 +151,7 @@ describe('load', () => {
     await run({ fill: false, load: 'refresh' })
     expect(billCalls).toEqual([0, 1, 2])
     expect(bills.readBillsMeta(TIN)).toMatchObject({ complete: true, pass: 1 })
-    expect(bills.queryBills(TIN, {})?.total).toBe(9)
+    expect(bills.queryBills(TIN, {})?.total).toBe(6) // only the bills that name a case are kept (3 of the 9 name none)
   })
 
   test('the first scrape\'s date is set once; a finished load is «as of» the moment it began; a refresh says what it added', async () => {
@@ -158,7 +159,7 @@ describe('load', () => {
     const withClock = { ...deps, now: () => clock }
     lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
     await lib.jobDone()
-    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 1_000_000, refreshedAt: 1_000_000, lastAdded: 9 })
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 1_000_000, refreshedAt: 1_000_000, lastAdded: 6 })
     // two weeks later a refresh finds one more bill on the last page
     clock = 2_000_000
     const base = PAGES[2]!
@@ -191,16 +192,19 @@ describe('load', () => {
 
   test('a big page that keeps failing is asked as five smaller requests of the same window, and the load goes on', async () => {
     // 25 000 bills: pages of 10 000 → 3 pages; page 1 (offset 10 000) is rejected every time at the full size
-    const all = Array.from({ length: 25_000 }, (_, i) => ({ ...bill(null), number: String(400000000000 + i) }))
+    const all = Array.from({ length: 25_000 }, (_, i) => ({ ...bill('2-1004-2603/1'), number: String(400000000000 + i) }))
     bigTotal = 25_000
     pagesFor = (page, size) => all.slice(page * size, (page + 1) * size)
     billFails = { 1: 99 } // only the full-size page index 1 fails; the split uses page indexes 5-9 of size 2 000
     const st = await run({ fill: false })
     expect(st.state).toBe('done')
-    expect(billSizes.filter((x) => x === 2_000)).toHaveLength(5)
+    // page 1 needed the split after three failures; page 2 (deeper) then STARTED split without trying the full size again
+    expect(billSizes.filter((x) => x === 2_000)).toHaveLength(10)
     expect(billCalls.filter((p) => p >= 5 && p <= 9)).toEqual([5, 6, 7, 8, 9])
+    expect(billCalls.filter((p) => p >= 10)).toEqual([10, 11, 12, 13, 14])
     expect(bills.queryBills(TIN, {})?.total).toBe(25_000) // every bill of the failing window arrived
-    expect(waits).toEqual([30_000, 60_000, 90_000]) // three full-size attempts, then the split went through
+    expect(waits).toEqual([30_000, 60_000, 90_000]) // three full-size attempts on page 1 only; the deeper page went straight to the split
+    expect(lib.billCasesStatus(TIN).passes[0]).toMatchObject({ pass: 0, size: 10_000, rows: 25_000, added: 25_000 })
   })
 
   test('an empty page inside the range is an error, not the end', async () => {

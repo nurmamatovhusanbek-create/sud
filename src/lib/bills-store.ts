@@ -43,6 +43,33 @@ export interface PageTotals {
   pageSize: number
 }
 
+export interface PassLog {
+  pass: number
+  size: number
+  /** rows read (every page), distinct bills with a case that were new, bills seen again from an earlier page of this pass */
+  rows: number
+  added: number
+  overlap: number
+  at: number
+}
+
+/** what each pass of the load read and added: the evidence that the union is converging (kept in `meta`, per company) */
+export function readPasses(tin: string): PassLog[] {
+  try {
+    const r = getDb().prepare('SELECT v FROM meta WHERE k = ?').get(`bills_passes:${tin}`)
+    const a = r ? (JSON.parse(String(r.v)) as PassLog[]) : []
+    return Array.isArray(a) ? a : []
+  } catch {
+    return []
+  }
+}
+
+export function recordPass(tin: string, entry: PassLog): void {
+  const list = readPasses(tin).filter((p) => p.pass !== entry.pass)
+  list.push(entry)
+  getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run(`bills_passes:${tin}`, JSON.stringify(list.slice(-20)))
+}
+
 /** how many distinct bills of the company are stored */
 export function billCountOf(tin: string): number {
   return Number(getDb().prepare('SELECT COUNT(*) n FROM bills WHERE tin = ?').get(tin)?.n ?? 0)

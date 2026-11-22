@@ -23,9 +23,9 @@ function seed() {
   const bill = db.prepare('INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, ctype, kind, yymm, hay, cat, court) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
   bill.run(A, '1001', 0, 'PAID', ms('2024-03-01'), 100, '2-1004-2403/1', 'civil', 'duty', 2403, 'c d', 'x', 'c')
   bill.run(A, '1002', 0, 'USED', ms('2024-11-01'), 100, '2-1004-2411/2', 'civil', 'post', 2411, 'c d', 'x', 'c')
-  bill.run(A, '1003', 0, 'PAID', ms('2025-02-01'), 100, null, null, 'duty', -1, 'c d', 'x', 'c')
+  bill.run(A, '1003', 0, 'PAID', ms('2025-02-01'), 100, '2-1004-2502/3', 'civil', 'duty', 2502, 'c d', 'x', 'c')
   bill.run(A, '1004', 0, 'PAID', null, 100, null, null, 'duty', -1, 'c d', 'x', 'c')
-  bill.run(B, '2001', 0, 'PAID', ms('2025-05-05'), 50, null, null, 'duty', -1, 'c d', 'x', 'c')
+  bill.run(B, '2001', 0, 'PAID', ms('2025-05-05'), 50, '2-1004-2505/9', 'civil', 'duty', 2505, 'c d', 'x', 'c')
   db.prepare('INSERT INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('civil', A, '2-1004-2403/1', 2403, 's', 'h', '{"n":1}', 10)
   db.prepare('INSERT INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('civil', A, '2-1004-2509/7', 2509, 's', 'h', '{"n":2}', 11)
   db.prepare('INSERT INTO tried (tin, num, t, found) VALUES (?, ?, ?, ?)').run(A, '2-1004-2403/1', 10, 1)
@@ -51,7 +51,7 @@ describe('buckets', () => {
   test('named by company and year, undated ones in year 0', () => {
     seed()
     expect(bk.listBuckets()).toEqual([
-      `index:${B}`, `bills:${B}:2025`, `state:${A}`, `tried:${A}`, `index:${A}`, `bills:${A}:0`, `bills:${A}:2024`, `bills:${A}:2025`, `found:${A}:civil:24`, `found:${A}:civil:25`,
+      `index:${B}`, `bills:${B}:2025`, `state:${A}`, `tried:${A}`, `index:${A}`, `bills:${A}:2024`, `bills:${A}:2025`, `found:${A}:civil:24`, `found:${A}:civil:25`,
       'details:civil:24', 'details:economic:0',
     ])
   })
@@ -98,11 +98,12 @@ describe('buckets', () => {
     expect(text).toEqual([
       ['c', '2-1004-2403/1', 'civil', 24], // found case: its own court and year
       ['c', '2-1004-2411/2', 'civil', 24], // only a bill names it
+      ['c', '2-1004-2502/3', 'civil', 25], // only a bill names it
       ['c', '2-1004-2509/7', 'civil', 25],
       ['b', '1001', 2024, '2-1004-2403/1'],
       ['b', '1002', 2024, '2-1004-2411/2'],
-      ['b', '1003', 2025, ''],
-      ['b', '1004', 0, ''],
+      ['b', '1003', 2025, '2-1004-2502/3'],
+      // bill 1004 names no case: it is not in the locator (nor kept at all)
     ])
     const target = dbm.openDbFile(path.join(DIR, 'idx.db'))
     expect(bk.importBucket(`index:${A}`, bk.renderBucket(`index:${A}`)!.text, target)).toBe(0)
@@ -121,13 +122,16 @@ describe('buckets', () => {
     const m2 = lines(bk.mergeBucketText(`found:${A}:civil:24`, t([['civil', A, '2-1004-2403/1', 2403, 'remote-newer', '', '{}', 99]]), local))
     expect(m2.find((r) => r[2] === '2-1004-2403/1')?.[4]).toBe('remote-newer')
     // bills have no time: the local copy wins, rows only the channel has are kept
-    const b = lines(bk.mergeBucketText(`bills:${A}:2024`, t([['x', '1001', 'OLD'], ['x', '1002', 'KEEP']]), t([['x', '1001', 'NEW'], ['x', '1000', 'ADD']])))
+    // a bill row: [tin, number, status, …, case_number at index 14]
+    const br = (number: string, status: string, caseNumber: string | null) => { const r: unknown[] = new Array(15).fill(null); r[0] = A; r[1] = number; r[2] = status; r[14] = caseNumber; return r }
+    const b = lines(bk.mergeBucketText(`bills:${A}:2024`, t([br('1001', 'OLD', '2-1-2401/1'), br('1002', 'KEEP', '2-1-2401/2'), br('1005', 'NOCASE', null)]), t([br('1001', 'NEW', '2-1-2401/1'), br('1000', 'ADD', '2-1-2401/0')])))
+    // the local copy wins; rows only the channel has are kept; a bill that names no case is dropped (an older backup holds many)
     expect(b.map((r) => [r[1], r[2]])).toEqual([['1000', 'ADD'], ['1001', 'NEW'], ['1002', 'KEEP']])
     // a copy that adds nothing merges to exactly the other one (so its id matches and nothing is uploaded)
-    expect(bk.mergeBucketText(`bills:${A}:2024`, t([['x', '1001', 'A'], ['x', '1002', 'B']]), t([['x', '1001', 'A']])).equals(t([['x', '1001', 'A'], ['x', '1002', 'B']]))).toBe(true)
+    expect(bk.mergeBucketText(`bills:${A}:2024`, t([br('1001', 'A', '2-1-2401/1'), br('1002', 'B', '2-1-2401/2')]), t([br('1001', 'A', '2-1-2401/1')])).equals(t([br('1001', 'A', '2-1-2401/1'), br('1002', 'B', '2-1-2401/2')]))).toBe(true)
     // the locator: cases first, then bills, each by key
-    const ix = lines(bk.mergeBucketText(`index:${A}`, t([['c', '2-1-2401/9', 'civil', 24], ['b', '2002', 2024, '']]), t([['c', '2-1-2401/1', 'civil', 24], ['b', '1001', 2024, '']])))
-    expect(ix.map((r) => r[1])).toEqual(['2-1-2401/1', '2-1-2401/9', '1001', '2002'])
+    const ix = lines(bk.mergeBucketText(`index:${A}`, t([['c', '2-1-2401/9', 'civil', 24], ['b', '2002', 2024, '2-1-2401/9'], ['b', '3003', 2024, '']]), t([['c', '2-1-2401/1', 'civil', 24], ['b', '1001', 2024, '2-1-2401/1']])))
+    expect(ix.map((r) => r[1])).toEqual(['2-1-2401/1', '2-1-2401/9', '1001', '2002']) // the bill that names no case (3003) is dropped
   })
 
   test('the court lists (files) are a bucket of their own and their cases are in the locator', () => {

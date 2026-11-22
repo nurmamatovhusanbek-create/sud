@@ -64,6 +64,12 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
     <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
       {text}
       {dates && <div style={{ marginTop: 6, color: 'var(--text-2)', fontSize: 12.5 }}>{dates}</div>}
+      {st && st.passes.length > 0 && (
+        <div style={{ marginTop: 4, color: 'var(--text-2)', fontSize: 12.5 }}>
+          Oʻtishlar: {st.passes.map((p) => `${p.pass + 1}-oʻtish +${fmt(p.added)}`).join(' · ')}
+          {st.coverage !== null ? ` · taxminiy qamrov ${Math.round(st.coverage * 1000) / 10}%` : ''}
+        </div>
+      )}
       {wait > 0 && <div style={{ marginTop: 6, color: 'var(--text-2)' }}>Sud tizimi javob bermadi: {wait} soniyadan keyin qayta uriniladi ({job?.lastError}).</div>}
       {(paused || failed) && job?.lastError && <div style={{ marginTop: 6, color: 'var(--neg-text)' }}>{job.lastError}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
