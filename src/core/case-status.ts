@@ -9,6 +9,7 @@
  *   Қабул қилиш рад этилган (девонхона)                the claim was refused at the chancellery: it never became a case
  *   Фуқаро шахсий кабинетида яратилган, судга юборилмаган   a draft made in the citizen's cabinet, not sent to court
  *   Иш ҳолати номаълум                                 status unknown (old records)
+ *   Иш қўзғатиш · Тайёрлаш                             ongoing (the case is being opened / prepared; seen on real rows in Nov 2026)
  * Instance statuses («Апелляцияда», «Назоратда» …) are not in this table: they say WHERE the case is, the older table handles them.
  */
 
@@ -41,6 +42,8 @@ export function caseStatusInfo(raw: string | null | undefined): CaseStatusInfo |
   if (/номаълум|noma'lum|nomalum/.test(s)) return { stage: 'unknown', writ: false, label: 'Holati nomaʼlum', color: '#6b7280' }
   if (/тайинлаш|tayinlash/.test(s)) return { stage: 'ongoing', writ: false, label: 'Tayinlash', color: '#2563a8' }
   if (/рўйхатга\s*олиш|ro'yxatga\s*olish|royxatga\s*olish/.test(s)) return { stage: 'ongoing', writ: false, label: 'Roʻyxatga olish', color: '#2563a8' }
+  if (/иш\s*қўзғатиш|ish\s*qo'zg'atish|ish\s*qozgatish/.test(s)) return { stage: 'ongoing', writ: false, label: "Ish qoʻzgʻatish", color: '#2563a8' }
+  if (/тайёрлаш|tayyorlash/.test(s)) return { stage: 'ongoing', writ: false, label: 'Tayyorlash', color: '#2563a8' }
   if (/жараёнида|jarayonida/.test(s)) return { stage: 'ongoing', writ: false, label: 'Koʻrib chiqilmoqda', color: '#2563a8' }
   return null
 }

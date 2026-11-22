@@ -1,6 +1,8 @@
 import { guard, coalesce } from '@/server/middleware'
 import { jsonOk, jsonFail } from '@/server/envelope'
-import { courtCasesSource, courtListSource, caseDetailSource } from '@/sources'
+import { courtCasesSource, courtListSource } from '@/sources'
+import { getCaseBundle, clearCourtCaseCache } from '@/lib/court-case'
+import { servedCaseDetail } from '@/lib/served-case'
 import { viaSnapshot, type SnapshotPart } from '@/lib/snapshot-store'
 import { StirQuery, PinflQuery, CourtTypeQuery } from '@/core/schemas'
 import { logger } from '@/infra/logger'
@@ -33,11 +35,18 @@ export const GET = guard(async (req) => {
     if (!ct.success) return jsonFail("courtType notoʻgʻri", 'bad_request', 400)
     // the number becomes part of an upstream URL path: only the case-number shape gets there
     if (!CASE_NUMBER_RE.test(detail)) return jsonFail('Ish raqami formati: X-XXXX-XXXX/XXXXX', 'bad_request', 400)
+    // «Yangilash»: ask the court about THIS case only. A failure is an error (the page keeps what it shows); the stored copy is untouched.
+    const refresh = url.searchParams.get('refresh') === '1'
+    const tinRaw = url.searchParams.get('tin')
+    const tin = tinRaw && StirQuery.safeParse(tinRaw).success ? tinRaw : undefined
     try {
-      const data = await coalesce(`case-detail:${ct.data}:${detail}`, () =>
-        caseDetailSource.run({ courtType: ct.data, caseNumber: detail }),
+      const served = await coalesce(`case-detail:${ct.data}:${detail}:${refresh ? 'r' : 'c'}:${tin ?? ''}`, () =>
+        servedCaseDetail(ct.data, detail, getCaseBundle, { refresh, tin }),
       )
-      return jsonOk(data)
+      if (refresh && tin) clearCourtCaseCache(tin) // the 10 min memory of that company's list holds the old row
+      return jsonOk(served.data, {
+        meta: { cached: served.fromStore, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}), ...(served.frozen ? { frozen: true } : {}) },
+      })
     } catch (e) {
       return jsonFail(e instanceof Error ? e.message : "Ish tafsilotlarini olib boʻlmadi", 'upstream_error', 502)
     }

@@ -20,7 +20,7 @@
 import { CopyText } from '@/components/ui-custom/copy-text'
 import { getLook, useLook } from '@/lib/look'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileSpreadsheet, FileText, Gavel, Scale, Search, User, Wallet, Link2, X } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Gavel, RefreshCw, Scale, Search, User, Wallet, Link2, X } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
 import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
@@ -38,7 +38,7 @@ import { ListPagination, clampPage } from '@/components/ui-custom/list-paginatio
 import { useResource } from '@/hooks/use-resource'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
-import { dateKey, daysUntil, parseYmd } from '@/core/dates'
+import { dateKey, daysUntil, formatDmy, parseYmd } from '@/core/dates'
 import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
@@ -313,8 +313,15 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     BASE,
   )
 
-  void (async () => {
-    const res = await getCaseDetail(courtType, caseNumber)
+  // `refresh`: the drawer's «Yangilash» asks the court about THIS case only. If that fails the drawer keeps what it shows and a pop-up
+  // says why (the stored copy on the server is untouched); on success the drawer is redrawn and the company's list reads its stored row again
+  const load = async (refresh: boolean): Promise<void> => {
+    const toastId = refresh ? toast.loading('Sud saytidan soʻralmoqda…', { position: 'top-left' }) : undefined
+    const res = await getCaseDetail(courtType, caseNumber, undefined, { refresh, tin: company?.stir })
+    if (!res.ok && refresh) {
+      toast.error(`Ish yangilanmadi: ${res.error}. Oldingi nusxa saqlanib qoldi.`, { id: toastId, position: 'top-left', duration: 8000 }) // top: the default corner is the drawer's own footer, where the button just pressed is; the left, because the drawer covers the right
+      return
+    }
     if (!res.ok) {
       openProtoDrawer(
         <CopyText text={caseNumber} tag="span" />,
@@ -330,7 +337,17 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       )
       return
     }
+    if (refresh) {
+      toast.success('Ish yangilandi', { id: toastId, position: 'top-left' })
+      window.dispatchEvent(new Event('sud:cases-reload'))
+    }
     const d = res.data
+    // where this copy came from: a stored one is dated, so nobody mistakes it for the court's answer of today
+    const savedNote = res.meta?.stale
+      ? `Sudga ulanib boʻlmadi: oxirgi saqlangan nusxa (${stampOf(res.meta.fetchedAt)}) koʻrsatilmoqda.`
+      : res.meta?.frozen && res.meta.cached
+        ? `Yakunlangan ish: saqlangan nusxa (${stampOf(res.meta.fetchedAt)}). Sud saytidan qayta soʻralmaydi, «Yangilash» soʻraydi.`
+        : null
     const g = d.general
     const fi = d.firstInstance
     const ap = d.appellate
@@ -426,6 +443,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
     openProtoDrawer(
       <CopyText text={caseNumber} tag="span" />,
       <div>
+        {savedNote && <div className="dw-orders-empty" style={{ marginTop: 14 }}>{savedNote}</div>}
         {amount && amount !== '-' && (
           <div style={{ marginTop: 22 }}>
             <DwFig label="Daʼvo summasi" value={amount} unit={numeric ? 'soʻm' : undefined} />
@@ -497,14 +515,28 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
           </span>
         ) : undefined,
         footer: (
-          <button className="btn btn-primary" onClick={printCase}>
-            <Download />
-            <span>PDF sifatida saqlash</span>
-          </button>
+          <>
+            <button className="btn btn-outline" onClick={() => void load(true)}>
+              <RefreshCw />
+              <span>Yangilash</span>
+            </button>
+            <button className="btn btn-primary" onClick={printCase}>
+              <Download />
+              <span>PDF sifatida saqlash</span>
+            </button>
+          </>
         ),
       },
     )
-  })()
+  }
+  void load(false)
+}
+
+/** «22.11.2026 14:05» for the moment the court last answered */
+function stampOf(t: number | undefined): string {
+  if (!t) return 'sanasi nomaʼlum'
+  const d = new Date(t)
+  return `${formatDmy(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 // ---- section (v204: merged list held HERE, not per court) ------------------------
@@ -641,9 +673,11 @@ export function CasesSection() {
     const handler = () => refetchAll()
     window.addEventListener('sud:force-section', handler)
     window.addEventListener(COMPANY_REFRESHED, reloadAll)
+    window.addEventListener('sud:cases-reload', reloadAll) // one case was refreshed from its drawer: its stored row changed
     return () => {
       window.removeEventListener('sud:force-section', handler)
       window.removeEventListener(COMPANY_REFRESHED, reloadAll)
+      window.removeEventListener('sud:cases-reload', reloadAll)
     }
   }, [refetchAll, reloadAll])
 

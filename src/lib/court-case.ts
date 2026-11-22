@@ -92,6 +92,7 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 // scheduler records per-worker health for the Settings dashboard).
 import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
 import { salvageJsonArray } from '@/core/json-salvage'
+import { mergeRows, readFeed, writeFeed } from './case-store'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -411,16 +412,28 @@ async function searchCourtCasesInternal(
       // headers (`streamBody`), the body is read with an idle limit, and a duplicate hedge is not fired for a slow first byte (it would
       // run the same heavy query twice); what arrived before a stall or a break is kept (below)
       const isList = /\/findByTin\//.test(url)
+      // what this endpoint last said about this company (disk): asked with its ETag so an unchanged big list costs nothing, and the rows
+      // that arrived are merged into it, never replacing it with less (lib/case-store)
+      const feedKey = isList && mode === 'tin' && /^\d{9}$/.test(value) ? feedKeyOf(courtType, url) : null
+      const known = feedKey ? readFeed(value, feedKey) : null
+      const kept: CourtCase[] = known?.items ?? []
       const res = await fetchViaWorkers(url, {
         originKey: origin,
         // v207: jadval real searches measured at 1.8-21s — 12s killed winners;
         // 20s + curl fallback covers the tail without stalling the request.
-        timeoutMs: isJadvalSudUz || isList ? 20_000 : 12_000,
+        // A TIN LIST is slower still: the court's backend takes 5-29 s (measured, TIN of a large company) before the first byte, so the
+        // headers get 90 s (the body has its own idle limit below)
+        timeoutMs: isList ? 90_000 : isJadvalSudUz ? 20_000 : 12_000,
         hedgeMs: isList ? 6_000 : 800,
         // v207: per-TIN token bucket — 2 worker samples, not 3.
         maxAttempts: 2,
         streamBody: isList,
+        headers: known?.complete && known.etag ? { 'If-None-Match': known.etag } : undefined,
       })
+      if (res.status === 304 && known) {
+        console.log(`[court-case] ${origin} — list not modified, ${known.items.length} cases from disk`)
+        return { items: known.items, failed: false }
+      }
       if (!res.ok) {
         // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
         // as definitive. Only treat 404/410 as definitive for non-CONFLICT URLs.
@@ -431,7 +444,14 @@ async function searchCourtCasesInternal(
         }
         if (isJadvalSudUz) return await curlLadder()
         console.log(`[court-case] ${url} — HTTP ${res.status} after hedged attempts, marking as incomplete`)
-        return { items: [] as CourtCase[], failed: true }
+        return { items: kept, failed: true }
+      }
+      // a worker may answer 200 for a conditional request (it re-fetches and does not pass «not modified» on), but the answer still carries
+      // the ETag: the same ETag is the same list, so the body is not downloaded or parsed at all
+      if (known?.complete && known.etag && res.headers.get('etag') === known.etag) {
+        void res.body?.cancel().catch(() => {})
+        console.log(`[court-case] ${origin} — same ETag, ${known.items.length} cases from disk (body not read)`)
+        return { items: known.items, failed: false }
       }
       const body = isList ? await readBodyIdle(res, { idleMs: 20_000, totalMs: 240_000 }) : { text: await res.text(), complete: true }
       const text = body.text
@@ -439,20 +459,27 @@ async function searchCourtCasesInternal(
         // a stalled or broken download of a big list: keep the complete cases that arrived and say the list is partial (honesty invariant)
         const part = salvageJsonArray(text)
         console.log(`[court-case] ${origin} — big list cut short (${body.reason}): kept ${part.items.length} complete cases of the part that arrived`)
-        if (part.items.length > 0) return { items: part.items.map(mapper), failed: true }
+        if (part.items.length > 0) {
+          const arrived = part.items.map(mapper)
+          const merged = feedKey ? mergeRows(kept, arrived) : arrived
+          if (feedKey) writeFeed(value, feedKey, { t: Date.now(), complete: false, items: merged }) // no ETag: the next ask must fetch it all
+          return { items: merged, failed: true }
+        }
         if (isJadvalSudUz) return await curlLadder()
-        return { items: [] as CourtCase[], failed: true }
+        return { items: kept, failed: true }
       }
       // v207: fake-empty from a bad LB node is a retryable glitch, NOT a
       // definitive answer — a fast response here is almost always fake.
       if (isFakeEmptyText(text)) {
         console.log(`[court-case] ${origin} — fake-empty from flaky node, trying curl ladder`)
         if (isJadvalSudUz) return await curlLadder()
-        return { items: [] as CourtCase[], failed: true }
+        return { items: kept, failed: true }
       }
       const data = JSON.parse(text)
       const items = (Array.isArray(data) ? data : (data.data || [])).map(mapper)
       console.log(`[court-case] ${origin} — got ${items.length} cases via scheduler`)
+      // a COMPLETE list is the truth: it replaces the stored one (a case the court no longer lists is gone) and keeps its ETag
+      if (feedKey) writeFeed(value, feedKey, { t: Date.now(), etag: res.headers.get('etag') ?? undefined, complete: true, items })
       return { items, failed: false }
     } catch {
       // All workers failed at transport level → jadval.sud.uz gets the curl
@@ -460,7 +487,7 @@ async function searchCourtCasesInternal(
       // the endpoint incomplete (honesty invariant — v153).
       if (isJadvalSudUz) return await curlLadder()
       console.log(`[court-case] ${url} — all worker attempts failed, marking as incomplete`)
-      return { items: [] as CourtCase[], failed: true }
+      return { items: storedRows(courtType, mode, value, url), failed: true }
     }
   })
 
@@ -487,6 +514,22 @@ async function searchCourtCasesInternal(
 
   console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed' : ''}`)
   return { cases: merged, incomplete }
+}
+
+/** the stored feed of one list endpoint: court + host + path without the company number (the number is the file) */
+function feedKeyOf(courtType: CourtType, url: string): string {
+  try {
+    const u = new URL(url)
+    return `${courtType}|${u.hostname}${u.pathname.replace(/\/\d+$/, '')}`
+  } catch {
+    return `${courtType}|${url}`
+  }
+}
+
+/** what the disk holds for a list endpoint when every worker failed: the last rows, never nothing (the result is still marked incomplete) */
+function storedRows(courtType: CourtType, mode: SearchMode, value: string, url: string): CourtCase[] {
+  if (mode !== 'tin' || !/\/findByTin\//.test(url) || !/^\d{9}$/.test(value)) return []
+  return readFeed(value, feedKeyOf(courtType, url))?.items ?? []
 }
 
 interface ApiConfig {
@@ -651,10 +694,19 @@ function hearingFields(raw: any): Pick<CourtCase, 'hearingDate' | 'hearingTime' 
  * Get full case details. Calls BOTH jadvalapi.sud.uz and jadval.sud.uz and
  * merges the richest data from each.
  */
-export async function getCaseDetails(
+export async function getCaseDetails(courtType: CourtType, caseNumber: string): Promise<FullCaseData> {
+  return (await getCaseBundle(courtType, caseNumber)).data
+}
+
+/**
+ * The case's full detail AND its list row, from the same two answers (so refreshing ONE case costs the two single-case calls and
+ * nothing more). `row` is the row jadvalapi's list would have shown for it (null when only jadval.sud.uz answered): the store puts it into
+ * the company's stored list.
+ */
+export async function getCaseBundle(
   courtType: CourtType,
   caseNumber: string,
-): Promise<FullCaseData> {
+): Promise<{ data: FullCaseData; row: CourtCase | null }> {
   // defence in depth (the route checks too): the number is spliced into upstream URL paths
   if (!CASE_NUMBER_RE.test(caseNumber)) throw new Error('Ish raqami formati: X-XXXX-XXXX/XXXXX')
   const encodedNumber = caseNumber.replace('/', '@')
@@ -673,7 +725,7 @@ export async function getCaseDetails(
   // jadvalapi's findByNumber returns 400 for most court types.
   const raw = jadvalData?.[0] || jadvalApiData?.[0]
   if (!raw) {
-    return { general: null, firstInstance: null, appellate: null, cassation: null, inspection: null }
+    return { data: { general: null, firstInstance: null, appellate: null, cassation: null, inspection: null }, row: null }
   }
 
   const detailRaw = jadvalData?.[0] || jadvalApiData?.[0]
@@ -717,7 +769,7 @@ export async function getCaseDetails(
   // the result: this row's, else the latest earlier first-instance proceeding's
   const earlierResult = [...reviewsOf(raw, 'first')].reverse().map((r: any) => r.result).find((x: any) => x && x !== '—' && x !== '-')
   const decisionText = stageOfRow(d) === 'first' ? d.result || d.article || earlierResult || '' : earlierResult || ''
-  return {
+  const data: FullCaseData = {
     general: {
       caseNumber: d.casenumber || d.caseNumber || caseNumber,
       caseType: d.category || '-',
@@ -760,6 +812,7 @@ export async function getCaseDetails(
     cassation: parseReviewInstance(raw, hearingsRaw, 'cassation'),
     inspection: parseReviewInstance(raw, hearingsRaw, 'inspection'),
   }
+  return { data, row: jadvalApiData?.[0] ? mapJadvalApiCase(jadvalApiData[0]) : null }
 }
 
 /**

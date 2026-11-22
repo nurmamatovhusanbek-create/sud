@@ -109,8 +109,14 @@ export function searchCases(params: { courtType: string; mode: string; value: st
   return request<{ cases: CourtCase[] }>(`/api/court-cases?${q}`, signal)
 }
 
-export function getCaseDetail(courtType: string, caseNumber: string, signal?: AbortSignal) {
+/**
+ * `refresh`: ask the court about THIS case only (the drawer's «Yangilash»); on failure the caller keeps what it shows.
+ * `tin`: the company the case was opened from, so its stored list gets the fresh row too.
+ */
+export function getCaseDetail(courtType: string, caseNumber: string, signal?: AbortSignal, opts?: { refresh?: boolean; tin?: string }) {
   const q = new URLSearchParams({ courtType: normalizeCourtType(courtType) ?? courtType, detail: caseNumber })
+  if (opts?.refresh) q.set('refresh', '1')
+  if (opts?.tin) q.set('tin', opts.tin)
   return request<FullCaseData>(`/api/court-cases?${q}`, signal)
 }
 

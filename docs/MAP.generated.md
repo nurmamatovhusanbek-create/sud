@@ -58,9 +58,10 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
 | `billing-format.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, lib/api-client.ts, lib/api-types.ts, lib/billing.ts | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
-| `case-status.ts` | components/sections/cases.tsx, core/classify.ts, core/public-orders.ts | core/__tests__/case-status.test.ts |
+| `case-freeze.ts` | lib/served-case.ts | core/__tests__/case-freeze.test.ts |
+| `case-status.ts` | components/sections/cases.tsx, core/case-freeze.ts, core/classify.ts, core/public-orders.ts | core/__tests__/case-status.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/case-status.test.ts, core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/hearing-pick.ts, core/instance-track.ts, lib/court-case.ts, +5 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
+| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/case-freeze.ts, core/hearing-pick.ts, core/instance-track.ts, +6 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
@@ -107,11 +108,12 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
 | `bills-snapshot.ts` | api/bills/route | lib/__tests__/bills-snapshot.test.ts |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/case-instances.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
+| `case-store.ts` | lib/court-case.ts, lib/served-case.ts | lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts |
+| `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/case-instances.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
 | `count-tween.ts` | components/proto/primitives.tsx | lib/__tests__/count-tween.test.ts |
-| `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/court-case.ts, sources/index.ts |  |
-| `court-case.ts` | api/court-cases/export/route, lib/stats.ts, sources/index.ts | lib/__tests__/case-instances.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
+| `court-case-types.ts` | api/court-cases/export/route, components/sections/cases.tsx, lib/api-types.ts, lib/case-store.ts, lib/court-case.ts, lib/served-case.ts, sources/index.ts | lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts |
+| `court-case.ts` | api/court-cases/export/route, api/court-cases/route, lib/stats.ts, sources/index.ts | lib/__tests__/case-instances.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
 | `documents/bulk.server.ts` | api/documents/generate-bulk/route | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/script.test.ts |
@@ -174,7 +176,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `report/model.ts` | lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/report/__tests__/fixtures.ts, lib/report/__tests__/model.test.ts, lib/report/__tests__/render-ink.test.ts, lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
 | `report/render-ink.ts` | lib/report/doc.ts | lib/report/__tests__/render-ink.test.ts |
 | `report/render.ts` | lib/report/doc.ts, lib/report/render-ink.ts | lib/report/__tests__/render.test.ts, lib/report/__tests__/xss.test.ts |
-| `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
+| `served-case.ts` | api/court-cases/route | lib/__tests__/served-case.test.ts |
+| `snapshot-store.ts` | api/bills/route, api/company-info/route, api/court-cases/route, api/snapshot/route, lib/bills-snapshot.ts, lib/served-case.ts, lib/stats-snapshot.ts | lib/__tests__/bills-snapshot.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/snapshot-store.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `stats-snapshot.ts` | api/stats/route | lib/__tests__/stats-snapshot.test.ts |
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 | lib/__tests__/ui-boundary.test.ts |
@@ -301,6 +304,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `CACHE_TTL_COURT_MS` | server/config.ts |
 | `CACHE_TTL_STATS_MS` | server/config.ts |
 | `CACHE_TTL_UPCOMING_MS` | server/config.ts |
+| `CASE_STORE_DIR` | lib/case-store.ts |
 | `CF_WORKER_REQUIRE_CONFIGURED` | server/config.ts |
 | `CF_WORKER_SECRET` | server/config.ts |
 | `CF_WORKER_URL` | lib/cf-worker-pool.ts, lib/workers-config.ts, server/config.ts |
@@ -355,6 +359,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sud-tizimi` | lib/public-orders/meta-backup.ts, lib/update-check.ts |
 | `sud-watchlist` | lib/registry.ts |
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
+| `sud:cases-reload` | components/sections/cases.tsx |
 | `sud:company-refreshed` | lib/hard-refresh.ts |
 | `sud:doc-script` | lib/documents/script-pref.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
@@ -371,6 +376,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | Event | Used in |
 |---|---|
 | `sud:cases-query` | components/sections/cases.tsx, components/sections/overview.tsx |
+| `sud:cases-reload` | components/sections/cases.tsx |
 | `sud:company-refreshed` | lib/hard-refresh.ts |
 | `sud:doc-script` | lib/documents/script-pref.ts |
 | `sud:export-active` | app/page.tsx, components/company/context-bar.tsx |
@@ -392,6 +398,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__resetRatingCacheForTests` | lib/rating-service.ts |
 | `__resetSecurityForTests` | server/audit.ts |
 | `__resetSnapshotsForTests` | lib/snapshot-store.ts |
+| `__sudCaseStore` | lib/case-store.ts |
 | `__sudHealthPools` | lib/health-registry.ts |
 | `__sudHealthStore` | lib/health-store.ts |
 | `__sudHidden` | lib/public-orders/hidden-store.ts |
