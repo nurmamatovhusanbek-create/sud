@@ -114,6 +114,17 @@ export function sealManifest(m: AnyManifest, salt: Buffer, key: Buffer): Buffer 
   return Buffer.concat([MAGIC, salt, seal(key, Buffer.from(JSON.stringify(m)), MANIFEST_AAD)])
 }
 
+/** a manifest of the same chain (same salt): opened with the key already derived, no second scrypt */
+export function openManifestWithKey(key: Buffer, blob: Uint8Array): AnyManifest | null {
+  const b = Buffer.from(blob.buffer, blob.byteOffset, blob.byteLength)
+  if (b.length < MAGIC.length + SALT + IV + TAG || !b.subarray(0, MAGIC.length).equals(MAGIC)) return null
+  try {
+    return JSON.parse(open(key, b.subarray(MAGIC.length + SALT), MANIFEST_AAD).toString('utf8')) as AnyManifest
+  } catch {
+    return null
+  }
+}
+
 export type OpenedManifest = { ok: true; manifest: AnyManifest; key: Buffer; salt: Buffer } | { ok: false; error: 'not_backup' | 'wrong_passphrase' }
 
 export function openManifest(passphrase: string, blob: Uint8Array): OpenedManifest {

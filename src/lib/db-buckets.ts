@@ -183,3 +183,45 @@ export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), o
   })
   return n
 }
+
+
+// ---- merging two copies of one bucket -----------------------------------------------------------------------------------
+
+/** the row's identity inside a bucket, and its time (rows with a time: the newer copy wins; the others: the LOCAL copy wins) */
+function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null } {
+  switch (kind) {
+    case 'bills': return { key: String(r[1]), t: null }
+    case 'found': return { key: String(r[2]), t: Number(r[7]) || 0 }
+    case 'details': return { key: String(r[1]), t: Number(r[2]) || 0 }
+    case 'tried': return { key: String(r[1]), t: Number(r[2]) || 0 }
+    case 'index': return { key: `${r[0]}:${r[1]}`, t: null }
+    default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
+  }
+}
+
+/**
+ * The union of what the channel already holds for a bucket (`base`) and what this computer holds (`local`): every row of either, a row in both is
+ * the newer one (by its own time; no time: the local one), in the bucket's key order. A backup of a computer that has only part of a company's data
+ * therefore never takes the rest away from the channel. Returns the text of the merged bucket.
+ */
+export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Array): Buffer {
+  const b = parseBucket(name)
+  if (!b) throw new Error('noma\'lum bo\'lak')
+  const rows = new Map<string, { line: string; t: number | null }>()
+  const take = (text: Uint8Array, isLocal: boolean) => {
+    for (const line of Buffer.from(text).toString('utf8').split('\n')) {
+      if (!line) continue
+      let r: unknown[]
+      try { r = JSON.parse(line) as unknown[] } catch { continue }
+      const { key, t } = rowKey(b.kind, r)
+      const have = rows.get(key)
+      if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t })
+    }
+  }
+  take(base, false)
+  take(local, true)
+  // the order `renderBucket` writes: by key (case numbers, bill numbers: plain ASCII, so code-unit order is the database's order)
+  const order = (e: [string, { line: string }]) => (b.kind === 'index' ? (e[0].startsWith('c:') ? `0${e[0]}` : `1${e[0]}`) : e[0])
+  const lines = [...rows.entries()].sort((x, y) => (order(x) < order(y) ? -1 : order(x) > order(y) ? 1 : 0)).map((e) => e[1].line)
+  return Buffer.from(lines.join('\n') + '\n')
+}

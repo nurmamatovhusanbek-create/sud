@@ -277,6 +277,52 @@ describe('incremental backup and restore through a fake channel', () => {
   })
 })
 
+describe('a backup never takes data away from the channel', () => {
+  const OTHER2 = '201052713'
+  const seedOther = () => {
+    const db = dbm.getDb()
+    db.prepare('INSERT INTO bills (tin, number, pass, status, issued, amount, hay) VALUES (?, ?, 0, ?, ?, 5, ?)').run(OTHER2, 'z1', 'PAID', ms('2024-02-02'), 'h')
+    db.prepare('INSERT INTO bill_loads (tin, total_elements, total_pages, page_size, pass, pages_done, complete, stable, loaded_at) VALUES (?, 1, 1, 10000, 0, 1, 1, 1, 5)').run(OTHER2)
+  }
+
+  test('a computer that holds ANOTHER company backs up without dropping the first one', async () => {
+    fakeChannel()
+    await runBackup() // computer A: the company TIN
+    // computer B: an empty database with only OTHER2
+    dbm.closeDb()
+    for (const n of fs.readdirSync(DIR)) if (n.startsWith('sud.db')) fs.rmSync(path.join(DIR, n), { force: true })
+    seedOther()
+    const b = await runBackup()
+    expect(b.phase).toBe('done')
+    expect(b.message).toContain('kanaldan olingan')
+    const cat = catalogLib.readCatalog()!
+    expect(cat.companies.map((c) => c.tin).sort()).toEqual([OTHER2, TIN].sort())
+    // and the restore has both
+    backup.startRestore(PASS)
+    const r = await finished()
+    const copy = dbm.openDbFile(r.result!.restoredFile!)
+    expect(Number(copy.prepare('SELECT COUNT(*) c FROM bills WHERE tin = ?').get(TIN)?.c)).toBe(600)
+    expect(Number(copy.prepare('SELECT COUNT(*) c FROM bills WHERE tin = ?').get(OTHER2)?.c)).toBe(1)
+    copy.close()
+  })
+
+  test('a company both computers hold: the backup is the union of their rows', async () => {
+    fakeChannel()
+    await runBackup() // A: bills a0..a299 (2024) and b0..b299 (2025)
+    dbm.closeDb()
+    for (const n of fs.readdirSync(DIR)) if (n.startsWith('sud.db')) fs.rmSync(path.join(DIR, n), { force: true })
+    // B holds the same company but only one new bill in 2025
+    dbm.getDb().prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, hay) VALUES (?, 'new1', 0, 'PAID', ?, 7, 'h')").run(TIN, ms('2025-06-06'))
+    await runBackup()
+    backup.startRestore(PASS)
+    const r = await finished()
+    const copy = dbm.openDbFile(r.result!.restoredFile!)
+    expect(Number(copy.prepare("SELECT COUNT(*) c FROM bills WHERE tin = ? AND number LIKE 'b%'").get(TIN)?.c)).toBe(300) // A's rows are still there
+    expect(copy.prepare("SELECT amount FROM bills WHERE number = 'new1'").get()?.amount).toBe(7) // and B's new one
+    copy.close()
+  })
+})
+
 describe('catalog and loading single companies from the channel', () => {
   const OTHER = '201052713'
 

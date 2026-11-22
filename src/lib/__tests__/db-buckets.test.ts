@@ -106,6 +106,27 @@ describe('buckets', () => {
     target.close()
   })
 
+  test('merging two copies of a bucket: every row of either, the newer one where both have it, in key order', () => {
+    const t = (rows: unknown[][]) => Buffer.from(rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    const lines = (b: Buffer) => b.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    // found cases: [court, tin, num, yymm, status, hay, row, t]
+    const base = t([['civil', A, '2-1004-2403/1', 2403, 'old', '', '{}', 10], ['civil', A, '2-1004-2403/9', 2403, 'only-remote', '', '{}', 5]])
+    const local = t([['civil', A, '2-1004-2403/1', 2403, 'new', '', '{}', 20], ['civil', A, '2-1004-2403/5', 2403, 'only-local', '', '{}', 7]])
+    const m = lines(bk.mergeBucketText(`found:${A}:civil:24`, base, local))
+    expect(m.map((r) => [r[2], r[4]])).toEqual([['2-1004-2403/1', 'new'], ['2-1004-2403/5', 'only-local'], ['2-1004-2403/9', 'only-remote']])
+    // the same row, the REMOTE one is newer: it stays
+    const m2 = lines(bk.mergeBucketText(`found:${A}:civil:24`, t([['civil', A, '2-1004-2403/1', 2403, 'remote-newer', '', '{}', 99]]), local))
+    expect(m2.find((r) => r[2] === '2-1004-2403/1')?.[4]).toBe('remote-newer')
+    // bills have no time: the local copy wins, rows only the channel has are kept
+    const b = lines(bk.mergeBucketText(`bills:${A}:2024`, t([['x', '1001', 'OLD'], ['x', '1002', 'KEEP']]), t([['x', '1001', 'NEW'], ['x', '1000', 'ADD']])))
+    expect(b.map((r) => [r[1], r[2]])).toEqual([['1000', 'ADD'], ['1001', 'NEW'], ['1002', 'KEEP']])
+    // a copy that adds nothing merges to exactly the other one (so its id matches and nothing is uploaded)
+    expect(bk.mergeBucketText(`bills:${A}:2024`, t([['x', '1001', 'A'], ['x', '1002', 'B']]), t([['x', '1001', 'A']])).equals(t([['x', '1001', 'A'], ['x', '1002', 'B']]))).toBe(true)
+    // the locator: cases first, then bills, each by key
+    const ix = lines(bk.mergeBucketText(`index:${A}`, t([['c', '2-1-2401/9', 'civil', 24], ['b', '2002', 2024, '']]), t([['c', '2-1-2401/1', 'civil', 24], ['b', '1001', 2024, '']])))
+    expect(ix.map((r) => r[1])).toEqual(['2-1-2401/1', '2-1-2401/9', '1001', '2002'])
+  })
+
   test('an unknown name is refused', () => {
     expect(() => bk.importBucket('nonsense:1', Buffer.from('[]\n'))).toThrow()
     expect(bk.renderBucket('nonsense:1')).toBeNull()

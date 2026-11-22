@@ -124,7 +124,7 @@ describe('load', () => {
     const st = await run({ fill: false })
     expect(st.state).toBe('done')
     expect(billCalls).toEqual([0, 1, 1, 1, 2])
-    expect(waits).toEqual([15_000, 30_000])
+    expect(waits).toEqual([30_000, 60_000])
   })
 
   test('a page that keeps failing ends the job with the pages already stored kept; the next start resumes the SAME pass after them', async () => {

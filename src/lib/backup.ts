@@ -6,10 +6,10 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 import {
-  CHUNK_PLAIN, MIN_PASSPHRASE, bucketAad, bucketId, chunkAad, chunkPlain, deriveKey, newSalt, open, openManifest, seal, sealManifest, sha256,
+  CHUNK_PLAIN, MIN_PASSPHRASE, bucketAad, bucketId, chunkAad, chunkPlain, deriveKey, newSalt, open, openManifest, openManifestWithKey, seal, sealManifest, sha256,
   type AnyManifest, type BucketRef, type Manifest, type ManifestV2, type PartRef,
 } from './backup-crypto'
-import { importBucket, listBuckets, parseBucket, renderBucket } from './db-buckets'
+import { importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
 import { billJobRunning } from './bill-cases'
@@ -150,6 +150,42 @@ async function pinnedManifest(token: string, chat: string, passphrase: string, w
   return { ok: true, value: { m: o.manifest, salt: o.salt, key: o.key, pin: { messageId: pinned.value.messageId, fileId: pinned.value.fileId } } }
 }
 
+/** download, check, open and unpack one bucket of the channel */
+async function downloadBucket(token: string, key: Buffer, b: BucketRef): Promise<Buffer | null> {
+  const gz: Buffer[] = []
+  for (let i = 0; i < b.parts.length; i++) {
+    const p = b.parts[i]!
+    const f = await getFileBytes(token, p.fileId)
+    if (!f.ok || f.value.length !== p.size || sha256(f.value) !== p.sha256) return null
+    try {
+      gz.push(open(key, f.value, bucketAad(b.id, i)))
+    } catch {
+      return null
+    }
+  }
+  const text = zlib.gunzipSync(Buffer.concat(gz))
+  return bucketId(key, text) === b.id ? text : null
+}
+
+/**
+ * What the channel holds, by bucket name: the NEWEST version of every bucket ever uploaded in this chain (the pinned manifest first, then each `prev`).
+ * A computer that holds only part of the data (a second machine, a fresh scrape) must not take the rest away from the channel, so a backup starts from
+ * this union: buckets it has nothing new for are carried over, buckets both have are merged.
+ */
+async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limit = 60): Promise<Map<string, BucketRef>> {
+  const out = new Map<string, BucketRef>()
+  let m: ManifestV2 | null = newest
+  for (let depth = 0; m && depth < limit; depth++) {
+    for (const b of m.buckets) if (!out.has(b.name)) out.set(b.name, b)
+    if (!m.prev) break
+    const f = await getFileBytes(token, m.prev.fileId)
+    if (!f.ok) break // an older manifest that is gone: what was gathered so far is what the channel certainly holds
+    const older = openManifestWithKey(key, f.value)
+    m = older && older.v === 2 ? older : null
+  }
+  return out
+}
+
 async function runBackup(passphrase: string, token: string, chat: string): Promise<void> {
   const prev = await pinnedManifest(token, chat, passphrase, 'Parol notoʻgʻri: kanaldagi zaxira boshqa parol bilan yaratilgan (avvalgi parolni kiriting)')
   if (!prev.ok) return fail(prev.error)
@@ -157,7 +193,13 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
   const salt = prev.value?.salt ?? newSalt()
   const key = prev.value?.key ?? deriveKey(passphrase, salt)
   const known = new Map<string, BucketRef>()
-  if (prev.value?.m.v === 2) for (const b of prev.value.m.buckets) known.set(b.id, b)
+  let base = new Map<string, BucketRef>()
+  if (prev.value?.m.v === 2) {
+    for (const b of prev.value.m.buckets) known.set(b.id, b)
+    set({ phase: 'snapshot', message: 'Kanaldagi zaxira tarixi oʻqilmoqda…' })
+    base = await chainBuckets(token, key, prev.value.m)
+    for (const b of base.values()) known.set(b.id, b)
+  }
 
   const snap = snapshotFile()
   let snapDb: ReturnType<typeof openDbFile> | null = null
@@ -178,8 +220,19 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       const name = names[n]!
       const r = renderBucket(name, snapDb)
       if (!r) continue
-      const bid = bucketId(key, r.text)
-      plainBytes += r.text.length
+      let text: Buffer = r.text
+      let rows = r.rows
+      // the channel already holds a DIFFERENT version of this bucket (another computer, an older scrape): the backup is their union
+      const held = base.get(name)
+      if (held && held.id !== bucketId(key, text)) {
+        const theirs = await downloadBucket(token, key, held)
+        if (theirs) {
+          text = mergeBucketText(name, theirs, text)
+          rows = text.toString('utf8').split('\n').filter(Boolean).length
+        }
+      }
+      const bid = bucketId(key, text)
+      plainBytes += text.length
       const old = known.get(bid)
       // an unchanged bucket is reused when the channel still holds all of its pieces
       if (old && old.name === name) {
@@ -192,7 +245,7 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
           continue
         }
       }
-      const gz = zlib.gzipSync(r.text, { level: 6 })
+      const gz = zlib.gzipSync(text, { level: 6 })
       const size = chunkPlain()
       const count = Math.max(1, Math.ceil(gz.length / size))
       const parts: PartRef[] = []
@@ -205,10 +258,18 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
         sentParts++
         await pause(gapMs())
       }
-      refs.push({ name, id: bid, rows: r.rows, bytes: r.text.length, parts })
+      refs.push({ name, id: bid, rows, bytes: text.length, parts })
       set({ done: n + 1, message: `Yuklanmoqda: ${n + 1}/${total}` })
     }
 
+    // buckets of other companies / years that this computer has nothing for stay in the manifest: a backup never takes data away from the channel
+    const have = new Set(refs.map((x) => x.name))
+    let carried = 0
+    for (const [bname, ref] of base) {
+      if (have.has(bname)) continue
+      refs.push(ref)
+      carried++
+    }
     set({ phase: 'manifest', message: 'Manifest yuborilmoqda…' })
     const companies: ManifestV2['companies'] = {}
     for (const c of snapDb.prepare('SELECT tin, first_at, refreshed_at FROM companies').all()) companies[String(c.tin)] = { firstAt: Number(c.first_at), refreshedAt: Number(c.refreshed_at) }
@@ -231,7 +292,7 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       result,
       finishedAt: Date.now(),
       message: pin.ok
-        ? `Tayyor: ${refs.length - reused} ta yangi/oʻzgargan, ${reused} ta oʻzgarmagan boʻlak; manifest mahkamlandi`
+        ? `Tayyor: ${refs.length - reused - carried} ta yangi/oʻzgargan, ${reused} ta oʻzgarmagan${carried ? `, ${carried} ta kanaldan olingan` : ''} boʻlak; manifest mahkamlandi`
         : `Zaxira joylandi, lekin manifestni mahkamlab boʻlmadi (${pin.error}): botga «Pin messages» huquqini bering`,
     })
   } finally {

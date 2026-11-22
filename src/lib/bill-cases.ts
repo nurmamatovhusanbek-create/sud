@@ -31,9 +31,13 @@ import { passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 export const RETRY_MISSING_MS = 14 * 24 * 60 * 60_000
 /** the pause between two requests to the court (`CASE_FETCH_GAP_MS`) */
 export const DEFAULT_PACE_MS = 1_200
-/** a billing page that failed is tried again this many times, `PAGE_RETRY_MS` × attempt apart */
-const PAGE_ATTEMPTS = 3
-const PAGE_RETRY_MS = 15_000
+/**
+ * a billing page that failed is tried again this many times, `PAGE_RETRY_MS` × attempt apart (30 s, 60 s … about 15 minutes in all). Billing's captcha is
+ * flaky for a client it scores low (a solved picture can still end in «Failed captcha check», measured on a 123 255-bill company: pages 11+ failed for
+ * minutes while page 0 and others passed), so a background load waits and tries again for a long while before it gives up; what is stored stays.
+ */
+const PAGE_ATTEMPTS = 8
+const PAGE_RETRY_MS = 30_000
 const BACKOFF_FIRST_MS = 20_000
 const BACKOFF_MAX_MS = 15 * 60_000
 /** the job pauses after this many failures in a row */
