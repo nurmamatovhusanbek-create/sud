@@ -14,7 +14,7 @@ import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Tim
 import { SolidIcon } from '@/components/ui-custom/solid-icons'
 import { getLook } from '@/lib/look'
 import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
-import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
+import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, DwSection, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useStream, phaseIndex } from '@/hooks/use-stream'
@@ -79,12 +79,22 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
     ['Sana', formatDate(b.issued), { mono: true }],
     // the day of the ruling this invoice belongs to (billing returns it; nothing showed it)
     ['Qaror sanasi', d?.decisionDate ? formatDate(d.decisionDate).slice(0, 10) : '', { mono: true }],
+    ['Toʻlovchi STIR', d?.payerTin, { mono: true }],
+    ['Hisob raqami', d?.forAccount, { mono: true }],
     ['Maqsad', d?.purpose || d?.description],
+    ['Toʻlanishi kerak', d?.mustPayAmount ? `${formatSum(d.mustPayAmount)} soʻm` : '', { mono: true }],
     ['Toʻlangan', d ? `${formatSum(d.paidAmount)} soʻm` : '', { mono: true }],
     ['Balans', d ? `${formatSum(d.balance)} soʻm` : '', { mono: true }],
     ['Muddati oʻtgan', d?.overdue && d.overdue > 0 ? `${formatSum(d.overdue)} soʻm` : '', { mono: true, tone: 'neg' }],
     ['Foydasiga', d?.isInFavor === true ? 'Ha' : d?.isInFavor === false ? 'Yoʻq' : ''],
   ]
+
+  // where this invoice was USED: each entry is a payment applied to a case (billing's historyList; a rolled-back one is marked)
+  const history: DwRow[] = (d?.historyList ?? []).map((h) => [
+    formatDate(h.createdAt).slice(0, 10),
+    `${h.caseNumber || 'ish raqamisiz'} · ${formatSum(h.amount)} soʻm${h.rolledBackAt ? ' · qaytarilgan' : ''}`,
+    { mono: true },
+  ])
 
   // v204 (P-C): real print dialog for the receipt (was a fake toast).
   const printReceipt = () => {
@@ -105,7 +115,9 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
           ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : null],
           ['Ish raqami', d?.claimCaseNumber],
           ['Sana', formatDate(b.issued)],
+          ['Toʻlovchi STIR', d?.payerTin],
           ['Maqsad', d?.purpose || d?.description],
+          ['Toʻlanishi kerak', d?.mustPayAmount ? `${formatSum(d.mustPayAmount)} soʻm` : null],
           ['Toʻlangan', d ? `${formatSum(d.paidAmount)} soʻm` : null],
           ['Balans', d ? `${formatSum(d.balance)} soʻm` : null],
           ...(d?.overdue && d.overdue > 0 ? [['Muddati oʻtgan', `${formatSum(d.overdue)} soʻm`]] : []),
@@ -153,6 +165,11 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
         <DwKv rows={rows} />
         <DwFig label="Jami summa" value={formatSum(d?.amount)} unit="soʻm" />
       </div>
+      {history.length > 0 && (
+        <DwSection title="Foydalanish tarixi" count={history.length}>
+          <DwKv rows={history} />
+        </DwSection>
+      )}
     </div>,
     subline,
     {

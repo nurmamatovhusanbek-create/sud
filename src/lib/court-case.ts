@@ -510,6 +510,13 @@ function getApiConfig(courtType: CourtType, mode: SearchMode, value: string): Ap
         mapper: mapJadvalApiCase,
       })
     }
+  } else if (courtType === 'criminal') {
+    // the route exists (an unknown TIN answers 404 «No claims found.», read live Nov 2026) but a company rarely has a criminal case, so the
+    // UI asks for it only when «Jinoyat» is picked, never as part of «Barchasi»; the row shape is assumed to be the other types'
+    configs.push({
+      url: `${JADVALAPI}/online-monitoring/CRIMINAL/${mode === 'tin' ? 'findByTin' : 'findByNumber'}/${value}`,
+      mapper: mapJadvalApiCase,
+    })
   } else if (courtType === 'administrative') {
     if (mode === 'tin') {
       configs.push({
@@ -703,6 +710,7 @@ export async function getCaseDetails(
       court: now.court || d.court || '-',
       judge: now.judge || '-',
       currentInstance: now.stage,
+      region: String(d.region || ''),
       secretary: '-',
       plaintiff: d.claiment || d.claimant || d.plaintiff || '-',
       plaintiffTin: '-',
@@ -797,10 +805,10 @@ async function fetchJadvalApiDetails(courtTypeUpper: string, encodedNumber: stri
     ECONOMIC: 'ECONOMIC',
     CIVIL: 'CIVIL',
     ADMINISTRATIVE: 'CONFLICT',
-    CRIMINAL: '', // jadvalapi doesn't support criminal — skip
+    CRIMINAL: 'CRIMINAL',
   }
   const apiType = apiTypeMap[courtTypeUpper] || ''
-  if (!apiType) return null // Criminal cases are only on jadval.sud.uz
+  if (!apiType) return null
 
   const url = `${JADVALAPI}/online-monitoring/${apiType}/findByNumber/${encodedNumber}`
   // v206: routed through the shared hedged scheduler (was round-robin single worker)

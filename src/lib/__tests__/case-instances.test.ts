@@ -18,7 +18,7 @@ mock.module('@/lib/cf-worker-pool', () => ({
 
 const CASE = '4-1001-2621/42936'
 const raw = {
-  casenumber: CASE, court: 'Toshkent shahar iqtisodiy sudi', category: 'Qarz undirish', status_name: 'Назоратда',
+  casenumber: CASE, region: 'Хоразм вилояти', court: 'Toshkent shahar iqtisodiy sudi', category: 'Qarz undirish', status_name: 'Назоратда',
   instance: 'Биринчи инстанция', claiment: 'ALFA MCHJ', defendant: 'BETA MCHJ', reg_date: '01.02.2026',
   hearing_date: '03.03.2026', hearing_time: '10:00', responsible: 'Karimov', result: 'Даъво қаноатлантирилсин',
   reviews: [
@@ -52,6 +52,7 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   const worker = WORKERS.find((w) => full.startsWith(w)) ?? ''
   const url = full.slice(worker.length)
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  if (url.includes('CRIMINAL/findByTin/309922241')) return json([{ ...raw, casenumber: '1-1001-2621/00001', instance: 'Биринчи инстанция', reviews: [] }])
   if (url.includes(MULTI.replace('/', '@'))) return json([multi])
   if (url.includes('findByTin/309922240')) return json([{ ...raw, casenumber: '4-1001-2621/42937', hearing_date: '', hearing_time: '', reviews: [{ instance: 'Апелляция инстанцияси', court: 'Appeal court', responsible: 'Aliyev' }] }])
   if (url.includes('jadval.sud.uz/case/findByNumber/') || url.includes('jadvalapi.sud.uz')) return json([raw])
@@ -111,5 +112,16 @@ describe('every proceeding of the case number counts (the real API shape)', () =
   test('the EARLIER first-instance proceeding joins the first instance\'s hearings', async () => {
     const d = await getCaseDetails('economic', MULTI)
     expect(d.firstInstance?.hearings.map((h) => h.judge).sort()).toEqual(['Karimov', 'Rahimov'].sort())
+  })
+})
+
+describe('criminal and region', () => {
+  test('a criminal search asks jadvalapi CRIMINAL/findByTin and maps the rows like the others', async () => {
+    const r = await searchCourtCases('criminal', 'tin', '309922241')
+    expect(r[0]).toMatchObject({ caseNumber: '1-1001-2621/00001', judge: 'Karimov' })
+  })
+  test('the court region reaches the case detail', async () => {
+    const d = await getCaseDetails('economic', CASE)
+    expect(d.general?.region).toBe('Хоразм вилояти')
   })
 })

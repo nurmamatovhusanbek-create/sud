@@ -52,6 +52,7 @@ const COURT_SEG: { key: string; label: string }[] = [
   { key: 'economic', label: 'Iqtisodiy' },
   { key: 'civil', label: 'Fuqarolik' },
   { key: 'administrative', label: "Maʼmuriy" },
+  { key: 'criminal', label: 'Jinoyat' },
 ]
 
 const COURT_TYPES: CourtType[] = ['economic', 'civil', 'administrative']
@@ -384,6 +385,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
 
     const rows: DwRow[] = [
       [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${INSTANCE_NAME[g.currentInstance]}` : 'Sudya', g?.judge],
+      ['Hudud', g?.region],
       ['Kotib', g?.secretary],
       ['Ish turi', g?.caseType],
       ['Daʼvo predmeti', g?.claimSubject],
@@ -595,19 +597,27 @@ export function CasesSection() {
     { cacheKey: `court:administrative:tin:${stir}`, persist: false, enabled: !!company && courts.includes('administrative') },
   )
 
+  // criminal: only when «Jinoyat» is picked (never part of «Barchasi»: a company rarely has one, and it would be one more request each time)
+  const crim = useResource<{ cases: CourtCase[] }>(
+    (signal, force) => searchCases({ courtType: 'criminal', mode: 'tin', value: stir }, signal, force),
+    { cacheKey: `court:criminal:tin:${stir}`, persist: false, enabled: !!company && courts.includes('criminal') },
+  )
+
   const views = useMemo(
     () =>
       [
         { courtType: 'economic' as CourtType, view: econ.state as ResourceState<{ cases: CourtCase[] }>, refetch: econ.refetch, elapsed: econ.elapsed },
         { courtType: 'civil' as CourtType, view: civ.state as ResourceState<{ cases: CourtCase[] }>, refetch: civ.refetch, elapsed: civ.elapsed },
         { courtType: 'administrative' as CourtType, view: adm.state as ResourceState<{ cases: CourtCase[] }>, refetch: adm.refetch, elapsed: adm.elapsed },
+        { courtType: 'criminal' as CourtType, view: crim.state as ResourceState<{ cases: CourtCase[] }>, refetch: crim.refetch, elapsed: crim.elapsed },
       ].filter((v) => courts.includes(v.courtType)),
-    [econ.state, civ.state, adm.state, econ.elapsed, civ.elapsed, adm.elapsed, courtFilter],
+    [econ.state, civ.state, adm.state, crim.state, econ.elapsed, civ.elapsed, adm.elapsed, crim.elapsed, courtFilter],
   )
   const refetchEnabled = () => {
     if (courts.includes('economic') && econ.state.status === 'error') econ.refetch()
     if (courts.includes('civil') && civ.state.status === 'error') civ.refetch()
     if (courts.includes('administrative') && adm.state.status === 'error') adm.refetch()
+    if (courts.includes('criminal') && crim.state.status === 'error') crim.refetch()
   }
 
   // v208: Yangilash previously did NOTHING on this section (no listener).
@@ -616,14 +626,16 @@ export function CasesSection() {
     if (courts.includes('economic')) econ.refetch()
     if (courts.includes('civil')) civ.refetch()
     if (courts.includes('administrative')) adm.refetch()
-  }, [econ.refetch, civ.refetch, adm.refetch, courts.join(',')])
+    if (courts.includes('criminal')) crim.refetch()
+  }, [econ.refetch, civ.refetch, adm.refetch, crim.refetch, courts.join(',')])
 
   // the header's hard refresh already scraped (through the stats): read the lists again, without forcing a second scrape
   const reloadAll = useCallback(() => {
     if (courts.includes('economic')) econ.reload()
     if (courts.includes('civil')) civ.reload()
     if (courts.includes('administrative')) adm.reload()
-  }, [econ.reload, civ.reload, adm.reload, courts.join(',')])
+    if (courts.includes('criminal')) crim.reload()
+  }, [econ.reload, civ.reload, adm.reload, crim.reload, courts.join(',')])
 
   useEffect(() => {
     const handler = () => refetchAll()

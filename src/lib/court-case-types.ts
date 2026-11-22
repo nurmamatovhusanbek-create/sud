@@ -35,6 +35,8 @@ export interface CaseDetail {
   judge: string
   /** the instance `court` and `judge` belong to: the one the case is in now */
   currentInstance?: 'first' | 'appeal' | 'cassation' | 'inspection'
+  /** the court's region («Хоразм вилояти») */
+  region?: string
   secretary: string
   plaintiff: string
   plaintiffTin: string
