@@ -22,7 +22,7 @@ export function mountShell(headEl) {
     const t = v.trim()
     timer = setTimeout(() => {
       if (t.length < 3) { if (route().name === 'search') go({ name: 'home' }, { replace: true }); return }
-      route().name === 'search' ? (remember({ name: 'search', q: t }), rerender()) : go({ name: 'search', q: t })
+      if (route().name === 'search') { remember({ name: 'search', q: t }); rerender() } else go({ name: 'search', q: t })
     }, 220)
   }
   field = Field({ placeholder: 'Ish, kvitansiya yoki STIR', onInput })
