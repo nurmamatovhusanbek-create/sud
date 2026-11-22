@@ -68,7 +68,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
-| `bill-cases.ts` | core/bill-rows.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/case-store.ts, lib/db-import.ts | core/__tests__/bill-cases.test.ts |
+| `bill-cases.ts` | core/bill-rows.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/case-store.ts, lib/db-import.ts | core/__tests__/bill-cases.test.ts, lib/__tests__/db.test.ts |
 | `bill-passes.ts` | lib/bill-cases.ts | core/__tests__/bill-passes.test.ts |
 | `bill-rows.ts` | api/bills/export/route, api/bills/query/route, components/sections/bills.tsx, lib/api-types.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/db-import.ts | core/__tests__/bill-rows.test.ts, lib/__tests__/bills-store.test.ts |
 | `billing-format.ts` | api/bills/export/route, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/found-cases.tsx, components/sections/overview.tsx, core/bill-cases.ts, core/bill-rows.ts, +4 | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |
@@ -135,10 +135,11 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `court-case-types.ts` | api/court-cases/export/route, api/found-cases/route, components/sections/cases.tsx, core/bill-cases.ts, lib/api-types.ts, lib/bill-cases.ts, lib/case-store.ts, +3 | core/__tests__/bill-cases.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts |
 | `court-case.ts` | api/court-cases/export/route, api/court-cases/route, lib/bill-cases.ts, lib/stats.ts, sources/index.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
-| `db-admin.ts` | api/settings/db/compact/route, api/settings/db/download/route, api/settings/db/forget/route, api/settings/db/route, hooks/use-db-admin.ts, lib/backup.ts | lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts |
+| `db-admin.ts` | api/settings/db/compact/route, api/settings/db/download/route, api/settings/db/forget/route, api/settings/db/route, hooks/use-db-admin.ts, lib/backup.ts | lib/__tests__/backup.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts |
+| `db-buckets.ts` | lib/backup.ts | lib/__tests__/backup.test.ts, lib/__tests__/db-buckets.test.ts |
 | `db-import.ts` | lib/db.ts |  |
 | `db-schema.ts` | lib/db.ts |  |
-| `db.ts` | lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/company-meta.ts, lib/db-admin.ts, lib/db-import.ts | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts |
+| `db.ts` | lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/company-meta.ts, lib/db-admin.ts, lib/db-buckets.ts, lib/db-import.ts | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
 | `documents/bulk.server.ts` | api/documents/generate-bulk/route | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/script.test.ts |
 | `documents/bulk.ts` | api/documents/generate-bulk/route, components/views/doc-bulk.tsx, lib/documents/bulk.server.ts | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/bulk.test.ts |
@@ -366,6 +367,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SNAPSHOT_TTL_MS` | server/config.ts |
 | `SUD_AUTO_EXIT` | app/api/presence/route.ts |
 | `SUD_BACKUP_CHUNK` | lib/backup-crypto.ts |
+| `SUD_BACKUP_GAP_MS` | lib/backup.ts |
 | `SUD_DB` | lib/db.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
 | `TELEGRAM_CONFIG_FILE` | lib/telegram-config.ts |
@@ -391,6 +393,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `sb-cache-v138:` | lib/cache.ts |
 | `sud-${stamp}.db` | lib/db-admin.ts |
 | `sud-YYYYMMDD.db` | app/api/settings/db/download/route.ts, lib/api-client.ts |
+| `sud-bucket-id` | lib/backup-crypto.ts |
 | `sud-buyrugini-bekor-qilish` | lib/documents/registry.ts |
 | `sud-doc-letterhead-v1` | components/proto/letterhead.tsx |
 | `sud-doc-script` | lib/documents/script-pref.ts |

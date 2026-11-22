@@ -28,11 +28,11 @@ function BackupCard({ configured }: { configured: boolean }) {
       <div className="card-h">
         <div className="ico"><DatabaseBackup /></div>
         <h2>Shifrlangan zaxira</h2>
-        {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.chunks} boʻlak{last.pinned ? '' : ' · mahkamlanmagan'}</span>}
+        {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.buckets ?? last.chunks} boʻlak{last.reused ? ` (${last.reused} ta oʻzgarmagan)` : ''}{last.pinned ? '' : ' · mahkamlanmagan'}</span>}
       </div>
       <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
-        Baza siqiladi, parolingiz bilan AES-256 yordamida shifrlanadi va 19 MB lik boʻlaklar bilan kanalga joylanadi; soʻnggi xabar (manifest) kanalda mahkamlanadi.
-        Telegram faqat tasodifiy baytlarni koʻradi. <b>Parol hech qayerda saqlanmaydi: yoʻqotsangiz zaxirani ochib boʻlmaydi.</b> Yangi kompyuterda botni, kanalni va parolni kiritib «Tiklash» ni bosing.
+        Baza kompaniya va yil boʻyicha boʻlaklarga ajratiladi; har bir boʻlak siqiladi, parolingiz bilan AES-256 yordamida shifrlanadi va kanalga joylanadi.
+        Keyingi zaxirada faqat oʻzgargan boʻlaklar yuboriladi (hech narsa oʻchirilmaydi, eski manifestlar tarix boʻlib qoladi); soʻnggi manifest mahkamlanadi. Telegram faqat tasodifiy baytlarni va maʼnosiz fayl nomlarini koʻradi. Har safar <b>bir xil parol</b> kiriting. <b>Parol hech qayerda saqlanmaydi: yoʻqotsangiz zaxirani ochib boʻlmaydi.</b> Yangi kompyuterda botni, kanalni va parolni kiritib «Tiklash» ni bosing.
       </p>
       <label className="field" style={{ height: 40 }}>
         <input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Zaxira paroli (kamida 10 belgi)" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />

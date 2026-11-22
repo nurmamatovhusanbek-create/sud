@@ -60,4 +60,17 @@ CREATE TABLE companies (
 );
 `,
   },
+  {
+    // a case's registration month (yymm of «2-1004-2603/8020», -1 when unreadable) computed by the database itself, so the backup can cut case
+    // details into year buckets with an index instead of reading every row (same rule as core/bill-cases registeredKey)
+    v: 3,
+    sql: `
+ALTER TABLE case_details ADD COLUMN yymm INTEGER GENERATED ALWAYS AS (
+  CASE WHEN substr(num, instr(num, '-') + instr(substr(num, instr(num, '-') + 1), '-') + 5, 1) = '/'
+       THEN CAST(substr(num, instr(num, '-') + instr(substr(num, instr(num, '-') + 1), '-') + 1, 4) AS INTEGER)
+       ELSE -1 END
+) VIRTUAL;
+CREATE INDEX details_by_year ON case_details (court, yymm);
+`,
+  },
 ]

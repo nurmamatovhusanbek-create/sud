@@ -79,7 +79,14 @@ function tryRequire(req: NodeJS.Require, name: string): unknown {
 function wrap(raw: Raw, driver: Db['driver'], file: string): Db {
   const cache = new Map<string, Stmt>()
   let depth = 0
-  const norm = (r: unknown) => (r === null || r === undefined ? undefined : (r as Record<string, unknown>))
+  // node:sqlite THROWS on an integer above 2^53 (a bill with an absurd amount is one); bun:sqlite gives a float. With bigints read, every
+  // integer is turned into a Number the same way, so one odd row cannot break a whole list.
+  const big = driver === 'node:sqlite'
+  const fix = (r: Record<string, unknown>): Record<string, unknown> => {
+    if (big) for (const k in r) if (typeof r[k] === 'bigint') r[k] = Number(r[k])
+    return r
+  }
+  const norm = (r: unknown) => (r === null || r === undefined ? undefined : fix(r as Record<string, unknown>))
   const db: Db = {
     path: file,
     driver,
@@ -88,8 +95,9 @@ function wrap(raw: Raw, driver: Db['driver'], file: string): Db {
       let s = cache.get(sql)
       if (!s) {
         const st = raw.prepare(sql)
+        if (big) (st as unknown as { setReadBigInts?: (on: boolean) => void }).setReadBigInts?.(true)
         s = {
-          all: (...p) => st.all(...p) as Record<string, unknown>[],
+          all: (...p) => (st.all(...p) as Record<string, unknown>[]).map(fix),
           get: (...p) => norm(st.get(...p)),
           run: (...p) => ({ changes: Number(st.run(...p).changes) }),
         }
@@ -188,6 +196,11 @@ export function getDb(): Db {
     console.warn(`[db] import of the old files failed, it will be tried again next time: ${e instanceof Error ? e.message : e}`)
   }
   return db
+}
+
+/** A SEPARATE database file (a restored copy, a check): opened, checked and migrated like the live one, but not the app's connection and with no import of the old files. The caller closes it. */
+export function openDbFile(file: string): Db {
+  return openChecked(file).db
 }
 
 /** close the connection (tests; the next `getDb()` opens it again) */

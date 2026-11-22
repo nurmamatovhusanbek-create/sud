@@ -28,7 +28,7 @@ describe('open and migrate', () => {
     expect(fs.existsSync(FILE)).toBe(true)
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name)
     expect(tables).toEqual(expect.arrayContaining(['bills', 'bill_loads', 'found_cases', 'tried', 'case_details', 'meta']))
-    expect(Number(db.prepare('PRAGMA user_version').get()?.user_version)).toBe(2)
+    expect(Number(db.prepare('PRAGMA user_version').get()?.user_version)).toBe(3)
     expect(String(db.prepare('PRAGMA journal_mode').get()?.journal_mode)).toBe('wal')
   })
 
@@ -101,5 +101,19 @@ describe('backup', () => {
     expect(c.prepare('SELECT v FROM meta WHERE k = ?').get('x').v).toBe('y')
     c.close()
     db.prepare('INSERT INTO meta VALUES (?, ?)').run('z', 'w') // the live connection still works
+  })
+})
+
+describe('case_details.yymm (computed by the database)', () => {
+  test('equals registeredKey for real numbers and is -1 for odd ones', async () => {
+    const { registeredKey } = await import('../../core/bill-cases')
+    const db = dbm.getDb()
+    const nums = ['2-1004-2603/8020', '4-1001-2505/3', '2-1004-2101/2', '1-1001-0001/9', 'garbage', '2-1004-26/8', '']
+    const ins = db.prepare('INSERT INTO case_details (court, num, t, d) VALUES (?, ?, 1, ?)')
+    for (const n of nums) ins.run('civil', n, new Uint8Array([1]))
+    for (const n of nums) {
+      const r = db.prepare('SELECT yymm FROM case_details WHERE court = ? AND num = ?').get('civil', n)
+      expect(Number(r?.yymm)).toBe(registeredKey(n))
+    }
   })
 })

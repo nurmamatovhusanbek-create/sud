@@ -211,3 +211,8 @@ export async function pinnedDocument(token: string, chat: string): Promise<TgRes
   const d = r.result.pinned_message?.document
   return { ok: true, value: d ? { fileId: d.file_id, name: d.file_name ?? '', messageId: r.result.pinned_message!.message_id } : null }
 }
+
+/** does Telegram still hold this file (a reused backup piece may have been deleted from the channel)? */
+export async function fileExists(token: string, fileId: string): Promise<boolean> {
+  return (await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId })).ok
+}

@@ -10,6 +10,8 @@ import type { BackupState } from '@/lib/backup'
 export interface BackupLast {
   created: string
   chunks: number
+  buckets?: number
+  reused?: number
   dbBytes: number
   uploadedBytes: number
   pinned: boolean
