@@ -15,6 +15,7 @@ import {
   Activity,
   AlertTriangle,
   Check,
+  Database,
   Download,
   FlaskConical,
   GitBranch,
@@ -40,6 +41,7 @@ import { waitForUpdate, type VersionSnap } from '@/lib/update-wait'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'
 import { VlmTab } from '@/components/views/vlm-settings'
+import { DbTab } from '@/components/views/db-settings'
 import { AppearanceTab } from '@/components/views/appearance-settings'
 
 // ---- shared shapes --------------------------------------------------------------
@@ -961,7 +963,7 @@ function HealthTab() {
 
 // ---- the view ---------------------------------------------------------------------
 
-type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'security'
+type SetTab = 'looks' | 'updates' | 'workers' | 'health' | 'orders' | 'vlm' | 'db' | 'security'
 
 export function SettingsView() {
   const [tab, setTab] = useState<SetTab>('workers')
@@ -1006,6 +1008,10 @@ export function SettingsView() {
           <ScanEye />
           Captcha
         </button>
+        <button className={`set-tab ${tab === 'db' ? 'on' : ''}`} onClick={() => setTab('db')}>
+          <Database />
+          Baza
+        </button>
         <button className={`set-tab ${tab === 'security' ? 'on' : ''}`} onClick={() => setTab('security')}>
           <ShieldCheck />
           Xavfsizlik
@@ -1018,6 +1024,7 @@ export function SettingsView() {
       {tab === 'health' && <HealthTab />}
       {tab === 'orders' && <OrdersTab />}
       {tab === 'vlm' && <VlmTab />}
+      {tab === 'db' && <DbTab />}
       {tab === 'security' && <SecurityTab />}
     </div>
   )

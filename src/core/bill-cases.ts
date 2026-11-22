@@ -98,3 +98,8 @@ export function rowFromDetail(d: FullCaseData, fallback: { caseNumber: string; c
     judge: g?.judge && g.judge !== '-' ? g.judge : '',
   }
 }
+
+/** the lower-cased text a found case is searched by (every field the list shows) */
+export function caseHay(c: Pick<CourtCase, 'caseNumber' | 'courtName' | 'plaintiff' | 'defendant' | 'caseType' | 'caseStatus' | 'result' | 'judge'>): string {
+  return [c.caseNumber, c.courtName, c.plaintiff, c.defendant, c.caseType, c.caseStatus, c.result, c.judge].join(' ').toLowerCase()
+}

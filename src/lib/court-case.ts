@@ -92,7 +92,7 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 // scheduler records per-worker health for the Settings dashboard).
 import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
 import { salvageJsonArray } from '@/core/json-salvage'
-import { mergeRows, readFeed, readFound, writeFeed } from './case-store'
+import { mergeRows, readFeed, writeFeed } from './case-store'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -536,15 +536,6 @@ async function searchCourtCasesInternal(
         // the court and judge come WITH the hearing (an appeal hearing in the first court's row would show the wrong judge)
         merged[i] = { ...merged[i], hearingDate: item.hearingDate, hearingTime: item.hearingTime, judge: item.judge, courtName: item.hearingStage && item.hearingStage !== 'first' ? item.courtName : merged[i].courtName, hearingStage: item.hearingStage }
       }
-    }
-  }
-
-  // cases found by number from the company's bills (lib/bill-cases): the list the court gave is cut at its row limit, these are not in it
-  if (mode === 'tin' && /^\d{9}$/.test(value)) {
-    for (const r of readFound(value, courtType)) {
-      if (!r.caseNumber || at.has(r.caseNumber)) continue
-      at.set(r.caseNumber, merged.length)
-      merged.push(r)
     }
   }
 

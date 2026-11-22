@@ -37,7 +37,7 @@ import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { BillCasesPanel } from './bill-cases-panel'
-import { CASES_FOUND, type CasesFoundDetail } from '@/hooks/use-bill-cases'
+import { FoundCases } from './found-cases'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { dateKey, daysUntil, formatDmy, parseYmd } from '@/core/dates'
@@ -560,9 +560,6 @@ function stampOf(t: number | undefined): string {
 
 // ---- section (v204: merged list held HERE, not per court) ------------------------
 
-/** cases found in the background are added to the open list at most this often */
-const LIVE_BATCH_MS = 4000
-
 interface MergedRow {
   c: CourtCase
   courtType: CourtType
@@ -741,47 +738,15 @@ export function CasesSection() {
         : [],
   )
 
-  // cases the background job finds by number from the company's bills (lib/bill-cases): they are added here the moment they are found, so the
-  // list grows live without being reloaded; the server's own list already holds them after the next read (deduped by case number)
-  const [live, setLive] = useState<MergedRow[]>([])
-  useEffect(() => setLive([]), [stir])
-  useEffect(() => {
-    // finds arrive about one a second for hours, and every change re-derives the whole list (sides, counts): they are applied in batches
-    let pending: MergedRow[] = []
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const flush = () => {
-      timer = null
-      const add = pending
-      pending = []
-      setLive((prev) => {
-        const have = new Set(prev.map((m) => m.c.caseNumber))
-        const fresh = add.filter((m) => !have.has(m.c.caseNumber))
-        return fresh.length ? [...prev, ...fresh] : prev
-      })
-    }
-    const onFound = (e: Event) => {
-      const d = (e as CustomEvent<CasesFoundDetail>).detail
-      if (!d || d.stir !== stir) return
-      pending.push(...d.events.map((ev) => ({ c: ev.row, courtType: ev.courtType as CourtType })))
-      if (!timer) timer = setTimeout(flush, LIVE_BATCH_MS)
-    }
-    window.addEventListener(CASES_FOUND, onFound)
-    return () => {
-      window.removeEventListener(CASES_FOUND, onFound)
-      if (timer) clearTimeout(timer)
-    }
-  }, [stir])
-
-  const merged: MergedRow[] = useMemo(() => {
-    const base = views.flatMap((v) =>
-      v.view.status === 'success' || v.view.status === 'partial'
-        ? (v.view.data.cases || []).map((c) => ({ c, courtType: v.courtType }))
-        : [],
-    )
-    if (!live.length) return base
-    const have = new Set(base.map((m) => m.c.caseNumber))
-    return [...base, ...live.filter((m) => !have.has(m.c.caseNumber) && courts.includes(m.courtType))]
-  }, [views, live, courts.join(',')])
+  const merged: MergedRow[] = useMemo(
+    () =>
+      views.flatMap((v) =>
+        v.view.status === 'success' || v.view.status === 'partial'
+          ? (v.view.data.cases || []).map((c) => ({ c, courtType: v.courtType }))
+          : [],
+      ),
+    [views],
+  )
 
   // which side the company is on in each case. Decided over the WHOLE loaded list (not the search results): the company's
   // own spelling is learned from the party names that repeat in nearly every case (core/classify assignRoles)
@@ -969,7 +934,6 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
-          <BillCasesPanel stir={stir} capped={capped} />
           <div className="list">
             {look === 'navy' ? (
               paged.map(({ c, courtType }, i) => (
@@ -1035,6 +999,9 @@ export function CasesSection() {
           />
         </>
       )}
+      {/* the cases the bills name and the court's TIN list does not show: a panel to start the job, and the found cases, a page at a time */}
+      <BillCasesPanel stir={stir} capped={capped} />
+      <FoundCases stir={stir} />
     </div>
   )
 }

@@ -20,6 +20,7 @@ import type {
   BillSeg,
   BillSort,
   BillsQueryResult,
+  FoundCasesResult,
   BillSummary,
   CompanyInfoData,
   CompanyStats,
@@ -193,6 +194,14 @@ export function queryStoredBills(stir: string, p: BillsQueryParams, signal?: Abo
   if (p.court) q.set('court', p.court)
   if (p.kind) q.set('kind', p.kind)
   return request<BillsQueryResult>(`/api/bills/query?${q}`, signal)
+}
+
+/** One page of the cases found by number from the company's bills (the cases its TIN lists do not show). Database only. */
+export function getFoundCases(stir: string, p: { court?: string; q?: string; page: number; size: number }, signal?: AbortSignal) {
+  const q = new URLSearchParams({ tin: stir, page: String(p.page), size: String(p.size) })
+  if (p.court) q.set('court', p.court)
+  if (p.q?.trim()) q.set('q', p.q.trim())
+  return request<FoundCasesResult>(`/api/found-cases?${q}`, signal)
 }
 
 /** The bills of ONE case (usually two: state duty and postal costs). */
@@ -618,4 +627,19 @@ export async function fetchPublicOrders(
 
 export function getPublicOrdersCache(signal?: AbortSignal) {
   return request<OrdersCacheStats>('/api/public-orders/cache', signal)
+}
+
+/** Settings › Maʼlumotlar bazasi: the whole database as one file (`sud-YYYYMMDD.db`), downloaded through the browser. Privileged. */
+export async function downloadDatabase(): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch('/api/settings/db/download', { headers: privilegedHeaders(), cache: 'no-store' })
+  } catch {
+    throw new Error('Tarmoq xatosi: serverga ulanib boʻlmadi')
+  }
+  if (!res.ok) {
+    const j = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(j?.error || `Nusxa olib boʻlmadi (${res.status})`)
+  }
+  await saveBlob(res, 'sud.db')
 }

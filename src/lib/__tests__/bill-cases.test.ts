@@ -11,6 +11,8 @@ mock.module('server-only', () => ({}))
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bill-job-'))
 process.env.CASE_STORE_DIR = DIR
 process.env.SNAPSHOT_DIR = path.join(DIR, 'snap')
+process.env.SUD_DB = path.join(DIR, 'sud.db')
+const dbm = await import('../db')
 const store = await import('../case-store')
 const bills = await import('../bills-store')
 const lib = await import('../bill-cases')
@@ -68,11 +70,16 @@ const run = async (o: Parameters<typeof lib.startJob>[1] = {}) => {
 }
 
 beforeEach(() => {
+  dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
-  store.forgetCaseStoreMemory(); bills.forgetBillsMemory(); lib.forgetJob()
+  fs.mkdirSync(DIR, { recursive: true })
+  store.forgetCaseStoreMemory(); lib.forgetJob()
   n = 0; billCalls = []; billSizes = []; pagesFor = null; callNo = 0; billFails = {}; caseCalls = []; waits = []; script = {}; defaultCase = found
 })
-afterAll(() => fs.rmSync(DIR, { recursive: true, force: true }))
+afterAll(() => {
+  dbm.closeDb()
+  fs.rmSync(DIR, { recursive: true, force: true })
+})
 
 describe('load', () => {
   test('stores every page as it arrives; a pass whose pages did not overlap is the whole load; the cases come out with BOTH their bills', async () => {
@@ -81,9 +88,9 @@ describe('load', () => {
     expect(billSizes).toEqual([10_000, 10_000, 10_000])
     expect(st).toMatchObject({ state: 'done', pages: 3, bills: 9, pass: 0, stable: true })
     expect(bills.readBillsMeta(TIN)).toMatchObject({ pagesDone: 3, complete: true, stable: true, pass: 0 })
-    const c = bills.storedBillCases(TIN)
-    expect([...c.keys()].sort()).toEqual(['2-1004-2101/2', '2-1004-2401/4', '2-1004-2603/1', '4-1001-2505/3'])
-    expect(c.get('2-1004-2603/1')!.bills.map((b) => b.cat)).toEqual(['Давлат божи', 'Почта харажатлари']) // state duty on page 1, postal costs on page 2
+    expect(bills.billCaseCount(TIN)).toBe(4)
+    expect(bills.nextMissingCases(TIN, 0, 10).map((c) => c.caseNumber)).toEqual(['2-1004-2603/1', '4-1001-2505/3', '2-1004-2401/4', '2-1004-2101/2']) // newest registration first
+    expect(bills.billsOfCase(TIN, '2-1004-2603/1').map((b) => b.cat)).toEqual(['Давлат божи', 'Почта харажатлари']) // state duty on page 1, postal costs on page 2
     expect(caseCalls).toEqual([]) // fill was not asked for
   })
 
@@ -254,12 +261,23 @@ describe('fill', () => {
     await lib.jobDone()
   })
 
-  test('the found cases appear in the company\'s list, and the day snapshots are dropped', async () => {
-    const snaps = await import('../snapshot-store')
-    snaps.writeSnapshot(TIN, 'court:civil', { cases: [] })
-    snaps.writeSnapshot(TIN, 'stats', { x: 1 })
+  test('the queue lives in the database: it is read a batch at a time and survives a restart of the job', async () => {
     await run({ fill: true })
-    expect(snaps.readSnapshot(TIN, 'court:civil')).toBeNull()
-    expect(snaps.readSnapshot(TIN, 'stats')).toBeNull()
+    const st1 = lib.jobStatus(TIN)
+    expect(st1).toMatchObject({ found: 4, total: 4 })
+    // after a restart of the process nothing is asked again: what was answered is in the tables
+    dbm.closeDb(); store.forgetCaseStoreMemory(); lib.forgetJob()
+    caseCalls = []
+    await run({ fill: true, load: 'skip' })
+    expect(caseCalls).toEqual([])
+    expect(store.readFound(TIN, 'civil').length + store.readFound(TIN, 'economic').length).toBe(4)
+  })
+
+  test('a case recorded as found is written the moment it is found (a crash loses nothing)', async () => {
+    const d: Partial<BillCasesDeps> = { ...deps, getCase: async (c, num) => { const r = await deps.getCase!(c, num); if (caseCalls.length >= 3) throw new Error('process died'); return r } }
+    // the third call throws: the job pauses after failures, but the first two are already in the tables
+    const st = await run({ fill: true, deps: d })
+    expect(st.found).toBe(2)
+    expect(store.readFound(TIN, 'civil').length + store.readFound(TIN, 'economic').length).toBe(2)
   })
 })

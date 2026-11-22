@@ -9,6 +9,8 @@ import path from 'node:path'
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'served-case-'))
 process.env.CASE_STORE_DIR = DIR
 process.env.SNAPSHOT_DIR = path.join(DIR, 'snap')
+process.env.SUD_DB = path.join(DIR, 'sud.db')
+const dbm = await import('../db')
 const store = await import('../case-store')
 const snaps = await import('../snapshot-store')
 const { servedCaseDetail, freezeOf } = await import('../served-case')
@@ -39,12 +41,17 @@ const fetcher = async () => {
 const EMPTY: FullCaseData = { general: null, firstInstance: null, appellate: null, cassation: null, inspection: null }
 
 beforeEach(() => {
+  dbm.closeDb()
   store.forgetCaseStoreMemory()
   fs.rmSync(DIR, { recursive: true, force: true })
+  fs.mkdirSync(DIR, { recursive: true })
   snaps.__resetSnapshotsForTests()
   calls = 0
 })
-afterAll(() => fs.rmSync(DIR, { recursive: true, force: true }))
+afterAll(() => {
+  dbm.closeDb()
+  fs.rmSync(DIR, { recursive: true, force: true })
+})
 
 describe('servedCaseDetail', () => {
   test('a first open reads the court and stores the answer', async () => {

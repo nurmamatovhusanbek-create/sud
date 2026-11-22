@@ -22,6 +22,8 @@ mock.module('@/lib/cf-worker-pool', () => ({
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'case-list-'))
 process.env.CASE_STORE_DIR = DIR
+process.env.SUD_DB = path.join(DIR, 'sud.db')
+const dbm = await import('../db')
 const TIN = '309922250'
 const FEED = 'civil|jadvalapi.sud.uz/online-monitoring/CIVIL/findByTin'
 
@@ -56,6 +58,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 afterAll(() => {
   mock.module('@/lib/cf-worker-pool', () => realPool)
   globalThis.fetch = realFetch
+  dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
 })
 
@@ -67,7 +70,9 @@ const open = async () => {
 }
 
 beforeEach(() => {
+  dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
+  fs.mkdirSync(DIR, { recursive: true })
   store.forgetCaseStoreMemory()
   court.clearCourtCaseCache(TIN)
   script = []
@@ -75,23 +80,9 @@ beforeEach(() => {
 })
 
 describe('cases found by number (lib/bill-cases)', () => {
-  const found = (n: string) => ({ caseNumber: n, caseType: '', caseStatus: 'Якунланган', result: '', courtName: 'Found court', dateFiled: '', plaintiff: '', defendant: '', claimAmount: '', hearingDate: '', hearingTime: '', judge: '' })
-
-  test('are merged into that court\'s list, never twice, and survive a total failure of the court', async () => {
-    script = [{ status: 200, etag: 'W/"a"', rows: [mk(1), mk(2)] }, { status: 500 }, { status: 500 }, { status: 500 }]
-    store.addFound(TIN, [{ courtType: 'civil', row: found('2-9-9999/9') }, { courtType: 'civil', row: found('2-1103-2604/00001') }], {})
-    const a = await open()
-    expect(a.cases.map((c) => c.caseNumber).sort()).toEqual(['2-1103-2604/00001', '2-1103-2604/00002', '2-9-9999/9'])
-    // the court's own row for 00001 wins over the found one (it is listed twice nowhere)
-    expect(a.cases.find((c) => c.caseNumber === '2-1103-2604/00001')?.courtName).toBe('Sud')
-    const b = await open()
-    expect(b.incomplete).toBe(true)
-    expect(b.cases.map((c) => c.caseNumber)).toContain('2-9-9999/9')
-  })
-
-  test('another court\'s found cases do not leak into this list', async () => {
+  test('are NOT merged into the TIN list the browser gets (a big company has tens of thousands: they are read in pages)', async () => {
     script = [{ status: 200, etag: 'W/"a"', rows: [mk(1)] }]
-    store.addFound(TIN, [{ courtType: 'economic', row: found('4-1-2101/5') }], {})
+    store.addFound(TIN, [{ courtType: 'civil', row: { caseNumber: '2-9-9999/9', caseType: '', caseStatus: 'Якунланган', result: '', courtName: 'Found court', dateFiled: '', plaintiff: '', defendant: '', claimAmount: '', hearingDate: '', hearingTime: '', judge: '' } }], {})
     expect((await open()).cases.map((c) => c.caseNumber)).toEqual(['2-1103-2604/00001'])
   })
 })

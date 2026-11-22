@@ -21,7 +21,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
+import { caseHay, registeredKey } from '@/core/bill-cases'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
+import { getDb } from './db'
 
 const TIN_RE = /^\d{9}$/
 const NUMBER_RE = /^\d+-[\d-]+\/\d+$/
@@ -68,7 +70,6 @@ function mem(): { dir: string; files: Map<string, FeedFile> } {
 /** forget what is held in memory (tests; the disk is untouched) */
 export function forgetCaseStoreMemory(): void {
   g.__sudCaseStore = undefined
-  ;(globalThis as unknown as { __sudFound?: unknown }).__sudFound = undefined
 }
 
 function writeAtomic(target: string, json: string): boolean {
@@ -176,115 +177,137 @@ export function patchRow(tin: string, courtType: CourtType, row: CourtCase): boo
 // ---------------- the cases found by number (from the bills) ----------------
 
 /**
- * Cases no TIN list shows (the court cuts a list at its row limit), found by asking the court for their NUMBER (`lib/bill-cases`):
- * `<STIR>.found.json.gz`, the list rows per court type. It is a file of its own so that saving thousands of found cases never rewrites the
- * company's big TIN lists, and `court-case` merges it into each court's list. `tried` says which numbers were already asked.
+ * Cases no TIN list shows (the court cuts a list at its row limit), found by asking the court for their NUMBER (`lib/bill-cases`), in
+ * `sud.db` (`found_cases`, the list row as JSON; `tried` = the numbers already asked). They are NOT merged into the TIN list the browser
+ * gets: a big company has tens of thousands, so they are read in pages (`queryFound`, `/api/found-cases`).
  */
-interface FoundFile {
-  v: 1
-  tin: string
-  courts: Partial<Record<CourtType, CourtCase[]>>
-  /** a number already asked of the court: `found` false = neither system knows it (asked again after a while, see lib/bill-cases) */
-  tried: Record<string, { t: number; found: boolean }>
+export type TriedMap = Record<string, { t: number; found: boolean }>
+
+const hayOf = caseHay
+const yymmOf = registeredKey
+
+/** Add found rows (by case number, the new one wins) and the numbers just tried, in one transaction. */
+export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType; row: CourtCase }>, tried: TriedMap): boolean {
+  if (!TIN_RE.test(tin)) return false
+  const db = getDb()
+  const fc = db.prepare('INSERT OR REPLACE INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+  const tr = db.prepare('INSERT OR REPLACE INTO tried (tin, num, t, found) VALUES (?, ?, ?, ?)')
+  const now = Date.now()
+  db.transaction(() => {
+    for (const { courtType, row } of rows) {
+      if (row.caseNumber && COURTS.has(courtType)) fc.run(courtType, tin, row.caseNumber, yymmOf(row.caseNumber), row.caseStatus, hayOf(row), JSON.stringify(row), now)
+    }
+    for (const [num, v] of Object.entries(tried)) tr.run(tin, num, v.t, v.found ? 1 : 0)
+  })
+  return true
 }
 
-const gf = globalThis as unknown as { __sudFound?: { dir: string; files: Map<string, FoundFile> } }
-function foundMem(): { dir: string; files: Map<string, FoundFile> } {
-  const dir = caseStoreDir()
-  if (!gf.__sudFound || gf.__sudFound.dir !== dir) gf.__sudFound = { dir, files: new Map() }
-  return gf.__sudFound
-}
-
-const foundPath = (tin: string): string => path.join(caseStoreDir(), `${tin}.found.json.gz`)
-
-function loadFound(tin: string): FoundFile | null {
-  if (!TIN_RE.test(tin)) return null
-  const m = foundMem()
-  const hit = m.files.get(tin)
-  if (hit) return hit
-  const raw = readJson(foundPath(tin)) as Partial<FoundFile> | null
-  let file: FoundFile
-  if (raw && raw.v === 1 && raw.tin === tin && raw.courts && typeof raw.courts === 'object') {
-    file = { v: 1, tin, courts: raw.courts, tried: raw.tried && typeof raw.tried === 'object' ? raw.tried : {} }
-  } else file = { v: 1, tin, courts: {}, tried: {} }
-  m.files.set(tin, file)
-  while (m.files.size > 4) m.files.delete(m.files.keys().next().value as string)
-  return file
-}
-
-/** the found cases of one court (empty when none) */
+/** the found cases of one court (all of them: tests and the importer; the app reads pages) */
 export function readFound(tin: string, courtType: CourtType): CourtCase[] {
-  return loadFound(tin)?.courts[courtType] ?? []
+  if (!TIN_RE.test(tin)) return []
+  return getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? ORDER BY yymm DESC, num').all(courtType, tin).map((r) => JSON.parse(String(r.row)) as CourtCase)
 }
 
-export function readTried(tin: string): Record<string, { t: number; found: boolean }> {
-  return loadFound(tin)?.tried ?? {}
+export function readTried(tin: string): TriedMap {
+  if (!TIN_RE.test(tin)) return {}
+  const out: TriedMap = {}
+  for (const r of getDb().prepare('SELECT num, t, found FROM tried WHERE tin = ?').all(tin)) out[String(r.num)] = { t: Number(r.t), found: Number(r.found) === 1 }
+  return out
 }
 
-/** Add found rows (by case number, the new one wins) and the numbers just tried, and save. */
-export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType; row: CourtCase }>, tried: Record<string, { t: number; found: boolean }>): boolean {
-  const file = loadFound(tin)
-  if (!file) return false
-  const by = new Map<CourtType, CourtCase[]>()
-  for (const { courtType, row } of rows) (by.get(courtType) ?? by.set(courtType, []).get(courtType)!).push(row)
-  for (const [ct, list] of by) file.courts[ct] = mergeRows(file.courts[ct] ?? [], list)
-  Object.assign(file.tried, tried)
-  return writeAtomic(foundPath(tin), JSON.stringify(file))
+/** how many numbers were found / asked without an answer (and not old enough to be asked again) */
+export function triedStats(tin: string, retryBefore: number): { found: number; notFound: number } {
+  if (!TIN_RE.test(tin)) return { found: 0, notFound: 0 }
+  const r = getDb().prepare('SELECT COALESCE(SUM(found = 1), 0) AS f, COALESCE(SUM(found = 0 AND t > ?), 0) AS n FROM tried WHERE tin = ?').get(retryBefore, tin)
+  return { found: Number(r?.f ?? 0), notFound: Number(r?.n ?? 0) }
 }
 
-/** a found case that is also in a stored TIN list or here: one row of «Yangilash» replaces it in the found rows too */
+export interface FoundQuery {
+  court?: CourtType
+  q?: string
+  page?: number
+  size?: number
+  /** `new` (default): the newest registration first */
+  sort?: 'new' | 'old'
+}
+
+export interface FoundPage {
+  /** found cases per court type (all of them, whatever the filter) */
+  byCourt: Partial<Record<CourtType, number>>
+  matched: number
+  rows: Array<{ courtType: CourtType; row: CourtCase }>
+}
+
+/** One PAGE of the found cases, with the counts per court type. */
+export function queryFound(tin: string, f: FoundQuery): FoundPage {
+  const empty: FoundPage = { byCourt: {}, matched: 0, rows: [] }
+  if (!TIN_RE.test(tin)) return empty
+  const db = getDb()
+  const byCourt: FoundPage['byCourt'] = {}
+  for (const r of db.prepare('SELECT court, COUNT(*) n FROM found_cases WHERE tin = ? GROUP BY court').all(tin)) byCourt[String(r.court) as CourtType] = Number(r.n)
+  const parts = ['tin = ?']
+  const params: Array<string | number> = [tin]
+  if (f.court && COURTS.has(f.court)) { parts.push('court = ?'); params.push(f.court) }
+  const q = f.q?.trim().toLowerCase()
+  if (q) { parts.push('instr(hay, ?) > 0'); params.push(q) }
+  const w = parts.join(' AND ')
+  const matched = Number(db.prepare(`SELECT COUNT(*) n FROM found_cases WHERE ${w}`).get(...params)?.n ?? 0)
+  if (!matched) return { byCourt, matched: 0, rows: [] }
+  const size = Math.max(1, Math.min(200, Math.trunc(f.size ?? 25)))
+  const page = Math.max(1, Math.min(Math.ceil(matched / size), Math.trunc(f.page ?? 1)))
+  const order = f.sort === 'old' ? 'yymm ASC, num ASC' : 'yymm DESC, num ASC'
+  const rows = db.prepare(`SELECT court, row FROM found_cases WHERE ${w} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...params, size, (page - 1) * size)
+  return { byCourt, matched, rows: rows.map((r) => ({ courtType: String(r.court) as CourtType, row: JSON.parse(String(r.row)) as CourtCase })) }
+}
+
+/** a found case replaced by a fresher row («Yangilash»): returns whether it was one of the found cases */
 function patchFound(tin: string, courtType: CourtType, row: CourtCase): boolean {
-  const file = loadFound(tin)
-  const list = file?.courts[courtType]
-  if (!file || !list) return false
-  const i = list.findIndex((r) => r.caseNumber === row.caseNumber)
-  if (i < 0) return false
-  list[i] = row
-  return writeAtomic(foundPath(tin), JSON.stringify(file))
+  if (!TIN_RE.test(tin)) return false
+  return getDb().prepare('UPDATE found_cases SET row = ?, status = ?, hay = ?, t = ? WHERE court = ? AND tin = ? AND num = ?').run(JSON.stringify(row), row.caseStatus, hayOf(row), Date.now(), courtType, tin, row.caseNumber).changes > 0
+}
+
+/** the case numbers the company's stored TIN lists show (all courts, every endpoint) */
+export function feedCaseNumbers(tin: string): Set<string> {
+  const out = new Set<string>()
+  const file = loadFeeds(tin)
+  if (file) for (const f of Object.values(file.feeds)) for (const r of f.items) if (r.caseNumber) out.add(r.caseNumber)
+  return out
 }
 
 /** every case number the stored lists AND the found cases of a company hold (all courts) */
 export function knownCaseNumbers(tin: string): Set<string> {
-  const out = new Set<string>()
-  const file = loadFeeds(tin)
-  if (file) for (const f of Object.values(file.feeds)) for (const r of f.items) if (r.caseNumber) out.add(r.caseNumber)
-  const found = loadFound(tin)
-  if (found) for (const list of Object.values(found.courts)) for (const r of list ?? []) if (r.caseNumber) out.add(r.caseNumber)
+  const out = feedCaseNumbers(tin)
+  if (TIN_RE.test(tin)) for (const r of getDb().prepare('SELECT num FROM found_cases WHERE tin = ?').all(tin)) out.add(String(r.num))
   return out
 }
 
 // ---------------- details ----------------
 
-function detailFile(courtType: string, caseNumber: string): string | null {
-  if (!COURTS.has(courtType) || !NUMBER_RE.test(caseNumber)) return null
-  return path.join(caseStoreDir(), 'details', courtType, `${caseNumber.replace('/', '@')}.json.gz`)
-}
-
+/** a case's full detail (gzip JSON in `case_details`) */
 export function readDetail(courtType: CourtType, caseNumber: string): DetailRecord | null {
-  const file = detailFile(courtType, caseNumber)
-  if (!file) return null
-  const raw = readJson(file) as Partial<DetailRecord> | null
-  if (!raw || raw.v !== 1 || typeof raw.t !== 'number' || !raw.data || typeof raw.data !== 'object') return null
-  return { v: 1, t: raw.t, courtType, caseNumber, data: raw.data }
+  if (!COURTS.has(courtType) || !NUMBER_RE.test(caseNumber)) return null
+  const r = getDb().prepare('SELECT t, d FROM case_details WHERE court = ? AND num = ?').get(courtType, caseNumber)
+  if (!r) return null
+  try {
+    const data = JSON.parse(zlib.gunzipSync(Buffer.from(r.d as Uint8Array)).toString('utf8')) as FullCaseData
+    return data && typeof data === 'object' ? { v: 1, t: Number(r.t), courtType, caseNumber, data } : null
+  } catch {
+    return null // damaged: the next write replaces it
+  }
 }
 
 export function writeDetail(courtType: CourtType, caseNumber: string, data: FullCaseData, t: number = Date.now()): boolean {
-  const file = detailFile(courtType, caseNumber)
-  if (!file) return false
-  const rec: DetailRecord = { v: 1, t, courtType, caseNumber, data }
-  return writeAtomic(file, JSON.stringify(rec))
+  if (!COURTS.has(courtType) || !NUMBER_RE.test(caseNumber)) return false
+  getDb().prepare('INSERT OR REPLACE INTO case_details (court, num, t, d) VALUES (?, ?, ?, ?)').run(courtType, caseNumber, t, zlib.gzipSync(JSON.stringify(data)))
+  return true
 }
 
-/** how much is kept (Settings / docs); counts files, reads nothing */
-export function caseStoreStats(): { companies: number; details: number } {
-  const count = (dir: string, re: RegExp): number => {
-    try {
-      return fs.readdirSync(dir).filter((n) => re.test(n)).length
-    } catch {
-      return 0
-    }
-  }
-  let details = 0
-  for (const c of COURTS) details += count(path.join(caseStoreDir(), 'details', c), /\.json\.gz$/)
-  return { companies: count(caseStoreDir(), /^\d{9}\.json\.gz$/), details }
+/** how much is kept (Settings / docs) */
+export function caseStoreStats(): { companies: number; details: number; found: number } {
+  const db = getDb()
+  let companies = 0
+  try {
+    companies = fs.readdirSync(caseStoreDir()).filter((n) => /^\d{9}\.json\.gz$/.test(n)).length
+  } catch { /* no directory */ }
+  return { companies, details: Number(db.prepare('SELECT COUNT(*) n FROM case_details').get()?.n ?? 0), found: Number(db.prepare('SELECT COUNT(*) n FROM found_cases').get()?.n ?? 0) }
 }

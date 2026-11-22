@@ -15,6 +15,7 @@ export type ApiResult<T> =
 export type { CompanyStats, CourtCase, FullCaseData, BillSummary, EnrichedBill }
 export type { BillCasesStatus, FoundEvent, JobStatus as BillJobStatus } from './bill-cases'
 export type { BillRow, BillSeg, BillSort, BillsSummary, CategoryKind } from '@/core/bill-rows'
+export type { FoundPage as FoundCasesResult } from './case-store'
 import type { BillCasesStatus, FoundEvent, JobStatus } from './bill-cases'
 import type { BillsMeta, BillsPage } from './bills-store'
 export type { BillsMeta, BillsPage }
