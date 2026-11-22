@@ -1,0 +1,8 @@
+/* Screen-level layout only (spacing between components). No new look. */
+.screen { display: block; }
+.screen__top { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-1) 0 var(--space-3); }
+.screen__lead { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-1) 0 0; }
+.screen__id { margin: 0; }
+.screen__status { margin-top: var(--space-3); }
+.screen__filters { display: grid; gap: var(--space-3); margin: var(--space-3) 0; }
+.screen__more { margin-top: var(--space-3); }

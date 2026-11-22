@@ -52,6 +52,19 @@ describe('orginfo fetching — a failed fetch is an error, never «company not f
     expect(c).toMatchObject({ tin: '222222222', status: 'Faoliyatda', director: 'Ali Valiyev', officialName: 'TEST MCHJ' })
   })
 
+  test('a liquidated branch: empty fields stay empty (the next label is not their value) and the new name labels are read', async () => {
+    // the real page of a closed bank branch (Nov 2026): «Tashkilotni rasmiy nomi», dates and authority empty, the label list runs on
+    const page = big(
+      `<html><body><a href="/uz/organization/abc123def456/">X</a>` +
+        `<div>Tashkilotni rasmiy nomi</div><div>KAPITALBANK FILIALI</div><div>Tashkilotni qisqacha nomi</div><div>KAPITALBANK FILIALI</div>` +
+        `<div>Ro'yxatdan o'tgan sana</div><div>Faollik holati</div><div>Tugatilgan</div><div>Ro'yxatdan o'tkazuvchi organ</div>` +
+        `<div>STIR</div><div>666666666</div><div>THSHT</div><div>DBIBT</div><div>IFUT</div><div>Ustav fondi</div></body></html>`,
+    )
+    stub(async () => new Response(page, { status: 200 }))
+    const c = await getCompanyByTin('666666666')
+    expect(c).toMatchObject({ tin: '666666666', officialName: 'KAPITALBANK FILIALI', shortName: 'KAPITALBANK FILIALI', status: 'Tugatilgan', registeredDate: '', registeringAuthority: '', thsht: '', dbibt: '', ifut: '', charterCapital: '' })
+  })
+
   test('the worker answers HTTP 500 → the retry goes direct and the profile still loads', async () => {
     const page = big(`<html><body><a href="/uz/organization/abc123def456/">X</a><div>STIR</div><div>333333333</div><div>Faollik holati</div><div>Faoliyatda</div></body></html>`)
     let calls = 0

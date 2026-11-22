@@ -19,6 +19,7 @@ base64 = "0.22"
 hex = "0.4"
 unicode-normalization = "0.1"
 form_urlencoded = "1"
+include_dir = "0.7"
 
 [profile.release]
 opt-level = 2

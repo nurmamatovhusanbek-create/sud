@@ -22,6 +22,7 @@ memory and answers in a chat and in a Telegram Mini App. It never scrapes a site
 cd bot && cargo test            # includes a test that opens data sealed by the app's own TypeScript code
 cargo run --release
 ```
+The Mini App is `bot/static/` (tokens → components → screens, see design-notes › «Mini App architecture and design tokens»).
 `GET /health` → `{ready, indexed, companies, backupAt}` (what UptimeRobot pings). `GET /app` is the Mini App; its `/api/*` calls carry Telegram's signed
 `initData`, checked against the bot token and the allowed ids. Commands: `/find`, `/case`, `/bill`, `/company`, `/app`, `/status`; any plain text is a search.
 

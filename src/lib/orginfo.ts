@@ -435,6 +435,16 @@ function parseSearchResults(html: string): CompanySearchResult[] {
   return results
 }
 
+/**
+ * The labels orginfo.uz prints in its field list. A field with NO value (a liquidated company or a branch has many) is followed directly by the
+ * next label, which the scan below used to return AS the value («Ro'yxatdan o'tkazuvchi organ» = «STIR»).
+ */
+const FIELD_LABELS = new Set([
+  'STIR', 'THSHT', 'DBIBT', 'IFUT', 'Ustav fondi', "Ro'yxatdan o'tgan sana", "Ro'yxatdan o'tkazuvchi organ", 'Faollik holati', 'Reklama', 'Manzili',
+  'Telefon raqami', 'Elektron pochta', 'Tashkilotni rasmiy nomi', 'Tashkilotni qisqacha nomi', 'Rasmiy nomi', 'Qisqa nomi', 'Rahbar', 'Direktor',
+  'Rahbar INN', 'Soliq to‘lovchi', 'Katta soliq to‘lovchi', "Katta soliq to'lovchi",
+])
+
 function extractField(html: string, fieldName: string): string {
   // Remove scripts and styles
   const clean = html.replace(/<script[^>]*>.*?<\/script>/gs, '').replace(/<style[^>]*>.*?<\/style>/gs, '')
@@ -449,6 +459,7 @@ function extractField(html: string, fieldName: string): string {
     const texts = after.match(/>([^<]+)</g) || []
     for (const t of texts) {
       const val = t.replace(/[><]/g, '').trim()
+      if (val && val !== fieldName && FIELD_LABELS.has(val)) break // this occurrence of the field has no value: the next label follows
       if (val && val !== fieldName && !val.startsWith('Loading') && !val.startsWith('Parol') && !val.startsWith('-') && val.length > 0) {
         return val
           .replace(/&#x27;/g, "'")
@@ -542,9 +553,11 @@ function parseCompanyPage(html: string, tin: string, url: string): CompanyInfo {
   // (most reliable across all org pages), then fall back to the Latin label.
   const officialName =
     extractField(html, 'Официальное название организации') ||
+    extractField(html, 'Tashkilotni rasmiy nomi') ||
     extractField(html, 'Rasmiy nomi')
   const shortName =
     extractField(html, 'Краткое название организации') ||
+    extractField(html, 'Tashkilotni qisqacha nomi') ||
     extractField(html, 'Qisqa nomi')
 
   return {

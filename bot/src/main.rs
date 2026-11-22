@@ -11,16 +11,18 @@ mod tg;
 
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
-    response::{Html, IntoResponse, Response},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use include_dir::{include_dir, Dir};
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use store::Shared;
 
-const APP_HTML: &str = include_str!("../static/app.html");
+// the Mini App: HTML, CSS, ES modules and fonts under `static/`, compiled into the binary (nothing is read from disk at run time)
+static ASSETS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/static");
 
 type Sh = State<Arc<Shared>>;
 
@@ -42,8 +44,46 @@ async fn health(State(sh): Sh) -> Json<Value> {
     Json(sh.info().await)
 }
 
-async fn app_page() -> Html<&'static str> {
-    Html(APP_HTML)
+/// The page and its assets carry a strict policy: everything is same-origin, no inline script or style, and only Telegram may frame it.
+fn secure(mut r: Response) -> Response {
+    let h = r.headers_mut();
+    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://web.telegram.org https://*.telegram.org"));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    r
+}
+
+fn mime(path: &str) -> &'static str {
+    match path.rsplit('.').next().unwrap_or("") {
+        "html" => "text/html; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "js" => "text/javascript; charset=utf-8",
+        "woff2" => "font/woff2",
+        "svg" => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
+}
+
+fn asset(path: &str) -> Response {
+    // a path inside static/ only: no `..`, no absolute paths
+    if path.split('/').any(|p| p == ".." || p.is_empty()) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    match ASSETS.get_file(path) {
+        Some(f) => {
+            let cache = if path.ends_with(".woff2") { "public, max-age=31536000, immutable" } else { "no-cache" };
+            secure(([(header::CONTENT_TYPE, mime(path)), (header::CACHE_CONTROL, cache)], f.contents()).into_response())
+        }
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn app_page() -> Response {
+    asset("index.html")
+}
+
+async fn static_file(Path(path): Path<String>) -> Response {
+    asset(&path)
 }
 
 async fn webhook(State(sh): Sh, Path(secret): Path<String>, headers: HeaderMap, Json(update): Json<Value>) -> StatusCode {
@@ -188,6 +228,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/app", get(app_page))
+        .route("/static/{*path}", get(static_file))
         .route("/tg/{secret}", post(webhook))
         .route("/api/search", get(api_search))
         .route("/api/case", get(api_case))

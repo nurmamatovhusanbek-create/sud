@@ -1,0 +1,76 @@
+/*
+ * DESIGN TOKENS: the only place a colour, a size, a radius or a duration is decided. Components (components.css) and screens (screens.css) read
+ * these variables and never write a literal. The identity is the app's «Premium» look: TWO colours, near-white and ink, in both themes; no accent hue.
+ * Meaning is carried by shape and words (a filled dot, a ring, a half dot), never by a hue.
+ *
+ * Layers: primitives (raw values) → semantic roles (what a token is FOR) → component aliases (rare). Themes only re-map the semantic roles.
+ */
+
+:root {
+  /* ---- primitives ---- */
+  --p-ink: #0f1216;
+  --p-paper: #ffffff;
+  --p-canvas: #f2f3f5;
+  --p-ink-60: rgba(15, 18, 22, 0.6);
+  --p-ink-10: rgba(15, 18, 22, 0.1);
+  --p-ink-04: rgba(15, 18, 22, 0.04);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-1: 8px;
+  --radius-2: 12px;
+  --radius-3: 16px;
+  --radius-pill: 999px;
+
+  --font-sans: "IBM Plex Sans", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --leading-tight: 1.25;
+  --leading-body: 1.45;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  --tap-size: 44px;
+  --content-width: 720px;
+  --border-width: 1px;
+
+  /* ---- semantic roles (light) ---- */
+  --color-canvas: var(--p-canvas);
+  --color-surface: var(--p-paper);
+  --color-text: var(--p-ink);
+  --color-text-muted: var(--p-ink-60);
+  --color-line: var(--p-ink-10);
+  --color-wash: var(--p-ink-04);
+  --color-action: var(--p-ink);
+  --color-on-action: var(--p-paper);
+  --color-focus: var(--p-ink);
+  --color-danger: var(--p-ink); /* an error is words and an icon, not a hue */
+}
+
+:root[data-theme="dark"] {
+  --p-ink: #eceef1;
+  --p-paper: #16191e;
+  --p-canvas: #0d0f12;
+  --p-ink-60: rgba(236, 238, 241, 0.6);
+  --p-ink-10: rgba(236, 238, 241, 0.12);
+  --p-ink-04: rgba(236, 238, 241, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration-base: 0ms; }
+}
