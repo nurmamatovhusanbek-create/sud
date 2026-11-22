@@ -266,6 +266,32 @@ function patchFound(tin: string, courtType: CourtType, row: CourtCase): boolean 
   return getDb().prepare('UPDATE found_cases SET row = ?, status = ?, hay = ?, t = ? WHERE court = ? AND tin = ? AND num = ?').run(JSON.stringify(row), row.caseStatus, hayOf(row), Date.now(), courtType, tin, row.caseNumber).changes > 0
 }
 
+/** the companies that have a stored TIN list file (the lists the court showed; kept as files, not in the database) */
+export function feedTins(): string[] {
+  try {
+    return fs.readdirSync(caseStoreDir()).filter((n) => /^\d{9}\.json\.gz$/.test(n)).map((n) => n.slice(0, 9)).sort()
+  } catch {
+    return []
+  }
+}
+
+/** every row of the company's stored TIN lists, one per (court, case number): when two endpoints list a case, the newer answer's row */
+export function feedRows(tin: string): Array<{ court: string; num: string; row: CourtCase; t: number }> {
+  const file = loadFeeds(tin)
+  if (!file) return []
+  const out = new Map<string, { court: string; num: string; row: CourtCase; t: number }>()
+  for (const [key, f] of Object.entries(file.feeds)) {
+    const court = key.split('|')[0] ?? ''
+    for (const row of f.items) {
+      if (!row.caseNumber) continue
+      const k = `${court}:${row.caseNumber}`
+      const have = out.get(k)
+      if (!have || f.t >= have.t) out.set(k, { court, num: row.caseNumber, row, t: f.t })
+    }
+  }
+  return [...out.values()].sort((a, b) => (a.court + a.num < b.court + b.num ? -1 : 1))
+}
+
 /** the case numbers the company's stored TIN lists show (all courts, every endpoint) */
 export function feedCaseNumbers(tin: string): Set<string> {
   const out = new Set<string>()

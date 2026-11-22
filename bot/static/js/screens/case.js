@@ -33,7 +33,7 @@ export async function caseScreen(route, { signal }) {
   const detail = c.detail || {}
   const g = detail.general
   const row = c.row
-  const status = g?.caseStatus || row?.status
+  const status = g?.caseStatus || row?.caseStatus
   const bills = c.bills || []
   const total = bills.reduce((a, b) => a + (Number(b.amount) || 0), 0)
   const copy = Button({ label: 'Nusxa', size: 'small', onClick: async () => { try { await navigator.clipboard.writeText(c.num); copy.textContent = 'Nusxalandi' } catch { /* not allowed here */ } } })
@@ -46,7 +46,7 @@ export async function caseScreen(route, { signal }) {
       Card({ title: 'Umumiy' }, Kv('Turi', g.caseType), Kv('Daʼvo predmeti', g.claimSubject), Kv('Sud', g.court), Kv('Hudud', g.region), Kv('Sudya', g.judge), Kv('Kotib', g.secretary), Kv('Joriy instansiya', INSTANCE[g.currentInstance] || g.currentInstance), Kv('Daʼvo summasi', g.claimAmount), Kv('Davlat boji', g.stateDuty), Kv('Ariza sanasi', g.applicationDate), Kv('Ish qoʻzgatilgan', g.initiatedDate), Kv('Muddat', g.deadlineDate)),
       Card({ title: 'Tomonlar' }, Kv('Daʼvogar', g.plaintiff), Kv('Daʼvogar STIR', g.plaintiffTin), Kv('Javobgar', g.defendant), Kv('Javobgar STIR', g.defendantTin), Kv('Uchinchi shaxs', g.thirdParty), Kv('Vakil', g.representative), Kv('Prokuror', g.prosecutor)),
     ] : row
-      ? Card({ title: 'Umumiy' }, Kv('Sud', row.court), Kv('Daʼvogar', row.plaintiff), Kv('Javobgar', row.defendant), Kv('Holati', row.status))
+      ? Card({ title: 'Umumiy (sud roʻyxatidan)' }, Kv('Turi', row.caseType), Kv('Sud', row.courtName), Kv('Sudya', row.judge), Kv('Daʼvogar', row.plaintiff), Kv('Javobgar', row.defendant), Kv('Daʼvo summasi', row.claimAmount), Kv('Ariza sanasi', row.dateFiled), Kv('Natija', row.result), Kv('Navbatdagi majlis', [row.hearingDate, row.hearingTime].filter(has).join(' ')))
       : Card({}, h('p', { class: 'muted small' }, 'Batafsil maʼlumot zaxirada yoʻq: bu ish faqat kvitansiyalar orqali maʼlum. Ilovada kompaniya ishlari yangilanganda zaxiraga tushadi.')),
     instance('1-instansiya', detail.firstInstance), instance('Apellyatsiya', detail.appellate), instance('Kassatsiya', detail.cassation), instance('Taftish', detail.inspection),
     bills.length > 0 && [SectionLabel(`Kvitansiyalar (${bills.length}) · jami ${money(total)}`),

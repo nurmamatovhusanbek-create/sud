@@ -86,7 +86,7 @@ fn case_text(c: &Value) -> String {
         line("Ariza sanasi", s(g, "applicationDate"));
     } else if c["row"].is_object() {
         let r = &c["row"];
-        for (label, k) in [("Holati", "status"), ("Sud", "court"), ("Daʼvogar", "plaintiff"), ("Javobgar", "defendant")] {
+        for (label, k) in [("Holati", "caseStatus"), ("Turi", "caseType"), ("Sud", "courtName"), ("Sudya", "judge"), ("Daʼvogar", "plaintiff"), ("Javobgar", "defendant"), ("Daʼvo summasi", "claimAmount"), ("Ariza sanasi", "dateFiled"), ("Natija", "result")] {
             line(label, s(r, k));
         }
     } else {

@@ -13,6 +13,7 @@ import zlib from 'node:zlib'
 mock.module('server-only', () => ({}))
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-'))
 process.env.SUD_DB = path.join(DIR, 'sud.db')
+process.env.CASE_STORE_DIR = path.join(DIR, 'cases')
 process.env.TELEGRAM_CONFIG_FILE = path.join(DIR, 'telegram.json')
 process.env.SUD_BACKUP_CHUNK = '4096'
 process.env.SUD_BACKUP_GAP_MS = '0'

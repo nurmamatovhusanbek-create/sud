@@ -288,6 +288,23 @@ impl Shared {
                 }
             }
         }
+        // a case the company's TIN lists show but nothing found by number: the list row (status, parties, next hearing)
+        if row.is_null() {
+            if let Some(t) = self.bucket_text(&format!("lists:{}", e.tin)).await? {
+                for line in String::from_utf8_lossy(&t).lines() {
+                    if !line.contains(num) {
+                        continue;
+                    }
+                    let Ok(r) = serde_json::from_str::<Vec<Value>>(line) else { continue };
+                    if r.get(1).and_then(|v| v.as_str()) == Some(num) {
+                        if let Some(s) = r.get(2).and_then(|v| v.as_str()) {
+                            row = serde_json::from_str(s).unwrap_or(Value::Null);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
         let mut bills = Vec::new();
         for year in [2000 + e.yy, 2000 + e.yy + 1, 2000 + e.yy - 1] {
             if let Some(t) = self.bucket_text(&format!("bills:{}:{}", e.tin, year)).await? {

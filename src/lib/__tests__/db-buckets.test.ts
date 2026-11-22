@@ -9,8 +9,10 @@ import path from 'node:path'
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'buckets-'))
 process.env.SUD_DB = path.join(DIR, 'sud.db')
+process.env.CASE_STORE_DIR = path.join(DIR, 'cases') // the lists are files: never read the real ones
 const dbm = await import('../db')
 const bk = await import('../db-buckets')
+const cs = await import('../case-store')
 
 const A = '207324986'
 const B = '201052713'
@@ -38,6 +40,7 @@ const all = (db: ReturnType<typeof dbm.getDb>) => Object.fromEntries(bk.listBuck
 beforeEach(() => {
   dbm.closeDb()
   for (const n of fs.readdirSync(DIR)) fs.rmSync(path.join(DIR, n), { force: true, recursive: true })
+  cs.forgetCaseStoreMemory()
 })
 afterAll(() => {
   dbm.closeDb()
@@ -125,6 +128,24 @@ describe('buckets', () => {
     // the locator: cases first, then bills, each by key
     const ix = lines(bk.mergeBucketText(`index:${A}`, t([['c', '2-1-2401/9', 'civil', 24], ['b', '2002', 2024, '']]), t([['c', '2-1-2401/1', 'civil', 24], ['b', '1001', 2024, '']])))
     expect(ix.map((r) => r[1])).toEqual(['2-1-2401/1', '2-1-2401/9', '1001', '2002'])
+  })
+
+  test('the court lists (files) are a bucket of their own and their cases are in the locator', () => {
+    seed()
+    cs.writeFeed(A, 'civil|jadvalapi/CIVIL/findByTin', { t: 100, complete: true, items: [{ caseNumber: '2-1004-2601/77', status: 'Иш юритувда', plaintiff: 'P', defendant: 'D' } as never] })
+    cs.writeFeed(A, 'economic|jadvalapi/ECONOMIC/findByTin', { t: 100, complete: true, items: [{ caseNumber: '4-1001-2602/5', status: 'x' } as never] })
+    expect(bk.listBuckets()).toContain(`lists:${A}`)
+    const lists = bk.renderBucket(`lists:${A}`)!.text.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lists.map((r) => [r[0], r[1]])).toEqual([['civil', '2-1004-2601/77'], ['economic', '4-1001-2602/5']])
+    expect(JSON.parse(lists[0][2]).plaintiff).toBe('P')
+    const index = bk.renderBucket(`index:${A}`)!.text.toString('utf8')
+    expect(index).toContain('["c","2-1004-2601/77","civil",26]')
+    expect(index).toContain('["c","4-1001-2602/5","economic",26]')
+    // never imported into a database
+    const target = dbm.openDbFile(path.join(DIR, 'lists.db'))
+    expect(bk.importBucket(`lists:${A}`, bk.renderBucket(`lists:${A}`)!.text, target)).toBe(0)
+    target.close()
+    cs.forgetCaseStoreMemory()
   })
 
   test('an unknown name is refused', () => {

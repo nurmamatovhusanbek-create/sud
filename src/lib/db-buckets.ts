@@ -1,5 +1,6 @@
 import { getDb, type Db, type SqlValue } from './db'
 import { courtTypeOfNumber, registeredKey } from '@/core/bill-cases'
+import { feedRows, feedTins } from './case-store'
 
 /**
  * The database cut into BUCKETS for the Telegram backup: stable, small, deterministic pieces, so that a bucket whose rows did not change has the
@@ -9,6 +10,8 @@ import { courtTypeOfNumber, registeredKey } from '@/core/bill-cases'
  *   details:<court>:<year>        full cases, by registration year
  *   tried:<tin>                   the case numbers already asked
  *   state:<tin>                   the company's load state and its two dates
+ *   lists:<tin>                   the rows of the company's TIN lists (what the courts' list endpoints showed: status, parties…), kept as files by the
+ *                                 app, not in the database; read by the bot, never imported (the lists are fetched again from the courts)
  *   index:<tin>                   the LOCATOR of the company: every case number and bill number with the court/year of the bucket that holds it (never
  *                                 imported into a database: it is read by the search, `lib/telegram-index`)
  * Text of a bucket: one JSON array per row, rows in primary-key order, binary columns as base64. The bills' `pass` counter is left out (it moves on
@@ -28,7 +31,7 @@ const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ')
 
 const yearOfMs = (c: string) => `CAST(strftime('%Y', ${c} / 1000, 'unixepoch') AS INTEGER)`
 
-export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index'
+export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists'
 export interface BucketName {
   kind: BucketKind
   tin: string | null
@@ -45,6 +48,7 @@ export function parseBucket(name: string): BucketName | null {
     case 'tried': return p.length === 2 ? { kind: 'tried', tin: p[1]!, court: null, year: null } : null
     case 'state': return p.length === 2 ? { kind: 'state', tin: p[1]!, court: null, year: null } : null
     case 'index': return p.length === 2 ? { kind: 'index', tin: p[1]!, court: null, year: null } : null
+    case 'lists': return p.length === 2 ? { kind: 'lists', tin: p[1]!, court: null, year: null } : null
     default: return null
   }
 }
@@ -54,10 +58,13 @@ export function listBuckets(db: Db = getDb()): string[] {
   const out: string[] = []
   const tins = new Set<string>()
   for (const t of ['bills', 'found_cases', 'tried', 'bill_loads', 'companies']) for (const r of db.prepare(`SELECT DISTINCT tin FROM ${t}`).all()) tins.add(String(r.tin))
+  const listed = new Set(feedTins())
+  for (const t of listed) tins.add(t)
   for (const tin of [...tins].sort()) {
     if (db.prepare('SELECT 1 FROM bill_loads WHERE tin = ?').get(tin) || db.prepare('SELECT 1 FROM companies WHERE tin = ?').get(tin)) out.push(`state:${tin}`)
     if (db.prepare('SELECT 1 FROM tried WHERE tin = ? LIMIT 1').get(tin)) out.push(`tried:${tin}`)
-    if (db.prepare('SELECT 1 FROM bills WHERE tin = ? LIMIT 1').get(tin) || db.prepare('SELECT 1 FROM found_cases WHERE tin = ? LIMIT 1').get(tin)) out.push(`index:${tin}`)
+    if (listed.has(tin) && feedRows(tin).length) out.push(`lists:${tin}`)
+    if (db.prepare('SELECT 1 FROM bills WHERE tin = ? LIMIT 1').get(tin) || db.prepare('SELECT 1 FROM found_cases WHERE tin = ? LIMIT 1').get(tin) || (listed.has(tin) && feedRows(tin).length)) out.push(`index:${tin}`)
     for (const r of db.prepare(`SELECT DISTINCT COALESCE(${yearOfMs('issued')}, 0) y FROM bills WHERE tin = ? ORDER BY y`).all(tin)) out.push(`bills:${tin}:${Number(r.y)}`)
     for (const r of db.prepare('SELECT DISTINCT court, CASE WHEN yymm < 0 THEN 0 ELSE yymm / 100 END y FROM found_cases WHERE tin = ? ORDER BY court, y').all(tin)) out.push(`found:${tin}:${r.court}:${Number(r.y)}`)
   }
@@ -102,6 +109,10 @@ export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | n
     case 'tried':
       take(db.prepare(`SELECT ${list(TRIED)} FROM tried WHERE tin = ? ORDER BY num`).all(b.tin), TRIED)
       break
+    case 'lists': {
+      for (const r of feedRows(b.tin!)) lines.push(line([r.court, r.num, JSON.stringify(r.row)]))
+      break
+    }
     case 'index': {
       // cases: found ones (their court and year are exact) and the ones only the bills name; then every bill with the case it names
       const cases = new Map<string, string>()
@@ -111,6 +122,7 @@ export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | n
         cases.set(num, JSON.stringify(['c', num, court || courtTypeOfNumber(num) || '', y < 0 ? 0 : Math.floor(y / 100)]))
       }
       for (const r of db.prepare('SELECT court, num FROM found_cases WHERE tin = ?').all(b.tin)) put(String(r.num), String(r.court))
+      for (const r of feedRows(b.tin!)) if (!cases.has(r.num)) put(r.num, r.court)
       for (const r of db.prepare("SELECT DISTINCT case_number, ctype FROM bills WHERE tin = ? AND case_number IS NOT NULL AND case_number != ''").all(b.tin)) if (!cases.has(String(r.case_number))) put(String(r.case_number), String(r.ctype ?? ''))
       for (const k of [...cases.keys()].sort()) lines.push(cases.get(k)!)
       for (const r of db.prepare('SELECT number, issued, case_number FROM bills WHERE tin = ? ORDER BY number').all(b.tin)) {
@@ -140,7 +152,7 @@ export interface ImportCount {
 export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), opts: { bills?: 'replace' | 'keep' } = {}): number {
   const b = parseBucket(name)
   if (!b) throw new Error(`noma'lum bo'lak: ${name.slice(0, 40)}`)
-  if (b.kind === 'index') return 0 // a locator is read by the search, never imported
+  if (b.kind === 'index' || b.kind === 'lists') return 0 // a locator and the court lists are read by the search / the bot, never imported
   const rows = Buffer.from(text).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SqlValue[])
   let n = 0
   db.transaction(() => {
@@ -195,6 +207,7 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
     case 'details': return { key: String(r[1]), t: Number(r[2]) || 0 }
     case 'tried': return { key: String(r[1]), t: Number(r[2]) || 0 }
     case 'index': return { key: `${r[0]}:${r[1]}`, t: null }
+    case 'lists': return { key: `${r[0]}:${r[1]}`, t: null }
     default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
   }
 }
