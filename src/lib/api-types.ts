@@ -13,7 +13,26 @@ export type ApiResult<T> =
   | { ok: false; error: string; code?: string; status?: number }
 
 export type { CompanyStats, CourtCase, FullCaseData, BillSummary, EnrichedBill }
-export type { BillCasesEvent, BillCasesStatus } from './bill-cases'
+export type { BillCasesStatus, FoundEvent, JobStatus as BillJobStatus } from './bill-cases'
+export type { BillRow, BillSeg, BillSort, BillsSummary, CategoryKind } from '@/core/bill-rows'
+import type { BillCasesStatus, FoundEvent, JobStatus } from './bill-cases'
+import type { BillsMeta, BillsPage } from './bills-store'
+export type { BillsMeta, BillsPage }
+
+/** `GET /api/bill-cases` */
+export interface BillJobState {
+  status: BillCasesStatus
+  job: JobStatus
+  events: FoundEvent[]
+  behind: boolean
+}
+
+/** `GET /api/bills/query` (`bills: null` = nothing is stored yet) */
+export interface BillsQueryResult {
+  bills: BillsPage | null
+  meta: BillsMeta | null
+  job: JobStatus
+}
 
 export interface CompanyInfoData {
   company: CompanyInfoPayload['company']

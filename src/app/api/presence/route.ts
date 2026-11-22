@@ -4,12 +4,13 @@
  *   POST { id, bye? }  a page's heartbeat (every 30 s) or its goodbye. Answers `{ autoExit }`: the page stops pinging when
  *                      the server was not started to shut itself down (a plain `bun run dev`), so dev.log stays quiet.
  *   GET                what the supervisor reads to decide whether to stop the server: open windows, how long it has been
- *                      empty, and whether a background order job is still running (never stop under it).
+ *                      empty, and whether a background order or bills job is still running (never stop under it).
  *
  * Starts nothing and touches no network. Docs: AGENTS.md › Windows launcher.
  */
 
 import { z } from 'zod'
+import { billJobRunning } from '@/lib/bill-cases'
 import { caseJobStatus } from '@/lib/public-orders/company-job'
 import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
@@ -33,5 +34,5 @@ export const POST = guard(
 )
 
 export const GET = guard(async () => {
-  return jsonOk({ ...presenceSnapshot(), busy: caseJobStatus().state === 'running', autoExit: autoExit() })
+  return jsonOk({ ...presenceSnapshot(), busy: caseJobStatus().state === 'running' || billJobRunning(), autoExit: autoExit() })
 })

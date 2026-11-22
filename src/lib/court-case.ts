@@ -92,7 +92,7 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 // scheduler records per-worker health for the Settings dashboard).
 import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
 import { salvageJsonArray } from '@/core/json-salvage'
-import { billsFeedKey, mergeRows, readFeed, writeFeed } from './case-store'
+import { mergeRows, readFeed, readFound, writeFeed } from './case-store'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -541,7 +541,7 @@ async function searchCourtCasesInternal(
 
   // cases found by number from the company's bills (lib/bill-cases): the list the court gave is cut at its row limit, these are not in it
   if (mode === 'tin' && /^\d{9}$/.test(value)) {
-    for (const r of readFeed(value, billsFeedKey(courtType))?.items ?? []) {
+    for (const r of readFound(value, courtType)) {
       if (!r.caseNumber || at.has(r.caseNumber)) continue
       at.set(r.caseNumber, merged.length)
       merged.push(r)
@@ -756,6 +756,90 @@ export async function getCaseBundle(
     fetchJadvalDetails(courtType, encodedNumber),
   ])
 
+  return buildCaseBundle(courtType, caseNumber, jadvalApiData, jadvalData)
+}
+
+// ---- the lean lookup of ONE case by number, for the bulk fill (lib/bill-cases) ----
+
+export type CaseLean =
+  | { kind: 'found'; data: FullCaseData; row: CourtCase | null; via: 'new' | 'old' }
+  /** neither system has a case with this number (the new one answers 400 for what only the old one holds) */
+  | { kind: 'absent' }
+  /** the answer could not be had (transport, HTTP 5xx / 429 / 403, unreadable): says nothing about the case */
+  | { kind: 'error'; message: string }
+
+type Probe = { kind: 'ok'; rows: any[] } | { kind: 'absent' } | { kind: 'error'; message: string }
+
+const PROBE_HEADERS = { Accept: 'application/json, text/plain, */*', Origin: 'https://my.sud.uz', Referer: 'https://my.sud.uz/' }
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
+async function probeJadvalApi(apiType: string, encodedNumber: string): Promise<Probe> {
+  try {
+    const res = await fetchViaWorkers(`${JADVALAPI}/online-monitoring/${apiType}/findByNumber/${encodedNumber}`, {
+      originKey: 'jadvalapi.sud.uz', timeoutMs: 15_000, hedgeMs: 4_000, maxAttempts: 2, headers: PROBE_HEADERS,
+    })
+    // 400 «Bad Request» is how the NEW system answers a number only the OLD one holds (2021-2022 cases): a definitive «not here», not an error
+    if (res.status === 400 || res.status === 404 || res.status === 410) return { kind: 'absent' }
+    if (!res.ok) return { kind: 'error', message: `jadvalapi HTTP ${res.status}` }
+    const text = await res.text()
+    if (text.includes('топилмади')) return { kind: 'absent' }
+    const data = JSON.parse(text)
+    if (data && !Array.isArray(data) && typeof data === 'object' && data.message && data.statusCode) return data.statusCode === 400 || data.statusCode === 404 ? { kind: 'absent' } : { kind: 'error', message: `jadvalapi ${data.statusCode}` }
+    const rows = Array.isArray(data) ? data : [data]
+    return rows.length ? { kind: 'ok', rows } : { kind: 'absent' }
+  } catch (e) {
+    return { kind: 'error', message: errMsg(e) }
+  }
+}
+
+async function probeJadval(courtType: CourtType, encodedNumber: string): Promise<Probe> {
+  const finder = { economic: 'findByNumber', civil: 'findByCivilNumber', criminal: 'findByCriminalNumber', administrative: 'findByAdmNumber' }[courtType]
+  try {
+    const res = await fetchViaWorkers(`${JADVAL_API}/case/${finder}/${encodedNumber}`, {
+      originKey: 'jadval.sud.uz', timeoutMs: 20_000, hedgeMs: 5_000, maxAttempts: 2, headers: PROBE_HEADERS,
+    })
+    if (!res.ok) return { kind: 'error', message: `jadval HTTP ${res.status}` }
+    const text = await res.text()
+    // that site's flaky node answers «not found» to a case that exists, so the caller asks twice before it believes this
+    if (isFakeEmptyText(text)) return { kind: 'absent' }
+    const data = JSON.parse(text)
+    if (!data || (typeof data === 'object' && !Array.isArray(data) && data.message && data.statusCode)) return { kind: 'absent' }
+    const rows = Array.isArray(data) ? data : [data]
+    return rows.length ? { kind: 'ok', rows } : { kind: 'absent' }
+  } catch (e) {
+    return { kind: 'error', message: errMsg(e) }
+  }
+}
+
+const apiTypeOf = (c: CourtType): string => ({ economic: 'ECONOMIC', civil: 'CIVIL', administrative: 'CONFLICT', criminal: 'CRIMINAL' })[c]
+
+/**
+ * ONE case by its number with the fewest requests: the new system (jadvalapi) first, ~1 s, no known rate limit; only a number it answers
+ * «400» for goes to the OLD system (jadval.sud.uz), whose search service is the one with a per-IP / per-TIN token bucket, and it is asked
+ * TWICE (`recheckMs` apart) before «not found» is believed. The bulk fill used `getCaseBundle`, which asks both systems for every case.
+ */
+export async function getCaseLean(courtType: CourtType, caseNumber: string, opts: { recheckMs?: number } = {}): Promise<CaseLean> {
+  if (!CASE_NUMBER_RE.test(caseNumber)) return { kind: 'error', message: 'Ish raqami formati notoʻgʻri' }
+  const encoded = caseNumber.replace('/', '@')
+  const api = await probeJadvalApi(apiTypeOf(courtType), encoded)
+  if (api.kind === 'error') return api
+  if (api.kind === 'ok') return { kind: 'found', via: 'new', ...buildCaseBundle(courtType, caseNumber, api.rows, null) }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const old = await probeJadval(courtType, encoded)
+    if (old.kind === 'error') return old
+    if (old.kind === 'ok') return { kind: 'found', via: 'old', ...buildCaseBundle(courtType, caseNumber, null, old.rows) }
+    if (attempt === 0) await new Promise((r) => setTimeout(r, opts.recheckMs ?? 4_000))
+  }
+  return { kind: 'absent' }
+}
+
+/** What a case's detail and list row are made of, from the two sources' answers (either may be null). Pure; the callers fetch. */
+function buildCaseBundle(
+  courtType: CourtType,
+  caseNumber: string,
+  jadvalApiData: any[] | null,
+  jadvalData: any[] | null,
+): { data: FullCaseData; row: CourtCase | null } {
   // Prefer jadval.sud.uz for BOTH parties and hearings — it returns the real
   // hearing_date / hearing_time / responsible (judge) fields per case, whereas
   // jadvalapi's findByNumber returns 400 for most court types.

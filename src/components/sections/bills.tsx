@@ -3,25 +3,27 @@
 /**
  * Bills section — the prototypeʼs Toʻlovlar: STIR/invoice toggle pair, the
  * invoice check-in row, summary KPIs, the dense receipt list with filter bar
- * (search + status seg + stream replay + Excel export), the phase-ladder
- * stream card while importing, and the cheque-style receipt drawer with a
- * generated barcode. Live NDJSON stream via useStream; one-shot invoice
- * lookup via getBillDetail.
+ * (search + status seg + court-type and fee-kind chips + Excel export), the
+ * load card while the server loads the bills page by page, and the cheque-style
+ * receipt drawer with a generated barcode. The bills live on the server
+ * (lib/bills-store): this tab asks for ONE PAGE with its filters (useStoredBills)
+ * and polls while the load runs; one-shot invoice lookup via getBillDetail.
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Bolt, Check, ChevronRight, Clock, Download, Gavel, Receipt, Search, Timer, Wallet } from 'lucide-react'
+import { Bolt, ChevronRight, Download, Gavel, Receipt, Search } from 'lucide-react'
 import { SolidIcon } from '@/components/ui-custom/solid-icons'
 import { getLook } from '@/lib/look'
-import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, applySort, type SortKey } from '@/components/proto/primitives'
+import { EmptyBlock, Kpi, TogglePair, Seg, CountUp, SortMenu, type SortKey } from '@/components/proto/primitives'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, DwSection, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
-import { useStream, phaseIndex } from '@/hooks/use-stream'
+import { useStoredBills } from '@/hooks/use-stored-bills'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
-import { setCachedBills, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
+import { setCachedBills, setBillsSummary, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
 import { exportBillsXlsx, getBillDetail } from '@/lib/api-client'
+import { rowAsDetail, type BillRow, type BillSeg, type BillSort, type CategoryKind } from '@/core/bill-rows'
 import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
 import { billStatusFamilySafe } from './bills-helpers'
@@ -36,13 +38,6 @@ import {
 } from '@/core/billing-format'
 import { familyBadgeClass } from '@/components/proto/primitives'
 import { toast } from 'sonner'
-
-const PHASES: [string, string][] = [
-  ['connecting', 'billing.sud.uz ga ulanilmoqda'],
-  ['captcha', 'PoW captcha yechilmoqda (SHA-256)'],
-  ['fetching', "Kvitansiyalar roʻyxati olinmoqda"],
-  ['enriching', 'Har bir toʻlov tafsiloti olinmoqda'],
-]
 
 /** Deterministic pseudo-barcode from the invoice number (prototype barcode()). */
 function Barcode({ seed }: { seed: string }) {
@@ -194,10 +189,10 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
   )
 }
 
-// ---- stream card ---------------------------------------------------------------
+// ---- load card -----------------------------------------------------------------
 
-function StreamCard({ phase, loaded, total, error }: { phase: string | null; loaded: number; total: number | null; error: string | null }) {
-  const current = phaseIndex(phase)
+/** the load of the company's bills runs on the server, page by page: the rows stored so far are already in the list below */
+function LoadCard({ page, pages, pass, stored, total, wait, error, onStop }: { page: number; pages: number; pass: number; stored: number; total: number; wait: number; error: string | null; onStop: () => void }) {
   return (
     <div className="stream">
       <div className="p-row">
@@ -210,41 +205,56 @@ function StreamCard({ phase, loaded, total, error }: { phase: string | null; loa
         <div>
           <b style={{ fontSize: 14 }}>Toʻlovlar yuklab olinmoqda…</b>
           <div className="faint mono" style={{ fontSize: 12 }}>
-            {error ? 'Xato' : <><span>{loaded}</span> / ~{total ?? '…'} kvitansiya</>}
+            <span>{formatCount(stored)}</span> / {total ? formatCount(total) : '…'} kvitansiya · {Math.min(page + 1, pages || page + 1)}/{pages || '…'}-sahifa{pass > 0 ? ` · ${pass + 1}-oʻtish` : ''}
           </div>
         </div>
         <div style={{ flex: 1 }} />
+        <button className="btn btn-outline btn-sm" onClick={onStop}>Toʻxtatish</button>
         <span className="spinner" />
       </div>
       <div className="stream-bar">
-        <div className="stream-fill" style={{ width: `${total ? Math.min(100, Math.round((loaded / total) * 100)) : current >= 0 ? 12 : 4}%` }} />
+        <div className="stream-fill" style={{ width: `${total ? Math.min(100, Math.round((stored / total) * 100)) : 4}%` }} />
       </div>
-      <div className="phases">
-        {PHASES.map(([k, label], i) => {
-          const cls = i < current ? 'done' : i === current ? 'active' : ''
-          return (
-            <div className={`phase ${cls}`} key={k}>
-              <span className="pd">{i < current ? <Check /> : i === current ? <Clock /> : <Clock style={{ opacity: 0.4 }} />}</span>
-              {label}
-            </div>
-          )
-        })}
+      <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--text-3)' }}>
+        Yuklangan sahifalar hozirdan qidirilishi va ochilishi mumkin; qolganlari ketma-ket qoʻshiladi. Sahifadan chiqsangiz ham yuklash davom etadi.
       </div>
+      {wait > 0 && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--text-2)' }}>billing.sud.uz javob bermadi: {wait} soniyadan keyin qayta uriniladi.</div>}
       {error && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--neg-text)' }}>{error}</div>}
     </div>
   )
 }
 
+const formatCount = (n: number): string => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+
 // ---- section ---------------------------------------------------------------
+
+/** a stored row as the receipt reads a bill */
+const asEnriched = (r: BillRow): EnrichedBill => ({ number: r.number, invoiceStatus: r.status, issued: r.issued, detail: rowAsDetail(r) })
+
+const COURT_CHIPS: { key: '' | 'economic' | 'civil' | 'administrative' | 'criminal'; label: string }[] = [
+  { key: '', label: 'Barcha sudlar' },
+  { key: 'economic', label: 'Iqtisodiy' },
+  { key: 'civil', label: 'Fuqarolik' },
+  { key: 'administrative', label: 'Maʼmuriy' },
+  { key: 'criminal', label: 'Jinoyat' },
+]
+const KIND_CHIPS: { key: '' | CategoryKind; label: string }[] = [
+  { key: '', label: 'Barcha turlar' },
+  { key: 'davlat_boji', label: 'Davlat boji' },
+  { key: 'pochta', label: 'Pochta' },
+  { key: 'other', label: 'Boshqa' },
+]
 
 export function BillsSection() {
   const company = useAppStore((s) => s.activeCompany)
-  const stream = useStream()
   const setCounts = useTabCounts((s) => s.set)
   const [mode, setMode] = useState<'stir' | 'invoice'>('stir')
   const [invoice, setInvoice] = useState('')
   const [filter, setFilter] = useState('')
-  const [seg, setSeg] = useState<'all' | 'paid' | 'overdue'>('all')
+  const [qDeb, setQDeb] = useState('')
+  const [seg, setSeg] = useState<BillSeg>('all')
+  const [court, setCourt] = useState<(typeof COURT_CHIPS)[number]['key']>('')
+  const [kind, setKind] = useState<'' | CategoryKind>('')
   const [sort, setSort] = useState<SortKey>('new')
   const [invoiceBusy, setInvoiceBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -254,101 +264,73 @@ export function BillsSection() {
 
   const stir = company?.stir
 
+  // the search box asks the server (the bills of a big company are not in the browser): one question per pause in typing
   useEffect(() => {
-    if (!stir) return
-    stream.start(stir)
-  }, [stir])
+    const t = setTimeout(() => setQDeb(filter), 250)
+    return () => clearTimeout(t)
+  }, [filter])
+
+  const store = useStoredBills(stir, { page, size: pageSize, sort: sort as BillSort, seg, q: qDeb, court: court || undefined, kind: kind || undefined })
+  const bills = store.data?.bills ?? null
+  const meta = store.data?.meta ?? null
+  const job = store.data?.job
+  const loadingBills = store.loading_bills && job?.phase === 'load'
+  const summary = bills?.summary ?? null
+  const rows = bills?.rows ?? []
 
   useEffect(() => {
-    // a section-level retry: scrape billing.sud.uz now, not the daily snapshot
-    const force = () => {
-      if (stir) stream.start(stir, { force: true })
-    }
-    // the header's hard refresh retired the snapshot (when the stats came back complete): read again
-    const refreshed = () => {
-      if (stir) stream.start(stir)
-    }
+    // a section-level retry: read billing.sud.uz again now
+    const force = () => void store.refresh()
     window.addEventListener('sud:force-section', force)
-    window.addEventListener(COMPANY_REFRESHED, refreshed)
-    return () => {
-      window.removeEventListener('sud:force-section', force)
-      window.removeEventListener(COMPANY_REFRESHED, refreshed)
-    }
-  }, [stir])
+    return () => window.removeEventListener('sud:force-section', force)
+  }, [store.refresh])
 
   // the header shows how old the dossier is
   useEffect(() => {
     if (!stir) return
-    reportAge(stir, 'bills', stream.status === 'done' && stream.fetchedAt ? stream.fetchedAt : undefined, stream.stale)
-  }, [stir, stream.status, stream.fetchedAt, stream.stale])
+    reportAge(stir, 'bills', meta?.complete && meta.loadedAt ? meta.loadedAt : undefined, false)
+  }, [stir, meta?.complete, meta?.loadedAt])
 
-  const items = stream.items
   useEffect(() => {
-    if (stream.total !== null) setCounts({ bills: stream.total })
-    else if (items.length) setCounts({ bills: items.length })
-  }, [stream.total, items.length, setCounts])
+    if (bills) setCounts({ bills: bills.total })
+  }, [bills?.total, setCounts])
 
-  // Mirror the stream into the shared bills cache (Overview KPIs + recent strip)
+  // the Overview reads the whole company's totals and the newest receipts from the shared bills cache
+  const defaultView = page === 1 && sort === 'new' && seg === 'all' && !qDeb.trim() && !court && !kind
   useEffect(() => {
-    if (!stir || items.length === 0) return
-    setCachedBills(stir, items)
-  }, [stir, items])
+    if (!stir || !bills) return
+    const s = bills.summary
+    setBillsSummary(stir, { loaded: true, count: s.count, paidCount: s.paid, totalPaid: s.totalPaid, overdue: s.overdueSum })
+    if (defaultView) setCachedBills(stir, bills.rows.map(asEnriched))
+  }, [stir, bills, defaultView])
 
-  // Persist billing aggregates into registry meta once the stream completes
+  // Persist billing aggregates into registry meta once the load is complete
   useEffect(() => {
-    if (!stir || stream.status !== 'done') return
+    if (!stir || !meta?.complete || !bills) return
     patchBillsMeta(stir, billsTotals(stir))
-  }, [stir, stream.status])
-
-  const summary = useMemo(() => {
-    let paid = 0
-    let overdue = 0
-    let partial = 0
-    let totalSum = 0
-    let totalPaid = 0
-    for (const b of items) {
-      const d = b.detail
-      const st = d?.invoiceStatus ?? b.invoiceStatus
-      if (st === 'PAID' || st === 'USED') paid++
-      else if (st === 'OVERDUE') overdue++
-      else if (st === 'PARTIALLY_PAID') partial++
-      totalSum += d?.amount ?? 0
-      totalPaid += d?.paidAmount ?? 0
-    }
-    return { paid, overdue, partial, totalSum, totalPaid, count: items.length }
-  }, [items])
-
-  const filtered = useMemo(() => {
-    let list = items
-    if (seg === 'paid') list = list.filter((b) => ['PAID', 'USED'].includes((b.detail?.invoiceStatus ?? b.invoiceStatus) as string))
-    if (seg === 'overdue') list = list.filter((b) => (b.detail?.invoiceStatus ?? b.invoiceStatus) === 'OVERDUE')
-    const q = filter.trim().toLowerCase()
-    if (q) {
-      list = list.filter(
-        (b) =>
-          b.number.toLowerCase().includes(q) ||
-          (b.detail?.claimCaseNumber || '').toLowerCase().includes(q) ||
-          (b.detail?.court || '').toLowerCase().includes(q),
-      )
-    }
-    return applySort(list, sort, (b) => b.issued ?? 0, (b) => b.number)
-  }, [items, seg, filter, sort])
+  }, [stir, meta?.complete, bills?.total])
 
   // Reset to page 1 whenever the list-shaping inputs change
   useEffect(() => {
     setPage(1)
-  }, [filter, seg, sort, stir])
+  }, [qDeb, seg, sort, court, kind, stir])
 
-  const safePage = clampPage(page, filtered.length, pageSize)
-  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const matched = bills?.matched ?? 0
+  const safePage = clampPage(page, matched, pageSize)
   // the receipt DOCKS beside the list (wide screens): the page's rows step with ↑ ↓
   const openReceiptAt = (idx: number) => {
-    const b = paged[idx]
-    if (!b) return
-    openReceipt(b, stir, {
-      pos: `${(safePage - 1) * pageSize + idx + 1} / ${filtered.length}`,
+    const r = rows[idx]
+    if (!r) return
+    const nav = {
+      pos: `${(safePage - 1) * pageSize + idx + 1} / ${matched}`,
       prev: idx > 0 ? () => openReceiptAt(idx - 1) : undefined,
-      next: idx < paged.length - 1 ? () => openReceiptAt(idx + 1) : undefined,
+      next: idx < rows.length - 1 ? () => openReceiptAt(idx + 1) : undefined,
+    }
+    openReceipt(asEnriched(r), stir, nav)
+    // a list row has no usage history (where the receipt was applied): it is asked for when the receipt opens
+    void getBillDetail(r.number).then((res) => {
+      const bill = res.ok ? (res.data as { bill?: CheckStatusResponse | null }).bill : null
+      if (bill && bill.historyList && bill.historyList.length && document.querySelector('.drawer')) openReceipt({ ...asEnriched(r), detail: { ...rowAsDetail(r), historyList: bill.historyList } }, stir, nav)
     })
   }
   const dockedBill = useDockedRowKey()
@@ -387,8 +369,15 @@ export function BillsSection() {
     }
   }
 
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    if (!job?.waitingUntil) return
+    const t = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [job?.waitingUntil])
   if (!company) return null
-  const streaming = stream.status === 'streaming' || stream.status === 'idle'
+  const wait = job?.waitingUntil ? Math.max(0, Math.ceil((job.waitingUntil - nowMs) / 1000)) : 0
+  const loadFailed = job?.state === 'error' || job?.state === 'paused'
 
   return (
     <div>
@@ -424,18 +413,18 @@ export function BillsSection() {
         <>
           <div className="kpis" style={{ marginBottom: 18 }}>
             <Kpi label="Jami kvitansiya" icon={<SolidIcon name="receipt" />}>
-              <CountUp value={summary.count} id={`bills-count-${stir}`} />
+              <CountUp value={summary?.count ?? 0} id={`bills-count-${stir}`} />
             </Kpi>
             <Kpi label="Toʻlangan" icon={<SolidIcon name="check-circle" />} foot={<><span className="p-dot d-pos" />Toʻliq</>}>
-              <CountUp value={summary.paid} id={`bills-paid-${stir}`} />
+              <CountUp value={summary?.paid ?? 0} id={`bills-paid-${stir}`} />
             </Kpi>
             <Kpi label="Qisman / Muddati oʻtgan" icon={<SolidIcon name="timer" />} foot={<><span className="p-dot d-neg" />Eʼtibor talab</>}>
               <span>
-                <CountUp value={summary.partial} id={`bills-partial-${stir}`} /> / <span style={{ color: 'var(--neg-text)' }}><CountUp value={summary.overdue} id={`bills-overdue-${stir}`} /></span>
+                <CountUp value={summary?.partial ?? 0} id={`bills-partial-${stir}`} /> / <span style={{ color: 'var(--neg-text)' }}><CountUp value={summary?.overdue ?? 0} id={`bills-overdue-${stir}`} /></span>
               </span>
             </Kpi>
             <Kpi label="Umumiy summa" icon={<SolidIcon name="wallet" />} valueSize={18}>
-              <span>{formatSum(summary.totalSum)}</span>
+              <span>{formatSum(summary?.totalAmount ?? 0)}</span>
             </Kpi>
           </div>
 
@@ -443,7 +432,7 @@ export function BillsSection() {
             <div className="filterbar">
               <div className="f-search">
                 <Search />
-                <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Kvitansiya yoki ish raqami…" />
+                <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Kvitansiya, ish raqami yoki sud…" />
               </div>
               <Seg
                 options={[
@@ -452,22 +441,22 @@ export function BillsSection() {
                   { key: 'overdue', label: "Muddati oʻtgan" },
                 ]}
                 value={seg}
-                onChange={(k) => setSeg(k as typeof seg)}
+                onChange={(k) => setSeg(k as BillSeg)}
               />
               <SortMenu value={sort} onChange={setSort} />
               <div style={{ flex: 1 }} />
-              <button className="btn btn-outline btn-sm" onClick={() => stir && stream.start(stir)}>
+              <button className="btn btn-outline btn-sm" disabled={store.loading_bills} onClick={() => void store.refresh()}>
                 <Bolt />
-                <span>Oqimni koʻrsatish</span>
+                <span>Yangilash</span>
               </button>
               <button
                 className="btn btn-outline btn-sm"
-                disabled={exporting || items.length === 0}
+                disabled={exporting || !bills || matched === 0}
                 onClick={() => {
                   setExporting(true)
                   void (async () => {
                     try {
-                      await exportBillsXlsx({ inn: stir, bills: items })
+                      await exportBillsXlsx({ inn: stir, query: { q: qDeb, seg, sort, court: court || undefined, kind: kind || undefined } })
                       toast.success('Excel yuklab olindi')
                     } catch (e) {
                       toast.error(e instanceof Error ? e.message : 'Eksport xatosi')
@@ -481,46 +470,64 @@ export function BillsSection() {
                 <span>Excel</span>
               </button>
             </div>
+            {/* the court type each bill names and the kind of fee: a case needs two bills, state duty and postal costs; the bills carry the court type,
+                so the civil cases of a bank show up here even though its TIN lists show few */}
+            <div className="filterbar" style={{ paddingTop: 0 }}>
+              <Seg options={COURT_CHIPS.map((c) => ({ key: c.key || 'all', label: c.label }))} value={court || 'all'} onChange={(k) => setCourt(k === 'all' ? '' : (k as typeof court))} />
+              <Seg options={KIND_CHIPS.map((c) => ({ key: c.key || 'all', label: c.label }))} value={kind || 'all'} onChange={(k) => setKind(k === 'all' ? '' : (k as CategoryKind))} />
+            </div>
 
-            {streaming ? (
-              <StreamCard phase={stream.phase} loaded={items.length} total={stream.total} error={stream.error} />
-            ) : stream.status === 'error' && items.length === 0 ? (
+            {loadingBills && job && <LoadCard page={job.page} pages={job.pages} pass={job.pass} stored={bills?.total ?? 0} total={job.bills || meta?.totalElements || 0} wait={wait} error={store.error} onStop={() => void store.stop()} />}
+            {/* billing's paging is not stable (the same page asked twice returns other bills): the load reads several passes; if they never agreed, say so */}
+            {!loadingBills && meta?.complete && !meta.stable && bills && (
+              <div className="dw-orders-empty" style={{ margin: '12px 0' }}>
+                Billing sahifalari barqaror emas (bir xil sahifa har safar boshqa kvitansiyalarni qaytaradi). {formatCount(bills.total)} ta noyob kvitansiya olindi, billingda {formatCount(meta.totalElements)} qator bor: baʼzi kvitansiyalar yetishmasligi mumkin. «Yangilash» yana bir bor oʻqiydi va yetishmaganlarini qoʻshadi.
+              </div>
+            )}
+            {!loadingBills && loadFailed && job?.lastError && (
+              <div className="alert err" style={{ margin: '12px 0' }}>
+                <div className="at">
+                  <b>Toʻlovlar toʻliq yuklanmadi</b>
+                  <p>{job.lastError} Yuklangan {formatCount(bills?.total ?? 0)} ta kvitansiya saqlangan; «Yangilash» davom ettiradi.</p>
+                </div>
+              </div>
+            )}
+
+            {store.loading && !bills ? (
+              <div className="list"><div className="sk-rows" style={{ padding: 18 }}>Yuklanmoqda…</div></div>
+            ) : !bills && store.error ? (
               <EmptyBlock
                 icon={<Receipt />}
                 title="Kvitansiyalar olinmadi"
-                hint={stream.error || 'billing.sud.uz javob bermadi.'}
-                action={
-                  <button className="btn btn-outline btn-sm" onClick={() => stir && stream.start(stir)}>
-                    Qayta urinish
-                  </button>
-                }
+                hint={store.error}
+                action={<button className="btn btn-outline btn-sm" onClick={() => void store.refresh()}>Qayta urinish</button>}
               />
-            ) : items.length === 0 ? (
+            ) : !bills ? (
+              <EmptyBlock icon={<Receipt />} title="Kvitansiyalar yuklanmoqda" hint="Birinchi sahifa kelishi bilan shu yerda koʻrinadi." />
+            ) : bills.total === 0 && !loadingBills ? (
               <EmptyBlock icon={<Receipt />} title="Kvitansiyalar topilmadi" hint="Bu STIR boʻyicha billing.sud.uz da kvitansiya yoʻq." />
-            ) : filtered.length === 0 ? (
-              <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz bilan qidirib koʻring." />
+            ) : matched === 0 ? (
+              <EmptyBlock icon={<Search />} title="Filtr boʻyicha natija yoʻq" hint="Boshqa soʻz yoki filtr bilan qidirib koʻring." />
             ) : (
               <div className="list">
-                {paged.map((b, i) => {
-                  const d = b.detail
-                  const status = d?.invoiceStatus ?? b.invoiceStatus
-                  const fam = billStatusFamilySafe(status)
+                {rows.map((r, i) => {
+                  const fam = billStatusFamilySafe(r.status)
                   return (
-                    <div className={`lrow${dockedBill && dockedBill === b.number ? ' sel' : ''}`} key={`${b.number}-${i}`} data-bill={b.number} onClick={() => openReceiptAt(i)}>
+                    <div className={`lrow${dockedBill && dockedBill === r.number ? ' sel' : ''}`} key={`${r.number}-${i}`} data-bill={r.number} onClick={() => openReceiptAt(i)}>
                       <div className="lead">
                         <Receipt />
                       </div>
                       <div className="main-c">
-                        <b className="mono">{b.number}</b>
+                        <b className="mono">{r.number}</b>
                         <div className="sub">
-                          {d?.payCategory ? categoryLabel(d.payCategory).label : 'Toʻlov'} · {d?.court || courtTypeLabel(d?.courtType) || '-'}
-                          {d?.claimCaseNumber ? ` · ish ${d.claimCaseNumber}` : ''}
+                          {r.cat ? categoryLabel(r.cat).label : 'Toʻlov'} · {r.court || courtTypeLabel(r.courtType) || '-'}
+                          {r.caseNumber ? ` · ish ${r.caseNumber}` : ''}
                         </div>
                       </div>
-                      <span className={`badge ${familyBadgeClass(fam)}`}>{statusLabel(status)}</span>
+                      <span className={`badge ${familyBadgeClass(fam)}`}>{statusLabel(r.status)}</span>
                       <div className="amt">
-                        {formatSum(d?.amount)}
-                        <small>{formatDate(b.issued)}</small>
+                        {formatSum(r.amount)}
+                        <small>{formatDate(r.issued)}</small>
                       </div>
                       <span className="chev">
                         <ChevronRight />
@@ -533,7 +540,7 @@ export function BillsSection() {
             <ListPagination
               page={safePage}
               pageSize={pageSize}
-              total={filtered.length}
+              total={matched}
               onPage={setPage}
               onPageSize={(n) => {
                 setPageSize(n)

@@ -1,79 +1,92 @@
 'use client'
 
 /**
- * useBillCases: the cases a company's court bills name and its TIN list lacks (lib/bill-cases). Reads what the server already knows on
- * mount (disk only), and runs a scan / fill ONLY when `start` is called from a click. The server keeps what it found, so a later `start`
- * continues where the last one stopped.
+ * useBillJob: watches the server's background job that loads a company's court bills and finds the cases they name (lib/bill-cases).
+ * The job runs on the server and goes on when this page is closed; this hook only POLLS it (2 s while it runs, not at all otherwise) and
+ * hands every case it finds to the open list through the `sud:cases-found` event, so the list grows LIVE without being reloaded. Nothing is
+ * started except by `start`, which a click calls.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getBillCasesStatus, streamBillCases } from '@/lib/api-client'
-import type { BillCasesStatus } from '@/lib/api-types'
+import { getBillJob, startBillJob, stopBillJob } from '@/lib/api-client'
+import type { BillJobState, FoundEvent } from '@/lib/api-types'
 
-export interface BillCasesRun {
-  /** cases found by number in this run */
-  found: number
-  /** the reason the run stopped early, when it did (what was found is kept) */
-  error: string | null
+export const CASES_FOUND = 'sud:cases-found'
+export const CASES_RELOAD = 'sud:cases-reload'
+
+export interface CasesFoundDetail {
+  stir: string
+  events: FoundEvent[]
 }
 
-export interface UseBillCases {
-  status: BillCasesStatus | null
-  busy: boolean
-  /** what the run is doing now */
-  text: string
-  start: (scan: 'auto' | 'force' | 'skip', limit: number) => Promise<BillCasesRun>
-  stop: () => void
+const POLL_MS = 2000
+/** a page that just opened asks for this many of the latest finds (the unsaved ones are not in the list the server answered with) */
+const CATCH_UP = 100
+
+export interface UseBillJob {
+  state: BillJobState | null
+  running: boolean
+  /** start the job; resolves to an error text, or null when it started */
+  start: (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }) => Promise<string | null>
+  stop: () => Promise<void>
 }
 
-const fmt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+export function useBillJob(stir: string): UseBillJob {
+  const [state, setState] = useState<BillJobState | null>(null)
+  const afterRef = useRef<number | null>(null)
+  const wasRunning = useRef(false)
+  const alive = useRef(true)
 
-export function useBillCases(stir: string): UseBillCases {
-  const [status, setStatus] = useState<BillCasesStatus | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [text, setText] = useState('')
-  const abortRef = useRef<AbortController | null>(null)
-
-  const load = useCallback(async () => {
-    const res = await getBillCasesStatus(stir)
-    if (res.ok) setStatus(res.data)
+  const poll = useCallback(async () => {
+    const res = await getBillJob(stir, afterRef.current)
+    if (!alive.current || !res.ok) return
+    const d = res.data
+    if (afterRef.current === null) afterRef.current = Math.max(0, d.job.seq - CATCH_UP)
+    if (d.events.length) {
+      afterRef.current = d.events[d.events.length - 1].seq
+      window.dispatchEvent(new CustomEvent<CasesFoundDetail>(CASES_FOUND, { detail: { stir, events: d.events } }))
+    }
+    if (d.behind) window.dispatchEvent(new Event(CASES_RELOAD)) // fell too far behind to follow: read the list again
+    const running = d.job.state === 'running'
+    if (wasRunning.current && !running) window.dispatchEvent(new Event(CASES_RELOAD)) // the job ended: the list reads what it saved
+    wasRunning.current = running
+    setState(d)
   }, [stir])
 
+  // polled only while the job runs
+  const running = state?.job.state === 'running'
   useEffect(() => {
-    setStatus(null)
-    void load()
-    return () => abortRef.current?.abort()
-  }, [load])
+    if (!running) return
+    const t = setInterval(() => void poll(), POLL_MS)
+    return () => clearInterval(t)
+  }, [running, poll])
+
+  useEffect(() => {
+    alive.current = true
+    afterRef.current = null
+    wasRunning.current = false
+    setState(null)
+    void poll()
+    return () => {
+      alive.current = false
+    }
+  }, [poll])
 
   const start = useCallback(
-    async (scan: 'auto' | 'force' | 'skip', limit: number): Promise<BillCasesRun> => {
-      const ac = new AbortController()
-      abortRef.current = ac
-      setBusy(true)
-      setText('Boshlanmoqda…')
-      let found = 0
-      let error: string | null = null
-      await streamBillCases(stir, { scan, limit }, (e) => {
-        if (e.type === 'phase') setText(e.detail)
-        else if (e.type === 'scan') setText(`Toʻlovlar oʻqildi: ${e.page}/${e.pages}-sahifa · ${fmt(e.cases)} ta ish raqami`)
-        else if (e.type === 'case') {
-          if (e.found) found++
-          setText(`Ishlar olinmoqda: ${e.index}/${e.of} · ${found} tasi topildi`)
-        } else if (e.type === 'done') {
-          setStatus(e.status)
-          found = e.found
-        } else if (e.type === 'error') error = e.error
-      }, ac.signal)
-      abortRef.current = null
-      setBusy(false)
-      setText('')
-      await load()
-      return { found, error }
+    async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }): Promise<string | null> => {
+      const res = await startBillJob(stir, opts)
+      if (!res.ok) return res.error
+      wasRunning.current = true
+      await poll()
+      return null
     },
-    [stir, load],
+    [stir, poll],
   )
 
-  const stop = useCallback(() => abortRef.current?.abort(), [])
+  const stop = useCallback(async () => {
+    await stopBillJob(stir)
+    await poll()
+  }, [stir, poll])
 
-  return { status, busy, text, start, stop }
+  return { state, running, start, stop }
 }

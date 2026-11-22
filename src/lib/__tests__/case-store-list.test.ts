@@ -74,6 +74,28 @@ beforeEach(() => {
   seen = []
 })
 
+describe('cases found by number (lib/bill-cases)', () => {
+  const found = (n: string) => ({ caseNumber: n, caseType: '', caseStatus: 'Якунланган', result: '', courtName: 'Found court', dateFiled: '', plaintiff: '', defendant: '', claimAmount: '', hearingDate: '', hearingTime: '', judge: '' })
+
+  test('are merged into that court\'s list, never twice, and survive a total failure of the court', async () => {
+    script = [{ status: 200, etag: 'W/"a"', rows: [mk(1), mk(2)] }, { status: 500 }, { status: 500 }, { status: 500 }]
+    store.addFound(TIN, [{ courtType: 'civil', row: found('2-9-9999/9') }, { courtType: 'civil', row: found('2-1103-2604/00001') }], {})
+    const a = await open()
+    expect(a.cases.map((c) => c.caseNumber).sort()).toEqual(['2-1103-2604/00001', '2-1103-2604/00002', '2-9-9999/9'])
+    // the court's own row for 00001 wins over the found one (it is listed twice nowhere)
+    expect(a.cases.find((c) => c.caseNumber === '2-1103-2604/00001')?.courtName).toBe('Sud')
+    const b = await open()
+    expect(b.incomplete).toBe(true)
+    expect(b.cases.map((c) => c.caseNumber)).toContain('2-9-9999/9')
+  })
+
+  test('another court\'s found cases do not leak into this list', async () => {
+    script = [{ status: 200, etag: 'W/"a"', rows: [mk(1)] }]
+    store.addFound(TIN, [{ courtType: 'economic', row: found('4-1-2101/5') }], {})
+    expect((await open()).cases.map((c) => c.caseNumber)).toEqual(['2-1103-2604/00001'])
+  })
+})
+
 describe('a list the court cuts at its row limit', () => {
   const many = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => mk(from + i))
 

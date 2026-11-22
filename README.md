@@ -43,8 +43,15 @@ Everything is token-driven (`src/app/globals.css`, `prototype.css`, the look lay
 **Home** (launcher): recently viewed and watched companies, refresh, *Tozalash* (clears searched companies only, never watched ones).
 Search here or with `⌘K` from anywhere.
 
-**Toʻlovlar** (bills): `billing.sud.uz` by STIR or a single kvitansiya; results stream in (PoW captcha → fetch → enrich) as receipts with
-status, court and case links; the counters count up as they arrive. Excel export. A receipt opens its case.
+**Toʻlovlar** (bills): `billing.sud.uz` by STIR or a single kvitansiya. ALL of a company's bills are loaded by a background job on the
+server, page by page (a bank has 241 541), and kept on disk; the tab shows what has arrived so far, searchable by receipt, case number or
+court, filterable by status, **court type** and fee kind (davlat boji / pochta xarajati), with Excel export. A receipt opens its case, and a
+case's drawer lists its two bills. billing's paging is not stable, so the load reads several passes until they agree (the tab says so when
+they never do).
+
+**Cases the court's TIN list hides**: the court cuts a TIN list at 100 (new system) / 200 (old system) rows. The bills name every case they
+were used on, so «Toʻlovlardan ishlarni topish» asks the court for those case numbers (one request at a time, paced, with back-off) and the
+found cases join the open list live, searchable at once. It runs on the server and goes on if you leave the screen.
 
 **Sud ishlari** (cases): by STIR / PINFL / case number across economic, civil and administrative courts. The list can
 be filtered by court type, side, outcome and text, exported to PDF / Excel, and a case opens in a detail panel that **docks beside the

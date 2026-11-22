@@ -71,7 +71,7 @@ export function useResource<T>(
   })
 
   const run = useCallback(
-    async (force: boolean) => {
+    async (force: boolean, quiet = false) => {
       abortRef.current?.abort()
       const ac = new AbortController()
       abortRef.current = ac
@@ -84,16 +84,17 @@ export function useResource<T>(
         }
       }
 
-      setState({ status: 'loading' })
+      // `quiet`: the list on screen stays until the new answer replaces it (a background refresh must not blank it)
+      if (!quiet) setState({ status: 'loading' })
       const t0 = Date.now()
-      const timer = setInterval(() => setElapsed(Date.now() - t0), 500)
+      const timer = quiet ? null : setInterval(() => setElapsed(Date.now() - t0), 500)
       try {
         const res = await fetcherRef.current(ac.signal, force)
         // Superseded/unmounted while the response was in flight. This used to
         // `return` with the interval still running: every 500ms it re-rendered
         // the owning component (e.g. the whole cases list) forever.
-        if (ac.signal.aborted) { clearInterval(timer); return }
-        clearInterval(timer)
+        if (ac.signal.aborted) { if (timer) clearInterval(timer); return }
+        if (timer) clearInterval(timer)
         setElapsed(Date.now() - t0)
         if (res.ok) {
           // a PARTIAL answer (one source failed) is not cached: replaying it later would show the gaps as if that were all
@@ -105,7 +106,7 @@ export function useResource<T>(
           setState({ status: 'error', error: res.error })
         }
       } catch (e) {
-        clearInterval(timer)
+        if (timer) clearInterval(timer)
         if (e instanceof DOMException && e.name === 'AbortError') return
         // A throw here means the fetcher itself blew up (not a handled API
         // error — those resolve via res.ok===false above), so e.message is
@@ -134,6 +135,12 @@ export function useResource<T>(
     return run(false)
   }, [cacheKey, run])
 
+  /** Read again WITHOUT forcing and WITHOUT blanking what is on screen: a background change (cases found by the bills job) refreshed the data. */
+  const reloadQuiet = useCallback(() => {
+    if (cacheKey) clearCached(cacheKey)
+    return run(false, true)
+  }, [cacheKey, run])
+
   const clear = useCallback(() => {
     abortRef.current?.abort()
     setState({ status: 'idle' })
@@ -141,7 +148,7 @@ export function useResource<T>(
     setMeta(null)
   }, [])
 
-  return { state, elapsed, meta, refetch, reload, clear, loading: state.status === 'loading' }
+  return { state, elapsed, meta, refetch, reload, reloadQuiet, clear, loading: state.status === 'loading' }
 }
 
 function decide<T>(data: T, partial: SourceError[], isEmpty?: (d: T) => boolean): ResourceState<T> {

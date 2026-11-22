@@ -21,7 +21,6 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
-import type { BillCase } from '@/core/bill-cases'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 
 const TIN_RE = /^\d{9}$/
@@ -69,6 +68,7 @@ function mem(): { dir: string; files: Map<string, FeedFile> } {
 /** forget what is held in memory (tests; the disk is untouched) */
 export function forgetCaseStoreMemory(): void {
   g.__sudCaseStore = undefined
+  ;(globalThis as unknown as { __sudFound?: unknown }).__sudFound = undefined
 }
 
 function writeAtomic(target: string, json: string): boolean {
@@ -154,7 +154,9 @@ export function mergeRows(kept: readonly CourtCase[], arrived: readonly CourtCas
  */
 export function patchRow(tin: string, courtType: CourtType, row: CourtCase): boolean {
   const file = loadFeeds(tin)
-  if (!file || !row.caseNumber) return false
+  if (!row.caseNumber) return false
+  if (patchFound(tin, courtType, row)) return true
+  if (!file) return false
   const keys = Object.keys(file.feeds).filter((k) => k.startsWith(`${courtType}|`))
   if (!keys.length) return false
   let held = false
@@ -171,70 +173,83 @@ export function patchRow(tin: string, courtType: CourtType, row: CourtCase): boo
   return writeAtomic(feedFile(tin), JSON.stringify(file))
 }
 
-/**
- * Add rows to a feed, creating it when it does not exist (the `<court>|bills` feed: cases found by number from the bills, which no TIN
- * list shows). By case number, the new row wins.
- */
-export function addFeedRows(tin: string, key: string, rows: readonly CourtCase[]): boolean {
-  if (!TIN_RE.test(tin) || !rows.length) return false
-  const old = readFeed(tin, key)
-  return writeFeed(tin, key, { t: Date.now(), complete: true, items: mergeRows(old?.items ?? [], rows) })
-}
-
-/** the feed key of the cases found by number from the bills, per court type (court-case merges it into that court's list) */
-export const billsFeedKey = (courtType: CourtType): string => `${courtType}|bills`
-
-// ---------------- the bills' case numbers ----------------
+// ---------------- the cases found by number (from the bills) ----------------
 
 /**
- * What a scan of a company's bills found: every case number the bills name (with court type and court), how far the scan got, and which
- * numbers were already asked by number (`tried`: `found` false = the court's APIs know no such case, so it is not asked again for
- * RETRY_MISSING_MS; a case that was found is simply a row in the bills feed).
+ * Cases no TIN list shows (the court cuts a list at its row limit), found by asking the court for their NUMBER (`lib/bill-cases`):
+ * `<STIR>.found.json.gz`, the list rows per court type. It is a file of its own so that saving thousands of found cases never rewrites the
+ * company's big TIN lists, and `court-case` merges it into each court's list. `tried` says which numbers were already asked.
  */
-export interface BillIndex {
+interface FoundFile {
   v: 1
   tin: string
-  /** when the scan last finished or was last extended (ms) */
-  scannedAt: number
-  totalElements: number
-  totalPages: number
-  pageSize: number
-  /** pages read so far; a scan that stopped early is resumed from here while the totals and the page size still match */
-  pagesDone: number
-  complete: boolean
-  cases: Record<string, BillCase>
+  courts: Partial<Record<CourtType, CourtCase[]>>
+  /** a number already asked of the court: `found` false = neither system knows it (asked again after a while, see lib/bill-cases) */
   tried: Record<string, { t: number; found: boolean }>
 }
 
-const billFile = (tin: string): string => path.join(caseStoreDir(), `${tin}.bills.json.gz`)
+const gf = globalThis as unknown as { __sudFound?: { dir: string; files: Map<string, FoundFile> } }
+function foundMem(): { dir: string; files: Map<string, FoundFile> } {
+  const dir = caseStoreDir()
+  if (!gf.__sudFound || gf.__sudFound.dir !== dir) gf.__sudFound = { dir, files: new Map() }
+  return gf.__sudFound
+}
 
-export function readBillIndex(tin: string): BillIndex | null {
+const foundPath = (tin: string): string => path.join(caseStoreDir(), `${tin}.found.json.gz`)
+
+function loadFound(tin: string): FoundFile | null {
   if (!TIN_RE.test(tin)) return null
-  const raw = readJson(billFile(tin)) as Partial<BillIndex> | null
-  if (!raw || raw.v !== 1 || raw.tin !== tin || !raw.cases || typeof raw.cases !== 'object') return null
-  return {
-    v: 1, tin,
-    scannedAt: Number(raw.scannedAt) || 0,
-    totalElements: Number(raw.totalElements) || 0,
-    totalPages: Number(raw.totalPages) || 0,
-    pageSize: Number(raw.pageSize) || 0,
-    pagesDone: Number(raw.pagesDone) || 0,
-    complete: raw.complete === true,
-    cases: raw.cases as Record<string, BillCase>,
-    tried: (raw.tried && typeof raw.tried === 'object' ? raw.tried : {}) as BillIndex['tried'],
-  }
+  const m = foundMem()
+  const hit = m.files.get(tin)
+  if (hit) return hit
+  const raw = readJson(foundPath(tin)) as Partial<FoundFile> | null
+  let file: FoundFile
+  if (raw && raw.v === 1 && raw.tin === tin && raw.courts && typeof raw.courts === 'object') {
+    file = { v: 1, tin, courts: raw.courts, tried: raw.tried && typeof raw.tried === 'object' ? raw.tried : {} }
+  } else file = { v: 1, tin, courts: {}, tried: {} }
+  m.files.set(tin, file)
+  while (m.files.size > 4) m.files.delete(m.files.keys().next().value as string)
+  return file
 }
 
-export function writeBillIndex(idx: BillIndex): boolean {
-  if (!TIN_RE.test(idx.tin)) return false
-  return writeAtomic(billFile(idx.tin), JSON.stringify(idx))
+/** the found cases of one court (empty when none) */
+export function readFound(tin: string, courtType: CourtType): CourtCase[] {
+  return loadFound(tin)?.courts[courtType] ?? []
 }
 
-/** every case number the stored lists of a company hold (all courts, the bills feed included) */
+export function readTried(tin: string): Record<string, { t: number; found: boolean }> {
+  return loadFound(tin)?.tried ?? {}
+}
+
+/** Add found rows (by case number, the new one wins) and the numbers just tried, and save. */
+export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType; row: CourtCase }>, tried: Record<string, { t: number; found: boolean }>): boolean {
+  const file = loadFound(tin)
+  if (!file) return false
+  const by = new Map<CourtType, CourtCase[]>()
+  for (const { courtType, row } of rows) (by.get(courtType) ?? by.set(courtType, []).get(courtType)!).push(row)
+  for (const [ct, list] of by) file.courts[ct] = mergeRows(file.courts[ct] ?? [], list)
+  Object.assign(file.tried, tried)
+  return writeAtomic(foundPath(tin), JSON.stringify(file))
+}
+
+/** a found case that is also in a stored TIN list or here: one row of «Yangilash» replaces it in the found rows too */
+function patchFound(tin: string, courtType: CourtType, row: CourtCase): boolean {
+  const file = loadFound(tin)
+  const list = file?.courts[courtType]
+  if (!file || !list) return false
+  const i = list.findIndex((r) => r.caseNumber === row.caseNumber)
+  if (i < 0) return false
+  list[i] = row
+  return writeAtomic(foundPath(tin), JSON.stringify(file))
+}
+
+/** every case number the stored lists AND the found cases of a company hold (all courts) */
 export function knownCaseNumbers(tin: string): Set<string> {
   const out = new Set<string>()
   const file = loadFeeds(tin)
   if (file) for (const f of Object.values(file.feeds)) for (const r of f.items) if (r.caseNumber) out.add(r.caseNumber)
+  const found = loadFound(tin)
+  if (found) for (const list of Object.values(found.courts)) for (const r of list ?? []) if (r.caseNumber) out.add(r.caseNumber)
   return out
 }
 

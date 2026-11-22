@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, Gavel, RefreshCw, Scale, Search, User, Wallet, Link2, X } from 'lucide-react'
 import { EmptyBlock, SkRows, Seg, familyBadgeClass, SortMenu, applySort, parseSortDate, type SortKey } from '@/components/proto/primitives'
 import { ScrapeProgress, SCRAPE_CFG } from '@/components/proto/scrape-progress'
-import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/billing-format'
+import { categoryLabel, courtTypeForCase, formatClaimAmount, formatSum, normalizeCourtType, statusLabel } from '@/core/billing-format'
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { buildTrack, TRACK_NAME } from '@/core/instance-track'
@@ -37,10 +37,11 @@ import { PartialBanner, ErrorState } from '@/components/ui-custom/states'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useResource } from '@/hooks/use-resource'
 import { BillCasesPanel } from './bill-cases-panel'
+import { CASES_FOUND, type CasesFoundDetail } from '@/hooks/use-bill-cases'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { dateKey, daysUntil, formatDmy, parseYmd } from '@/core/dates'
-import { getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
+import { getBillsOfCase, getCaseDetail, searchCases, searchCompanies, exportCasesXlsx } from '@/lib/api-client'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useAppStore } from '@/lib/store/app-store'
 import type { CourtType, CourtCase, FullCaseData, Hearing, InstanceData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
@@ -318,7 +319,12 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
   // says why (the stored copy on the server is untouched); on success the drawer is redrawn and the company's list reads its stored row again
   const load = async (refresh: boolean): Promise<void> => {
     const toastId = refresh ? toast.loading('Sud saytidan soʻralmoqda…', { position: 'top-left' }) : undefined
-    const res = await getCaseDetail(courtType, caseNumber, undefined, { refresh, tin: company?.stir })
+    // the case's bills (usually two: state duty and postal costs) from the company's stored bills: a local read, asked together with the case
+    const [res, billsRes] = await Promise.all([
+      getCaseDetail(courtType, caseNumber, undefined, { refresh, tin: company?.stir }),
+      company?.stir ? getBillsOfCase(company.stir, caseNumber) : Promise.resolve(null),
+    ])
+    const caseBills = billsRes && billsRes.ok ? billsRes.data.bills : []
     if (!res.ok && refresh) {
       toast.error(`Ish yangilanmadi: ${res.error}. Oldingi nusxa saqlanib qoldi.`, { id: toastId, position: 'top-left', duration: 8000 }) // top: the default corner is the drawer's own footer, where the button just pressed is; the left, because the drawer covers the right
       return
@@ -482,6 +488,18 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
 
         <CaseOrders caseNumber={caseNumber} courtType={courtType} decisions={knownDecisions} ongoing={knownDecisions.length === 0 && isOngoingFirstInstance({ caseStatus: g?.caseStatus })} />
 
+        {caseBills.length > 0 && (
+          <DwSection title="Toʻlovlar" count={caseBills.length}>
+            <DwKv
+              rows={caseBills.map((b): DwRow => [
+                categoryLabel(b.cat).label,
+                `${formatSum(b.amount)} soʻm · ${statusLabel(b.status)}`,
+                { mono: true },
+              ])}
+            />
+          </DwSection>
+        )}
+
         <DwSection title="Hujjat tayyorlash">
           <div className="dw-docs">
             {PREFILLABLE_DOCS.map((id) => (
@@ -541,6 +559,9 @@ function stampOf(t: number | undefined): string {
 }
 
 // ---- section (v204: merged list held HERE, not per court) ------------------------
+
+/** cases found in the background are added to the open list at most this often */
+const LIVE_BATCH_MS = 4000
 
 interface MergedRow {
   c: CourtCase
@@ -670,17 +691,26 @@ export function CasesSection() {
     if (courts.includes('criminal')) crim.reload()
   }, [econ.reload, civ.reload, adm.reload, crim.reload, courts.join(',')])
 
+  // something changed in the background (a case was refreshed from its drawer, the bills job saved cases): read the lists again, but keep
+  // the list on screen until the answer arrives, so nothing blinks while a long job runs
+  const reloadQuiet = useCallback(() => {
+    if (courts.includes('economic')) econ.reloadQuiet()
+    if (courts.includes('civil')) civ.reloadQuiet()
+    if (courts.includes('administrative')) adm.reloadQuiet()
+    if (courts.includes('criminal')) crim.reloadQuiet()
+  }, [econ.reloadQuiet, civ.reloadQuiet, adm.reloadQuiet, crim.reloadQuiet, courts.join(',')])
+
   useEffect(() => {
     const handler = () => refetchAll()
     window.addEventListener('sud:force-section', handler)
     window.addEventListener(COMPANY_REFRESHED, reloadAll)
-    window.addEventListener('sud:cases-reload', reloadAll) // one case was refreshed from its drawer: its stored row changed
+    window.addEventListener('sud:cases-reload', reloadQuiet) // one case was refreshed from its drawer, or the bills job saved cases
     return () => {
       window.removeEventListener('sud:force-section', handler)
       window.removeEventListener(COMPANY_REFRESHED, reloadAll)
-      window.removeEventListener('sud:cases-reload', reloadAll)
+      window.removeEventListener('sud:cases-reload', reloadQuiet)
     }
-  }, [refetchAll, reloadAll])
+  }, [refetchAll, reloadAll, reloadQuiet])
 
   // the header shows how old the dossier is: the oldest of the court lists on screen
   useEffect(() => {
@@ -711,15 +741,47 @@ export function CasesSection() {
         : [],
   )
 
-  const merged: MergedRow[] = useMemo(
-    () =>
-      views.flatMap((v) =>
-        v.view.status === 'success' || v.view.status === 'partial'
-          ? (v.view.data.cases || []).map((c) => ({ c, courtType: v.courtType }))
-          : [],
-      ),
-    [views],
-  )
+  // cases the background job finds by number from the company's bills (lib/bill-cases): they are added here the moment they are found, so the
+  // list grows live without being reloaded; the server's own list already holds them after the next read (deduped by case number)
+  const [live, setLive] = useState<MergedRow[]>([])
+  useEffect(() => setLive([]), [stir])
+  useEffect(() => {
+    // finds arrive about one a second for hours, and every change re-derives the whole list (sides, counts): they are applied in batches
+    let pending: MergedRow[] = []
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const flush = () => {
+      timer = null
+      const add = pending
+      pending = []
+      setLive((prev) => {
+        const have = new Set(prev.map((m) => m.c.caseNumber))
+        const fresh = add.filter((m) => !have.has(m.c.caseNumber))
+        return fresh.length ? [...prev, ...fresh] : prev
+      })
+    }
+    const onFound = (e: Event) => {
+      const d = (e as CustomEvent<CasesFoundDetail>).detail
+      if (!d || d.stir !== stir) return
+      pending.push(...d.events.map((ev) => ({ c: ev.row, courtType: ev.courtType as CourtType })))
+      if (!timer) timer = setTimeout(flush, LIVE_BATCH_MS)
+    }
+    window.addEventListener(CASES_FOUND, onFound)
+    return () => {
+      window.removeEventListener(CASES_FOUND, onFound)
+      if (timer) clearTimeout(timer)
+    }
+  }, [stir])
+
+  const merged: MergedRow[] = useMemo(() => {
+    const base = views.flatMap((v) =>
+      v.view.status === 'success' || v.view.status === 'partial'
+        ? (v.view.data.cases || []).map((c) => ({ c, courtType: v.courtType }))
+        : [],
+    )
+    if (!live.length) return base
+    const have = new Set(base.map((m) => m.c.caseNumber))
+    return [...base, ...live.filter((m) => !have.has(m.c.caseNumber) && courts.includes(m.courtType))]
+  }, [views, live, courts.join(',')])
 
   // which side the company is on in each case. Decided over the WHOLE loaded list (not the search results): the company's
   // own spelling is learned from the party names that repeat in nearly every case (core/classify assignRoles)

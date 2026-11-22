@@ -1,6 +1,6 @@
 /**
  * The typed API client (arch guide §3.2) — the ONLY module allowed to fetch.
- * Components call these functions through useResource/useStream; no fetch()
+ * Components call these functions through useResource and the feature hooks; no fetch()
  * lives anywhere else. Every call is abortable and maps server envelopes (and
  * legacy shapes) into ApiResult<T>.
  */
@@ -13,10 +13,13 @@ import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
 import type {
   ApiResult,
-  BillCasesEvent,
-  BillCasesStatus,
   BillDetailData,
-  BillStreamMessage,
+  BillJobState,
+  BillJobStatus,
+  BillRow,
+  BillSeg,
+  BillSort,
+  BillsQueryResult,
   BillSummary,
   CompanyInfoData,
   CompanyStats,
@@ -146,109 +149,55 @@ export function getWorkers(signal?: AbortSignal) {
   return request<{ source: string; workers: { url: string; addedAt?: string | null; lastTestedAt?: string | null; lastTestResult?: 'ok' | 'fail' | null }[] }>(`/api/settings/workers`, signal)
 }
 
-// ---- Bills stream (the NDJSON contract) ----------------------------------------
+// ---- The bills job and the stored bills (lib/bill-cases, lib/bills-store) ----
 
-export interface StreamHandlers {
-  onPhase?: (phase: string, detail?: string) => void
-  onMeta?: (total: number, info?: { cached?: boolean; fetchedAt?: number; stale?: boolean }) => void
-  onBill?: (bill: EnrichedBill, index: number) => void
-  onDone?: (info?: { fetchedAt?: number }) => void
-  onError?: (error: string) => void
+/** What is stored, the background job's progress, and the cases it found after event `after` (nothing is scraped by asking). */
+export function getBillJob(stir: string, after: number | null, signal?: AbortSignal) {
+  return request<BillJobState>(`/api/bill-cases?tin=${stir}${after === null ? '' : `&after=${after}`}`, signal)
 }
 
-/** `force`: the hard refresh: scrape billing.sud.uz now instead of replaying the daily snapshot. */
-export async function streamBills(stir: string, handlers: StreamHandlers, signal?: AbortSignal, force = false): Promise<void> {
+/** Started by a click (or by opening the Toʻlovlar tab of a company with no stored bills, `fill: false`). Returns at once. */
+export async function startBillJob(stir: string, opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }): Promise<ApiResult<{ job: BillJobStatus }>> {
+  return post(`/api/bill-cases?tin=${stir}&action=start&load=${opts.load}&fill=${opts.fill ? 1 : 0}`)
+}
+
+export async function stopBillJob(stir: string): Promise<ApiResult<{ job: BillJobStatus }>> {
+  return post(`/api/bill-cases?tin=${stir}&action=stop`)
+}
+
+async function post<T>(url: string): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/bills?inn=${stir}${force ? '&force=1' : ''}`, { signal, headers: authHeaders() })
-    if (!res.ok || !res.body) {
-      let msg = `Server xatosi (${res.status})`
-      try {
-        const j = await res.json()
-        if (j?.error) msg = j.error
-      } catch { /* stream content-type — ignore */ }
-      handlers.onError?.(msg)
-      return
-    }
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buf = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      const lines = buf.split('\n')
-      buf = lines.pop() || ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let msg: BillStreamMessage
-        try {
-          msg = JSON.parse(line) as BillStreamMessage
-        } catch {
-          continue
-        }
-        switch (msg.type) {
-          case 'meta': handlers.onMeta?.(msg.total, { cached: msg.cached, fetchedAt: msg.fetchedAt, stale: msg.stale }); break
-          case 'phase': handlers.onPhase?.(msg.phase, msg.detail); break
-          case 'bill': handlers.onBill?.(msg.bill, msg.index); break
-          case 'done': handlers.onDone?.({ fetchedAt: msg.fetchedAt }); break
-          case 'error': handlers.onError?.(msg.error); break
-        }
-      }
-    }
-    handlers.onDone?.()
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') return
-    handlers.onError?.('Tarmoq xatosi — serverga ulanib boʻlmadi')
+    const res = await fetch(url, { method: 'POST', headers: authHeaders(), cache: 'no-store' })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && 'data' in json) return { ok: true, data: json.data as T }
+    return { ok: false, error: json?.error || `Server xatosi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi', status: 0 }
   }
 }
 
-// ---- Cases found through the bills (the court's TIN lists are cut at a row limit) ----
-
-export function getBillCasesStatus(stir: string, signal?: AbortSignal) {
-  return request<BillCasesStatus>(`/api/bill-cases?tin=${stir}`, signal)
+export interface BillsQueryParams {
+  page: number
+  size: number
+  sort: BillSort
+  seg: BillSeg
+  q?: string
+  court?: string
+  kind?: string
 }
 
-/**
- * Started by a click: reads the company's bills (when needed), then asks the court for up to `limit` of the case numbers the lists lack,
- * and reports every step. Aborting the signal stops it after the current step; what was found stays.
- */
-export async function streamBillCases(
-  stir: string,
-  opts: { scan: 'auto' | 'force' | 'skip'; limit: number },
-  onEvent: (e: BillCasesEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  try {
-    const res = await fetch(`/api/bill-cases?tin=${stir}&scan=${opts.scan}&limit=${opts.limit}`, { method: 'POST', signal, headers: authHeaders(), cache: 'no-store' })
-    if (!res.ok || !res.body) {
-      let msg = `Server xatosi (${res.status})`
-      try {
-        const j = await res.json()
-        if (j?.error) msg = j.error
-      } catch { /* not JSON */ }
-      onEvent({ type: 'error', error: msg })
-      return
-    }
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buf = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      const lines = buf.split('\n')
-      buf = lines.pop() || ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        try {
-          onEvent(JSON.parse(line) as BillCasesEvent)
-        } catch { /* a broken line is skipped */ }
-      }
-    }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') return
-    onEvent({ type: 'error', error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' })
-  }
+/** A page of the company's STORED bills (no site is asked), the summary of all of them, the load's progress and the job. */
+export function queryStoredBills(stir: string, p: BillsQueryParams, signal?: AbortSignal) {
+  const q = new URLSearchParams({ inn: stir, page: String(p.page), size: String(p.size), sort: p.sort, seg: p.seg })
+  if (p.q?.trim()) q.set('q', p.q.trim())
+  if (p.court) q.set('court', p.court)
+  if (p.kind) q.set('kind', p.kind)
+  return request<BillsQueryResult>(`/api/bills/query?${q}`, signal)
+}
+
+/** The bills of ONE case (usually two: state duty and postal costs). */
+export function getBillsOfCase(stir: string, caseNumber: string, signal?: AbortSignal) {
+  return request<{ bills: BillRow[] }>(`/api/bills/query?inn=${stir}&forCase=${encodeURIComponent(caseNumber)}`, signal)
 }
 
 // ---- Exports (binary downloads) -------------------------------------------------

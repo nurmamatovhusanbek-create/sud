@@ -13,6 +13,8 @@ import type { EnrichedBill } from '@/lib/api-types'
 import { patchMeta } from '@/lib/registry'
 
 const cache = new Map<string, EnrichedBill[]>()
+/** the whole company's totals when the bills live on the server (a big company's bills are never all in the browser) */
+const summaries = new Map<string, BillsTotals>()
 const listeners = new Set<() => void>()
 let version = 0
 
@@ -24,6 +26,12 @@ function emit() {
 export function setCachedBills(stir: string, items: EnrichedBill[]): void {
   if (typeof window === 'undefined') return
   cache.set(stir, items)
+  emit()
+}
+
+export function setBillsSummary(stir: string, t: BillsTotals): void {
+  if (typeof window === 'undefined') return
+  summaries.set(stir, t)
   emit()
 }
 
@@ -51,6 +59,8 @@ export interface BillsTotals {
 }
 
 export function billsTotals(stir: string): BillsTotals {
+  const sum = summaries.get(stir)
+  if (sum) return sum
   const items = getCachedBills(stir)
   if (!items) return { loaded: false, count: 0, paidCount: 0, totalPaid: 0, overdue: 0 }
   let paidCount = 0

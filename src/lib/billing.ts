@@ -504,7 +504,7 @@ function rejectionReason(r: unknown): string {
  */
 export async function searchBillsByInn(
   inn: string,
-  opts: { page?: number; size?: number; onPhase?: PhaseCallback } = {},
+  opts: { page?: number; size?: number; sort?: string; worker?: string; onPhase?: PhaseCallback } = {},
 ): Promise<SearchResponse> {
   const page = opts.page ?? 0
   const size = opts.size ?? 100
@@ -524,7 +524,7 @@ export async function searchBillsByInn(
     // One worker for this whole captcha session: PoW, analyze and the search all leave
     // through the same egress, and the search is never hedged (it consumes the token).
     // A rejected token is retried on the NEXT worker.
-    const worker = pickWorker(triedWorkers)
+    const worker = opts.worker ?? pickWorker(triedWorkers)
     if (worker) triedWorkers.push(worker)
     const token = await getCaptchaToken(6, onPhase, worker)
     const params = new URLSearchParams({
@@ -534,6 +534,7 @@ export async function searchBillsByInn(
       size: String(size),
       captchaToken: token,
     })
+    if (opts.sort) params.set('sort', opts.sort) // Spring paging: `field,asc|desc`
     const searchUrl = `${BILLING_API}/api/invoice/captcha/search?${params.toString()}`
     const searchHeaders = {
       Accept: 'application/json',

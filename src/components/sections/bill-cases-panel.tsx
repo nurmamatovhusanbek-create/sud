@@ -1,60 +1,74 @@
 'use client'
 
 /**
- * Under the cases list of a company whose court list is cut at the court's row limit: the cases the bills name and the list lacks.
- * Everything here is started by a click (nothing reads the bills or asks the court by itself). The server remembers what it found, so
- * the same button simply continues where the last run stopped.
+ * Under the cases list of a company whose court list is cut at the court's row limit (or that already has bills): the cases the bills
+ * name and the list lacks. Everything is started by a click; the work runs on the server and this panel WATCHES it (the list grows live
+ * as cases are found, and the job goes on if the page is left). The same button continues where the last run stopped.
  */
 
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { useBillCases } from '@/hooks/use-bill-cases'
-
-const BATCH = 60
+import { useBillJob } from '@/hooks/use-bill-cases'
 
 const fmt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
 export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean }) {
-  const { status, busy, text, start: run, stop } = useBillCases(stir)
+  const { state, running, start, stop } = useBillJob(stir)
+  const [now, setNow] = useState(() => Date.now())
+  const job = state?.job
+  const st = state?.status
 
-  const start = async (scan: 'auto' | 'force' | 'skip', limit: number) => {
-    const { found, error } = await run(scan, limit)
-    if (error) toast.error(`Toʻlovlardan ishlarni topib boʻlmadi: ${error}. Topilganlari saqlandi.`, { position: 'top-left' })
-    else if (found > 0) toast.success(`${found} ta ish topildi va saqlandi`, { position: 'top-left' })
-    if (found > 0) window.dispatchEvent(new Event('sud:cases-reload')) // the company's list reads its stored rows again
+  // the countdown of a back-off
+  useEffect(() => {
+    if (!job?.waitingUntil) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [job?.waitingUntil])
+
+  const go = async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }) => {
+    const err = await start(opts)
+    if (err) toast.error(err, { position: 'top-left' })
   }
 
-  if (!capped && !status?.scanned) return null
+  if (!state) return null
+  const loaded = !!st && st.totalBills > 0 && st.loaded
+  if (!capped && !running && !(st && st.billCases > 0) && !loaded) return null
+
+  const paused = job?.state === 'paused'
+  const failed = job?.state === 'error'
+  const wait = job?.waitingUntil ? Math.max(0, Math.ceil((job.waitingUntil - now) / 1000)) : 0
+
+  let text: string
+  if (running && job?.phase === 'load') {
+    text = `Toʻlovlar oʻqilmoqda: ${job.page}/${job.pages || '…'}-sahifa${job.pass > 0 ? ` · ${job.pass + 1}-oʻtish` : ''}${job.bills ? ` · ${fmt(job.bills)} ta kvitansiya` : ''}. Oʻqilgan sahifalardagi ishlar roʻyxatga keyin qoʻshiladi.`
+  } else if (running && job?.phase === 'fill') {
+    text = `Ishlar raqam boʻyicha olinmoqda: ${fmt(job.done)}/${fmt(job.total)} · ${fmt(job.found)} tasi topildi${job.absent ? `, ${fmt(job.absent)} tasi sud tizimida yoʻq` : ''}. Topilgan ishlar roʻyxatga shu zahoti qoʻshiladi; sahifadan chiqsangiz ham davom etadi.`
+  } else if (!loaded || !st || st.billCases === 0) {
+    text = 'Sud tizimi bu STIR boʻyicha roʻyxatni cheklaydi (yangi tizim 100 ta, eski tizim 200 ta qator): eski ishlar koʻrinmasligi mumkin. Bir marta koʻrilgan ish serverda saqlanadi va roʻyxatdan yoʻqolmaydi. Toʻlovlar (billing.sud.uz) har bir ishning raqamini beradi (har ishga odatda ikkita kvitansiya: davlat boji va pochta xarajati): yetishmayotgan ishlarni shu raqamlar orqali olish mumkin.'
+  } else {
+    text = `Toʻlovlarda ${fmt(st.billCases)} ta ish raqami bor: ${fmt(st.found)} tasi olingan, ${fmt(st.missing)} tasi hali olinmagan${st.notFound > 0 ? `, ${fmt(st.notFound)} tasi sud tizimida topilmadi` : ''}.`
+  }
 
   return (
     <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
-      {!status?.scanned ? (
-        <>
-          Sud tizimi bu STIR boʻyicha roʻyxatni cheklaydi (yangi tizim 100 ta, eski tizim 200 ta qator): eski ishlar koʻrinmasligi mumkin. Bir marta koʻrilgan ish serverda saqlanadi va roʻyxatdan yoʻqolmaydi. Toʻlovlar (billing.sud.uz) har bir ishning raqamini beradi: yetishmayotgan ishlarni shu raqamlar orqali olish mumkin.
-        </>
-      ) : (
-        <>
-          Toʻlovlarda {fmt(status.billCases)} ta ish raqami bor: {fmt(status.found)} tasi olingan, {fmt(status.missing)} tasi hali olinmagan
-          {status.notFound > 0 ? `, ${fmt(status.notFound)} tasi sud tizimida topilmadi` : ''}.
-          {!status.complete ? ` Toʻlovlar toʻliq oʻqilmagan (${status.pagesDone}/${status.totalPages}-sahifa).` : ''}
-        </>
-      )}
-      {busy && <div style={{ marginTop: 8, color: 'var(--text-2)' }}>{text}</div>}
+      {text}
+      {wait > 0 && <div style={{ marginTop: 6, color: 'var(--text-2)' }}>Sud tizimi javob bermadi: {wait} soniyadan keyin qayta uriniladi ({job?.lastError}).</div>}
+      {(paused || failed) && job?.lastError && <div style={{ marginTop: 6, color: 'var(--neg-text)' }}>{job.lastError}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-        {busy ? (
-          <button className="btn btn-outline btn-sm" onClick={stop}>Toʻxtatish</button>
-        ) : !status?.scanned || !status.complete ? (
-          <button className="btn btn-outline btn-sm" onClick={() => void start('auto', BATCH)}>
-            {status?.scanned ? 'Toʻlovlarni oʻqishni davom ettirish' : 'Toʻlovlardan ishlarni topish'}
+        {running ? (
+          <button className="btn btn-outline btn-sm" onClick={() => void stop()}>Toʻxtatish</button>
+        ) : !loaded || !st || st.billCases === 0 ? (
+          <button className="btn btn-outline btn-sm" onClick={() => void go({ load: 'auto', fill: true })}>
+            {st && st.totalBills > 0 && !st.loaded ? 'Toʻlovlarni oʻqishni davom ettirish' : 'Toʻlovlardan ishlarni topish'}
           </button>
         ) : (
           <>
-            {status.missing > 0 && (
-              <>
-                <button className="btn btn-outline btn-sm" onClick={() => void start('skip', BATCH)}>Yana {Math.min(BATCH, status.missing)} ta ishni olish</button>
-                <button className="btn btn-outline btn-sm" onClick={() => void start('skip', 100_000)}>Toʻxtatguncha olish</button>
-              </>
+            {st.missing > 0 && (
+              <button className="btn btn-outline btn-sm" onClick={() => void go({ load: 'skip', fill: true })}>
+                {paused || job?.state === 'stopped' ? 'Davom ettirish' : 'Yetishmayotgan ishlarni olish'} ({fmt(st.missing)})
+              </button>
             )}
-            <button className="btn btn-ghost btn-sm" onClick={() => void start('force', 0)}>Toʻlovlarni qayta oʻqish</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => void go({ load: 'refresh', fill: true })}>Toʻlovlarni yangilash</button>
           </>
         )}
       </div>
