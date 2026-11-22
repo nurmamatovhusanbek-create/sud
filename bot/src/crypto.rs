@@ -60,6 +60,32 @@ pub fn bucket_aad(id: &str, part: usize) -> String {
     format!("bucket:{id}:{part}")
 }
 
+/// plain → `iv | tag | ciphertext` (tests only: the bot never writes a backup; the iv is a counter, unique per process)
+#[cfg(test)]
+pub fn seal(key: &Key, plain: &[u8], aad: &str) -> Vec<u8> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(1);
+    let mut iv = [0u8; IV];
+    iv[4..].copy_from_slice(&N.fetch_add(1, Ordering::SeqCst).to_be_bytes());
+    let cipher = Aes256Gcm::new_from_slice(key).expect("key");
+    let ct_tag = cipher.encrypt(Nonce::from_slice(&iv), Payload { msg: plain, aad: aad.as_bytes() }).expect("seal");
+    let (ct, tag) = ct_tag.split_at(ct_tag.len() - TAG);
+    let mut out = Vec::with_capacity(IV + TAG + ct.len());
+    out.extend_from_slice(&iv);
+    out.extend_from_slice(tag);
+    out.extend_from_slice(ct);
+    out
+}
+
+/// the manifest as the app writes it: `MAGIC | salt | seal(json, "manifest")` (tests only)
+#[cfg(test)]
+pub fn seal_manifest(key: &Key, salt: &[u8], json: &[u8]) -> Vec<u8> {
+    let mut out = MAGIC.to_vec();
+    out.extend_from_slice(salt);
+    out.extend(seal(key, json, "manifest"));
+    out
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartRef {

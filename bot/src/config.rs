@@ -13,6 +13,8 @@ pub struct Config {
     pub api_base: String,
     pub refresh_secs: u64,
     pub set_webhook: bool,
+    /// calls per person per minute (0 = no limit)
+    pub rate_per_minute: usize,
 }
 
 fn env(k: &str) -> Option<String> {
@@ -33,6 +35,27 @@ impl Config {
             api_base: env("TG_API_BASE").unwrap_or_else(|| "https://api.telegram.org".to_string()),
             refresh_secs: env("REFRESH_SECS").and_then(|p| p.parse().ok()).unwrap_or(300),
             set_webhook: env("WEBHOOK").map(|v| v != "0").unwrap_or(true),
+            rate_per_minute: env("RATE_PER_MINUTE").and_then(|p| p.parse().ok()).unwrap_or(90),
         })
+    }
+}
+
+impl Config {
+    /// a fixed set of values for tests (never read from the environment)
+    #[cfg(test)]
+    pub fn for_tests() -> Config {
+        Config {
+            token: "123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x1Yz".into(),
+            chat: "-100123".into(),
+            pass: "a fine long pass phrase".into(),
+            allowed: vec![4242],
+            webhook_secret: "testsecrettestsecret".into(),
+            public_url: Some("https://bot.example".into()),
+            port: 0,
+            api_base: "http://127.0.0.1:1".into(),
+            refresh_secs: 300,
+            set_webhook: false,
+            rate_per_minute: 0,
+        }
     }
 }
