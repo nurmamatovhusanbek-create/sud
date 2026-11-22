@@ -182,8 +182,13 @@ export interface WorkerFetchOptions {
   method?: string
   /** Request body (string — the scrapers only ever send JSON strings). */
   body?: string
-  /** Per attempt (default 12000). */
+  /** Per attempt (default 12000). With `streamBody` it covers only the time until the HEADERS arrive. */
   timeoutMs?: number
+  /**
+   * The caller reads a BIG body itself (`readBodyIdle`): `timeoutMs` then stops at the headers, so a multi-megabyte list that is still
+   * arriving is not cut at 12 s. The caller owns the body's own idle/total limits.
+   */
+  streamBody?: boolean
   /** Escalate to next worker after this (default 800). */
   hedgeMs?: number
   /** Cap on worker attempts (default 3). */
@@ -255,6 +260,10 @@ async function attempt(
   if (outerSignal.aborted) onOuterAbort()
   else outerSignal.addEventListener('abort', onOuterAbort, { once: true })
 
+  // streamBody: the timeout is for the headers only (cleared once fetch() resolves), the body has its own limits
+  const headersOnly = !!opts.streamBody
+  const headersTimer = new AbortController()
+  const headersTimeout = headersOnly ? setTimeout(() => headersTimer.abort(new DOMException('timeout', 'TimeoutError')), opts.timeoutMs ?? 12_000) : null
   const init: RequestInit = {
     headers: {
       Accept: 'application/json, text/plain, */*',
@@ -263,7 +272,7 @@ async function attempt(
       Referer: 'https://my.sud.uz/',
       ...opts.headers,
     },
-    signal: AbortSignal.any([own.signal, AbortSignal.timeout(opts.timeoutMs ?? 12_000)]),
+    signal: AbortSignal.any([own.signal, headersOnly ? headersTimer.signal : AbortSignal.timeout(opts.timeoutMs ?? 12_000)]),
   }
   if (opts.method) init.method = opts.method
   if (opts.body !== undefined) init.body = opts.body
@@ -271,6 +280,7 @@ async function attempt(
     await space(origin)
     if (process.env.NET_DEBUG === '1') console.error(`[dbg] attempt ${hostOf(worker)} → ${origin} fired`)
     const res = await fetch(worker + target, init)
+    if (headersTimeout) clearTimeout(headersTimeout)
     const ms = Date.now() - t0
     if (!workerReached(res.status)) {
       recordFail(worker)
@@ -283,6 +293,7 @@ async function attempt(
     if (res.ok || res.status === 404) healthPool.recordSuccess(origin, worker, ms)
     return res
   } catch (e) {
+    if (headersTimeout) clearTimeout(headersTimeout)
     if (!(e instanceof DOMException && e.name === 'AbortError')) {
       recordFail(worker)
       const ms = Date.now() - t0
@@ -374,5 +385,55 @@ export async function fetchJsonViaWorkers<T = unknown>(
     return { status: res.status, data: JSON.parse(text) as T }
   } catch {
     return { status: res.status, data: null }
+  }
+}
+
+
+/**
+ * Read a big response body with an IDLE limit (no bytes for `idleMs` = stalled) and a total ceiling, instead of one wall-clock timeout. Returns
+ * whatever arrived: `complete` is false when the stream stalled, broke or hit the ceiling, so the caller can salvage the part it has.
+ */
+export async function readBodyIdle(
+  res: Response,
+  opts: { idleMs?: number; totalMs?: number; maxBytes?: number } = {},
+): Promise<{ text: string; complete: boolean; reason?: 'idle' | 'total' | 'size' | 'error' }> {
+  const idleMs = opts.idleMs ?? 15_000
+  const totalMs = opts.totalMs ?? 180_000
+  const maxBytes = opts.maxBytes ?? 200 * 1024 * 1024
+  if (!res.body) return { text: await res.text(), complete: true }
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  const t0 = Date.now()
+  let text = ''
+  let bytes = 0
+  try {
+    for (;;) {
+      const left = totalMs - (Date.now() - t0)
+      if (left <= 0) {
+        await reader.cancel().catch(() => {})
+        return { text, complete: false, reason: 'total' }
+      }
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise<'idle'>((r) => {
+          timer = setTimeout(() => r('idle'), Math.min(idleMs, left))
+        }),
+      ])
+      if (timer) clearTimeout(timer)
+      if (chunk === 'idle') {
+        await reader.cancel().catch(() => {})
+        return { text, complete: false, reason: Date.now() - t0 >= totalMs ? 'total' : 'idle' }
+      }
+      if (chunk.done) return { text: text + dec.decode(), complete: true }
+      bytes += chunk.value.byteLength
+      if (bytes > maxBytes) {
+        await reader.cancel().catch(() => {})
+        return { text, complete: false, reason: 'size' }
+      }
+      text += dec.decode(chunk.value, { stream: true })
+    }
+  } catch {
+    return { text, complete: false, reason: 'error' }
   }
 }

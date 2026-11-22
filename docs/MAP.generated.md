@@ -64,6 +64,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
+| `json-salvage.ts` | lib/court-case.ts | core/__tests__/json-salvage.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +11 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
@@ -143,7 +144,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
 | `net/pacer.ts` | lib/public-orders/pace.ts | lib/net/__tests__/pacer.test.ts |
 | `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/net/chain-fetch.ts, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
-| `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/worker-fetch-pin.test.ts |
+| `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/read-body-idle.test.ts, lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts |
 | `pretenzia/constants.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts, lib/pretenzia/__tests__/script.test.ts |

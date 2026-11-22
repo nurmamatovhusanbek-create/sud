@@ -90,7 +90,8 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 // v206: all worker fan-out goes through the shared hedged scheduler —
 // court-case no longer builds its own worker list or health pool (the
 // scheduler records per-worker health for the Settings dashboard).
-import { fetchViaWorkers } from './net/worker-fetch'
+import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
+import { salvageJsonArray } from '@/core/json-salvage'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -406,14 +407,19 @@ async function searchCourtCasesInternal(
     }
 
     try {
+      // a TIN list has NO pagination: a bank answers with every case it ever had in one multi-megabyte array. So the timeout covers only the
+      // headers (`streamBody`), the body is read with an idle limit, and a duplicate hedge is not fired for a slow first byte (it would
+      // run the same heavy query twice); what arrived before a stall or a break is kept (below)
+      const isList = /\/findByTin\//.test(url)
       const res = await fetchViaWorkers(url, {
         originKey: origin,
         // v207: jadval real searches measured at 1.8-21s — 12s killed winners;
         // 20s + curl fallback covers the tail without stalling the request.
-        timeoutMs: isJadvalSudUz ? 20_000 : 12_000,
-        hedgeMs: 800,
+        timeoutMs: isJadvalSudUz || isList ? 20_000 : 12_000,
+        hedgeMs: isList ? 6_000 : 800,
         // v207: per-TIN token bucket — 2 worker samples, not 3.
         maxAttempts: 2,
+        streamBody: isList,
       })
       if (!res.ok) {
         // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
@@ -427,7 +433,16 @@ async function searchCourtCasesInternal(
         console.log(`[court-case] ${url} — HTTP ${res.status} after hedged attempts, marking as incomplete`)
         return { items: [] as CourtCase[], failed: true }
       }
-      const text = await res.text()
+      const body = isList ? await readBodyIdle(res, { idleMs: 20_000, totalMs: 240_000 }) : { text: await res.text(), complete: true }
+      const text = body.text
+      if (!body.complete) {
+        // a stalled or broken download of a big list: keep the complete cases that arrived and say the list is partial (honesty invariant)
+        const part = salvageJsonArray(text)
+        console.log(`[court-case] ${origin} — big list cut short (${body.reason}): kept ${part.items.length} complete cases of the part that arrived`)
+        if (part.items.length > 0) return { items: part.items.map(mapper), failed: true }
+        if (isJadvalSudUz) return await curlLadder()
+        return { items: [] as CourtCase[], failed: true }
+      }
       // v207: fake-empty from a bad LB node is a retryable glitch, NOT a
       // definitive answer — a fast response here is almost always fake.
       if (isFakeEmptyText(text)) {

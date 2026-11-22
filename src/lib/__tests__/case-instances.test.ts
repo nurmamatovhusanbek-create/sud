@@ -52,6 +52,13 @@ globalThis.fetch = (async (input: RequestInfo | URL) => {
   const worker = WORKERS.find((w) => full.startsWith(w)) ?? ''
   const url = full.slice(worker.length)
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  if (url.includes('findByTin/309922242')) {
+    // a big list that breaks half way: two complete cases, then the connection resets in the middle of the third
+    const one = (n: string) => JSON.stringify({ ...raw, casenumber: n, reviews: [] })
+    const enc = new TextEncoder()
+    let sent = false
+    return new Response(new ReadableStream({ pull(c) { if (!sent) { sent = true; c.enqueue(enc.encode(`[${one('4-1001-2621/00001')},${one('4-1001-2621/00002')},{"casenumber":"4-1001-2621/0000`)) } else c.error(new Error('connection reset')) } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
   if (url.includes('CRIMINAL/findByTin/309922241')) return json([{ ...raw, casenumber: '1-1001-2621/00001', instance: 'Биринчи инстанция', reviews: [] }])
   if (url.includes(MULTI.replace('/', '@'))) return json([multi])
   if (url.includes('findByTin/309922240')) return json([{ ...raw, casenumber: '4-1001-2621/42937', hearing_date: '', hearing_time: '', reviews: [{ instance: 'Апелляция инстанцияси', court: 'Appeal court', responsible: 'Aliyev' }] }])
@@ -123,5 +130,14 @@ describe('criminal and region', () => {
   test('the court region reaches the case detail', async () => {
     const d = await getCaseDetails('economic', CASE)
     expect(d.general?.region).toBe('Хоразм вилояти')
+  })
+})
+
+describe('a company with thousands of cases (a bank): one big list, no pagination', () => {
+  test('a list that breaks half way keeps the complete cases and says the list is partial', async () => {
+    const { searchCourtCasesDetailed } = await import('../court-case')
+    const r = await searchCourtCasesDetailed('economic', 'tin', '309922242')
+    expect(r.cases.map((c) => c.caseNumber)).toEqual(['4-1001-2621/00001', '4-1001-2621/00002'])
+    expect(r.incomplete).toBe(true)
   })
 })
