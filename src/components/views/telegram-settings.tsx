@@ -11,10 +11,13 @@ import { CheckCircle2, DatabaseBackup, FlaskConical, Radar, RotateCcw, Send, Tra
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup } from '@/hooks/use-backup'
 import { STEP_LABEL } from '@/core/telegram'
+import { formatDmy } from '@/core/dates'
 
 function BackupCard({ configured }: { configured: boolean }) {
-  const { snap, running, start, reload } = useBackup()
+  const { snap, running, start, load, catalog, reload } = useBackup()
   const [pass, setPass] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
+  const [reading, setReading] = useState(false)
   const st = snap?.state
   const last = snap?.last
   const ok = pass.length >= 10
@@ -22,6 +25,19 @@ function BackupCard({ configured }: { configured: boolean }) {
     if (kind === 'restore' && !window.confirm('Kanaldagi eng soʻnggi zaxira yuklab olinadi va sud.restored-….db nomi bilan joriy bazaning yoniga yoziladi. Joriy baza oʻzgarmaydi. Davom etasizmi?')) return
     if (await start(kind, pass)) setPass('')
     else void reload()
+  }
+  const companies = snap?.catalog?.companies ?? []
+  const toggle = (tin: string) => setPicked((p) => (p.includes(tin) ? p.filter((t) => t !== tin) : [...p, tin]))
+  const read = async () => {
+    setReading(true)
+    await catalog(pass)
+    setReading(false)
+  }
+  const loadPicked = async () => {
+    if (await load(pass, picked)) {
+      setPass('')
+      setPicked([])
+    }
   }
   return (
     <div className="p-card rise-c" style={{ marginTop: 14 }}>
@@ -47,6 +63,33 @@ function BackupCard({ configured }: { configured: boolean }) {
           Tiklash
         </button>
       </div>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+        <button className="btn btn-outline" onClick={() => void read()} disabled={!configured || !ok || running || reading}>
+          {reading ? <span className="spinner" /> : null}
+          Kanaldagi kompaniyalar
+        </button>
+        {picked.length > 0 && (
+          <button className="btn btn-primary" onClick={() => void loadPicked()} disabled={!ok || running}>
+            Tanlanganlarni yuklash ({picked.length})
+          </button>
+        )}
+      </div>
+      {companies.length > 0 && (
+        <div className="list" style={{ marginTop: 12 }}>
+          {companies.map((c) => (
+            <label className="kv" key={c.tin} style={{ cursor: 'pointer' }}>
+              <span className="k" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={picked.includes(c.tin)} onChange={() => toggle(c.tin)} />
+                <span className="mono">{c.tin}</span>
+              </span>
+              <span className="faint mono" style={{ fontSize: 12 }}>
+                {c.bills} toʻlov · {c.found} ish{c.refreshedAt > 0 ? ` · ${formatDmy(new Date(c.refreshedAt))} holatiga` : ''}
+              </span>
+            </label>
+          ))}
+          <p className="faint" style={{ fontSize: 12, margin: '8px 0 0' }}>Tanlangan kompaniyalar joriy bazaga qoʻshiladi (yangiroq qatorlar saqlanadi); saytlarga soʻrov yuborilmaydi.</p>
+        </div>
+      )}
       {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '10px 0 0' }}>Avval yuqorida botni va kanalni saqlang.</p>}
       {st && st.phase !== 'idle' && (
         <div className="kv" style={{ marginTop: 14 }}>

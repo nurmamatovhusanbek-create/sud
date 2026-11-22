@@ -19,6 +19,7 @@ import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwKv, DwFig, DwSect
 import { ListPagination, clampPage, DEFAULT_PAGE_SIZE } from '@/components/ui-custom/list-pagination'
 import { printHtml, escapeHtml } from '@/lib/print'
 import { useStoredBills } from '@/hooks/use-stored-bills'
+import { TelegramCopyCard } from '@/components/sections/telegram-copy-card'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 import { setCachedBills, setBillsSummary, billsTotals, patchBillsMeta } from '@/lib/bills-cache'
@@ -502,6 +503,8 @@ export function BillsSection() {
                 hint={store.error}
                 action={<button className="btn btn-outline btn-sm" onClick={() => void store.refresh()}>Qayta urinish</button>}
               />
+            ) : !bills && store.data?.inTelegram ? (
+              <TelegramCopyCard entry={store.data.inTelegram} onScrape={() => void store.scrapeNow()} onLoaded={store.refetch} />
             ) : !bills ? (
               <EmptyBlock icon={<Receipt />} title="Kvitansiyalar yuklanmoqda" hint="Birinchi sahifa kelishi bilan shu yerda koʻrinadi." />
             ) : bills.total === 0 && !loadingBills ? (

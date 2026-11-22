@@ -165,6 +165,11 @@ const summaries = {
   },
 }
 
+/** drop the cached summary of a company (its bills were changed by something other than a page write: a load from Telegram) */
+export function forgetBillsSummary(tin: string): void {
+  summaries.delete(tin)
+}
+
 function summary(tin: string): BillsSummary {
   const hit = summaries.get(tin)
   if (hit) return hit

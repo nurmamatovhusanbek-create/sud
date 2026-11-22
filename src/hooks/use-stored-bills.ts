@@ -4,7 +4,7 @@
  * useStoredBills: the Toʻlovlar tab's data. A company's bills (a bank has 241 541) live on the server (lib/bills-store); the tab asks for ONE
  * PAGE of them with the filters it shows, plus the summary of all of them. While the server's job is still loading pages the hook polls
  * (2 s), so the first pages can be read and searched while the rest arrive. With nothing stored it starts the load itself (opening the tab
- * of a company is the click, as before); a small company's stored bills older than a day are read again, a big one's only on «Yangilash».
+ * of a company is the click, as before) UNLESS the Telegram copy already holds the company: then it waits and the tab offers to load it from there (`scrapeNow`); a small company's stored bills older than a day are read again, a big one's only on «Yangilash».
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -24,6 +24,10 @@ export interface UseStoredBills {
   loading_bills: boolean
   refresh: () => Promise<void>
   stop: () => Promise<void>
+  /** read the company from billing.sud.uz now (the answer to «it is in Telegram, but I want the sites») */
+  scrapeNow: () => Promise<void>
+  /** ask the server again (after a load from Telegram) */
+  refetch: () => void
 }
 
 export function useStoredBills(stir: string | undefined, params: BillsQueryParams): UseStoredBills {
@@ -55,7 +59,8 @@ export function useStoredBills(stir: string | undefined, params: BillsQueryParam
     if (d.job.state !== 'running' && started.current !== stir) {
       const meta = d.meta
       const stale = !!meta && meta.complete && meta.totalPages <= SMALL_PAGES && Date.now() - meta.loadedAt > DAY_MS
-      if (d.bills === null || (meta && !meta.complete) || stale) {
+      // a company the Telegram copy holds is not scraped until the person says so
+      if ((d.bills === null && !d.inTelegram) || (meta && !meta.complete) || stale) {
         started.current = stir
         const r = await startBillJob(stir, { load: stale ? 'refresh' : 'auto', fill: false })
         if (r.ok) setTick((t) => t + 1)
@@ -97,5 +102,15 @@ export function useStoredBills(stir: string | undefined, params: BillsQueryParam
     void fetchNow()
   }, [stir, fetchNow])
 
-  return { data, loading, error, loading_bills: running, refresh, stop }
+  const scrapeNow = useCallback(async () => {
+    if (!stir) return
+    started.current = stir
+    const r = await startBillJob(stir, { load: 'auto', fill: false })
+    if (!r.ok) setError(r.error)
+    else void fetchNow()
+  }, [stir, fetchNow])
+
+  const refetch = useCallback(() => setTick((t) => t + 1), [])
+
+  return { data, loading, error, loading_bills: running, refresh, stop, scrapeNow, refetch }
 }

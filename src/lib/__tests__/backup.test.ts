@@ -21,6 +21,9 @@ const dbm = await import('../db')
 const bk = await import('../db-buckets')
 const cfg = await import('../telegram-config')
 const backup = await import('../backup')
+const catalogLib = await import('../telegram-catalog')
+const admin = await import('../db-admin')
+const billsLib = await import('../bills-store')
 
 const TOKEN = '123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x1Yz'
 const PASS = 'a fine long pass phrase'
@@ -268,5 +271,75 @@ describe('incremental backup and restore through a fake channel', () => {
     expect(backup.startBackup('short').ok).toBe(false)
     cfg.removeTelegram()
     expect(backup.startBackup(PASS)).toEqual({ ok: false, error: expect.stringContaining('Telegram') })
+  })
+})
+
+describe('catalog and loading single companies from the channel', () => {
+  const OTHER = '201052713'
+
+  test('the catalog lists what the channel holds, saved locally for the «already in Telegram» prompt', async () => {
+    fakeChannel()
+    await runBackup()
+    // a backup already leaves the list behind
+    expect(catalogLib.catalogFor(TIN)).toMatchObject({ tin: TIN, bills: 600, found: 1, firstAt: 100, refreshedAt: 777 })
+    expect(catalogLib.catalogFor(OTHER)).toBeNull()
+    dbm.getDb().prepare("DELETE FROM meta WHERE k = 'telegram_catalog'").run()
+    expect(catalogLib.catalogFor(TIN)).toBeNull()
+    const r = await backup.readRemoteCatalog(PASS)
+    expect(r.ok && r.catalog.companies.map((c) => c.tin)).toEqual([TIN])
+    expect(catalogLib.catalogFor(TIN)?.bills).toBe(600)
+    expect(await backup.readRemoteCatalog('some other pass phrase')).toMatchObject({ ok: false })
+  })
+
+  test('a company forgotten here comes back from the channel: bills, found cases, details, state and dates', async () => {
+    fakeChannel()
+    await runBackup()
+    const before = allBuckets(dbm.getDb())
+    admin.forgetCompany(TIN)
+    dbm.getDb().prepare('DELETE FROM case_details').run()
+    expect(billsLib.queryBills(TIN, {})).toBeNull()
+    expect(backup.startLoad(PASS, [TIN]).ok).toBe(true)
+    const r = await finished()
+    expect(r.phase).toBe('done')
+    expect(r.result!.loadedTins).toEqual([TIN])
+    expect(allBuckets(dbm.getDb())).toEqual(before)
+    expect(billsLib.queryBills(TIN, {})?.total).toBe(600) // the cached summary was dropped
+    expect(dbm.getDb().prepare('SELECT first_at, refreshed_at FROM companies').get()).toMatchObject({ first_at: 100, refreshed_at: 777 })
+  })
+
+  test('other companies in the database are left alone', async () => {
+    fakeChannel()
+    await runBackup()
+    dbm.getDb().prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, hay) VALUES (?, 'z1', 0, 'PAID', 1, 5, 'h')").run(OTHER)
+    admin.forgetCompany(TIN)
+    backup.startLoad(PASS, [TIN])
+    await finished()
+    expect(Number(dbm.getDb().prepare('SELECT COUNT(*) c FROM bills WHERE tin = ?').get(OTHER)?.c)).toBe(1)
+  })
+
+  test('a newer copy in the database keeps its bills; only the missing ones are added', async () => {
+    fakeChannel()
+    await runBackup()
+    const db = dbm.getDb()
+    db.prepare("UPDATE bills SET status = 'OVERDUE' WHERE number = 'a1'").run()
+    db.prepare("DELETE FROM bills WHERE number = 'a2'").run()
+    db.prepare('UPDATE companies SET refreshed_at = 999999 WHERE tin = ?').run(TIN) // newer than the backup's 777
+    backup.startLoad(PASS, [TIN])
+    await finished()
+    expect(db.prepare("SELECT status FROM bills WHERE number = 'a1'").get()?.status).toBe('OVERDUE') // kept
+    expect(db.prepare("SELECT status FROM bills WHERE number = 'a2'").get()?.status).toBe('PAID') // added back
+    expect(db.prepare('SELECT refreshed_at FROM companies WHERE tin = ?').get(TIN)?.refreshed_at).toBe(999999)
+  })
+
+  test('a company the channel does not hold, and bad input, are refused', async () => {
+    fakeChannel()
+    await runBackup()
+    backup.startLoad(PASS, [OTHER])
+    const r = await finished()
+    expect(r.phase).toBe('error')
+    expect(r.message).toContain('topilmadi')
+    expect(backup.startLoad(PASS, []).ok).toBe(false)
+    expect(backup.startLoad(PASS, ['12']).ok).toBe(false)
+    expect(backup.startLoad('short', [TIN]).ok).toBe(false)
   })
 })

@@ -3,6 +3,7 @@ import { jsonOk, jsonFail } from '@/server/envelope'
 import { StirQuery } from '@/core/schemas'
 import { billsOfCase, queryBills, readBillsMeta } from '@/lib/bills-store'
 import { jobStatus } from '@/lib/bill-cases'
+import { catalogFor } from '@/lib/telegram-catalog'
 import type { BillQuery, BillSeg, BillSort, CategoryKind } from '@/core/bill-rows'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +22,7 @@ const CASE_NUMBER = /^\d+-[\d-]+\/\d+$/
  *     first pages can be read and searched while the later ones still arrive.
  * GET /api/bills/query?inn=…&forCase=2-1004-2603/8020
  *   → that case's bills (usually two: state duty and postal costs): the case drawer's cross-reference.
- * `bills: null` = nothing is stored yet (the tab then starts the load).
+ * `bills: null` = nothing is stored yet (the tab then starts the load, unless `inTelegram` says the channel holds the company: it then asks first).
  */
 export const GET = guard(async (req) => {
   const sp = new URL(req.url).searchParams
@@ -52,5 +53,7 @@ export const GET = guard(async (req) => {
     page: Number(sp.get('page') ?? 1) || 1,
     size: Number(sp.get('size') ?? 20) || 20,
   }
-  return jsonOk({ bills: queryBills(inn, f), meta: readBillsMeta(inn), job: jobStatus(inn) })
+  const bills = queryBills(inn, f)
+  // nothing stored yet: say when the Telegram copy has the company, so the tab offers it instead of scraping straight away
+  return jsonOk({ bills, meta: readBillsMeta(inn), job: jobStatus(inn), inTelegram: bills === null ? catalogFor(inn) : null })
 })

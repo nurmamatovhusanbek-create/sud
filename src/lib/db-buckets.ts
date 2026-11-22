@@ -116,7 +116,7 @@ export interface ImportCount {
  * Put a bucket's rows into `db`. Existing rows are replaced only when the bucket's row is NEWER (`t` of cases, `loaded_at`/`refreshed_at` of a
  * company); bills carry no time of their own, so for them the bucket wins (a bill's status only moves forward in time). Returns the rows applied.
  */
-export function importBucket(name: string, text: Uint8Array, db: Db = getDb()): number {
+export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), opts: { bills?: 'replace' | 'keep' } = {}): number {
   const b = parseBucket(name)
   if (!b) throw new Error(`noma'lum bo'lak: ${name.slice(0, 40)}`)
   const rows = Buffer.from(text).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SqlValue[])
@@ -124,8 +124,9 @@ export function importBucket(name: string, text: Uint8Array, db: Db = getDb()): 
   db.transaction(() => {
     switch (b.kind) {
       case 'bills': {
-        const st = db.prepare(`INSERT OR REPLACE INTO bills (${list(BILL)}, pass) VALUES (${marks(BILL.length)}, 0)`)
-        for (const r of rows) { st.run(...r); n++ }
+        // into a database that holds a NEWER copy of the company, only the bills it does not have are added; otherwise the bucket wins
+        const st = db.prepare(`INSERT OR ${opts.bills === 'keep' ? 'IGNORE' : 'REPLACE'} INTO bills (${list(BILL)}, pass) VALUES (${marks(BILL.length)}, 0)`)
+        for (const r of rows) { n += st.run(...r).changes }
         break
       }
       case 'found': {

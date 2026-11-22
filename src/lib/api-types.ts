@@ -33,6 +33,8 @@ export interface BillsQueryResult {
   bills: BillsPage | null
   meta: BillsMeta | null
   job: JobStatus
+  /** nothing is stored locally but the Telegram channel holds this company (as of its last backup) */
+  inTelegram?: { tin: string; firstAt: number; refreshedAt: number; bills: number; found: number } | null
 }
 
 export interface CompanyInfoData {

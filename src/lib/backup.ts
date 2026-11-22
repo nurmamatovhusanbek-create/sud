@@ -9,9 +9,13 @@ import {
   CHUNK_PLAIN, MIN_PASSPHRASE, bucketAad, bucketId, chunkAad, chunkPlain, deriveKey, newSalt, open, openManifest, seal, sealManifest, sha256,
   type AnyManifest, type BucketRef, type Manifest, type ManifestV2, type PartRef,
 } from './backup-crypto'
-import { importBucket, listBuckets, renderBucket } from './db-buckets'
+import { importBucket, listBuckets, parseBucket, renderBucket } from './db-buckets'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
+import { billJobRunning } from './bill-cases'
+import { forgetBillsSummary } from './bills-store'
+import { readCompany } from './company-meta'
+import { buildCatalog, saveCatalog, type Catalog } from './telegram-catalog'
 import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile } from './telegram-client'
 import { readTelegram } from './telegram-config'
 
@@ -35,7 +39,7 @@ import { readTelegram } from './telegram-config'
 export type BackupPhase = 'idle' | 'snapshot' | 'compress' | 'upload' | 'manifest' | 'download' | 'unpack' | 'done' | 'error'
 
 export interface BackupState {
-  kind: 'backup' | 'restore' | null
+  kind: 'backup' | 'restore' | 'load' | null
   phase: BackupPhase
   /** buckets (or pieces, for an old backup) done / total */
   done: number
@@ -60,6 +64,8 @@ export interface BackupResult {
   reused: number
   /** restore only: the file written next to the live database */
   restoredFile?: string
+  /** load only: the companies brought into the live database */
+  loadedTins?: string[]
 }
 
 const g = globalThis as unknown as { __sudBackup?: BackupState }
@@ -217,6 +223,7 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
     const pin = await pinMessage(token, chat, m.value.messageId)
 
     const result: BackupResult = { id, created, dbBytes: plainBytes, uploadedBytes: sentBytes + sealedManifest.length, chunks: sentParts, buckets: refs.length, reused }
+    saveCatalog(buildCatalog(manifest))
     getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...result, pinned: pin.ok, manifestMessageId: m.value.messageId }))
     set({
       phase: 'done',
@@ -352,6 +359,98 @@ async function restoreV1(m: Manifest, key: Buffer, token: string, dest: string):
   } finally {
     rm(gz)
   }
+}
+
+/** the companies the channel holds (needs the passphrase: the manifest is sealed); saved locally so the app can offer them before it scrapes */
+export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true; catalog: Catalog } | { ok: false; error: string }> {
+  const pre = precheck(passphrase)
+  if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre
+  const prev = await pinnedManifest(pre.token, pre.chat, passphrase, 'Parol notoʻgʻri (yoki manifest shikastlangan)')
+  if (!prev.ok) return prev
+  if (!prev.value) return { ok: false, error: 'Kanalda mahkamlangan zaxira yoʻq' }
+  if (prev.value.m.v !== 2) return { ok: false, error: 'Kanaldagi zaxira eski formatda: kompaniyalarni tanlab boʻlmaydi (yangi zaxira oling)' }
+  const catalog = buildCatalog(prev.value.m)
+  saveCatalog(catalog)
+  return { ok: true, catalog }
+}
+
+const TIN_RE = /^\d{9}$/
+
+export function startLoad(passphrase: string, tins: unknown): StartResult {
+  const pre = precheck(passphrase)
+  if (!('token' in pre)) return pre
+  const list = Array.isArray(tins) ? [...new Set(tins.filter((t): t is string => typeof t === 'string' && TIN_RE.test(t)))] : []
+  if (!list.length || list.length > 50) return { ok: false, error: 'Kamida bitta (koʻpi bilan 50 ta) kompaniyani tanlang' }
+  if (billJobRunning()) return { ok: false, error: 'Toʻlovlarni oʻqish jarayoni ketmoqda: avval uni toʻxtating' }
+  g.__sudBackup = { ...fresh(), kind: 'load', phase: 'download', message: 'Manifest qidirilmoqda…', startedAt: Date.now() }
+  void runLoad(passphrase, pre.token, pre.chat, list).catch((e) => unexpected('yuklash', e))
+  return { ok: true }
+}
+
+/**
+ * Bring the chosen companies from the channel into the LIVE database, without a file swap: their buckets (bills, found cases, tried numbers, state)
+ * and the case-detail buckets of the court/year pairs their found cases fall in. Rows already in the database are kept when they are newer (cases by
+ * the time they were fetched); the bills of a company the database holds a newer copy of are only added to, never overwritten.
+ */
+async function runLoad(passphrase: string, token: string, chat: string, tins: string[]): Promise<void> {
+  const prev = await pinnedManifest(token, chat, passphrase, 'Parol notoʻgʻri (yoki manifest shikastlangan)')
+  if (!prev.ok) return fail(prev.error)
+  if (!prev.value) return fail('Kanalda mahkamlangan zaxira yoʻq')
+  const { m, key } = prev.value
+  if (m.v !== 2) return fail('Kanaldagi zaxira eski formatda: kompaniyalarni tanlab boʻlmaydi (yangi zaxira oling)')
+  const want = new Set(tins)
+  const picked: BucketRef[] = []
+  const detailKeys = new Set<string>()
+  for (const b of m.buckets) {
+    const p = parseBucket(b.name)
+    if (p?.tin && want.has(p.tin)) {
+      picked.push(b)
+      if (p.kind === 'found') detailKeys.add(`${p.court}:${p.year}`)
+    }
+  }
+  for (const b of m.buckets) {
+    const p = parseBucket(b.name)
+    if (p?.kind === 'details' && detailKeys.has(`${p.court}:${p.year}`)) picked.push(b)
+  }
+  const present = new Set(picked.map((b) => parseBucket(b.name)?.tin).filter(Boolean))
+  const missing = tins.filter((t) => !present.has(t))
+  if (!picked.length) return fail('Tanlangan kompaniyalar kanaldagi zaxirada topilmadi')
+
+  const total = picked.length
+  set({ phase: 'download', done: 0, total, message: `Yuklab olinmoqda: 0/${total}` })
+  const db = getDb()
+  let rows = 0
+  for (let n = 0; n < total; n++) {
+    const b = picked[n]!
+    const p = parseBucket(b.name)!
+    const gzParts: Buffer[] = []
+    for (let i = 0; i < b.parts.length; i++) {
+      const part = b.parts[i]!
+      const f = await getFileBytes(token, part.fileId)
+      if (!f.ok) return fail(`${n + 1}/${total}-boʻlakni olib boʻlmadi: ${f.error}`)
+      if (f.value.length !== part.size || sha256(f.value) !== part.sha256) return fail(`${n + 1}/${total}-boʻlak shikastlangan (hash mos kelmadi)`)
+      try {
+        gzParts.push(open(key, f.value, bucketAad(b.id, i)))
+      } catch {
+        return fail(`${n + 1}/${total}-boʻlakni ochib boʻlmadi`)
+      }
+    }
+    const text = zlib.gunzipSync(Buffer.concat(gzParts))
+    if (bucketId(key, text) !== b.id) return fail(`${n + 1}/${total}-boʻlak mazmuni id ga mos kelmadi`)
+    // the database's own copy of this company is NEWER than the backup: its bills are only added to
+    const live = p.tin ? (readCompany(p.tin)?.refreshedAt ?? 0) : 0
+    const theirs = p.tin ? (m.companies[p.tin]?.refreshedAt ?? 0) : 0
+    rows += importBucket(b.name, text, db, { bills: live > theirs ? 'keep' : 'replace' })
+    set({ done: n + 1, message: `Yuklab olinmoqda: ${n + 1}/${total}` })
+  }
+  for (const t of tins) forgetBillsSummary(t)
+  const loaded = tins.filter((t) => present.has(t))
+  set({
+    phase: 'done',
+    finishedAt: Date.now(),
+    result: { id: m.id, created: m.created, dbBytes: 0, uploadedBytes: 0, chunks: 0, buckets: total, reused: 0, loadedTins: loaded },
+    message: `Tayyor: ${loaded.length} ta kompaniya Telegramdan yuklandi (${rows} qator)${missing.length ? `; zaxirada yoʻq: ${missing.join(', ')}` : ''}`,
+  })
 }
 
 export function lastBackup(): { created: string; chunks: number; buckets?: number; reused?: number; dbBytes: number; uploadedBytes: number; pinned: boolean } | null {
