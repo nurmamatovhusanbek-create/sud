@@ -191,6 +191,26 @@ impl Shared {
         Some(json!({ "tin": tin, "bills": bills, "found": found, "years": years, "firstAt": d.map(|d| d.first_at).unwrap_or(0), "refreshedAt": d.map(|d| d.refreshed_at).unwrap_or(0) }))
     }
 
+    /// every company the backup holds (the Mini App's home screen)
+    pub async fn companies(&self) -> Vec<Value> {
+        let tins: std::collections::BTreeSet<String> = {
+            let s = self.st.read().await;
+            let mut set: std::collections::BTreeSet<String> = s.index.tins().into_iter().collect();
+            if let Some(m) = &s.manifest {
+                set.extend(m.companies.keys().cloned());
+            }
+            set
+        };
+        let mut out = Vec::new();
+        for t in tins {
+            if let Some(c) = self.company(&t).await {
+                out.push(c);
+            }
+        }
+        out.sort_by(|a, b| b["bills"].as_i64().cmp(&a["bills"].as_i64()));
+        out
+    }
+
     /// the search box: a STIR (company), a bill number or a case number, by prefix
     pub async fn search(&self, raw: &str, limit: usize) -> Vec<Value> {
         let q = raw.trim();
@@ -284,6 +304,45 @@ impl Shared {
             }
         }
         Ok(json!({ "num": num, "court": e.court, "tin": e.tin, "year": e.yy, "detail": detail, "row": row, "bills": bills, "companies": entries.iter().map(|x| x.tin.clone()).collect::<Vec<_>>() }))
+    }
+
+    /// A company's cases (from its locator), newest registration first, filtered by a text (part of the number) and a court type; one page
+    pub async fn company_cases(&self, tin: &str, q: &str, court: &str, offset: usize, limit: usize) -> Value {
+        let mut rows = { self.st.read().await.index.shard_cases(tin) };
+        let mut courts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for r in &rows {
+            *courts.entry(r.1.clone()).or_default() += 1;
+        }
+        let q = q.trim();
+        rows.retain(|r| (court.is_empty() || r.1 == court) && (q.is_empty() || r.0.contains(q)));
+        // newest first: registration year, then the running number
+        let tail = |k: &str| k.rsplit('/').next().and_then(|n| n.parse::<u64>().ok()).unwrap_or(0);
+        rows.sort_by(|a, b| b.2.cmp(&a.2).then(tail(&b.0).cmp(&tail(&a.0))).then(b.0.cmp(&a.0)));
+        let total = rows.len();
+        let page: Vec<Value> = rows.into_iter().skip(offset).take(limit).map(|r| json!({ "key": r.0, "court": r.1, "year": r.2 })).collect();
+        json!({ "total": total, "rows": page, "courts": courts })
+    }
+
+    /// A company's bills of one year (a bucket), newest first, filtered by a text; one page
+    pub async fn company_bills(&self, tin: &str, year: u32, q: &str, offset: usize, limit: usize) -> Result<Value, String> {
+        let t = self.bucket_text(&format!("bills:{tin}:{year}")).await?.ok_or("Bu yil uchun kvitansiyalar zaxirada yoʻq")?;
+        let q = q.trim().to_lowercase();
+        let mut rows: Vec<(i64, Value)> = Vec::new();
+        let (mut sum, mut paid) = (0i64, 0i64);
+        for line in String::from_utf8_lossy(&t).lines() {
+            if !q.is_empty() && !line.to_lowercase().contains(&q) {
+                continue;
+            }
+            if let Ok(r) = serde_json::from_str::<Vec<Value>>(line) {
+                sum += r.get(4).and_then(|v| v.as_i64()).unwrap_or(0);
+                paid += r.get(5).and_then(|v| v.as_i64()).unwrap_or(0);
+                rows.push((r.get(3).and_then(|v| v.as_i64()).unwrap_or(0), bill_json(&r)));
+            }
+        }
+        rows.sort_by(|a, b| b.0.cmp(&a.0));
+        let total = rows.len();
+        let page: Vec<Value> = rows.into_iter().skip(offset).take(limit).map(|r| r.1).collect();
+        Ok(json!({ "total": total, "rows": page, "sum": sum, "paid": paid }))
     }
 
     pub async fn bill_detail(&self, number: &str) -> Result<Value, String> {

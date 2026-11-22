@@ -127,6 +127,20 @@ impl Index {
         out
     }
 
+    /// every case number of a company with its court and registration year (the company page lists them)
+    pub fn shard_cases(&self, tin: &str) -> Vec<(String, String, u32)> {
+        let Some(sh) = self.shards.get(tin) else { return Vec::new() };
+        let mut out = Vec::with_capacity(sh.cases.len());
+        for k in &sh.cases {
+            if let Some(v) = self.cases.get(k) {
+                if let Some(e) = v.iter().find(|e| e.tin == tin) {
+                    out.push((k.clone(), e.court.clone(), e.yy));
+                }
+            }
+        }
+        out
+    }
+
     pub fn bill(&self, number: &str) -> Option<&BillEntry> {
         self.bills.get(number)
     }
@@ -174,6 +188,18 @@ mod tests {
         assert!(ix.search_bills("260880770031", 5).is_empty());
         ix.remove("222222222");
         assert_eq!(ix.rows(), 1);
+    }
+
+    #[test]
+    fn a_company_lists_its_own_cases() {
+        let mut ix = Index::default();
+        ix.replace("111111111", "id1", A);
+        ix.replace("222222222", "id2", B);
+        let mut l = ix.shard_cases("111111111");
+        l.sort();
+        assert_eq!(l, vec![("2-1004-2403/1".to_string(), "civil".to_string(), 24), ("2-1004-2411/2".to_string(), "civil".to_string(), 24)]);
+        assert_eq!(ix.shard_cases("222222222")[0].1, "economic");
+        assert!(ix.shard_cases("999999999").is_empty());
     }
 
     #[test]

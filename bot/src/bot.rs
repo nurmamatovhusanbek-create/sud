@@ -92,7 +92,27 @@ fn case_text(c: &Value) -> String {
     } else {
         out.push_str("Batafsil maʼlumot zaxirada yoʻq (faqat kvitansiyalar orqali maʼlum).\n");
     }
-    out.push_str(&format!("STIR: {} · {}\n", c["tin"].as_str().unwrap_or(""), c["court"].as_str().unwrap_or("")));
+    // the instances: hearings and the decision, in short
+    for (title, key) in [("1-instansiya", "firstInstance"), ("Apellyatsiya", "appellate"), ("Kassatsiya", "cassation"), ("Taftish", "inspection")] {
+        let ins = &c["detail"][key];
+        if !ins.is_object() {
+            continue;
+        }
+        out.push_str(&format!("\n— {title}\n"));
+        if let Some(hs) = ins["hearings"].as_array() {
+            for h in hs.iter().take(4) {
+                out.push_str(&format!("📅 {} {} · {}\n", s(h, "date"), s(h, "time"), s(h, "status")));
+            }
+            if hs.len() > 4 {
+                out.push_str(&format!("… yana {} ta majlis\n", hs.len() - 4));
+            }
+        }
+        let d = &ins["decision"];
+        if d.is_object() {
+            out.push_str(&format!("⚖️ Qaror {}: {}\n", s(d, "date"), s(d, "text")));
+        }
+    }
+    out.push_str(&format!("\nSTIR: {} · {}\n", c["tin"].as_str().unwrap_or(""), c["court"].as_str().unwrap_or("")));
     if let Some(bs) = c["bills"].as_array() {
         for b in bs {
             out.push_str(&format!("🧾 {} · {} · {}\n", b["number"].as_str().unwrap_or(""), s(b, "cat"), fmt_int(b["amount"].as_i64().unwrap_or(0) / 100)));
@@ -138,13 +158,21 @@ async fn search_reply(sh: &Arc<Shared>, chat: i64, q: &str) {
     sh.tg.send(chat, &text, Some(json!({ "inline_keyboard": kb }))).await;
 }
 
+/// a button that opens the Mini App straight on this item (`/app?case=…`)
+fn app_button(sh: &Shared, param: &str, key: &str) -> Option<Value> {
+    let base = sh.cfg.public_url.as_ref()?;
+    let q: String = form_urlencoded::Serializer::new(String::new()).append_pair(param, key).finish();
+    Some(json!({ "inline_keyboard": [[{ "text": "Mini App'da ochish", "web_app": { "url": format!("{base}/app?{q}") } }]] }))
+}
+
 async fn show(sh: &Arc<Shared>, chat: i64, what: &str, key: &str) {
-    let r: Result<String, String> = match what {
-        "c" => sh.case_detail(key).await.map(|c| case_text(&c)),
-        "b" => sh.bill_detail(key).await.map(|b| bill_text(&b)),
-        _ => sh.company(key).await.map(|c| company_text(&c)).ok_or_else(|| "Bunday kompaniya zaxirada yoʻq".to_string()),
+    let (r, param): (Result<String, String>, &str) = match what {
+        "c" => (sh.case_detail(key).await.map(|c| case_text(&c)), "case"),
+        "b" => (sh.bill_detail(key).await.map(|b| bill_text(&b)), "bill"),
+        _ => (sh.company(key).await.map(|c| company_text(&c)).ok_or_else(|| "Bunday kompaniya zaxirada yoʻq".to_string()), "company"),
     };
-    sh.tg.send(chat, &r.unwrap_or_else(|e| e), None).await;
+    let markup = if r.is_ok() { app_button(sh, param, key) } else { None };
+    sh.tg.send(chat, &r.unwrap_or_else(|e| e), markup).await;
 }
 
 pub fn authorized(sh: &Shared, user: i64) -> bool {

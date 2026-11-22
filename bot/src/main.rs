@@ -83,6 +83,13 @@ async fn api_bill(State(sh): Sh, headers: HeaderMap, Query(q): Query<HashMap<Str
     }
 }
 
+async fn api_companies(State(sh): Sh, headers: HeaderMap) -> Response {
+    if let Err(r) = user_of(&sh, &headers) {
+        return r;
+    }
+    Json(json!({ "ok": true, "companies": sh.companies().await, "info": sh.info().await })).into_response()
+}
+
 async fn api_company(State(sh): Sh, headers: HeaderMap, Query(q): Query<HashMap<String, String>>) -> Response {
     if let Err(r) = user_of(&sh, &headers) {
         return r;
@@ -90,6 +97,29 @@ async fn api_company(State(sh): Sh, headers: HeaderMap, Query(q): Query<HashMap<
     match sh.company(q.get("tin").map(|s| s.as_str()).unwrap_or("")).await {
         Some(c) => Json(json!({ "ok": true, "company": c })).into_response(),
         None => err(StatusCode::NOT_FOUND, "Bunday kompaniya zaxirada yoʻq"),
+    }
+}
+
+fn num(q: &HashMap<String, String>, k: &str, default: usize, max: usize) -> usize {
+    q.get(k).and_then(|v| v.parse::<usize>().ok()).unwrap_or(default).min(max)
+}
+
+async fn api_company_cases(State(sh): Sh, headers: HeaderMap, Query(q): Query<HashMap<String, String>>) -> Response {
+    if let Err(r) = user_of(&sh, &headers) {
+        return r;
+    }
+    let get = |k: &str| q.get(k).map(|s| s.as_str()).unwrap_or("").to_string();
+    Json(json!({ "ok": true, "cases": sh.company_cases(&get("tin"), &get("q"), &get("court"), num(&q, "offset", 0, 1_000_000), num(&q, "limit", 30, 100)).await })).into_response()
+}
+
+async fn api_company_bills(State(sh): Sh, headers: HeaderMap, Query(q): Query<HashMap<String, String>>) -> Response {
+    if let Err(r) = user_of(&sh, &headers) {
+        return r;
+    }
+    let get = |k: &str| q.get(k).map(|s| s.as_str()).unwrap_or("").to_string();
+    match sh.company_bills(&get("tin"), num(&q, "year", 0, 3000) as u32, &get("q"), num(&q, "offset", 0, 1_000_000), num(&q, "limit", 30, 100)).await {
+        Ok(b) => Json(json!({ "ok": true, "bills": b })).into_response(),
+        Err(e) => err(StatusCode::NOT_FOUND, &e),
     }
 }
 
@@ -162,7 +192,10 @@ async fn main() {
         .route("/api/search", get(api_search))
         .route("/api/case", get(api_case))
         .route("/api/bill", get(api_bill))
+        .route("/api/companies", get(api_companies))
         .route("/api/company", get(api_company))
+        .route("/api/company/cases", get(api_company_cases))
+        .route("/api/company/bills", get(api_company_bills))
         .with_state(sh);
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await.expect("port");
     println!("[bot] tinglanmoqda: 0.0.0.0:{port}");
