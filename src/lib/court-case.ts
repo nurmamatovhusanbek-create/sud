@@ -95,7 +95,7 @@ import { fetchViaWorkers } from './net/worker-fetch'
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
 import type { CourtType, SearchMode, CourtCase, FullCaseData, Hearing, InstanceData } from './court-case-types'
-import { currentInstance, pickHearing, reviewOf, stageOfRow, type HearingStage } from '@/core/hearing-pick'
+import { currentInstance, pickHearing, reviewsOf, stageOfRow, type HearingStage } from '@/core/hearing-pick'
 import { daysUntil } from '@/core/dates'
 
 // ---- Status enums for UI ----
@@ -676,11 +676,25 @@ export async function getCaseDetails(
       ? { ...h, date: h.date || '-', time: h.time || '-', status: h.status || '-', judge: h.judge || '-' }
       : null
   const rowsOf = (stage: HearingStage) => hearingsRaw.filter((h: any) => stageOfRow(h) === stage)
-  const hearings = rowsOf('first').map(toHearing).map(clean).filter((h: any) => h !== null) as Hearing[]
+  // the first instance's hearings: this row's, plus the EARLIER first-instance proceedings of the same case number that the API nests in
+  // `reviews[]` (a case that was sent back is heard again as a new proceeding)
+  const seenHearing = new Set<string>()
+  const hearings = [...rowsOf('first'), ...reviewsOf(raw, 'first')]
+    .map(toHearing)
+    .map(clean)
+    .filter((h): h is NonNullable<ReturnType<typeof clean>> => {
+      if (!h) return false
+      const k = `${h.date}|${h.time}|${h.judge}`
+      if (seenHearing.has(k)) return false
+      seenHearing.add(k)
+      return true
+    }) as Hearing[]
 
   const d = detailRaw || raw
   const now = currentInstance(d) // the court and the judge of the instance the case is in now, not of the first one
-  const decisionText = d.result || d.article || ''
+  // the result: this row's, else the latest earlier first-instance proceeding's
+  const earlierResult = [...reviewsOf(raw, 'first')].reverse().map((r: any) => r.result).find((x: any) => x && x !== '—' && x !== '-')
+  const decisionText = stageOfRow(d) === 'first' ? d.result || d.article || earlierResult || '' : earlierResult || ''
   return {
     general: {
       caseNumber: d.casenumber || d.caseNumber || caseNumber,
@@ -732,9 +746,11 @@ export async function getCaseDetails(
  * THIS instance's own: an instance without a judge yet has none, it never borrows the first instance's.
  */
 function parseReviewInstance(raw: any, rows: any[], stage: Exclude<HearingStage, 'first'>): InstanceData | null {
-  const nested = reviewOf(raw ?? {}, stage)
+  // EVERY proceeding of this kind, oldest first: a case can have several appeals, a cassation AND a repeated cassation («Такрорий кассация»),
+  // each its own entry with its own hearing, judge and result
+  const nested = reviewsOf(raw ?? {}, stage)
   const own = rows.filter((r: any) => stageOfRow(r) === stage)
-  const sources = [...(nested ? [nested] : []), ...own] as any[]
+  const sources = [...nested, ...own] as any[]
   if (!sources.length) return null
 
   const hearings = sources
@@ -744,11 +760,12 @@ function parseReviewInstance(raw: any, rows: any[], stage: Exclude<HearingStage,
       status: r.status_name || r.instance || '-',
       postponementReason: r.postpone_reason || '',
       courtroom: r.courtroom || '',
-      judge: r.responsible || '-',
+      judge: r.responsible || r.judge || '-',
     }))
     .filter((h) => h.date !== '-' || h.time !== '-' || h.judge !== '-' || h.courtroom)
 
-  const withResult = sources.find((r) => r.result && r.result !== '—' && r.result !== '-')
+  // the latest proceeding that has a result is the decision of this instance
+  const withResult = [...sources].reverse().find((r) => r.result && r.result !== '—' && r.result !== '-')
   const decision = withResult
     ? {
         date: withResult.reg_date || '-',
@@ -761,10 +778,11 @@ function parseReviewInstance(raw: any, rows: any[], stage: Exclude<HearingStage,
       }
     : null
 
-  const head = sources[0]
+  const head = sources[sources.length - 1] // the latest proceeding names the court and judge
   return {
     court: String(head.court || ''),
-    judge: String(head.responsible || ''),
+    judge: String(head.responsible || head.judge || ''),
+    repeated: sources.some((r) => /такрорий|takroriy/i.test(String(r.instance || ''))),
     hearings,
     decision,
     documents: [],

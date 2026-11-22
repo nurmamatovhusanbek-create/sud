@@ -116,3 +116,12 @@ export function reviewOf(raw: Raw, stage: Exclude<HearingStage, 'first'>): Raw |
 export function stageOfRow(raw: Raw): HearingStage {
   return stageOfInstance(raw.instance)
 }
+
+/** EVERY review entry of one instance, oldest first (appeals, a cassation and its repeat, earlier first-instance proceedings…). */
+export function reviewsOf(raw: Raw, stage: HearingStage): Raw[] {
+  const reviews = Array.isArray(raw.reviews) ? raw.reviews : []
+  const key = (r: Raw) => dateKey(str(r.hearing_date) || str(r.reg_date)) || ''
+  return reviews
+    .filter((r): r is Raw => !!r && typeof r === 'object' && stageOfInstance((r as Raw).instance) === stage)
+    .sort((a, b) => key(a).localeCompare(key(b)))
+}

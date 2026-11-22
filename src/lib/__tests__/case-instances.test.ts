@@ -28,12 +28,31 @@ const raw = {
   ],
 }
 
+// the shape the API really has (read live, Nov 2026): `reviews[]` holds EVERY earlier proceeding of the case number, each with its own
+// case_id, hearing, judge, status and result: earlier first-instance proceedings, several appeals, a cassation and a repeated one
+const MULTI = '4-1001-2621/42938'
+const rev = (instance: string, date: string, judge: string, result: string, status = 'Якунланган (Ижро варақасиз)') => ({
+  instance, court: instance + ' sudi', hearing_date: date, hearing_time: '10:00', responsible: judge, judge, reg_date: date, result, status_name: status,
+})
+const multi = {
+  casenumber: MULTI, court: 'Toshkent iqtisodiy sudi', category: 'Qarz', status_name: 'Кўриб чиқиш жараёнида', instance: 'Биринчи инстанция',
+  hearing_date: '26.11.2026', hearing_time: '10:20', responsible: 'Karimov', result: '', reg_date: '10.11.2026', claiment: 'A', defendant: 'B',
+  reviews: [
+    rev('Биринчи инстанция', '11.04.2022', 'Rahimov', 'Тўлиқ қаноатлантирилган'),
+    rev('Апелляция инстанцияси', '01.06.2022', 'Aliyev', 'Рад қилинган'),
+    rev('Апелляция инстанцияси', '01.09.2022', 'Aliyev2', 'Қайтарилган'),
+    rev('Кассация инстанцияси', '01.01.2023', 'Valiyev', 'Рад қилинган'),
+    rev('Такрорий кассация инстанцияси', '01.05.2023', 'Tashev', 'Рад қилинган'),
+  ],
+}
+
 const realFetch = globalThis.fetch
 globalThis.fetch = (async (input: RequestInfo | URL) => {
   const full = String(input)
   const worker = WORKERS.find((w) => full.startsWith(w)) ?? ''
   const url = full.slice(worker.length)
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  if (url.includes(MULTI.replace('/', '@'))) return json([multi])
   if (url.includes('findByTin/309922240')) return json([{ ...raw, casenumber: '4-1001-2621/42937', hearing_date: '', hearing_time: '', reviews: [{ instance: 'Апелляция инстанцияси', court: 'Appeal court', responsible: 'Aliyev' }] }])
   if (url.includes('jadval.sud.uz/case/findByNumber/') || url.includes('jadvalapi.sud.uz')) return json([raw])
   return new Response('[]', { status: 404 })
@@ -75,5 +94,22 @@ describe('the list row names the judge of the instance the case is in', () => {
     expect(c.hearingDate).toBe('')
     expect(c.judge).toBe('Aliyev')
     expect(c.courtName).toBe('Appeal court')
+  })
+})
+
+describe('every proceeding of the case number counts (the real API shape)', () => {
+  test('several appeals: all their hearings, the latest names the judge; the repeated cassation is flagged', async () => {
+    const d = await getCaseDetails('economic', MULTI)
+    expect(d.appellate?.hearings.map((h) => h.judge)).toEqual(['Aliyev', 'Aliyev2'])
+    expect(d.appellate?.judge).toBe('Aliyev2')
+    expect(d.appellate?.decision?.text).toBe('Қайтарилган') // the latest proceeding's result
+    expect(d.cassation).toMatchObject({ judge: 'Tashev', repeated: true }) // the latest proceeding (the repeat) names the judge
+    // «Такрорий кассация» is a cassation proceeding too: it joins the cassation instance and flags it
+    expect(d.cassation?.hearings.map((h) => h.judge)).toEqual(['Valiyev', 'Tashev'])
+    expect(d.cassation?.repeated).toBe(true)
+  })
+  test('the EARLIER first-instance proceeding joins the first instance\'s hearings', async () => {
+    const d = await getCaseDetails('economic', MULTI)
+    expect(d.firstInstance?.hearings.map((h) => h.judge).sort()).toEqual(['Karimov', 'Rahimov'].sort())
   })
 })

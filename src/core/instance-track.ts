@@ -87,6 +87,7 @@ export function buildTrack(
         ? { state: 'done', note: 'Koʻrib chiqilgan', hint: i.decisionDate ? `Qaror: ${i.decisionDate}` : 'Qaror chiqarilgan' }
         : { state: 'done', note: 'Koʻrib chiqilmoqda', hint: 'Majlislar bor, qaror hali yoʻq' }
     }
+    if (k === 'first') return { state: 'none', note: 'Maʼlumot yoʻq', hint: 'Birinchi instansiya yozuvi topilmadi (eski yozuv boʻlishi mumkin)' }
     if (laterHas(k)) {
       return { state: 'skipped', note: 'Oʻtkazilgan', hint: 'Bu instansiyaga shikoyat berilmagan: ish keyingisiga oʻtgan' }
     }

@@ -8,6 +8,7 @@
  * can be looked up instantly instead of asking the slow search endpoint.
  */
 
+import { caseStatusInfo } from './case-status'
 import { classifyOutcome, type Classification, type PartyRole } from './classify'
 import { uzCyrToLat } from './translit'
 
@@ -263,7 +264,7 @@ export interface CaseCheck {
 
 const EMPTY_RESULT = /^[\s\-–—.]*$/
 const APPEAL_STATUS = /апелл|apell|кассац|kassats|назорат|nazorat|тафтиш|taftish/i
-const ONGOING_STATUS = /юритув|yurituv|кўриб\s*чиқ|ko[ʻʼ'’`]?rib\s*chiq|қабул|qabul/i
+const ONGOING_STATUS = /юритув|yurituv|кўриб\s*чиқ|ko[ʻʼ'’`]?rib\s*chiq|қабул\s*қилинди|қабул\s*қилинган|qabul\s*qilindi|qabul\s*qilingan/i
 
 /**
  * A case still being heard in the FIRST instance (no outcome yet, not in appeal/cassation/supervision) has no
@@ -276,6 +277,10 @@ export function isOngoingFirstInstance(c: { result?: string; caseStatus?: string
   if (!EMPTY_RESULT.test(c.result ?? '')) return false
   const status = clean(c.caseStatus ?? '')
   if (APPEAL_STATUS.test(status)) return false
+  const info = caseStatusInfo(status)
+  // the court's real statuses: being heard / scheduled / registered / a draft not sent to court have no order yet; finished, archived or
+  // refused at the chancellery may (a finished case with no result text is exactly the one to look up), unknown stays «check»
+  if (info) return info.stage === 'ongoing' || info.stage === 'draft' || info.stage === 'refused'
   return EMPTY_RESULT.test(status) || ONGOING_STATUS.test(status)
 }
 

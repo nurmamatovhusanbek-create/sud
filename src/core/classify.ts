@@ -16,6 +16,7 @@
  */
 
 import { uzCyrToLat } from './translit'
+import { isConcludedStatus } from './case-status'
 
 export type StatsCourtType = 'economic' | 'civil' | 'administrative'
 export type Classification = 'win' | 'lose' | 'neutral' | 'pending'
@@ -225,14 +226,18 @@ export function partyRole(company: { names: readonly (string | undefined)[]; tin
   return assignRoles([{ plaintiff, defendant }], company).roles[0]
 }
 
-/** Classify an Uzbek (Cyrillic or Latin) case outcome from the company's role. */
-export function classifyOutcome(role: PartyRole, result: string): Classification {
+/**
+ * Classify an Uzbek (Cyrillic or Latin) case outcome from the company's role. `status` (the court's `status_name`) matters only when the
+ * result text is empty: a case that is FINISHED, archived or refused at the chancellery is no longer «in progress» (42 of the real
+ * finished cases carry no result text), it has no winner we can name: neutral.
+ */
+export function classifyOutcome(role: PartyRole, result: string, status?: string | null): Classification {
   const r = (result || '')
     .toLowerCase()
     .replace(/[\u2018\u2019\u02bb\u02bc]/g, "'")
     .trim()
 
-  if (!r || r === '—' || r === '-') return 'pending'
+  if (!r || r === '—' || r === '-') return isConcludedStatus(status) ? 'neutral' : 'pending'
 
   const has = (...words: string[]) => words.some((w) => r.includes(w))
   const full = has('тўлиқ', "to'liq", 'toliq')
@@ -249,6 +254,8 @@ export function classifyOutcome(role: PartyRole, result: string): Classification
   // Terminated without ruling.
   const terminated = has('тугатилган', 'tugatilgan')
 
+  // «Бошқа судга юборилган» (sent to another court) and «Қабул қилиш рад қилинган» (the claim was never accepted) decide nothing
+  if (has('бошқа суд', 'boshqa sud', 'қабул қилиш рад', 'qabul qilish rad')) return 'neutral'
   if (granted) return role === 'plaintiff' ? 'win' : 'lose'
   if (returned) return 'neutral' // returned claims are just returned — no winner
   if (rejected) return role === 'plaintiff' ? 'lose' : 'win'

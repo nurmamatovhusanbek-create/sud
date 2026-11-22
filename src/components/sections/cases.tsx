@@ -27,6 +27,7 @@ import { courtTypeForCase, formatClaimAmount, normalizeCourtType } from '@/core/
 import { openProtoDrawer, closeProtoDrawer, useDockedRowKey, DwSection, DwKv, DwFig, type DwRow, type DrawerOpts } from '@/components/proto/drawer'
 import { CaseOrders } from '@/components/proto/case-orders'
 import { buildTrack, TRACK_NAME } from '@/core/instance-track'
+import { caseStatusInfo } from '@/core/case-status'
 import { assignRoles, classifyOutcome, type Classification, type PartyRole } from '@/core/classify'
 import { StatusIcon, type StatusFamilyKey } from '@/components/ui-custom/solid-icons'
 import { isOngoingFirstInstance, type KnownDecision } from '@/core/public-orders'
@@ -57,7 +58,7 @@ const COURT_TYPES: CourtType[] = ['economic', 'civil', 'administrative']
 
 function statusEn(s: string | null | undefined): string {
   if (!s) return ''
-  return CASE_STATUSES[s]?.en ?? s
+  return caseStatusInfo(s)?.label ?? CASE_STATUSES[s]?.en ?? s // the court's real wording first (core/case-status), then the instance statuses
 }
 function hearingEn(s: string | null | undefined): string {
   if (!s) return ''
@@ -379,7 +380,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       ),
       { courtType, current: g?.currentInstance },
     )
-    const steps = track.map((st) => ({ ...st, name: TRACK_NAME[st.key], who: st.state === 'done' ? who(insts[st.key]) : '' }))
+    const steps = track.map((st) => ({ ...st, note: st.key === 'cassation' && ca?.repeated && st.state === 'done' ? `${st.note} · takroriy` : st.note, name: TRACK_NAME[st.key], who: st.state === 'done' ? who(insts[st.key]) : '' }))
 
     const rows: DwRow[] = [
       [g?.currentInstance && g.currentInstance !== 'first' ? `Sudya · ${INSTANCE_NAME[g.currentInstance]}` : 'Sudya', g?.judge],
@@ -419,7 +420,7 @@ function openCaseDetail(caseNumber: string, courtType: CourtType, company?: { st
       }
     }
 
-    const statusColor = g?.caseStatus ? CASE_STATUSES[g.caseStatus]?.color : undefined
+    const statusColor = g?.caseStatus ? (caseStatusInfo(g.caseStatus)?.color ?? CASE_STATUSES[g.caseStatus]?.color) : undefined
     openProtoDrawer(
       <CopyText text={caseNumber} tag="span" />,
       <div>
@@ -700,7 +701,7 @@ export function CasesSection() {
   )
 
   // the same class the Statistika board counts (core/classify classifyOutcome; a case whose side is unknown counts as the plaintiff's, like there)
-  const outcomeOf = useCallback((m: MergedRow): Classification => classifyOutcome(roleOf(m) ?? 'plaintiff', m.c.result), [roleOf])
+  const outcomeOf = useCallback((m: MergedRow): Classification => classifyOutcome(roleOf(m) ?? 'plaintiff', m.c.result, m.c.caseStatus), [roleOf])
   const filtered = useMemo(() => {
     const byRole = roleFilter === 'all' ? searched : searched.filter((m) => (roleOf(m) ?? 'unknown') === roleFilter)
     const list = outcomeFilter === 'all' ? byRole : byRole.filter((m) => outcomeOf(m) === outcomeFilter)
@@ -885,7 +886,7 @@ export function CasesSection() {
               const { c, courtType } = m
               const role = roleOf(m)
               // the shape of the status: still being heard / granted / rejected / returned or otherwise closed
-              const fam: StatusFamilyKey = !c.result?.trim() ? 'pending' : role ? classifyOutcome(role, c.result) : 'unknown'
+              const fam: StatusFamilyKey = role ? classifyOutcome(role, c.result, c.caseStatus) : c.result?.trim() ? 'unknown' : classifyOutcome('plaintiff', '', c.caseStatus)
               const word = c.result?.trim() || (c.caseStatus ? statusEn(c.caseStatus) || c.caseStatus : '')
               return (
                 <div className={`lrow${dockedCase && dockedCase === `${courtType}|${c.caseNumber}` ? ' sel' : ''}`} key={`${courtType}-${c.caseNumber || i}`} data-case={c.caseNumber} onClick={() => openAt(i)}>

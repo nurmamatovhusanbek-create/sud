@@ -81,6 +81,8 @@ export interface InstanceData {
   /** the court and the judge of THIS instance (each instance has its own; never the first one's) */
   court?: string
   judge?: string
+  /** one of the proceedings is a repeated cassation («Такрорий кассация») */
+  repeated?: boolean
   hearings: Hearing[]
   decision: Decision | null
   documents: CaseDocument[]

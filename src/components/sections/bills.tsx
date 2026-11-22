@@ -77,6 +77,8 @@ export function openReceipt(b: EnrichedBill, activeStir: string | undefined, nav
     ['Kategoriya', d?.payCategory ? categoryLabel(d.payCategory).label : ''],
     ['Ish raqami', d?.claimCaseNumber, { mono: true }],
     ['Sana', formatDate(b.issued), { mono: true }],
+    // the day of the ruling this invoice belongs to (billing returns it; nothing showed it)
+    ['Qaror sanasi', d?.decisionDate ? formatDate(d.decisionDate).slice(0, 10) : '', { mono: true }],
     ['Maqsad', d?.purpose || d?.description],
     ['Toʻlangan', d ? `${formatSum(d.paidAmount)} soʻm` : '', { mono: true }],
     ['Balans', d ? `${formatSum(d.balance)} soʻm` : '', { mono: true }],

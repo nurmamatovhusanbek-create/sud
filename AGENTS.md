@@ -38,7 +38,7 @@ bun run map:check                        # docs/MAP.generated.md is current (els
 ```
 Never pipe these through `| tail` inside an `&&` chain before committing — `tail` hides the exit code.
 
-**Live scraping does not work in a sandbox** (sud.uz / orginfo / public.sud.uz are blocked, workers not configured). Verify UI/flows by seeding
+**Live scraping mostly does not work in a sandbox** (public.sud.uz, jadval.sud.uz, billing.sud.uz, my.sud.uz are blocked, workers not configured). `jadvalapi.sud.uz`, `sud.uz`, `orginfo.uz` and `admin.chamber.uz` answered plain GETs in Nov 2026: a read-only probe (e.g. `…/online-monitoring/ECONOMIC/findByTin/000000000`) shows the REAL response shape; never send the operator's own STIRs or case numbers to a site from here. Verify UI/flows by seeding
 `localStorage` (`page.addInitScript`), mocking `/api/*` (`page.route(...).fulfill()`), or pointing a service at a local mock
 (`PUBLIC_ORDERS_API=http://localhost:PORT`). A failed live fetch here proves nothing. Playwright + Chromium are preinstalled
 (`/opt/pw-browsers/...`); never run `playwright install`. Document editor: run `next dev`, open Hujjatlar, fill `[data-fk]`, click `.dprev .slot`, compare the download with the preview.

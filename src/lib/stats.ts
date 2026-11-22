@@ -358,7 +358,7 @@ function classifyCase(
   // the win/lose maths running (the Sud ishlari filter shows such a case as «Noaniq» instead of guessing)
   const role: PartyRole = side ?? 'plaintiff'
 
-  const classification = classifyOutcome(role, raw.result)
+  const classification = classifyOutcome(role, raw.result, raw.caseStatus)
   const counterparty = role === 'plaintiff' ? defendantRaw : plaintiffRaw
 
   return {
