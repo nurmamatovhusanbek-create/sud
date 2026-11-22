@@ -16,6 +16,7 @@ import { billJobRunning } from './bill-cases'
 import { forgetBillsSummary } from './bills-store'
 import { readCompany } from './company-meta'
 import { buildCatalog, saveCatalog, type Catalog } from './telegram-catalog'
+import { syncIndex, type SyncResult } from './telegram-index'
 import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile } from './telegram-client'
 import { readTelegram } from './telegram-config'
 
@@ -258,14 +259,15 @@ async function runRestore(passphrase: string, token: string, chat: string): Prom
   const dest = path.join(path.dirname(dbPath()), `sud.restored-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
   if (m.v === 1) return restoreV1(m, key, token, dest)
 
-  const total = m.buckets.length
+  const buckets = m.buckets.filter((b) => parseBucket(b.name)?.kind !== 'index') // locators are for the search, not for a database
+  const total = buckets.length
   set({ phase: 'download', done: 0, total, message: `Yuklab olinmoqda: 0/${total}` })
   let target: ReturnType<typeof openDbFile> | null = null
   let plainBytes = 0
   try {
     target = openDbFile(dest)
     for (let n = 0; n < total; n++) {
-      const b = m.buckets[n]!
+      const b = buckets[n]!
       const gzParts: Buffer[] = []
       for (let i = 0; i < b.parts.length; i++) {
         const p = b.parts[i]!
@@ -362,7 +364,7 @@ async function restoreV1(m: Manifest, key: Buffer, token: string, dest: string):
 }
 
 /** the companies the channel holds (needs the passphrase: the manifest is sealed); saved locally so the app can offer them before it scrapes */
-export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true; catalog: Catalog } | { ok: false; error: string }> {
+export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true; catalog: Catalog; index: SyncResult | null; indexError?: string } | { ok: false; error: string }> {
   const pre = precheck(passphrase)
   if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre
   const prev = await pinnedManifest(pre.token, pre.chat, passphrase, 'Parol notoʻgʻri (yoki manifest shikastlangan)')
@@ -371,7 +373,9 @@ export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true;
   if (prev.value.m.v !== 2) return { ok: false, error: 'Kanaldagi zaxira eski formatda: kompaniyalarni tanlab boʻlmaydi (yangi zaxira oling)' }
   const catalog = buildCatalog(prev.value.m)
   saveCatalog(catalog)
-  return { ok: true, catalog }
+  // the locator (where each case and bill sits) comes along: only the index buckets that changed are downloaded
+  const idx = await syncIndex(pre.token, prev.value.m, prev.value.key)
+  return idx.ok ? { ok: true, catalog, index: idx.value } : { ok: true, catalog, index: null, indexError: idx.error }
 }
 
 const TIN_RE = /^\d{9}$/
@@ -403,7 +407,7 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
   const detailKeys = new Set<string>()
   for (const b of m.buckets) {
     const p = parseBucket(b.name)
-    if (p?.tin && want.has(p.tin)) {
+    if (p?.tin && p.kind !== 'index' && want.has(p.tin)) {
       picked.push(b)
       if (p.kind === 'found') detailKeys.add(`${p.court}:${p.year}`)
     }

@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { CheckCircle2, DatabaseBackup, FlaskConical, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
-import { useBackup } from '@/hooks/use-backup'
+import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { STEP_LABEL } from '@/core/telegram'
 import { formatDmy } from '@/core/dates'
 
@@ -18,6 +18,8 @@ function BackupCard({ configured }: { configured: boolean }) {
   const [pass, setPass] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [reading, setReading] = useState(false)
+  const [q, setQ] = useState('')
+  const { result, searching } = useTelegramSearch(q)
   const st = snap?.state
   const last = snap?.last
   const ok = pass.length >= 10
@@ -90,6 +92,36 @@ function BackupCard({ configured }: { configured: boolean }) {
           <p className="faint" style={{ fontSize: 12, margin: '8px 0 0' }}>Tanlangan kompaniyalar joriy bazaga qoʻshiladi (yangiroq qatorlar saqlanadi); saytlarga soʻrov yuborilmaydi.</p>
         </div>
       )}
+      <div style={{ marginTop: 16 }}>
+        <label className="field" style={{ height: 40 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Telegram zaxirasidan qidirish: ish raqami, kvitansiya raqami yoki STIR…" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
+        </label>
+        {result && result.hits.length === 0 && !searching && (
+          <p className="faint" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
+            {result.indexed === 0 ? 'Indeks hali yoʻq: «Kanaldagi kompaniyalar» ni bosing (zaxira yangi formatda boʻlishi kerak).' : `Topilmadi (${result.companies} ta kompaniyaning ${fmtN(result.indexed)} ta yozuvi ichidan).`}
+          </p>
+        )}
+        {result && result.hits.length > 0 && (
+          <div className="list" style={{ marginTop: 8 }}>
+            {result.hits.map((h) => (
+              <div className="kv" key={`${h.kind}-${h.key}-${h.tin}`}>
+                <span className="k" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <span className="badge">{h.kind === 'case' ? 'Ish' : h.kind === 'bill' ? 'Kvitansiya' : 'Kompaniya'}</span>
+                  <b className="mono">{h.key}</b>
+                </span>
+                <span className="faint mono" style={{ fontSize: 12 }}>
+                  {h.kind === 'company' ? `${h.bills ?? 0} toʻlov · ${h.found ?? 0} ish` : `${h.kind === 'bill' && h.caseNumber ? `ish ${h.caseNumber} · ` : ''}STIR ${h.tin}${h.court ? ` · ${h.court}` : ''}${h.year ? ` · ${h.kind === 'case' ? `20${h.year}` : h.year}` : ''}`}
+                  {' · '}
+                  {h.loaded ? 'bazada bor' : 'Telegramda'}
+                </span>
+                {!h.loaded && (
+                  <button className="btn btn-outline btn-sm" onClick={() => toggle(h.tin)}>{picked.includes(h.tin) ? 'Tanlandi' : 'Yuklash uchun tanlash'}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '10px 0 0' }}>Avval yuqorida botni va kanalni saqlang.</p>}
       {st && st.phase !== 'idle' && (
         <div className="kv" style={{ marginTop: 14 }}>
@@ -104,6 +136,8 @@ function BackupCard({ configured }: { configured: boolean }) {
     </div>
   )
 }
+
+const fmtN = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')
 
 export function TelegramTab() {
   const { status, busy, out, channels, find, test, save, forget } = useTelegram()

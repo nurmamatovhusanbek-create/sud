@@ -48,7 +48,7 @@ describe('buckets', () => {
   test('named by company and year, undated ones in year 0', () => {
     seed()
     expect(bk.listBuckets()).toEqual([
-      `bills:${B}:2025`, `state:${A}`, `tried:${A}`, `bills:${A}:0`, `bills:${A}:2024`, `bills:${A}:2025`, `found:${A}:civil:24`, `found:${A}:civil:25`,
+      `index:${B}`, `bills:${B}:2025`, `state:${A}`, `tried:${A}`, `index:${A}`, `bills:${A}:0`, `bills:${A}:2024`, `bills:${A}:2025`, `found:${A}:civil:24`, `found:${A}:civil:25`,
       'details:civil:24', 'details:economic:0',
     ])
   })
@@ -87,6 +87,23 @@ describe('buckets', () => {
     dbm.getDb().prepare("UPDATE found_cases SET row = '{\"n\":99}', t = 99 WHERE num = '2-1004-2403/1'").run()
     bk.importBucket(`found:${A}:civil:24`, text)
     expect(dbm.getDb().prepare("SELECT row FROM found_cases WHERE num = '2-1004-2403/1'").get()?.row).toBe('{"n":99}')
+  })
+
+  test('the locator lists every case number (court, year) and every bill (year, its case), and is never imported', () => {
+    seed()
+    const text = bk.renderBucket(`index:${A}`)!.text.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(text).toEqual([
+      ['c', '2-1004-2403/1', 'civil', 24], // found case: its own court and year
+      ['c', '2-1004-2411/2', 'civil', 24], // only a bill names it
+      ['c', '2-1004-2509/7', 'civil', 25],
+      ['b', '1001', 2024, '2-1004-2403/1'],
+      ['b', '1002', 2024, '2-1004-2411/2'],
+      ['b', '1003', 2025, ''],
+      ['b', '1004', 0, ''],
+    ])
+    const target = dbm.openDbFile(path.join(DIR, 'idx.db'))
+    expect(bk.importBucket(`index:${A}`, bk.renderBucket(`index:${A}`)!.text, target)).toBe(0)
+    target.close()
   })
 
   test('an unknown name is refused', () => {

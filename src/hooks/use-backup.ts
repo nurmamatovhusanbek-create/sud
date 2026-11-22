@@ -16,6 +16,23 @@ export interface BackupLast {
   uploadedBytes: number
   pinned: boolean
 }
+export interface LocatorHit {
+  kind: 'company' | 'case' | 'bill'
+  key: string
+  tin: string
+  court: string
+  year: number
+  caseNumber: string
+  loaded: boolean
+  bills?: number
+  found?: number
+}
+export interface LocatorResult {
+  hits: LocatorHit[]
+  indexed: number
+  companies: number
+}
+
 export interface CatalogEntry {
   tin: string
   firstAt: number
@@ -109,4 +126,37 @@ export function useBackup() {
   }
 
   return { snap, running, start, load, catalog, reload: load0 }
+}
+
+/** the Telegram search box: a prefix search over the local locator (3+ characters, 250 ms after typing stops); nothing leaves this computer */
+export function useTelegramSearch(q: string): { result: LocatorResult | null; searching: boolean } {
+  const [result, setResult] = useState<LocatorResult | null>(null)
+  const [searching, setSearching] = useState(false)
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 3) {
+      setResult(null)
+      return
+    }
+    setSearching(true)
+    const ctl = new AbortController()
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/settings/backup/search?q=${encodeURIComponent(term)}`, { headers: authHeaders(), cache: 'no-store', signal: ctl.signal })
+          const j = (await res.json().catch(() => null)) as { ok?: boolean; data?: LocatorResult } | null
+          if (j?.ok && j.data && Array.isArray(j.data.hits)) setResult(j.data)
+        } catch {
+          /* a newer search replaced this one, or the server is away */
+        } finally {
+          if (!ctl.signal.aborted) setSearching(false)
+        }
+      })()
+    }, 250)
+    return () => {
+      clearTimeout(t)
+      ctl.abort()
+    }
+  }, [q])
+  return { result, searching }
 }

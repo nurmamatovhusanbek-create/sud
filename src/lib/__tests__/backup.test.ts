@@ -24,6 +24,7 @@ const backup = await import('../backup')
 const catalogLib = await import('../telegram-catalog')
 const admin = await import('../db-admin')
 const billsLib = await import('../bills-store')
+const index = await import('../telegram-index')
 
 const TOKEN = '123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x1Yz'
 const PASS = 'a fine long pass phrase'
@@ -76,6 +77,7 @@ function fakeChannel() {
   const files = new Map<string, Uint8Array>()
   const msgs = new Map<number, { fileId: string; name: string }>()
   const sent: string[] = []
+  const fileCalls: string[] = []
   let pinned = 0
   let next = 1
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -105,10 +107,11 @@ function fakeChannel() {
       const m = msgs.get(pinned)
       return json({ ok: true, result: { id: -1001, type: 'channel', pinned_message: m ? { message_id: pinned, document: { file_id: m.fileId, file_name: m.name } } : undefined } })
     }
+    if (method === 'getFile') fileCalls.push(b.file_id)
     if (method === 'getFile') return files.has(b.file_id) ? json({ ok: true, result: { file_path: b.file_id } }) : json({ ok: false, error_code: 400, description: 'Bad Request: wrong file_id' })
     return json({ ok: false, error_code: 404, description: 'Not Found' })
   }) as typeof fetch
-  return { files, msgs, sent, pin: (m: number) => (pinned = m), next: () => next }
+  return { files, msgs, sent, fileCalls, pin: (m: number) => (pinned = m), next: () => next }
 }
 
 async function finished() {
@@ -220,10 +223,10 @@ describe('incremental backup and restore through a fake channel', () => {
   test('a piece changed in the channel is caught and nothing is left behind', async () => {
     const ch = fakeChannel()
     await runBackup()
-    const first = ch.files.get('F2')!
+    const first = ch.files.get('F1')! // the state bucket: restored, so the change must be caught
     const bad = new Uint8Array(first)
     bad[40] ^= 1
-    ch.files.set('F2', bad)
+    ch.files.set('F1', bad)
     backup.startRestore(PASS)
     const r = await finished()
     expect(r.phase).toBe('error')
@@ -341,5 +344,72 @@ describe('catalog and loading single companies from the channel', () => {
     expect(backup.startLoad(PASS, []).ok).toBe(false)
     expect(backup.startLoad(PASS, ['12']).ok).toBe(false)
     expect(backup.startLoad('short', [TIN]).ok).toBe(false)
+  })
+})
+
+describe('the locator: search the Telegram copy without loading a company', () => {
+  const clearLocal = () => {
+    dbm.getDb().prepare('DELETE FROM locator').run()
+    dbm.getDb().prepare('DELETE FROM locator_shards').run()
+  }
+
+  test('reading the catalog brings the locator; cases, bills and companies are found by prefix, and «loaded» tells what is local', async () => {
+    fakeChannel()
+    await runBackup()
+    dbm.getDb().prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, hay) VALUES (?, 'x1', 0, 'PAID', ?, 1, '2-1004-2403/55', 'h')").run(TIN, ms('2024-06-01'))
+    await runBackup() // the new bill is in the index now
+    clearLocal()
+    expect(index.searchLocator('2-1004-24').hits).toEqual([]) // nothing local until the catalog is read
+    const r = await backup.readRemoteCatalog(PASS)
+    expect(r.ok && r.index).toMatchObject({ shards: 1, downloaded: 1 })
+
+    const cases = index.searchLocator('2-1004-24')
+    expect(cases.hits.map((h) => h.key)).toEqual(['2-1004-2403/1', '2-1004-2403/55'])
+    expect(cases.hits[0]).toMatchObject({ kind: 'case', tin: TIN, court: 'civil', year: 24, loaded: true })
+    expect(cases.indexed).toBeGreaterThan(600)
+
+    expect(index.searchLocator('a1').hits).toEqual([]) // too short, and not a number
+    dbm.getDb().prepare("INSERT OR REPLACE INTO locator (kind, key, tin, court, year, ref) VALUES ('b', '260880770031', ?, '', 2026, '2-1005-2602/19321')").run(TIN)
+    expect(index.searchLocator('2608807').hits[0]).toMatchObject({ kind: 'bill', key: '260880770031', year: 2026, caseNumber: '2-1005-2602/19321' })
+
+    const co = index.searchLocator(TIN.slice(0, 5))
+    expect(co.hits[0]).toMatchObject({ kind: 'company', tin: TIN, bills: 601, loaded: true })
+  })
+
+  test('a company that is not in the local database is reported as not loaded, and a load makes it loaded', async () => {
+    fakeChannel()
+    await runBackup()
+    clearLocal()
+    await backup.readRemoteCatalog(PASS)
+    admin.forgetCompany(TIN)
+    expect(index.searchLocator('2-1004-2403/1').hits[0]).toMatchObject({ tin: TIN, loaded: false })
+    backup.startLoad(PASS, [TIN])
+    await finished()
+    expect(index.searchLocator('2-1004-2403/1').hits[0]).toMatchObject({ loaded: true })
+  })
+
+  test('only an index bucket that changed is downloaded again', async () => {
+    const ch = fakeChannel()
+    await runBackup()
+    clearLocal()
+    await backup.readRemoteCatalog(PASS)
+    const calls = ch.fileCalls.length
+    const again = await backup.readRemoteCatalog(PASS)
+    expect(again.ok && again.index).toMatchObject({ downloaded: 0 })
+    expect(ch.fileCalls.length).toBe(calls + 1) // the manifest only
+    dbm.getDb().prepare("UPDATE bills SET case_number = '2-1004-2403/77' WHERE number = 'a1'").run()
+    await runBackup()
+    const third = await backup.readRemoteCatalog(PASS)
+    expect(third.ok && third.index).toMatchObject({ downloaded: 1 })
+    expect(index.searchLocator('2-1004-2403/77').hits).toHaveLength(1)
+  })
+
+  test('a backup without a locator or a wrong passphrase leaves the search empty, not broken', async () => {
+    fakeChannel()
+    await runBackup()
+    clearLocal()
+    expect((await backup.readRemoteCatalog('some other pass phrase')).ok).toBe(false)
+    expect(index.searchLocator('2-1004')).toMatchObject({ hits: [], indexed: 0, companies: 0 })
+    expect(index.searchLocator('ab').hits).toEqual([])
   })
 })

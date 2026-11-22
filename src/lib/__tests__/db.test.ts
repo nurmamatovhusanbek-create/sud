@@ -28,7 +28,7 @@ describe('open and migrate', () => {
     expect(fs.existsSync(FILE)).toBe(true)
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name)
     expect(tables).toEqual(expect.arrayContaining(['bills', 'bill_loads', 'found_cases', 'tried', 'case_details', 'meta']))
-    expect(Number(db.prepare('PRAGMA user_version').get()?.user_version)).toBe(3)
+    expect(Number(db.prepare('PRAGMA user_version').get()?.user_version)).toBe(4)
     expect(String(db.prepare('PRAGMA journal_mode').get()?.journal_mode)).toBe('wal')
   })
 

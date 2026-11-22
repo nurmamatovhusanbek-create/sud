@@ -73,4 +73,16 @@ ALTER TABLE case_details ADD COLUMN yymm INTEGER GENERATED ALWAYS AS (
 CREATE INDEX details_by_year ON case_details (court, yymm);
 `,
   },
+  {
+    // the LOCATOR: what the Telegram copy's index buckets say (a case number, a bill number → the company and bucket it sits in). It only points; the data
+    // stays in Telegram until a company is loaded. Kept per company with the id of the index bucket it came from, so a changed bucket replaces its rows.
+    v: 4,
+    sql: `
+CREATE TABLE locator (
+  kind TEXT NOT NULL, key TEXT NOT NULL, tin TEXT NOT NULL, court TEXT NOT NULL DEFAULT '', year INTEGER NOT NULL DEFAULT 0, ref TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (kind, key, tin)
+) WITHOUT ROWID;
+CREATE TABLE locator_shards (tin TEXT PRIMARY KEY, id TEXT NOT NULL, rows INTEGER NOT NULL, at INTEGER NOT NULL);
+`,
+  },
 ]
