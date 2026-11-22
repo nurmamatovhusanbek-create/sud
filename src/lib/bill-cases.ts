@@ -23,7 +23,8 @@ import { toBillRow } from '@/core/bill-rows'
 import { getCaseLean, type CaseLean } from './court-case'
 import type { CourtCase, CourtType } from './court-case-types'
 import { addFound, feedCaseNumbers, triedStats, writeDetail } from './case-store'
-import { billCaseCount, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, setKnownFeed, writeBillsPage } from './bills-store'
+import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, setKnownFeed, writeBillsPage } from './bills-store'
+import { ensureCompany, markRefreshed, readCompany } from './company-meta'
 import { passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 
 /** a case the court's APIs did not know is asked again only after this long (the old system's node is flaky: «not found» is not always true) */
@@ -84,6 +85,10 @@ export interface BillCasesStatus {
   totalPages: number
   loaded: boolean
   loadedAt: number
+  /** when this company was first scraped; when its last complete bills load began (the data is as of then; 0 = never completed); bills that load added */
+  firstAt: number
+  refreshedAt: number
+  lastAdded: number
   /** distinct cases the stored bills name */
   billCases: number
   /** of those: not in the stored lists and not tried (what a fill would ask) */
@@ -144,6 +149,7 @@ export function eventsSince(tin: string, after: number): { events: FoundEvent[];
 /** What is known about a company's bills and their cases, from the database only (no site is asked). */
 export function billCasesStatus(tin: string, now: number = Date.now()): BillCasesStatus {
   const meta = readBillsMeta(tin)
+  const co = readCompany(tin)
   const retryBefore = now - RETRY_MISSING_MS
   setKnownFeed(tin, feedCaseNumbers(tin))
   const tried = triedStats(tin, retryBefore)
@@ -153,6 +159,9 @@ export function billCasesStatus(tin: string, now: number = Date.now()): BillCase
     totalPages: meta?.totalPages ?? 0,
     loaded: meta?.complete ?? false,
     loadedAt: meta?.loadedAt ?? 0,
+    firstAt: co?.firstAt ?? 0,
+    refreshedAt: co?.refreshedAt ?? 0,
+    lastAdded: co?.lastAdded ?? 0,
     billCases: billCaseCount(tin),
     missing: countMissingCases(tin, retryBefore),
     found: tried.found,
@@ -225,6 +234,10 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
     const unfinished = !!meta && !meta.complete
     if (mode === 'refresh' || !meta || unfinished) {
       s.phase = 'load'
+      // the first scrape's date is set once; a load that finishes is «as of» the moment it BEGAN (a resumed one keeps the date it began on)
+      ensureCompany(tin, deps.now())
+      const loadStartedAt = unfinished && mode !== 'refresh' ? (readCompany(tin)?.firstAt ?? deps.now()) : deps.now()
+      const before = billCountOf(tin)
       // resume an unfinished pass where it stopped; otherwise a new pass (a new generation of files, so the stored rows keep being served)
       let pass = meta ? (unfinished && mode !== 'refresh' ? meta.pass : meta.pass + 1) : 0
       let passIndex = unfinished && mode !== 'refresh' && meta ? passIndexOfSize(meta.pageSize) : 0
@@ -288,6 +301,7 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
         if (page === -1) break
         if (!totalPages) break
       }
+      markRefreshed(tin, loadStartedAt, Math.max(0, billCountOf(tin) - before))
     }
   }
   if (stopped()) return

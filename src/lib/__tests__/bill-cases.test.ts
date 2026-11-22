@@ -151,6 +151,42 @@ describe('load', () => {
     expect(bills.queryBills(TIN, {})?.total).toBe(9)
   })
 
+  test('the first scrape\'s date is set once; a finished load is «as of» the moment it began; a refresh says what it added', async () => {
+    let clock = 1_000_000
+    const withClock = { ...deps, now: () => clock }
+    lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
+    await lib.jobDone()
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 1_000_000, refreshedAt: 1_000_000, lastAdded: 9 })
+    // two weeks later a refresh finds one more bill on the last page
+    clock = 2_000_000
+    const base = PAGES[2]!
+    n = 500
+    PAGES[2] = [...base, bill('2-1004-2509/9')]
+    try {
+      lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false, load: 'refresh' })
+      await lib.jobDone()
+    } finally {
+      PAGES[2] = base
+    }
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 1_000_000, refreshedAt: 2_000_000, lastAdded: 1 })
+  })
+
+  test('a load stopped half way does not move «refreshed»; the resumed load keeps the date it began on', async () => {
+    let clock = 5_000
+    const withClock = { ...deps, now: () => clock }
+    billFails = { 1: 99 } // page 1 keeps failing: the load ends with an error after page 0
+    lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
+    await lib.jobDone()
+    expect(lib.jobStatus(TIN).state).toBe('error')
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 5_000, refreshedAt: 0 })
+    clock = 9_000
+    billFails = {}
+    lib.forgetJob()
+    lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
+    await lib.jobDone()
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 5_000, refreshedAt: 5_000 })
+  })
+
   test('an empty page inside the range is an error, not the end', async () => {
     const orig = PAGES[1]
     PAGES[1] = []

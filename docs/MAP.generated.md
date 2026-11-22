@@ -76,7 +76,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `case-freeze.ts` | lib/served-case.ts | core/__tests__/case-freeze.test.ts |
 | `case-status.ts` | components/sections/cases.tsx, components/sections/found-cases.tsx, core/case-freeze.ts, core/classify.ts, core/public-orders.ts | core/__tests__/case-status.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/case-status.test.ts, core/__tests__/classify.test.ts |
-| `dates.ts` | components/proto/date-tile.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/case-freeze.ts, core/hearing-pick.ts, core/instance-track.ts, +6 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
+| `dates.ts` | components/proto/date-tile.tsx, components/sections/bill-cases-panel.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, core/case-freeze.ts, core/hearing-pick.ts, +7 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
 | `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
@@ -130,14 +130,15 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `case-store.ts` | api/found-cases/route, lib/api-types.ts, lib/bill-cases.ts, lib/court-case.ts, lib/served-case.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
+| `company-meta.ts` | lib/bill-cases.ts | lib/__tests__/company-meta.test.ts |
 | `count-tween.ts` | components/proto/primitives.tsx | lib/__tests__/count-tween.test.ts |
 | `court-case-types.ts` | api/court-cases/export/route, api/found-cases/route, components/sections/cases.tsx, core/bill-cases.ts, lib/api-types.ts, lib/bill-cases.ts, lib/case-store.ts, +3 | core/__tests__/bill-cases.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts |
 | `court-case.ts` | api/court-cases/export/route, api/court-cases/route, lib/bill-cases.ts, lib/stats.ts, sources/index.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
-| `db-admin.ts` | api/settings/db/compact/route, api/settings/db/download/route, api/settings/db/forget/route, api/settings/db/route, hooks/use-db-admin.ts, lib/backup.ts | lib/__tests__/db-admin.test.ts |
+| `db-admin.ts` | api/settings/db/compact/route, api/settings/db/download/route, api/settings/db/forget/route, api/settings/db/route, hooks/use-db-admin.ts, lib/backup.ts | lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts |
 | `db-import.ts` | lib/db.ts |  |
 | `db-schema.ts` | lib/db.ts |  |
-| `db.ts` | lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/db-admin.ts, lib/db-import.ts | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts |
+| `db.ts` | lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/company-meta.ts, lib/db-admin.ts, lib/db-import.ts | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
 | `documents/bulk.server.ts` | api/documents/generate-bulk/route | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/script.test.ts |
 | `documents/bulk.ts` | api/documents/generate-bulk/route, components/views/doc-bulk.tsx, lib/documents/bulk.server.ts | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/bulk.test.ts |

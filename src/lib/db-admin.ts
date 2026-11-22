@@ -99,6 +99,7 @@ export function forgetCompany(tin: string): { bills: number; found: number; trie
     db.prepare('DELETE FROM bill_loads WHERE tin = ?').run(tin)
     const found = db.prepare('DELETE FROM found_cases WHERE tin = ?').run(tin).changes
     const tried = db.prepare('DELETE FROM tried WHERE tin = ?').run(tin).changes
+    db.prepare('DELETE FROM companies WHERE tin = ?').run(tin)
     return { bills, found, tried }
   })
 }

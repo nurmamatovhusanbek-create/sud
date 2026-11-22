@@ -43,6 +43,11 @@ export interface PageTotals {
   pageSize: number
 }
 
+/** how many distinct bills of the company are stored */
+export function billCountOf(tin: string): number {
+  return Number(getDb().prepare('SELECT COUNT(*) n FROM bills WHERE tin = ?').get(tin)?.n ?? 0)
+}
+
 export function readBillsMeta(tin: string): BillsMeta | null {
   if (!TIN_RE.test(tin)) return null
   const r = getDb().prepare('SELECT * FROM bill_loads WHERE tin = ?').get(tin)

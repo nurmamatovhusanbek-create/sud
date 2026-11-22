@@ -48,4 +48,16 @@ CREATE TABLE case_details (court TEXT NOT NULL, num TEXT NOT NULL, t INTEGER NOT
 CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 `,
   },
+  {
+    // when a company's data was first scraped and last brought up to date (lib/company-meta): refreshes start from these dates
+    v: 2,
+    sql: `
+CREATE TABLE companies (
+  tin TEXT PRIMARY KEY,
+  first_at INTEGER NOT NULL,
+  refreshed_at INTEGER NOT NULL DEFAULT 0,
+  last_added INTEGER NOT NULL DEFAULT 0
+);
+`,
+  },
 ]

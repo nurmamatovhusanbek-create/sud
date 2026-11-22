@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useBillJob } from '@/hooks/use-bill-cases'
+import { formatDmy } from '@/core/dates'
 
 const fmt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
@@ -49,9 +50,20 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
     text = `Toʻlovlarda ${fmt(st.billCases)} ta ish raqami bor: ${fmt(st.found)} tasi olingan, ${fmt(st.missing)} tasi hali olinmagan${st.notFound > 0 ? `, ${fmt(st.notFound)} tasi sud tizimida topilmadi` : ''}.`
   }
 
+  // the base of every refresh: when the first scrape began and the data's «as of» (nothing refreshes by itself)
+  const dayMs = 86_400_000
+  const ageDays = st && st.refreshedAt > 0 ? Math.max(0, Math.floor((now - st.refreshedAt) / dayMs)) : null
+  const dates =
+    st && st.firstAt > 0
+      ? `Birinchi yuklash: ${formatDmy(new Date(st.firstAt))} · ${
+          st.refreshedAt > 0 ? `maʼlumot ${formatDmy(new Date(st.refreshedAt))} holatiga (${ageDays === 0 ? 'bugun' : `${ageDays} kun oldin`})${st.lastAdded > 0 ? `, oxirgi yuklashda ${fmt(st.lastAdded)} ta kvitansiya qoʻshilgan` : ''}` : 'toʻlovlar hali toʻliq oʻqilmagan'
+        }`
+      : null
+
   return (
     <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
       {text}
+      {dates && <div style={{ marginTop: 6, color: 'var(--text-2)', fontSize: 12.5 }}>{dates}</div>}
       {wait > 0 && <div style={{ marginTop: 6, color: 'var(--text-2)' }}>Sud tizimi javob bermadi: {wait} soniyadan keyin qayta uriniladi ({job?.lastError}).</div>}
       {(paused || failed) && job?.lastError && <div style={{ marginTop: 6, color: 'var(--neg-text)' }}>{job.lastError}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
