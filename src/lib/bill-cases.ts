@@ -38,6 +38,13 @@ export const DEFAULT_PACE_MS = 1_200
  */
 const PAGE_ATTEMPTS = 8
 const PAGE_RETRY_MS = 30_000
+/**
+ * A big page that keeps failing is asked in SPLIT smaller requests of the same window (page index × SPLIT + j, size / SPLIT): measured on 207275139,
+ * a 9 000-10 000 row page at an offset above ~100 000 was rejected («Failed captcha check») again and again, while 100-row pages at offsets up to
+ * 123 000 passed at once. Billing's page sizes divide by SPLIT (see core/bill-passes), so the window is exactly the same rows' range.
+ */
+const SPLIT = 5
+const SPLIT_AFTER = 3
 const BACKOFF_FIRST_MS = 20_000
 const BACKOFF_MAX_MS = 15 * 60_000
 /** the job pauses after this many failures in a row */
@@ -258,9 +265,16 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
           // a page can fail on the captcha (billing hands out a token only when it scores the client high enough, or when the math is solved):
           // try again after a pause before giving the load up; the pages already stored stay and the next start resumes after them
           let res: Awaited<ReturnType<BillCasesDeps['searchBills']>> | null = null
+          const parts: Array<Awaited<ReturnType<BillCasesDeps['searchBills']>> | undefined> = [] // answers of a split window, kept across attempts
           for (let attempt = 1; !res; attempt++) {
             try {
-              res = await deps.searchBills(tin, { page, size })
+              if (attempt <= SPLIT_AFTER || size % SPLIT !== 0) {
+                res = await deps.searchBills(tin, { page, size })
+              } else {
+                for (let j = 0; j < SPLIT; j++) parts[j] ??= await deps.searchBills(tin, { page: page * SPLIT + j, size: size / SPLIT })
+                const first = parts[0]!
+                res = { ...first, content: parts.flatMap((x) => x?.content ?? []), pageNumber: page, pageSize: size, totalPages: Math.ceil(first.totalElements / size) }
+              }
             } catch (e) {
               if (attempt >= PAGE_ATTEMPTS || signal.aborted) throw e
               s.lastError = e instanceof Error ? e.message : String(e)

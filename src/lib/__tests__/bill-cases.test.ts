@@ -32,6 +32,7 @@ const PAGES: unknown[][] = [
 let billCalls: number[] = []
 let billSizes: number[] = []
 let pagesFor: ((page: number, size: number, call: number) => unknown[]) | null = null
+let bigTotal: number | null = null // a dataset of this many bills: totals follow the page size
 let callNo = 0
 let billFails: Record<number, number> = {} // page → how many calls fail first
 let caseCalls: string[] = []
@@ -53,6 +54,7 @@ const deps: Partial<BillCasesDeps> = {
     callNo++
     if ((billFails[page] ?? 0) > 0) { billFails[page]--; throw new Error('Failed captcha check') }
     const content = pagesFor ? pagesFor(page, o.size ?? 0, callNo) : (PAGES[page] ?? [])
+    if (bigTotal !== null) { const sz = o.size ?? 10000; return { content, pageNumber: page, pageSize: sz, totalElements: bigTotal, totalPages: Math.ceil(bigTotal / sz), last: (page + 1) * sz >= bigTotal } }
     return { content, pageNumber: page, pageSize: o.size ?? 10000, totalElements: 9, totalPages: PAGES.length, last: page >= PAGES.length - 1 }
   }) as unknown as BillCasesDeps['searchBills'],
   getCase: async (_c, num) => {
@@ -74,7 +76,7 @@ beforeEach(() => {
   fs.rmSync(DIR, { recursive: true, force: true })
   fs.mkdirSync(DIR, { recursive: true })
   store.forgetCaseStoreMemory(); lib.forgetJob()
-  n = 0; billCalls = []; billSizes = []; pagesFor = null; callNo = 0; billFails = {}; caseCalls = []; waits = []; script = {}; defaultCase = found
+  n = 0; billCalls = []; billSizes = []; pagesFor = null; bigTotal = null; callNo = 0; billFails = {}; caseCalls = []; waits = []; script = {}; defaultCase = found
 })
 afterAll(() => {
   dbm.closeDb()
@@ -115,7 +117,7 @@ describe('load', () => {
     const st = await run({ fill: false })
     expect(st.state).toBe('done')
     expect(st.stable).toBe(false)
-    expect(new Set(billSizes)).toEqual(new Set([10_000, 9_000, 8_000, 7_000]))
+    expect(new Set(billSizes)).toEqual(new Set([10_000, 9_000, 8_000, 7_000, 9_500, 8_500, 7_500, 6_500])) // every size is tried before the load gives up
     expect(bills.readBillsMeta(TIN)).toMatchObject({ complete: true, stable: false })
   })
 
@@ -128,7 +130,7 @@ describe('load', () => {
   })
 
   test('a page that keeps failing ends the job with the pages already stored kept; the next start resumes the SAME pass after them', async () => {
-    billFails = { 2: 99 }
+    billFails = { 2: 99, 10: 99, 11: 99, 12: 99, 13: 99, 14: 99 } // the window fails as a whole page AND as its five smaller requests
     const st = await run({ fill: false })
     expect(st.state).toBe('error')
     expect(st.lastError).toContain('captcha')
@@ -174,7 +176,7 @@ describe('load', () => {
   test('a load stopped half way does not move «refreshed»; the resumed load keeps the date it began on', async () => {
     let clock = 5_000
     const withClock = { ...deps, now: () => clock }
-    billFails = { 1: 99 } // page 1 keeps failing: the load ends with an error after page 0
+    billFails = { 1: 99, 5: 99, 6: 99, 7: 99, 8: 99, 9: 99 } // page 1 keeps failing (whole and split): the load ends with an error after page 0
     lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
     await lib.jobDone()
     expect(lib.jobStatus(TIN).state).toBe('error')
@@ -185,6 +187,20 @@ describe('load', () => {
     lib.startJob(TIN, { deps: withClock, paceMs: 1000, fill: false })
     await lib.jobDone()
     expect(lib.billCasesStatus(TIN)).toMatchObject({ firstAt: 5_000, refreshedAt: 5_000 })
+  })
+
+  test('a big page that keeps failing is asked as five smaller requests of the same window, and the load goes on', async () => {
+    // 25 000 bills: pages of 10 000 → 3 pages; page 1 (offset 10 000) is rejected every time at the full size
+    const all = Array.from({ length: 25_000 }, (_, i) => ({ ...bill(null), number: String(400000000000 + i) }))
+    bigTotal = 25_000
+    pagesFor = (page, size) => all.slice(page * size, (page + 1) * size)
+    billFails = { 1: 99 } // only the full-size page index 1 fails; the split uses page indexes 5-9 of size 2 000
+    const st = await run({ fill: false })
+    expect(st.state).toBe('done')
+    expect(billSizes.filter((x) => x === 2_000)).toHaveLength(5)
+    expect(billCalls.filter((p) => p >= 5 && p <= 9)).toEqual([5, 6, 7, 8, 9])
+    expect(bills.queryBills(TIN, {})?.total).toBe(25_000) // every bill of the failing window arrived
+    expect(waits).toEqual([30_000, 60_000, 90_000]) // three full-size attempts, then the split went through
   })
 
   test('an empty page inside the range is an error, not the end', async () => {

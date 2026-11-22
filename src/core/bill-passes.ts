@@ -12,7 +12,9 @@
  */
 
 /** page sizes of the passes; billing accepts at least 10 000 a page (fewest captchas), the next ones shift the boundaries */
-export const PASS_SIZES: readonly number[] = [10_000, 9_000, 8_000, 7_000]
+export const PASS_SIZES: readonly number[] = [10_000, 9_000, 8_000, 7_000, 9_500, 8_500, 7_500, 6_500]
+// Every size divides by 5 (a failing page is asked as 5 smaller requests, lib/bill-cases). Eight passes: each pass reads a different slice of billing's
+// unstable order, so the union converges slowly (measured: 106 171 of ~121 000 distinct bills after one and a half passes).
 
 /** a pass is stable when fewer than this share of its rows repeat a bill of an EARLIER page of the same pass */
 export const STABLE_OVERLAP = 0.005
