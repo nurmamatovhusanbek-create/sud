@@ -1,10 +1,10 @@
 import { h } from '../ui/h.js'
-import { Button, Card, Kv, List, Row, SectionLabel, Timeline } from '../ui/components.js'
+import { Button, Callout, Card, Hero, Kv, List, Parties, Row, SectionLabel, Tabs, Timeline } from '../ui/components.js'
 import { BillStatus, billWord, CourtStatus } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go } from '../core/router.js'
-import { has, money } from '../core/format.js'
-import { d } from '../core/prefs.js'
+import { dmyKey, has, money, todayKey } from '../core/format.js'
+import { d } from '../core/text.js'
 import { courtName, TopBar } from './common.js'
 
 const INSTANCE = { first: '1-instansiya', appellate: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' }
@@ -28,6 +28,19 @@ function instance(title, ins) {
     docs.length > 0 && h('div', {}, h('div', { class: 'section-label' }, `Hujjatlar (${docs.length})`), ...docs.slice(0, 20).map((x) => Kv(x.date || x.type || '', x.name || x.title || x.type || ''))))
 }
 
+const ORDER = ['first', 'appellate', 'cassation', 'inspection']
+const KEYS = { first: 'firstInstance', appellate: 'appellate', cassation: 'cassation', inspection: 'inspection' }
+
+/** the first hearing from today on, over every instance (a past hearing that is still «scheduled» is not «next») */
+function nextHearing(detail, row) {
+  const today = todayKey()
+  const all = ORDER.flatMap((k) => (detail[KEYS[k]]?.hearings || []).map((x) => ({ ...x, instance: INSTANCE[k] })))
+  const upcoming = all.filter((x) => dmyKey(x.date) >= today).sort((a, b) => dmyKey(a.date) - dmyKey(b.date))[0]
+  if (upcoming) return upcoming
+  if (row && dmyKey(row.hearingDate) >= today) return { date: row.hearingDate, time: row.hearingTime }
+  return null
+}
+
 export async function caseScreen(route, { signal }) {
   const { case: c } = await api.caseOf(route.key, { signal })
   const detail = c.detail || {}
@@ -37,18 +50,22 @@ export async function caseScreen(route, { signal }) {
   const bills = c.bills || []
   const total = bills.reduce((a, b) => a + (Number(b.amount) || 0), 0)
   const copy = Button({ label: 'Nusxa', size: 'small', onClick: async () => { try { await navigator.clipboard.writeText(c.num); copy.textContent = 'Nusxalandi' } catch { /* not allowed here */ } } })
+  const next = nextHearing(detail, row)
+  const side = g || row
+  const instances = ORDER.filter((k) => detail[KEYS[k]] && typeof detail[KEYS[k]] === 'object')
+  const tab = instances.includes(route.tab) ? route.tab : instances.at(-1)
 
   return h('div', { class: 'screen stack' },
     TopBar(Button({ label: `STIR ${c.tin} ›`, size: 'small', onClick: () => go({ name: 'company', key: c.tin }) })),
-    Card({}, h('div', { class: 'split' }, h('p', { class: 'card__id mono' }, c.num), copy), h('div', { class: 'screen__lead' }, `${courtName(c.court)} · 20${c.year} yilda roʻyxatga olingan`),
-      status && h('div', { class: 'screen__status' }, CourtStatus(status))),
-    g ? [
-      Card({ title: 'Umumiy' }, Kv('Turi', g.caseType), Kv('Daʼvo predmeti', g.claimSubject), Kv('Sud', g.court), Kv('Hudud', g.region), Kv('Sudya', g.judge), Kv('Kotib', g.secretary), Kv('Joriy instansiya', INSTANCE[g.currentInstance] || g.currentInstance), Kv('Daʼvo summasi', g.claimAmount), Kv('Davlat boji', g.stateDuty), Kv('Ariza sanasi', g.applicationDate), Kv('Ish qoʻzgatilgan', g.initiatedDate), Kv('Muddat', g.deadlineDate)),
-      Card({ title: 'Tomonlar' }, Kv('Daʼvogar', g.plaintiff), Kv('Daʼvogar STIR', g.plaintiffTin), Kv('Javobgar', g.defendant), Kv('Javobgar STIR', g.defendantTin), Kv('Uchinchi shaxs', g.thirdParty), Kv('Vakil', g.representative), Kv('Prokuror', g.prosecutor)),
-    ] : row
-      ? Card({ title: 'Umumiy (sud roʻyxatidan)' }, Kv('Turi', row.caseType), Kv('Sud', row.courtName), Kv('Sudya', row.judge), Kv('Daʼvogar', row.plaintiff), Kv('Javobgar', row.defendant), Kv('Daʼvo summasi', row.claimAmount), Kv('Ariza sanasi', row.dateFiled), Kv('Natija', row.result), Kv('Navbatdagi majlis', [row.hearingDate, row.hearingTime].filter(has).join(' ')))
-      : Card({}, h('p', { class: 'muted small' }, 'Batafsil maʼlumot zaxirada yoʻq: bu ish faqat kvitansiyalar orqali maʼlum. Ilovada kompaniya ishlari yangilanganda zaxiraga tushadi.')),
-    instance('1-instansiya', detail.firstInstance), instance('Apellyatsiya', detail.appellate), instance('Kassatsiya', detail.cassation), instance('Taftish', detail.inspection),
+    Hero({ caption: `${courtName(c.court)} ish`, id: c.num, line: `20${c.year} yilda roʻyxatga olingan`, aside: copy }, status && h('div', { class: 'screen__status' }, CourtStatus(status))),
+    next && Callout('Navbatdagi majlis', [next.date, next.time].filter(has).join(' '), next.instance),
+    side && Parties({ role: 'Daʼvogar', name: d(side.plaintiff) || '—', tin: g?.plaintiffTin }, { role: 'Javobgar', name: d(side.defendant) || '—', tin: g?.defendantTin }),
+    g ? Card({ title: 'Umumiy' }, Kv('Turi', g.caseType), Kv('Daʼvo predmeti', g.claimSubject), Kv('Daʼvo summasi', g.claimAmount), Kv('Davlat boji', g.stateDuty), Kv('Sud', g.court), Kv('Hudud', g.region), Kv('Sudya', g.judge), Kv('Kotib', g.secretary), Kv('Joriy instansiya', INSTANCE[g.currentInstance] || g.currentInstance), Kv('Ariza sanasi', g.applicationDate), Kv('Ish qoʻzgatilgan', g.initiatedDate), Kv('Muddat', g.deadlineDate), Kv('Uchinchi shaxs', g.thirdParty), Kv('Vakil', g.representative), Kv('Prokuror', g.prosecutor))
+      : row ? Card({ title: 'Umumiy (sud roʻyxatidan)' }, Kv('Turi', row.caseType), Kv('Daʼvo summasi', row.claimAmount), Kv('Sud', row.courtName), Kv('Sudya', row.judge), Kv('Ariza sanasi', row.dateFiled), Kv('Natija', row.result))
+        : Card({}, h('p', { class: 'muted small' }, 'Batafsil maʼlumot zaxirada yoʻq: bu ish faqat kvitansiyalar orqali maʼlum. Ilovada kompaniya ishlari yangilanganda zaxiraga tushadi.')),
+    instances.length > 0 && [
+      instances.length > 1 && Tabs(instances.map((k) => ({ value: k, label: INSTANCE[k] })), tab, (v) => go({ name: 'case', key: c.num, tab: v }, { replace: true })),
+      instance(INSTANCE[tab], detail[KEYS[tab]])],
     bills.length > 0 && [SectionLabel(`Kvitansiyalar (${bills.length}) · jami ${money(total)}`),
       List(...bills.map((b) => Row({ icon: 'bill', title: b.number, sub: `${d(b.cat)} · ${money(b.amount)} · ${billWord(b.status)}`, onOpen: () => go({ name: 'bill', key: b.number }) })))])
 }

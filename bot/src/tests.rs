@@ -340,3 +340,50 @@ mod chat {
         assert_eq!(crate::chat::dmy_ms(0), "-");
     }
 }
+
+mod assets {
+    use include_dir::{include_dir, Dir};
+    static ASSETS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/static");
+
+    fn texts() -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        fn walk(d: &Dir<'static>, out: &mut Vec<(String, String)>) {
+            for f in d.files() {
+                let p = f.path().to_string_lossy().to_string();
+                if p.ends_with(".js") || p.ends_with(".css") || p.ends_with(".html") {
+                    out.push((p, String::from_utf8_lossy(f.contents()).into_owned()));
+                }
+            }
+            for s in d.dirs() {
+                walk(s, out);
+            }
+        }
+        walk(&ASSETS, &mut out);
+        out
+    }
+
+    #[test]
+    fn the_mini_app_obeys_its_policy() {
+        let files = texts();
+        assert!(files.len() > 15);
+        for (p, t) in &files {
+            // the CSP forbids inline script and style, so none may be written; data is shown as text, never as markup
+            assert!(!t.contains("innerHTML") && !t.contains("insertAdjacentHTML") && !t.contains("eval("), "{p}");
+            assert!(!t.contains("setAttribute('style'") && !t.contains(" style=\""), "{p}");
+            // nothing is loaded from another origin (the SVG namespace is a name, not a request)
+            for url in t.match_indices("http").map(|(i, _)| &t[i..(i + 30).min(t.len())]) {
+                assert!(url.starts_with("http://www.w3.org/2000/svg") || !url.starts_with("http://") && !url.starts_with("https://"), "{p}: {url}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_mini_app_is_latin_only() {
+        for (p, t) in texts() {
+            if p.ends_with("translit.js") {
+                continue; // the courts answer in Cyrillic: this file turns it into Latin
+            }
+            assert!(!t.contains("Кирил") && !t.contains("setAlphabet") && !t.contains("prefs.js"), "{p}");
+        }
+    }
+}

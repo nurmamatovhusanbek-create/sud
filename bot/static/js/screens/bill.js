@@ -4,7 +4,7 @@ import { BillStatus } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go } from '../core/router.js'
 import { dmy, has, money } from '../core/format.js'
-import { d } from '../core/prefs.js'
+import { d } from '../core/text.js'
 import { TopBar } from './common.js'
 
 export async function bill(route, { signal }) {

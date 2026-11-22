@@ -1,7 +1,7 @@
-// The frame around every screen: search field, alphabet switch, the one-line hint. It owns the search box (a search is a route of its own).
+// The frame around every screen: home button, search field, the one-line hint. It owns the search box (a search is a route of its own).
 import { h } from './ui/h.js'
-import { Field, Segmented } from './ui/components.js'
-import { getAlphabet, setAlphabet } from './core/prefs.js'
+import { Field } from './ui/components.js'
+import { icon } from './ui/icons.js'
 import { dmyIso, num } from './core/format.js'
 import { go, remember, route, rerender } from './core/router.js'
 
@@ -26,12 +26,10 @@ export function mountShell(headEl) {
     }, 220)
   }
   field = Field({ placeholder: 'Ish, kvitansiya, STIR', onInput })
-  const seg = h('div', {})
-  const drawSeg = () => seg.replaceChildren(Segmented([{ value: 'lat', label: 'Lotin' }, { value: 'cyr', label: 'Кирил' }], getAlphabet(), (a) => { setAlphabet(a); drawSeg(); rerender() }))
-  drawSeg()
+  const homeBtn = h('button', { type: 'button', class: 'brand', 'aria-label': 'Bosh sahifa', on: { click: () => go({ name: 'home' }) } }, icon('company', 20))
   hint = h('span', {})
   hintRight = h('span', {})
-  headEl.append(h('div', { class: 'shell-bar' }, field.el, seg), h('div', { class: 'shell-hint' }, hint, hintRight))
+  headEl.append(h('div', { class: 'shell-bar' }, homeBtn, field.el), h('div', { class: 'shell-hint' }, hint, hintRight))
 }
 
 /** the search box shows what the current search route asks (back / forward) */

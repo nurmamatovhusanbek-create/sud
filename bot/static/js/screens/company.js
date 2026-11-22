@@ -1,10 +1,10 @@
 import { h } from '../ui/h.js'
-import { Button, Card, Chips, Empty, ErrorBox, Field, List, Row, Stats, Tabs } from '../ui/components.js'
+import { Bars, Button, Card, Chips, Columns, Empty, ErrorBox, Field, Hero, Row, Stats, Tabs } from '../ui/components.js'
 import { billWord } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { dmy, has, money, num } from '../core/format.js'
-import { d } from '../core/prefs.js'
+import { d } from '../core/text.js'
 import { COURT, courtName, TopBar } from './common.js'
 
 const PAGE = 30
@@ -92,15 +92,24 @@ function debounce(fn, ms = 300) {
   return (v) => { clearTimeout(t); t = setTimeout(() => fn(v), ms) }
 }
 
+function overviewPane(o, years) {
+  const courts = Object.entries(o.courts).sort((a, b) => b[1] - a[1])
+  return h('div', { class: 'stack' },
+    courts.length > 0 && Card({ title: 'Sud turlari boʻyicha ishlar' }, Bars(courts.map(([k, v]) => ({ label: COURT[k] || k, value: v, onPick: () => go({ name: 'company', key: o.tin, tab: 'cases', court: k }) })), { format: num })),
+    o.byYear.length > 0 && Card({ title: 'Ishlar roʻyxatga olingan yil' }, Columns(o.byYear.map((y) => ({ label: y.year, a: y.cases })))),
+    o.byYear.some((y) => y.bills > 0) && Card({ title: 'Toʻlovlar (ishga bogʻlangan) yil boʻyicha' }, Bars(o.byYear.filter((y) => y.bills > 0).reverse().map((y) => ({ label: String(y.year), value: y.bills, onPick: () => go({ name: 'company', key: o.tin, tab: 'bills', year: String(y.year) }) })), { format: num })),
+    years.length === 0 && Empty('Kvitansiyalar zaxirada yoʻq.'))
+}
+
 export async function company(route, { signal }) {
-  const { company: c } = await api.company(route.key, { signal })
-  const years = (c.years || []).slice().sort().reverse()
-  const tab = route.tab || 'cases'
-  const dates = [c.firstAt ? `Birinchi yuklash: ${dmy(c.firstAt)}` : '', c.refreshedAt ? `maʼlumot ${dmy(c.refreshedAt)} holatiga` : ''].filter(Boolean).join(' · ') || 'Zaxiradagi kompaniya'
+  const { overview: o } = await api.overview(route.key, { signal })
+  const years = (o.years || []).slice().sort().reverse()
+  const tab = route.tab || 'overview'
+  const dates = [o.firstAt ? `Birinchi yuklash ${dmy(o.firstAt)}` : '', o.refreshedAt ? `maʼlumot ${dmy(o.refreshedAt)} holatiga` : ''].filter(Boolean).join(' · ') || 'Zaxiradagi kompaniya'
   return h('div', { class: 'screen stack' },
     TopBar(),
-    Card({}, h('p', { class: 'card__id mono' }, c.tin), h('div', { class: 'screen__lead' }, dates)),
-    Stats([num(c.bills), 'toʻlov'], [num(c.found), 'topilgan ish'], [String(years.length), 'yil']),
-    Tabs([{ value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Kvitansiyalar' }], tab, (v) => go({ name: 'company', key: c.tin, tab: v }, { replace: true })),
-    tab === 'cases' ? casesPane(c.tin, route, signal) : billsPane(c.tin, years, route, signal))
+    Hero({ caption: 'Kompaniya · STIR', id: o.tin, line: dates }),
+    Stats([num(o.cases), 'ish'], [num(o.bills), 'toʻlov'], [String(o.byYear.length), 'yil']),
+    Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
+    tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : billsPane(o.tin, years, route, signal))
 }

@@ -14,3 +14,10 @@ export function dmy(ms) {
 export const dmyIso = (iso) => (iso ? iso.slice(0, 10).split('-').reverse().join('.') : '')
 /** a value worth showing: not empty and not the courts' «-» */
 export const has = (v) => v != null && v !== '' && v !== '-'
+/** `dd.mm.yyyy` (the courts' date) → a sortable number, 0 when it is not one. Never compare these dates as strings. */
+export function dmyKey(s) {
+  const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(String(s || ''))
+  return m ? Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1]) : 0
+}
+/** today in Uzbekistan as the same sortable number */
+export const todayKey = () => dmyKey(dmy(Date.now()))

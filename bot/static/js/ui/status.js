@@ -1,6 +1,6 @@
-// What a court status or a bill status MEANS, as one of four shapes (see components.js Status). Words stay the court's own (in the chosen alphabet).
+// What a court status or a bill status MEANS, as one of four shapes (see components.js Status). Words stay the court's own.
 import { Status } from './components.js'
-import { d } from '../core/prefs.js'
+import { d } from '../core/text.js'
 
 const COURT = [
   [/якунланган|tugatil|yakunlan/i, 'done'],

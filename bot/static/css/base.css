@@ -28,3 +28,5 @@ button { cursor: pointer; }
 .cluster { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .split { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
 .grow { flex: 1; min-width: 0; }
+.brand { flex: none; width: var(--tap-size); height: var(--tap-size); display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-2); background: var(--color-action); color: var(--color-on-action); }
+@media (prefers-reduced-motion: reduce) { .bars__fill, .cols__fill { transition: none; } }

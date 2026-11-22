@@ -1,7 +1,7 @@
 // The component set. Each function returns a DOM node built from tokens' classes (components.css). Screens compose these; they add no look of their own.
 import { h } from './h.js'
 import { icon } from './icons.js'
-import { d } from '../core/prefs.js'
+import { d } from '../core/text.js'
 import { has } from '../core/format.js'
 
 export const Card = ({ title } = {}, ...kids) => h('section', { class: 'card' }, title && h('h3', { class: 'card__title' }, title), ...kids)
@@ -46,11 +46,48 @@ export function Field({ placeholder, value = '', onInput, compact, mono = true }
   return { el: wrap, input }
 }
 
-export const Segmented = (options, value, onPick) =>
-  h('div', { class: 'segmented', role: 'group' }, ...options.map((o) => h('button', { type: 'button', 'aria-pressed': String(o.value === value), on: { click: () => onPick(o.value) } }, o.label)))
-
 export const Skeletons = (n = 3) => h('div', { class: 'stack' }, ...Array.from({ length: n }, () => h('div', { class: 'skeleton' })))
 export const Empty = (text) => h('div', { class: 'empty' }, text)
 export function ErrorBox(message, onRetry) {
   return h('div', { class: 'empty empty--error' }, message, onRetry && h('div', { class: 'screen__more' }, Button({ label: 'Qayta urinish', onClick: onRetry, size: 'small' })))
 }
+
+// ---- charts: plain DOM, no libraries. A value reaches the CSS as a custom property set through the CSSOM (the CSP forbids style attributes). ----
+const share = (el, v) => { el.style.setProperty('--v', String(Math.max(0, Math.min(1, v)))); return el }
+
+/** horizontal bars: [{ label, value, onPick? }] against the largest value */
+export function Bars(items, { format = String } = {}) {
+  const max = Math.max(1, ...items.map((i) => i.value))
+  return h('div', { class: 'bars' }, ...items.map((i) => {
+    const tag = i.onPick ? 'button' : 'div'
+    return h(tag, { class: 'bars__row', type: i.onPick ? 'button' : undefined, on: i.onPick ? { click: i.onPick } : undefined },
+      h('span', { class: 'bars__label' }, i.label),
+      h('span', { class: 'bars__track' }, share(h('span', { class: 'bars__fill' }), i.value / max)),
+      h('span', { class: 'bars__value mono' }, format(i.value)))
+  }))
+}
+
+/** vertical columns, one per label (a year), two series: the tall one is `a`, the line over it `b` */
+export function Columns(items) {
+  const max = Math.max(1, ...items.map((i) => i.a))
+  return h('div', { class: 'cols', role: 'img', 'aria-label': 'Yillar boʻyicha' }, ...items.map((i) =>
+    h('div', { class: 'cols__col' },
+      h('span', { class: 'cols__value mono' }, i.a),
+      h('span', { class: 'cols__bar' }, share(h('span', { class: 'cols__fill' }), i.a / max)),
+      h('span', { class: 'cols__label mono' }, String(i.label).slice(-2)))))
+}
+
+/** the two sides of a case, side by side */
+export const Parties = (left, right) =>
+  h('div', { class: 'parties' },
+    h('div', { class: 'party' }, h('span', { class: 'party__role' }, left.role), h('span', { class: 'party__name' }, left.name), left.tin && h('span', { class: 'party__tin mono' }, left.tin)),
+    h('span', { class: 'parties__vs', 'aria-hidden': 'true' }, 'vs'),
+    h('div', { class: 'party' }, h('span', { class: 'party__role' }, right.role), h('span', { class: 'party__name' }, right.name), right.tin && h('span', { class: 'party__tin mono' }, right.tin)))
+
+/** one line that must not be missed (the next hearing) */
+export const Callout = (label, main, sub) =>
+  h('div', { class: 'callout' }, h('span', { class: 'callout__label' }, label), h('span', { class: 'callout__main mono' }, main), sub && h('span', { class: 'callout__sub' }, sub))
+
+/** the headline of a screen: a small caption, the identifier, a line under it */
+export const Hero = ({ caption, id, line, aside }, ...kids) =>
+  h('section', { class: 'hero' }, h('div', { class: 'split' }, h('span', { class: 'hero__caption' }, caption), aside), h('p', { class: 'hero__id mono' }, id), line && h('p', { class: 'hero__line' }, line), ...kids)
