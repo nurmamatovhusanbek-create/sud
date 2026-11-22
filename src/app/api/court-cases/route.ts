@@ -92,7 +92,7 @@ export const GET = guard(async (req) => {
         ),
       )
       return jsonOk({ cases: served.data.cases }, {
-        meta: { cached: served.fromSnapshot, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}) },
+        meta: { cached: served.fromSnapshot, fetchedAt: served.fetchedAt, ...(served.stale ? { stale: true } : {}), ...(served.data.capped ? { capped: true } : {}) },
       })
     }
     const cases = await coalesce(`court:${ct.data}:${mode}:${value}`, () =>

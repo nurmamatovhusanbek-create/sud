@@ -9,6 +9,8 @@
  *   Қабул қилиш рад этилган (девонхона)                the claim was refused at the chancellery: it never became a case
  *   Фуқаро шахсий кабинетида яратилган, судга юборилмаган   a draft made in the citizen's cabinet, not sent to court
  *   Иш ҳолати номаълум                                 status unknown (old records)
+ *   Натижа қабул қилинган                              finished (the OLD system jadval.sud.uz: «the result is accepted»; 49 of 57 rows of a big company, Nov 2026)
+ *   Архивга топширилган                                archived (the same old system; matched by «архив»)
  *   Иш қўзғатиш · Тайёрлаш                             ongoing (the case is being opened / prepared; seen on real rows in Nov 2026)
  * Instance statuses («Апелляцияда», «Назоратда» …) are not in this table: they say WHERE the case is, the older table handles them.
  */
@@ -31,7 +33,7 @@ export function caseStatusInfo(raw: string | null | undefined): CaseStatusInfo |
   const s = norm(raw ?? '')
   if (!s || s === '-' || s === '—') return null
   const writ = /ижро\s*варақа\s*билан|ijro\s*varaqa\s*bilan/.test(s)
-  if (/якунланган|yakunlangan/.test(s)) {
+  if (/якунланган|yakunlangan|натижа\s*қабул\s*қилинган|natija\s*qabul\s*qilingan/.test(s)) {
     return { stage: 'finished', writ, label: writ ? 'Yakunlangan · ijro varaqasi bilan' : 'Yakunlangan', color: '#1e7e44' }
   }
   if (/қабул\s*қилиш\s*рад|qabul\s*qilish\s*rad/.test(s)) return { stage: 'refused', writ: false, label: 'Qabul qilish rad etilgan', color: '#6b7280' }

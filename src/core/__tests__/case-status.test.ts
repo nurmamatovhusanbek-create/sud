@@ -10,6 +10,8 @@ describe('caseStatusInfo: the court\'s real statuses', () => {
       ['Кўриб чиқиш жараёнида', 'ongoing', false],
       ['Тайинлаш', 'ongoing', false],
       ['Рўйхатга олиш', 'ongoing', false],
+      ['Натижа қабул қилинган', 'finished', false],
+      ['Архивга топширилган', 'archived', false],
       ['Иш қўзғатиш', 'ongoing', false],
       ['Тайёрлаш', 'ongoing', false],
       ['Якунланган (Ижро варақасиз)', 'finished', false],

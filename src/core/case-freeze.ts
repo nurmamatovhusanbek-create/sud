@@ -6,7 +6,7 @@
  * not frozen the day it ends. It is FROZEN (served from disk, never fetched again unless the operator presses «Yangilash») only when
  *  - its status says it is over,
  *  - no hearing is still ahead, and
- *  - the last thing that happened in it (hearing or ruling) is older than FREEZE_AFTER_DAYS (the cassation window plus a margin).
+ *  - the last thing that happened in it (hearing or ruling) is older than FREEZE_AFTER_DAYS (six months: the cassation window).
  * A finished case inside that window is still stored (so the last answer survives a failed fetch) but is read live when opened.
  *
  * Pure: the caller passes the dates it already has; this file knows nothing about the court's JSON.
@@ -15,8 +15,8 @@
 import { caseStatusInfo } from './case-status'
 import { daysUntil, parseYmd } from './dates'
 
-/** cassation is ~6 months after the ruling (owner's rule, docs/design-notes «Instansiyalar»), plus a month of margin */
-export const FREEZE_AFTER_DAYS = 215
+/** six months, the owner's rule: a case whose last event is older than this is kept as it is and not asked again (the cassation window, docs/design-notes «Instansiyalar») */
+export const FREEZE_AFTER_DAYS = 183
 
 export interface FreezeInput {
   /** the court's status text of the case (the row's or the detail's) */

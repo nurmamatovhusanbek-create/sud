@@ -74,6 +74,39 @@ beforeEach(() => {
   seen = []
 })
 
+describe('a list the court cuts at its row limit', () => {
+  const many = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => mk(from + i))
+
+  test('exactly 100 rows (the new system\'s limit) is a window: it is merged into what was seen, so older cases stay', async () => {
+    script = [{ status: 200, etag: 'W/"a"', rows: many(1, 100) }, { status: 200, etag: 'W/"b"', rows: many(51, 150) }]
+    const a = await open()
+    expect(a.cases).toHaveLength(100)
+    expect(a.capped).toBe(true)
+    const b = await open()
+    expect(b.cases).toHaveLength(150) // 1-50 slid out of the court's newest 100 and are still here
+    expect(b.capped).toBe(true)
+    expect(b.incomplete).toBe(false)
+    expect(store.readFeed(TIN, FEED)?.capped).toBe(true)
+  })
+
+  test('an unchanged capped list is answered from disk with the accumulated rows and still says capped', async () => {
+    script = [{ status: 200, etag: 'W/"a"', rows: many(1, 100) }, { status: 200, etag: 'W/"b"', rows: many(51, 150) }, { status: 304 }]
+    await open()
+    await open()
+    const c = await open()
+    expect(c.cases).toHaveLength(150)
+    expect(c.capped).toBe(true)
+  })
+
+  test('a list under the limit is the whole truth and replaces the stored one', async () => {
+    script = [{ status: 200, etag: 'W/"a"', rows: many(1, 100) }, { status: 200, etag: 'W/"b"', rows: many(1, 40) }]
+    await open()
+    const b = await open()
+    expect(b.cases).toHaveLength(40)
+    expect(b.capped).toBeUndefined()
+  })
+})
+
 describe('a big list through the disk memory', () => {
   test('a complete answer is stored with its ETag, and the next open asks with it', async () => {
     script = [{ status: 200, etag: 'W/"v1"', rows: [mk(1), mk(2), mk(3)] }, { status: 304 }]

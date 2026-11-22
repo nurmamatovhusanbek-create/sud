@@ -696,6 +696,9 @@ export function CasesSection() {
     }
   }, [econ.state.status, econ.meta, civ.state.status, civ.meta, adm.state.status, adm.meta, courts.join(','), stir])
 
+  // the court's own list stops at a fixed number of rows (new system 100, old one 200: lib/court-case LIST_CAPS), so for a big company this is a window
+  const capped = [econ, civ, adm].some((r, i) => courts.includes((['economic', 'civil', 'administrative'] as const)[i]) && r.meta?.capped)
+
   const anyLoading = views.some((v) => v.view.status === 'idle' || v.view.status === 'loading')
   const allError = views.length > 0 && views.every((v) => v.view.status === 'error')
   const maxElapsed = views.reduce((acc, v) => Math.max(acc, v.elapsed ?? 0), 0)
@@ -903,6 +906,11 @@ export function CasesSection() {
       ) : (
         <>
           <PartialBanner errors={partialErrors} onRetry={refetchEnabled} />
+          {capped && (
+            <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
+              Sud tizimi bu STIR boʻyicha roʻyxatni cheklaydi (yangi tizim 100 ta, eski tizim 200 ta qator): eski ishlar koʻrinmasligi mumkin. Bir marta koʻrilgan ish serverda saqlanadi va roʻyxatdan yoʻqolmaydi.
+            </div>
+          )}
           <div className="list">
             {look === 'navy' ? (
               paged.map(({ c, courtType }, i) => (

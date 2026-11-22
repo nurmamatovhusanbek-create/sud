@@ -234,8 +234,27 @@ async function curlFetchCases(url: string, mapper: (raw: any) => CourtCase, altI
  * This cuts the total fetch time from 45s+ to ~5s when multiple tabs load
  * the same TIN.
  */
+/**
+ * `capped`: a source answered with exactly its row limit, so the court's own list is cut off (see LIST_CAPS). What is shown is then a
+ * window, not the company's whole history.
+ */
+export interface CourtListResult {
+  cases: CourtCase[]
+  incomplete: boolean
+  capped?: boolean
+}
+
+/**
+ * The court APIs cut a TIN list off at a fixed number of rows, with no way to ask for the rest (no page, offset, limit or date parameter
+ * is read; measured Nov 2026 on a water utility with thousands of cases: jadvalapi answered exactly 100, always the NEWEST by
+ * registration date, jadval.sud.uz exactly 200, mostly 2023 ones, and the site's own «Суддаги ишлар» showed 300 = 100 + 200).
+ * An answer that reaches the cap is therefore not «everything»: it is merged into what the disk already holds instead of replacing it,
+ * so a case that has slid out of the newest 100 stays known.
+ */
+export const LIST_CAPS: Record<string, number> = { 'jadvalapi.sud.uz': 100, 'jadval.sud.uz': 200 }
+
 interface CourtCaseCacheEntry {
-  result: Promise<{ cases: CourtCase[]; incomplete: boolean }>
+  result: Promise<CourtListResult>
   ts: number
 }
 const courtCaseCache = new Map<string, CourtCaseCacheEntry>()
@@ -254,7 +273,7 @@ function getCourtCasesCached(
   courtType: CourtType,
   mode: SearchMode,
   value: string,
-): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
+): Promise<CourtListResult> {
   // Case numbers use "@" instead of "/" in the URL
   const encodedValue = mode === 'caseNumber' ? value.replace('/', '@') : value
 
@@ -343,7 +362,7 @@ export async function searchCourtCasesDetailed(
   courtType: CourtType,
   mode: SearchMode,
   value: string,
-): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
+): Promise<CourtListResult> {
   return getCourtCasesCached(courtType, mode, value)
 }
 
@@ -366,7 +385,7 @@ async function searchCourtCasesInternal(
   mode: SearchMode,
   value: string,
   encodedValue: string,
-): Promise<{ cases: CourtCase[]; incomplete: boolean }> {
+): Promise<CourtListResult> {
   // Determine the API paths based on court type and search mode
   const apiConfig = getApiConfig(courtType, mode, encodedValue)
 
@@ -397,14 +416,14 @@ async function searchCourtCasesInternal(
     // are pure quota burn — 2 is the sweet spot.
     const ladderIps = [JADVAL_ALT_IP || undefined, undefined]
     const curlLadder = async (): Promise<{ items: CourtCase[]; failed: boolean }> => {
-      if (!isJadvalSudUz) return { items: [] as CourtCase[], failed: true }
+      if (!isJadvalSudUz) return { items: storedRows(courtType, mode, value, url), failed: true }
       for (let i = 0; i < ladderIps.length; i++) {
         if (i > 0) await new Promise(r => setTimeout(r, 6_000))
         try {
           return { items: await curlFetchCases(url, mapper, ladderIps[i]), failed: false }
         } catch { /* throttled/bad node — next sample */ }
       }
-      return { items: [] as CourtCase[], failed: true }
+      return { items: storedRows(courtType, mode, value, url), failed: true }
     }
 
     try {
@@ -432,7 +451,7 @@ async function searchCourtCasesInternal(
       })
       if (res.status === 304 && known) {
         console.log(`[court-case] ${origin} — list not modified, ${known.items.length} cases from disk`)
-        return { items: known.items, failed: false }
+        return { items: known.items, failed: false, capped: known.capped }
       }
       if (!res.ok) {
         // v149: CONFLICT/findByTin returns 404 intermittently — don't treat
@@ -451,7 +470,7 @@ async function searchCourtCasesInternal(
       if (known?.complete && known.etag && res.headers.get('etag') === known.etag) {
         void res.body?.cancel().catch(() => {})
         console.log(`[court-case] ${origin} — same ETag, ${known.items.length} cases from disk (body not read)`)
-        return { items: known.items, failed: false }
+        return { items: known.items, failed: false, capped: known.capped }
       }
       const body = isList ? await readBodyIdle(res, { idleMs: 20_000, totalMs: 240_000 }) : { text: await res.text(), complete: true }
       const text = body.text
@@ -476,11 +495,17 @@ async function searchCourtCasesInternal(
         return { items: kept, failed: true }
       }
       const data = JSON.parse(text)
-      const items = (Array.isArray(data) ? data : (data.data || [])).map(mapper)
+      const rawRows: unknown[] = Array.isArray(data) ? data : (data.data || [])
+      const items = rawRows.map(mapper)
       console.log(`[court-case] ${origin} — got ${items.length} cases via scheduler`)
+      // a list that reaches the source's row limit is only a WINDOW: it is merged into the stored one, a smaller one is the whole truth
+      const cap = isList ? LIST_CAPS[origin] : undefined
+      const capped = !!cap && rawRows.length >= cap
+      if (capped) console.log(`[court-case] ${origin} — ${rawRows.length} rows = the source's limit (${cap}): older cases may be missing, kept ones are merged in`)
+      const shown = capped && feedKey ? mergeRows(kept, items) : items
       // a COMPLETE list is the truth: it replaces the stored one (a case the court no longer lists is gone) and keeps its ETag
-      if (feedKey) writeFeed(value, feedKey, { t: Date.now(), etag: res.headers.get('etag') ?? undefined, complete: true, items })
-      return { items, failed: false }
+      if (feedKey) writeFeed(value, feedKey, { t: Date.now(), etag: res.headers.get('etag') ?? undefined, complete: true, capped: capped || undefined, items: shown })
+      return { items: shown, failed: false, capped }
     } catch {
       // All workers failed at transport level → jadval.sud.uz gets the curl
       // ladder (its TLS bypass + LB roulette sampling), everything else marks
@@ -496,8 +521,10 @@ async function searchCourtCasesInternal(
   const merged: CourtCase[] = []
   const at = new Map<string, number>()
   let incomplete = false
-  for (const { items, failed } of results) {
+  let capped = false
+  for (const { items, failed, capped: cut } of results) {
     if (failed) incomplete = true
+    if (cut) capped = true
     for (const item of items) {
       if (!item.caseNumber) continue
       const i = at.get(item.caseNumber)
@@ -513,7 +540,7 @@ async function searchCourtCasesInternal(
   }
 
   console.log(`[court-case] found ${merged.length} cases${incomplete ? ' — INCOMPLETE: one or more sources failed' : ''}`)
-  return { cases: merged, incomplete }
+  return { cases: merged, incomplete, ...(capped ? { capped } : {}) }
 }
 
 /** the stored feed of one list endpoint: court + host + path without the company number (the number is the file) */

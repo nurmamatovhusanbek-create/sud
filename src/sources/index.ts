@@ -165,7 +165,7 @@ export const companyInfoSource = defineSource<string, CompanyInfoPayload>({
 
 // ---- court cases -------------------------------------------------------------
 
-import { searchCourtCases, searchCourtCasesDetailed, clearCourtCaseCache, getCaseDetails, type FullCaseData } from '@/lib/court-case'
+import { searchCourtCases, searchCourtCasesDetailed, clearCourtCaseCache, getCaseDetails, type CourtListResult, type FullCaseData } from '@/lib/court-case'
 
 export interface CourtSearchParams {
   courtType: CourtType
@@ -187,7 +187,7 @@ export const courtCasesSource = defineSource<CourtSearchParams, Awaited<ReturnTy
  * The same search, but it says whether it is COMPLETE: a source that failed on every proxy reads as «no cases», and an
  * incomplete list must not be kept for a day. `force` drops the 10 min memory of that list first (hard refresh).
  */
-export const courtListSource = defineSource<CourtSearchParams, { cases: Awaited<ReturnType<typeof searchCourtCases>>; incomplete: boolean }>({
+export const courtListSource = defineSource<CourtSearchParams, CourtListResult>({
   name: 'court-cases',
   run: (p, ctx) => {
     if (ctx?.force && p.mode === 'tin') clearCourtCaseCache(p.value)
@@ -196,7 +196,8 @@ export const courtListSource = defineSource<CourtSearchParams, { cases: Awaited<
   schema: z.object({
     cases: CourtCasesResponseSchema.shape.cases,
     incomplete: z.boolean(),
-  }) as unknown as z.ZodType<{ cases: Awaited<ReturnType<typeof searchCourtCases>>; incomplete: boolean }>,
+    capped: z.boolean().optional(),
+  }) as unknown as z.ZodType<CourtListResult>,
 })
 
 export const caseDetailSource = defineSource<{ courtType: CourtType; caseNumber: string }, FullCaseData>({

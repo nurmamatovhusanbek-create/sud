@@ -38,6 +38,8 @@ export interface Feed {
   etag?: string
   /** the rows are the whole list (false: some of it never arrived) */
   complete: boolean
+  /** the court's list was cut at its row limit: the rows are every row ever seen, not what the court shows now */
+  capped?: boolean
   items: CourtCase[]
 }
 
@@ -107,7 +109,7 @@ function loadFeeds(tin: string): FeedFile | null {
   const feeds: Record<string, Feed> = {}
   for (const [k, f] of Object.entries(raw.feeds)) {
     const x = f as Partial<Feed> | null
-    if (x && typeof x.t === 'number' && Array.isArray(x.items)) feeds[k] = { t: x.t, etag: typeof x.etag === 'string' ? x.etag : undefined, complete: x.complete === true, items: x.items }
+    if (x && typeof x.t === 'number' && Array.isArray(x.items)) feeds[k] = { t: x.t, etag: typeof x.etag === 'string' ? x.etag : undefined, complete: x.complete === true, ...(x.capped === true ? { capped: true } : {}), items: x.items }
   }
   const file: FeedFile = { v: 1, tin, feeds }
   remember(tin, file)

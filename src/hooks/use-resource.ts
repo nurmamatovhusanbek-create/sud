@@ -48,6 +48,8 @@ export interface ResourceMeta {
   fetchedAt?: number
   /** past its day and the sites failed: the old data is shown */
   stale?: boolean
+  /** the court's own list was cut at its row limit */
+  capped?: boolean
 }
 
 export function useResource<T>(
@@ -97,7 +99,7 @@ export function useResource<T>(
           // a PARTIAL answer (one source failed) is not cached: replaying it later would show the gaps as if that were all
           // there is, without the banner that explains them
           if (cacheKey && persist && !(res.partial && res.partial.length > 0)) setCached(cacheKey, res.data)
-          setMeta(res.meta?.fetchedAt ? { fetchedAt: res.meta.fetchedAt, ...(res.meta.stale ? { stale: true } : {}) } : null)
+          setMeta(res.meta?.fetchedAt ? { fetchedAt: res.meta.fetchedAt, ...(res.meta.stale ? { stale: true } : {}), ...(res.meta.capped ? { capped: true } : {}) } : null)
           setState(decide(res.data, res.partial ?? [], isEmptyRef.current))
         } else {
           setState({ status: 'error', error: res.error })
