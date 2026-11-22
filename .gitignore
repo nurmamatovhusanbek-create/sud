@@ -22,3 +22,6 @@ sud-explore4/
 
 # ui:shots output (docs/ui-split-plan.md M0)
 /ui-shots/
+
+# Rust bot build output
+bot/target/

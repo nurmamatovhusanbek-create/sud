@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sud tizimi</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --text:#111418; --mut:#6b7280; --line:#e3e6ea; --ink:#111418; --on-ink:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1013; --card:#171a1f; --text:#eef0f3; --mut:#98a0ab; --line:#262b32; --ink:#eef0f3; --on-ink:#0e1013; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); padding-bottom:env(safe-area-inset-bottom); }
+  header { position:sticky; top:0; background:var(--bg); padding:12px 14px 8px; z-index:2; }
+  .search { display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:0 12px; height:44px; }
+  .search input { flex:1; border:0; outline:0; background:transparent; color:var(--text); font:inherit; font-family:ui-monospace, Menlo, Consolas, monospace; min-width:0; }
+  .hint { color:var(--mut); font-size:12.5px; padding:6px 2px 0; }
+  main { padding:0 14px 24px; }
+  .list { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .row { display:flex; align-items:center; gap:10px; padding:12px; border-top:1px solid var(--line); cursor:pointer; }
+  .row:first-child { border-top:0; }
+  .row:active { background:var(--bg); }
+  .tag { font-size:11.5px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; color:var(--mut); white-space:nowrap; }
+  .key { font-family:ui-monospace, Menlo, Consolas, monospace; font-weight:600; word-break:break-all; }
+  .sub { color:var(--mut); font-size:12.5px; }
+  .grow { flex:1; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-top:10px; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-top:1px solid var(--line); }
+  .kv:first-of-type { border-top:0; }
+  .kv span:first-child { color:var(--mut); }
+  .kv span:last-child { text-align:right; word-break:break-word; }
+  button.back { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:10px; padding:8px 12px; font:inherit; }
+  h2 { font-size:16px; margin:14px 0 4px; }
+  .msg { color:var(--mut); text-align:center; padding:28px 12px; }
+  .err { color:#b42318; }
+</style>
+</head>
+<body>
+<header>
+  <div class="search"><input id="q" placeholder="Ish raqami, kvitansiya yoki STIR…" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="search"></div>
+  <div class="hint" id="hint"></div>
+</header>
+<main id="main"><div class="msg">Kamida 3 ta belgi yozing.</div></main>
+<script>
+(function () {
+  // Telegram opens a Mini App with the signed launch data in the URL fragment; it is sent with every request and checked by the server
+  var params = new URLSearchParams(location.hash.slice(1));
+  var initData = params.get('tgWebAppData') || '';
+  try { var th = JSON.parse(params.get('tgWebAppThemeParams') || '{}'); if (th.bg_color) { var r = document.documentElement.style; r.setProperty('--bg', th.secondary_bg_color || th.bg_color); r.setProperty('--card', th.bg_color); r.setProperty('--text', th.text_color || '#000'); r.setProperty('--mut', th.hint_color || '#888'); } } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var main = $('main'), hint = $('hint'), q = $('q');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function money(n) { return String(Math.round((Number(n) || 0) / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+  function dmy(ms) { if (!ms) return '-'; var d = new Date(ms + 5 * 3600000); return ('0' + d.getUTCDate()).slice(-2) + '.' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '.' + d.getUTCFullYear(); }
+  function api(path) {
+    return fetch(path, { headers: { 'x-init-data': initData } }).then(function (r) { return r.json().then(function (j) { if (!j.ok) throw new Error(j.error || r.status); return j; }); });
+  }
+  function kv(k, v) { v = v == null || v === '' || v === '-' ? '' : v; return v === '' ? '' : '<div class="kv"><span>' + esc(k) + '</span><span>' + esc(v) + '</span></div>'; }
+  if (!initData) { main.innerHTML = '<div class="msg err">Bu sahifa Telegram ichida (botning «Qidiruv» tugmasi orqali) ochilishi kerak.</div>'; q.disabled = true; return; }
+
+  var timer = 0, seq = 0, last = null;
+  function showHits(hits, info) {
+    last = { hits: hits, info: info };
+    hint.textContent = info && info.ready ? (info.indexed.toLocaleString ? String(info.indexed).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : info.indexed) + ' yozuv · ' + info.companies + ' kompaniya' : 'Zaxira yuklanmoqda…';
+    if (!hits.length) { main.innerHTML = '<div class="msg">' + (info && info.ready ? 'Topilmadi.' : 'Zaxira hali yuklanmoqda, birozdan soʻng qayta urining.') + '</div>'; return; }
+    main.innerHTML = '<div class="list">' + hits.map(function (h, i) {
+      var tag = h.kind === 'case' ? 'Ish' : h.kind === 'bill' ? 'Kvitansiya' : 'Kompaniya';
+      var sub = h.kind === 'company' ? (h.bills + ' toʻlov · ' + h.found + ' ish') : h.kind === 'bill' ? ((h.caseNumber ? 'ish ' + h.caseNumber + ' · ' : '') + h.year) : (h.court + ' · 20' + h.year);
+      return '<div class="row" data-i="' + i + '"><span class="tag">' + tag + '</span><div class="grow"><div class="key">' + esc(h.key) + '</div><div class="sub">' + esc(sub) + '</div></div></div>';
+    }).join('') + '</div>';
+  }
+  function search() {
+    var v = q.value.trim(); var mine = ++seq;
+    if (v.length < 3) { main.innerHTML = '<div class="msg">Kamida 3 ta belgi yozing.</div>'; return; }
+    api('/api/search?q=' + encodeURIComponent(v)).then(function (j) { if (mine === seq) showHits(j.hits, j.info); }).catch(function (e) { if (mine === seq) main.innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; });
+  }
+  q.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 200); });
+
+  function back() { if (last) showHits(last.hits, last.info); else main.innerHTML = ''; }
+  function wrap(html) { main.innerHTML = '<button class="back" id="back">← Orqaga</button>' + html; $('back').onclick = back; }
+  function openCase(num) {
+    main.innerHTML = '<div class="msg">Yuklanmoqda…</div>';
+    api('/api/case?num=' + encodeURIComponent(num)).then(function (j) {
+      var c = j.case, g = (c.detail && c.detail.general) || null, r = c.row || null, h = '';
+      h += '<div class="card"><div class="key">' + esc(c.num) + '</div><div class="sub">' + esc(c.court) + ' · STIR ' + esc(c.tin) + '</div>';
+      if (g) { h += kv('Holati', g.caseStatus) + kv('Turi', g.caseType) + kv('Sud', g.court) + kv('Sudya', g.judge) + kv('Daʼvogar', g.plaintiff) + kv('Javobgar', g.defendant) + kv('Daʼvo summasi', g.claimAmount) + kv('Ariza sanasi', g.applicationDate) + kv('Muddat', g.deadlineDate); }
+      else if (r) { h += kv('Holati', r.status) + kv('Sud', r.court) + kv('Daʼvogar', r.plaintiff) + kv('Javobgar', r.defendant); }
+      else { h += '<div class="sub" style="margin-top:8px">Batafsil maʼlumot zaxirada yoʻq: ish faqat kvitansiyalar orqali maʼlum.</div>'; }
+      h += '</div>';
+      var hs = c.detail && c.detail.firstInstance && c.detail.firstInstance.hearings;
+      if (hs && hs.length) { h += '<h2>Majlislar (' + hs.length + ')</h2><div class="card">' + hs.slice(0, 12).map(function (x) { return kv(x.date || x.hearingDate || '', x.result || x.status || x.time || ''); }).join('') + '</div>'; }
+      if (c.bills && c.bills.length) { h += '<h2>Kvitansiyalar</h2><div class="list">' + c.bills.map(function (b) { return '<div class="row" data-bill="' + esc(b.number) + '"><div class="grow"><div class="key">' + esc(b.number) + '</div><div class="sub">' + esc(b.cat) + ' · ' + money(b.amount) + ' · ' + esc(b.status) + '</div></div></div>'; }).join('') + '</div>'; }
+      wrap(h);
+    }).catch(function (e) { wrap('<div class="msg err">' + esc(e.message) + '</div>'); });
+  }
+  function openBill(num) {
+    main.innerHTML = '<div class="msg">Yuklanmoqda…</div>';
+    api('/api/bill?num=' + encodeURIComponent(num)).then(function (j) {
+      var b = j.bill;
+      wrap('<div class="card"><div class="key">' + esc(b.number) + '</div>' + kv('Holati', b.status) + kv('Turi', b.cat) + kv('Sud', b.court) + kv('Summa', money(b.amount)) + kv('Toʻlangan', money(b.paid)) + kv('Qoldiq', money(b.balance)) + kv('Berilgan', dmy(b.issued)) + kv('Muddat', dmy(b.overdue)) + kv('To‘lovchi', b.payer) + kv('STIR', b.tin) + (b.caseNumber ? '<div class="row" data-case="' + esc(b.caseNumber) + '"><div class="grow"><div class="sub">Ish</div><div class="key">' + esc(b.caseNumber) + '</div></div></div>' : '') + '</div>');
+    }).catch(function (e) { wrap('<div class="msg err">' + esc(e.message) + '</div>'); });
+  }
+  function openCompany(tin) {
+    main.innerHTML = '<div class="msg">Yuklanmoqda…</div>';
+    api('/api/company?tin=' + encodeURIComponent(tin)).then(function (j) {
+      var c = j.company;
+      wrap('<div class="card"><div class="key">' + esc(c.tin) + '</div>' + kv('Toʻlovlar', c.bills) + kv('Topilgan ishlar', c.found) + kv('Birinchi yuklash', dmy(c.firstAt)) + kv('Maʼlumot holati', dmy(c.refreshedAt)) + kv('Yillar', (c.years || []).sort().join(', ')) + '</div>');
+    }).catch(function (e) { wrap('<div class="msg err">' + esc(e.message) + '</div>'); });
+  }
+  main.addEventListener('click', function (ev) {
+    var t = ev.target; while (t && t !== main && !(t.dataset && (t.dataset.i || t.dataset.bill || t.dataset.case))) t = t.parentNode;
+    if (!t || t === main) return;
+    if (t.dataset.bill) return openBill(t.dataset.bill);
+    if (t.dataset.case) return openCase(t.dataset.case);
+    var h = last && last.hits[Number(t.dataset.i)]; if (!h) return;
+    if (h.kind === 'case') openCase(h.key); else if (h.kind === 'bill') openBill(h.key); else openCompany(h.tin);
+  });
+  q.focus();
+})();
+</script>
+</body>
+</html>

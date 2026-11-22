@@ -1,0 +1,27 @@
+[package]
+name = "sud-bot"
+version = "0.1.0"
+edition = "2021"
+description = "Sud tizimi: standalone Telegram bot and Mini App that searches the encrypted backup in the operator's own channel"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net"] }
+axum = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+aes-gcm = "0.10"
+scrypt = "0.11"
+hmac = "0.12"
+sha2 = "0.10"
+flate2 = "1"
+base64 = "0.22"
+hex = "0.4"
+unicode-normalization = "0.1"
+form_urlencoded = "1"
+
+[profile.release]
+opt-level = 2
+codegen-units = 8
+panic = "abort"
+strip = true
