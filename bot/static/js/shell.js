@@ -25,7 +25,7 @@ export function mountShell(headEl) {
       if (route().name === 'search') { remember({ name: 'search', q: t }); rerender() } else go({ name: 'search', q: t })
     }, 220)
   }
-  field = Field({ placeholder: 'Ish, kvitansiya yoki STIR', onInput })
+  field = Field({ placeholder: 'Ish, kvitansiya, STIR', onInput })
   const seg = h('div', {})
   const drawSeg = () => seg.replaceChildren(Segmented([{ value: 'lat', label: 'Lotin' }, { value: 'cyr', label: 'Кирил' }], getAlphabet(), (a) => { setAlphabet(a); drawSeg(); rerender() }))
   drawSeg()
