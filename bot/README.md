@@ -9,7 +9,7 @@ memory and answers in a chat and in a Telegram Mini App. It never scrapes a site
 | Variable | |
 |---|---|
 | `BOT_TOKEN` | the bot's token (@BotFather) |
-| `SUD_CHANNEL` | the channel that holds the backup (`@name` or `-100…`); the bot must be an admin there |
+| `SUD_CHANNEL` | the channel that holds the backup (`@name` or `-100…`); the bot must be an admin there. Several, comma separated: the main one first, then its mirrors; the backup is read from the first that works |
 | `SUD_PASSPHRASE` | the backup passphrase (**the host can then read your data**: use a host you trust) |
 | `ALLOWED_USER_IDS` | comma separated Telegram user ids that may use the bot. Anyone else is told their own id and nothing else |
 | `WEBHOOK_SECRET` | a long random string; part of the webhook URL and checked in Telegram's header |

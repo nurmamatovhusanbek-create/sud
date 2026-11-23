@@ -8,14 +8,18 @@ export interface TelegramInput {
   token: string
   /** the channel: `@username` of a public one, or the numeric id (`-100…`) of a private one */
   chat: string
+  /** MIRROR channels (up to 3): the same encrypted backup is kept in each, so a banned channel or a deleted manifest message does not lose it; reading falls back to them in order */
+  mirrors: string[]
 }
 
-export type TelegramInputError = 'no_token' | 'bad_token' | 'no_chat' | 'bad_chat'
+export const MAX_MIRRORS = 3
+
+export type TelegramInputError = 'no_token' | 'bad_token' | 'no_chat' | 'bad_chat' | 'too_many_mirrors'
 
 const TOKEN_RE = /^\d{6,12}:[A-Za-z0-9_-]{30,50}$/
 const CHAT_RE = /^(@[A-Za-z][A-Za-z0-9_]{4,31}|-?\d{5,20})$/
 
-export function validateTelegramInput(raw: { token?: unknown; chat?: unknown }): { ok: true; value: TelegramInput } | { ok: false; error: TelegramInputError } {
+export function validateTelegramInput(raw: { token?: unknown; chat?: unknown; mirrors?: unknown }): { ok: true; value: TelegramInput } | { ok: false; error: TelegramInputError } {
   const token = typeof raw.token === 'string' ? raw.token.trim() : ''
   const chat = typeof raw.chat === 'string' ? raw.chat.trim() : ''
   if (!token) return { ok: false, error: 'no_token' }
@@ -23,7 +27,17 @@ export function validateTelegramInput(raw: { token?: unknown; chat?: unknown }):
   // the chat may be left out while the token is only being tested («Kanalni topish»): the caller decides
   if (!chat) return { ok: false, error: 'no_chat' }
   if (!CHAT_RE.test(chat)) return { ok: false, error: 'bad_chat' }
-  return { ok: true, value: { token, chat } }
+  // mirrors: a list of channels (or a comma / newline separated text); the primary and repeats are dropped
+  const list = Array.isArray(raw.mirrors) ? raw.mirrors : typeof raw.mirrors === 'string' ? raw.mirrors.split(/[\s,;]+/) : []
+  const mirrors: string[] = []
+  for (const m of list) {
+    const c = typeof m === 'string' ? m.trim() : ''
+    if (!c) continue
+    if (!CHAT_RE.test(c)) return { ok: false, error: 'bad_chat' }
+    if (c !== chat && !mirrors.includes(c)) mirrors.push(c)
+  }
+  if (mirrors.length > MAX_MIRRORS) return { ok: false, error: 'too_many_mirrors' }
+  return { ok: true, value: { token, chat, mirrors } }
 }
 
 /** the token's shape alone (for «find my channel», before a channel is chosen) */
@@ -38,6 +52,7 @@ export const TELEGRAM_ERROR_TEXT: Record<string, string> = {
   bad_token: 'Token notoʻgʻri koʻrinishda (123456789:AA… shaklida boʻlishi kerak)',
   no_chat: 'Kanal kerak (@nom yoki -100… raqami)',
   bad_chat: 'Kanal notoʻgʻri koʻrinishda (@nom yoki -100… raqami)',
+  too_many_mirrors: 'Zaxira kanallar koʻpi bilan 3 ta boʻlishi mumkin',
 }
 
 // ---- what Telegram's answers mean -------------------------------------------------------------------------------------

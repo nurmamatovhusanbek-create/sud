@@ -2,8 +2,9 @@
 
 pub struct Config {
     pub token: String,
-    /// the channel that holds the backup: `@name` or `-100…`
-    pub chat: String,
+    /// the channels that hold the backup, the main one first, then its mirrors: `@name` or `-100…` (SUD_CHANNEL, comma separated). The backup is read
+    /// from the first channel that works.
+    pub channels: Vec<String>,
     pub pass: String,
     /// Telegram user ids allowed to use the bot and the Mini App (comma separated)
     pub allowed: Vec<i64>,
@@ -28,7 +29,7 @@ impl Config {
         let need = |k: &str| env(k).ok_or_else(|| format!("{k} oʻrnatilmagan"));
         Ok(Config {
             token: need("BOT_TOKEN")?,
-            chat: need("SUD_CHANNEL")?,
+            channels: need("SUD_CHANNEL")?.split(',').map(|c| c.trim().to_string()).filter(|c| !c.is_empty()).collect(),
             pass: need("SUD_PASSPHRASE")?,
             allowed: env("ALLOWED_USER_IDS").map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect()).unwrap_or_default(),
             webhook_secret: need("WEBHOOK_SECRET")?,
@@ -49,7 +50,7 @@ impl Config {
     pub fn for_tests() -> Config {
         Config {
             token: "123456789:AAFakeFakeFakeFakeFakeFakeFakeFake_x1Yz".into(),
-            chat: "-100123".into(),
+            channels: vec!["-100123".into()],
             pass: "a fine long pass phrase".into(),
             allowed: vec![4242],
             webhook_secret: "testsecrettestsecret".into(),

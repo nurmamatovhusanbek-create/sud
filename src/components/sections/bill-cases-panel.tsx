@@ -72,6 +72,15 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
           {st.coverage !== null ? ` · taxminiy qamrov ${Math.round(st.coverage * 1000) / 10}%` : ''}
         </div>
       )}
+      {st && st.passes.length > 0 && st.passes[st.passes.length - 1]!.links && (() => {
+        const l = st.passes[st.passes.length - 1]!.links!
+        return (
+          <div style={{ marginTop: 4, color: 'var(--text-2)', fontSize: 12.5 }}>
+            Ish raqamisiz kvitansiyalar saqlanmaydi (oxirgi oʻtishda): {fmt(l.claimCost)} tasi daʼvo xarajati (pochta, video, sud toʻlovlari: ish hali ochilmagan), {fmt(l.unlinked)} tasi boshqa
+            {l.text > 0 ? `; ${fmt(l.text)} tasida ish raqami tavsifdan olindi` : ''}.
+          </div>
+        )
+      })()}
       {wait > 0 && <div style={{ marginTop: 6, color: 'var(--text-2)' }}>Sud tizimi javob bermadi: {wait} soniyadan keyin qayta uriniladi ({job?.lastError}).</div>}
       {(paused || failed) && job?.lastError && <div style={{ marginTop: 6, color: 'var(--neg-text)' }}>{job.lastError}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>

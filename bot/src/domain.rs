@@ -123,6 +123,11 @@ pub struct Info {
     pub backup_at: Option<String>,
     pub synced_at: i64,
     pub failures: u32,
+    /// which channel the data is read from: 0 = the main one, 1.. = a mirror (the main one is down or has no readable manifest)
+    pub channel: usize,
+    pub channels: usize,
+    /// why the main channel is not used, when a mirror is
+    pub degraded: Option<String>,
 }
 
 /// an upcoming hearing (from a company's `hearings:<tin>` bucket)

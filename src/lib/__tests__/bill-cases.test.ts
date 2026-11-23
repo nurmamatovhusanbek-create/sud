@@ -207,6 +207,22 @@ describe('load', () => {
     expect(lib.billCasesStatus(TIN).passes[0]).toMatchObject({ pass: 0, size: 10_000, rows: 25_000, added: 25_000 })
   })
 
+  test('bills with no case are told apart: claim costs, other bills, and a case number taken from the description are counted; only bills with a case are stored', async () => {
+    const mk = (extra: Record<string, unknown>) => ({ ...bill(null, 'CITIZEN', 'Почта харажатлари'), isInFavor: true, decisionDate: null, description: 'Почта харажатлари', ...extra })
+    bigTotal = 5
+    pagesFor = (page) => (page === 0 ? [
+      bill('2-1004-2603/1'),
+      mk({}), mk({}), // claim costs
+      mk({ payCategory: 'Давлат божи', description: 'Давлат божи', isInFavor: false }), // owed state duty with no case: «other»
+      mk({ description: '10.12.2021 санадаги 4-1001-2129/44390-сонли ҳал қилув қарори' }), // the number is in the text
+    ] : [])
+    const st = await run({})
+    const p = lib.billCasesStatus(TIN).passes[0]
+    expect(p?.links).toEqual({ text: 1, claimCost: 2, unlinked: 1 })
+    expect(bills.billCountOf(TIN)).toBe(2) // the bill with the case and the one recovered from its text
+    expect(st.state).toBe('done')
+  })
+
   test('an empty page inside the range is an error, not the end', async () => {
     const orig = PAGES[1]
     PAGES[1] = []

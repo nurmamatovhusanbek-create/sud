@@ -13,7 +13,7 @@ export const telegramFile = (): string => process.env.TELEGRAM_CONFIG_FILE || pa
 
 export function readTelegram(): TelegramInput | null {
   try {
-    const raw = JSON.parse(fs.readFileSync(telegramFile(), 'utf8')) as { token?: unknown; chat?: unknown }
+    const raw = JSON.parse(fs.readFileSync(telegramFile(), 'utf8')) as { token?: unknown; chat?: unknown; mirrors?: unknown }
     const v = validateTelegramInput(raw)
     return v.ok ? v.value : null
   } catch {
@@ -25,7 +25,7 @@ export function saveTelegram(v: TelegramInput): void {
   const file = telegramFile()
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
   const tmp = `${file}.${process.pid}.tmp`
-  fs.writeFileSync(tmp, JSON.stringify({ token: v.token, chat: v.chat, savedAt: new Date().toISOString() }, null, 2), { mode: 0o600 })
+  fs.writeFileSync(tmp, JSON.stringify({ token: v.token, chat: v.chat, mirrors: v.mirrors, savedAt: new Date().toISOString() }, null, 2), { mode: 0o600 })
   fs.renameSync(tmp, file) // never a half-written token
 }
 
@@ -40,10 +40,11 @@ export function removeTelegram(): void {
 export interface TelegramStatus {
   configured: boolean
   chat: string
+  mirrors: string[]
   tokenHint: string
 }
 
 export function telegramStatus(): TelegramStatus {
   const t = readTelegram()
-  return t ? { configured: true, chat: t.chat, tokenHint: tokenHint(t.token) } : { configured: false, chat: '', tokenHint: '' }
+  return t ? { configured: true, chat: t.chat, mirrors: t.mirrors, tokenHint: tokenHint(t.token) } : { configured: false, chat: '', mirrors: [], tokenHint: '' }
 }

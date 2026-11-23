@@ -4,9 +4,9 @@ import { readTelegram } from './telegram-config'
 
 /** The form's body → a setting the server may use. An empty token field means «keep the saved token» (so the channel can change without retyping it). */
 export async function readTelegramBody(req: Request, opts: { needChat: boolean }): Promise<{ ok: true; value: TelegramInput } | { ok: false; error: TelegramInputError | 'bad_body' }> {
-  let raw: { token?: unknown; chat?: unknown }
+  let raw: { token?: unknown; chat?: unknown; mirrors?: unknown }
   try {
-    raw = (await req.json()) as { token?: unknown; chat?: unknown }
+    raw = (await req.json()) as { token?: unknown; chat?: unknown; mirrors?: unknown }
   } catch {
     return { ok: false, error: 'bad_body' }
   }
@@ -16,7 +16,8 @@ export async function readTelegramBody(req: Request, opts: { needChat: boolean }
   if (!opts.needChat) {
     if (!token) return { ok: false, error: 'no_token' }
     if (!isTelegramToken(token)) return { ok: false, error: 'bad_token' }
-    return { ok: true, value: { token, chat: '' } }
+    return { ok: true, value: { token, chat: '', mirrors: [] } }
   }
-  return validateTelegramInput({ token, chat: raw.chat })
+  // a body with no `mirrors` keeps the saved ones; an empty list clears them
+  return validateTelegramInput({ token, chat: raw.chat, mirrors: 'mirrors' in raw ? raw.mirrors : readTelegram()?.mirrors })
 }

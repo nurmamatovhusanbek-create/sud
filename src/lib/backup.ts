@@ -92,19 +92,19 @@ function unexpected(what: string, e: unknown): void {
 
 export type StartResult = { ok: true } | { ok: false; error: string }
 
-function precheck(passphrase: string): StartResult | { ok: true; token: string; chat: string } {
+function precheck(passphrase: string): StartResult | { ok: true; token: string; chat: string; chats: string[] } {
   if (backupBusy()) return { ok: false, error: 'Zaxira jarayoni allaqachon ketmoqda' }
   if (typeof passphrase !== 'string' || passphrase.length < MIN_PASSPHRASE) return { ok: false, error: `Parol kamida ${MIN_PASSPHRASE} belgi boʻlishi kerak` }
   const tg = readTelegram()
   if (!tg) return { ok: false, error: 'Avval Telegram botini saqlang (Sozlamalar › Telegram)' }
-  return { ok: true, token: tg.token, chat: tg.chat }
+  return { ok: true, token: tg.token, chat: tg.chat, chats: [tg.chat, ...tg.mirrors] }
 }
 
 export function startBackup(passphrase: string): StartResult {
   const pre = precheck(passphrase)
   if (!('token' in pre)) return pre
   g.__sudBackup = { ...fresh(), kind: 'backup', phase: 'snapshot', message: 'Nusxa olinmoqda…', startedAt: Date.now() }
-  void runBackup(passphrase, pre.token, pre.chat).catch((e) => unexpected('zaxira', e))
+  void runBackupAll(passphrase, pre.token, pre.chats).catch((e) => unexpected('zaxira', e))
   return { ok: true }
 }
 
@@ -112,7 +112,7 @@ export function startRestore(passphrase: string): StartResult {
   const pre = precheck(passphrase)
   if (!('token' in pre)) return pre
   g.__sudBackup = { ...fresh(), kind: 'restore', phase: 'download', message: 'Manifest qidirilmoqda…', startedAt: Date.now() }
-  void runRestore(passphrase, pre.token, pre.chat).catch((e) => unexpected('tiklash', e))
+  void withFallback(pre.chats, (c) => runRestore(passphrase, pre.token, c)).catch((e) => unexpected('tiklash', e))
   return { ok: true }
 }
 
@@ -184,6 +184,56 @@ async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limi
     m = older && older.v === 2 ? older : null
   }
   return out
+}
+
+/**
+ * MIRROR channels: the backup is kept in the main channel AND in each mirror, every one with its OWN chain (own manifest, own pinned message, own
+ * pieces: a file id from one channel means nothing in another, and a banned channel takes its files with it). Each channel is brought up to date
+ * in turn; a channel that fails does not stop the others (a banned main channel is exactly when the mirror matters), and the result says which worked.
+ */
+async function runBackupAll(passphrase: string, token: string, chats: string[]): Promise<void> {
+  const outcomes: Array<{ chat: string; ok: boolean; message: string; result: BackupResult | null }> = []
+  for (const [i, chat] of chats.entries()) {
+    set({ phase: 'snapshot', done: 0, total: 0, result: null, finishedAt: 0, message: i === 0 ? 'Nusxa olinmoqda…' : `Zaxira kanal ${i}/${chats.length - 1} yangilanmoqda…` })
+    await runBackup(passphrase, token, chat)
+    const s = state()
+    outcomes.push({ chat, ok: s.phase === 'done', message: s.message, result: s.result })
+    if (!outcomes[i]!.ok && /Parol/.test(s.message)) break // a wrong passphrase is wrong for every channel's chain
+  }
+  if (chats.length === 1) return
+  const okN = outcomes.filter((o) => o.ok).length
+  const line = outcomes.map((o, i) => `${i === 0 ? 'asosiy' : 'zaxira'} ${o.chat}: ${o.ok ? 'tayyor' : `xato (${o.message})`}`).join(' · ')
+  try {
+    const last = getDb().prepare('SELECT v FROM meta WHERE k = ?').get('last_backup')
+    if (last) getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...(JSON.parse(String(last.v)) as object), channels: outcomes.map((o) => ({ chat: o.chat, ok: o.ok })) }))
+  } catch {
+    /* the summary is a convenience */
+  }
+  set({
+    phase: okN > 0 ? 'done' : 'error',
+    result: outcomes.find((o) => o.ok)?.result ?? null,
+    finishedAt: Date.now(),
+    message: okN === chats.length ? `Tayyor: ${chats.length} ta kanalga zaxira olindi (${line})` : okN > 0 ? `Qisman: ${okN}/${chats.length} kanalga olindi: ${line}` : line,
+  })
+}
+
+/**
+ * Run a read (restore, load) against each channel in turn until one does not fail: the main channel first, then the mirrors. A wrong passphrase stops
+ * at once (it is wrong for every channel). A failed attempt is reported in the message of the next one, so it is never silent that a mirror was used.
+ */
+async function withFallback(chats: string[], op: (chat: string) => Promise<void>): Promise<void> {
+  let failed = ''
+  for (const [i, chat] of chats.entries()) {
+    await op(chat)
+    const s = state()
+    const last = i === chats.length - 1
+    if (s.phase !== 'error' || last || /Parol/.test(s.message)) {
+      if (i > 0 && s.phase === 'done') set({ message: `${s.message} (asosiy kanal ishlamadi: ${failed}; zaxira kanal ${chat} ishlatildi)` })
+      return
+    }
+    failed = s.message
+    set({ phase: 'download', finishedAt: 0, done: 0, total: 0, message: `Kanal ishlamadi (${s.message}); zaxira kanal sinalmoqda…` })
+  }
 }
 
 async function runBackup(passphrase: string, token: string, chat: string): Promise<void> {
@@ -428,9 +478,17 @@ async function restoreV1(m: Manifest, key: Buffer, token: string, dest: string):
 export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true; catalog: Catalog; index: SyncResult | null; indexError?: string } | { ok: false; error: string }> {
   const pre = precheck(passphrase)
   if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre
-  const prev = await pinnedManifest(pre.token, pre.chat, passphrase, 'Parol notoʻgʻri (yoki manifest shikastlangan)')
-  if (!prev.ok) return prev
-  if (!prev.value) return { ok: false, error: 'Kanalda mahkamlangan zaxira yoʻq' }
+  // the main channel first; when it has no readable pinned manifest (banned, message deleted) the mirrors in order; a wrong passphrase stops at once
+  let prev: Awaited<ReturnType<typeof pinnedManifest>> = { ok: true, value: null }
+  const why: string[] = []
+  for (const chat of pre.chats) {
+    prev = await pinnedManifest(pre.token, chat, passphrase, 'Parol notoʻgʻri (yoki manifest shikastlangan)')
+    if (prev.ok && prev.value) break
+    if (!prev.ok && /Parol/.test(prev.error)) return prev
+    why.push(`${chat}: ${prev.ok ? 'mahkamlangan zaxira yoʻq' : prev.error}`)
+  }
+  if (!prev.ok) return { ok: false, error: why.join(' · ') }
+  if (!prev.value) return { ok: false, error: `Kanalda mahkamlangan zaxira yoʻq${why.length > 1 ? ` (${why.join(' · ')})` : ''}` }
   if (prev.value.m.v !== 2) return { ok: false, error: 'Kanaldagi zaxira eski formatda: kompaniyalarni tanlab boʻlmaydi (yangi zaxira oling)' }
   const catalog = buildCatalog(prev.value.m)
   saveCatalog(catalog)
@@ -448,7 +506,7 @@ export function startLoad(passphrase: string, tins: unknown): StartResult {
   if (!list.length || list.length > 50) return { ok: false, error: 'Kamida bitta (koʻpi bilan 50 ta) kompaniyani tanlang' }
   if (billJobRunning()) return { ok: false, error: 'Toʻlovlarni oʻqish jarayoni ketmoqda: avval uni toʻxtating' }
   g.__sudBackup = { ...fresh(), kind: 'load', phase: 'download', message: 'Manifest qidirilmoqda…', startedAt: Date.now() }
-  void runLoad(passphrase, pre.token, pre.chat, list).catch((e) => unexpected('yuklash', e))
+  void withFallback(pre.chats, (c) => runLoad(passphrase, pre.token, c, list)).catch((e) => unexpected('yuklash', e))
   return { ok: true }
 }
 
@@ -518,7 +576,7 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
   })
 }
 
-export function lastBackup(): { created: string; chunks: number; buckets?: number; reused?: number; dbBytes: number; uploadedBytes: number; pinned: boolean } | null {
+export function lastBackup(): { channels?: Array<{ chat: string; ok: boolean }>; created: string; chunks: number; buckets?: number; reused?: number; dbBytes: number; uploadedBytes: number; pinned: boolean } | null {
   try {
     const r = getDb().prepare("SELECT v FROM meta WHERE k = 'last_backup'").get()
     return r ? JSON.parse(String(r.v)) : null

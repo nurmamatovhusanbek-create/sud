@@ -43,7 +43,7 @@ mod sync {
         assert_eq!(b.channel.downloads.load(Ordering::SeqCst), before);
 
         // a second backup: the first company's locator grew by one case, the other company is untouched
-        publish(&b.channel, &b.pass, 2, &buckets(true));
+        publish(&b.channel, MAIN, &b.pass, 2, &buckets(true));
         let msg = sh.sync().await.unwrap();
         assert!(msg.contains("1 ta indeks"), "{msg}");
         // the manifest itself + one index bucket
@@ -72,7 +72,7 @@ mod sync {
     async fn a_company_that_left_the_backup_leaves_the_locator() {
         let (sh, b) = ready_bot().await;
         let only_first: Vec<_> = buckets(false).into_iter().filter(|(n, _)| !n.ends_with(OTHER_TIN)).collect();
-        publish(&b.channel, &b.pass, 3, &only_first);
+        publish(&b.channel, MAIN, &b.pass, 3, &only_first);
         sh.sync().await.unwrap();
         assert!(sh.search("2-1503-2503", 5).await.is_empty());
     }
@@ -150,6 +150,103 @@ mod service {
         let (a, c) = tokio::join!(sh.bucket_text(&name), sh.bucket_text(&name));
         assert!(a.unwrap().is_some() && c.unwrap().is_some());
         assert_eq!(b.channel.downloads.load(Ordering::SeqCst), before + 1);
+    }
+}
+
+mod mirrors {
+    use super::*;
+    use crate::state::Shared;
+
+    async fn ready_mirrored() -> (std::sync::Arc<Shared>, Backup) {
+        let (b, cfg) = mirrored();
+        let sh = bot_with(cfg, &b);
+        sh.sync().await.expect("sync");
+        (sh, b)
+    }
+
+    #[tokio::test]
+    async fn with_a_healthy_main_channel_the_mirror_is_not_touched() {
+        let (sh, _b) = ready_mirrored().await;
+        let i = sh.info().await;
+        assert_eq!((i.channel, i.channels, i.degraded), (0, 2, None));
+    }
+
+    #[tokio::test]
+    async fn a_banned_main_channel_moves_the_bot_to_the_mirror_and_it_keeps_answering() {
+        let (b, cfg) = mirrored();
+        b.channel.kill(MAIN);
+        let sh = bot_with(cfg, &b);
+        let msg = sh.sync().await.unwrap();
+        assert!(msg.contains(&format!("zaxira kanaldan ({MIRROR})")), "{msg}");
+        let i = sh.info().await;
+        assert!(i.ready && i.channel == 1 && i.degraded.as_deref().unwrap().contains(MAIN));
+        assert_eq!(sh.search("2-1004-2503", 5).await.len(), 2);
+        assert_eq!(sh.case_view(CASE).await.unwrap().detail["general"]["plaintiff"], "Daʼvogar MCHJ"); // buckets come from the mirror too
+    }
+
+    #[tokio::test]
+    async fn a_deleted_manifest_message_or_a_deleted_index_piece_also_moves_it() {
+        let (b, cfg) = mirrored();
+        b.channel.unpin(MAIN);
+        let sh = bot_with(cfg, &b);
+        assert!(sh.sync().await.is_ok() && sh.info().await.channel == 1);
+
+        let (b2, cfg2) = mirrored();
+        let victim = b2.channel.files_of(MAIN).into_iter().find(|f| !f.starts_with("MANIFEST")).unwrap();
+        b2.channel.delete_file(&victim);
+        let sh2 = bot_with(cfg2, &b2);
+        // some piece of the main channel is gone: if it is an index piece the sync falls over to the mirror, otherwise it is read on demand
+        sh2.sync().await.expect("sync");
+        assert_eq!(sh2.search("2-1004-2503", 5).await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_piece_that_vanishes_later_is_read_from_the_mirror_on_demand() {
+        let (sh, b) = ready_mirrored().await;
+        for f in b.channel.files_of(MAIN).into_iter().filter(|f| !f.starts_with("MANIFEST")) {
+            b.channel.delete_file(&f); // every piece of the main channel is gone while its manifest is still cached in memory
+        }
+        let p = sh.company_bills(TIN, 2025, "", 0, 10).await.unwrap();
+        assert_eq!(p.total, 2);
+        assert_eq!(sh.info().await.channel, 0); // still reading the main manifest: only this bucket came from the mirror
+    }
+
+    #[tokio::test]
+    async fn once_on_the_mirror_an_unchanged_pin_downloads_nothing() {
+        let (b, cfg) = mirrored();
+        b.channel.kill(MAIN);
+        let sh = bot_with(cfg, &b);
+        sh.sync().await.unwrap();
+        let before = b.channel.downloads.load(Ordering::SeqCst);
+        assert_eq!(sh.sync().await.unwrap(), "oʻzgarmagan");
+        assert_eq!(b.channel.downloads.load(Ordering::SeqCst), before);
+        assert!(sh.info().await.degraded.is_some()); // and the health still says the main channel is not used
+    }
+
+    #[tokio::test]
+    async fn a_wrong_passphrase_is_not_retried_on_the_mirror_and_all_channels_down_names_each() {
+        let (b, mut cfg) = mirrored();
+        cfg.pass = "a completely different phrase".into();
+        let sh = bot_with(cfg, &b);
+        assert!(matches!(sh.sync().await, Err(crate::backup::BackupError::WrongPassphrase)));
+
+        let (b2, cfg2) = mirrored();
+        b2.channel.kill(MAIN);
+        b2.channel.kill(MIRROR);
+        let sh2 = bot_with(cfg2, &b2);
+        let e = sh2.sync().await.unwrap_err().to_string();
+        assert!(e.contains(MAIN) && e.contains(MIRROR), "{e}");
+        assert!(!sh2.info().await.ready);
+    }
+
+    #[tokio::test]
+    async fn the_status_message_says_when_a_mirror_is_used() {
+        let (b, cfg) = mirrored();
+        b.channel.kill(MAIN);
+        let sh = bot_with(cfg, &b);
+        sh.sync().await.unwrap();
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/status" } })).await;
+        assert!(sh.outbox.captured()[0].text.contains("zaxira kanaldan oʻqilmoqda"));
     }
 }
 

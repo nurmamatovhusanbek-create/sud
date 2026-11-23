@@ -11,6 +11,7 @@
  */
 
 import { normalizeCourtType, type ApiCourtType } from './billing-format'
+import { linkOfBill } from './bill-link'
 import type { CourtCase, FullCaseData } from '@/lib/court-case-types'
 
 /** the same shape the routes accept (`X-XXXX-XXXX/XXXXX`) */
@@ -39,7 +40,7 @@ export function extractBillCases(rows: readonly unknown[], into: Map<string, Bil
   for (const r of rows) {
     if (!r || typeof r !== 'object') continue
     const o = r as Record<string, unknown>
-    const caseNumber = str(o.claimCaseNumber)
+    const caseNumber = linkOfBill(o).caseNumber ?? ''
     if (!CASE_NUMBER.test(caseNumber)) continue
     // billing's own court type first; a type the case API has no word for (MILITARY, unknown) falls back to what the number says
     const courtType = normalizeCourtType(str(o.courtType)) ?? courtTypeOfNumber(caseNumber)

@@ -89,22 +89,40 @@ impl Tg {
     }
 }
 
-/// An in-memory channel: a pinned document and a map of files. The tests build a whole sealed backup in it.
+/// An in-memory set of channels: each has a pinned document and its own files; a channel can be «killed» (banned) or lose its pin. The tests build
+/// whole sealed backups in it.
 #[derive(Default)]
 pub struct MemoryChannel {
-    pub pinned: Mutex<Option<(i64, String)>>,
-    pub files: Mutex<HashMap<String, Vec<u8>>>,
+    pinned: Mutex<HashMap<String, (i64, String)>>,
+    /// file id → (the channel it was sent to, bytes): a file id of one channel means nothing in another
+    files: Mutex<HashMap<String, (String, Vec<u8>)>>,
+    dead: Mutex<std::collections::HashSet<String>>,
     /// how many files were asked for (a test checks that an unchanged backup downloads nothing)
     pub downloads: AtomicUsize,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 impl MemoryChannel {
-    pub fn put(&self, file_id: &str, bytes: Vec<u8>) {
-        self.files.lock().unwrap().insert(file_id.to_string(), bytes);
+    pub fn put(&self, chat: &str, file_id: &str, bytes: Vec<u8>) {
+        self.files.lock().unwrap().insert(file_id.to_string(), (chat.to_string(), bytes));
     }
-    pub fn pin(&self, message_id: i64, file_id: &str) {
-        *self.pinned.lock().unwrap() = Some((message_id, file_id.to_string()));
+    pub fn pin(&self, chat: &str, message_id: i64, file_id: &str) {
+        self.pinned.lock().unwrap().insert(chat.to_string(), (message_id, file_id.to_string()));
+    }
+    /// the channel is banned: every call about it and every file of it fails
+    pub fn kill(&self, chat: &str) {
+        self.dead.lock().unwrap().insert(chat.to_string());
+    }
+    /// the pinned message is deleted
+    pub fn unpin(&self, chat: &str) {
+        self.pinned.lock().unwrap().remove(chat);
+    }
+    /// one file is deleted
+    pub fn delete_file(&self, file_id: &str) {
+        self.files.lock().unwrap().remove(file_id);
+    }
+    pub fn files_of(&self, chat: &str) -> Vec<String> {
+        self.files.lock().unwrap().iter().filter(|(_, (c, _))| c == chat).map(|(id, _)| id.clone()).collect()
     }
 }
 
@@ -119,7 +137,12 @@ impl Source {
     pub async fn pinned_document(&self, chat: &str) -> Result<Option<(i64, String)>, String> {
         match self {
             Source::Telegram(t) => t.pinned_document(chat).await,
-            Source::Memory(m) => Ok(m.pinned.lock().unwrap().clone()),
+            Source::Memory(m) => {
+                if m.dead.lock().unwrap().contains(chat) {
+                    return Err("Forbidden: bot was kicked from the channel chat".into());
+                }
+                Ok(m.pinned.lock().unwrap().get(chat).cloned())
+            }
         }
     }
 
@@ -128,7 +151,11 @@ impl Source {
             Source::Telegram(t) => t.file_bytes(file_id).await,
             Source::Memory(m) => {
                 m.downloads.fetch_add(1, Ordering::SeqCst);
-                m.files.lock().unwrap().get(file_id).cloned().ok_or_else(|| "Fayl topilmadi".to_string())
+                let found = m.files.lock().unwrap().get(file_id).cloned();
+                match found {
+                    Some((chat, bytes)) if !m.dead.lock().unwrap().contains(&chat) => Ok(bytes),
+                    _ => Err("Fayl topilmadi".to_string()),
+                }
             }
         }
     }

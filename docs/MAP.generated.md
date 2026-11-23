@@ -71,7 +71,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | File | Imported by | Tests |
 |---|---|---|
 | `age.ts` | components/company/context-bar.tsx | core/__tests__/age.test.ts |
-| `bill-cases.ts` | core/bill-rows.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/case-store.ts, lib/db-buckets.ts, lib/db-import.ts | core/__tests__/bill-cases.test.ts, lib/__tests__/db.test.ts |
+| `bill-cases.ts` | core/bill-link.ts, core/bill-rows.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/case-store.ts, lib/db-buckets.ts, lib/db-import.ts | core/__tests__/bill-cases.test.ts, lib/__tests__/db.test.ts |
+| `bill-link.ts` | core/bill-cases.ts, core/bill-rows.ts, lib/bill-cases.ts | core/__tests__/bill-link.test.ts |
 | `bill-passes.ts` | lib/bill-cases.ts | core/__tests__/bill-passes.test.ts |
 | `bill-rows.ts` | api/bills/export/route, api/bills/query/route, components/sections/bills.tsx, lib/api-types.ts, lib/bill-cases.ts, lib/bills-store.ts, lib/db-import.ts | core/__tests__/bill-rows.test.ts, lib/__tests__/bills-store.test.ts |
 | `billing-format.ts` | api/bills/export/route, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/found-cases.tsx, components/sections/overview.tsx, core/bill-cases.ts, core/bill-rows.ts, +4 | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |

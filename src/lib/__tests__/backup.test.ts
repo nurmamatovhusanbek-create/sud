@@ -132,7 +132,7 @@ const ms = (iso: string) => Date.parse(iso)
 beforeEach(() => {
   dbm.closeDb()
   for (const n of fs.readdirSync(DIR)) fs.rmSync(path.join(DIR, n), { force: true })
-  cfg.saveTelegram({ token: TOKEN, chat: '@my_channel' })
+  cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
   const db = dbm.getDb()
   const bill = db.prepare('INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, ctype, kind, yymm, hay, cat, court) VALUES (?, ?, 0, ?, ?, 100, ?, ?, ?, ?, ?, ?, ?)')
   // random filler so every year bucket is several pieces at the 4 KiB piece size
@@ -458,5 +458,143 @@ describe('the locator: search the Telegram copy without loading a company', () =
     expect((await backup.readRemoteCatalog('some other pass phrase')).ok).toBe(false)
     expect(index.searchLocator('2-1004')).toMatchObject({ hits: [], indexed: 0, companies: 0 })
     expect(index.searchLocator('ab').hits).toEqual([])
+  })
+})
+
+/** several fake channels in one Bot API: every chat keeps its own files and pinned message; a chat can be «banned» (everything of it fails) or lose its pin */
+function fakeChannels() {
+  const files = new Map<string, { chat: string; bytes: Uint8Array }>()
+  const msgs = new Map<string, { chat: string; fileId: string; name: string }>()
+  const pinned = new Map<string, string>() // chat → message key
+  const banned = new Set<string>()
+  const sentTo = new Map<string, number>()
+  let next = 1
+  const gone = (id: string) => new Response(JSON.stringify({ ok: false, error_code: 403, description: 'Forbidden: bot was kicked from the channel chat' }))
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const u = String(url)
+    const json = (v: unknown) => new Response(JSON.stringify(v))
+    if (u.includes('/file/bot')) {
+      const f = files.get(u.split('/file/bot')[1]!.split('/').slice(1).join('/'))
+      return f && !banned.has(f.chat) ? new Response(f.bytes as BodyInit) : new Response('', { status: 404 })
+    }
+    const method = u.split('/').pop()!
+    if (method === 'sendDocument') {
+      const form = init!.body as FormData
+      const chat = String(form.get('chat_id'))
+      if (banned.has(chat)) return gone(chat)
+      const blob = form.get('document') as File
+      const id = `F${next}`
+      files.set(id, { chat, bytes: new Uint8Array(await blob.arrayBuffer()) })
+      msgs.set(`${chat}#${next}`, { chat, fileId: id, name: blob.name })
+      sentTo.set(chat, (sentTo.get(chat) ?? 0) + 1)
+      return json({ ok: true, result: { message_id: next++, document: { file_id: id } } })
+    }
+    const b = JSON.parse(String(init!.body))
+    const chat = String(b.chat_id)
+    if (method === 'getFile') {
+      const f = files.get(b.file_id)
+      return f && !banned.has(f.chat) ? json({ ok: true, result: { file_path: b.file_id } }) : json({ ok: false, error_code: 400, description: 'Bad Request: wrong file_id' })
+    }
+    if (banned.has(chat)) return gone(chat)
+    if (method === 'pinChatMessage') {
+      pinned.set(chat, `${chat}#${b.message_id}`)
+      return json({ ok: true, result: true })
+    }
+    if (method === 'getChat') {
+      const key = pinned.get(chat)
+      const m = key ? msgs.get(key) : undefined
+      return json({ ok: true, result: { id: -1001, type: 'channel', pinned_message: m ? { message_id: Number(key!.split('#')[1]), document: { file_id: m.fileId, file_name: m.name } } : undefined } })
+    }
+    return json({ ok: false, error_code: 404, description: 'Not Found' })
+  }) as typeof fetch
+  return { files, banned, sentTo, unpin: (chat: string) => pinned.delete(chat) }
+}
+
+describe('mirror channels: a banned channel or a deleted manifest message does not lose the backup', () => {
+  const MAIN = '@my_channel'
+  const MIRROR = '@backup_channel'
+  beforeEach(() => cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [MIRROR] }))
+
+  test('one backup fills BOTH channels, each with its own chain, and says so', async () => {
+    const ch = fakeChannels()
+    const done = await runBackup()
+    expect(done.phase).toBe('done')
+    expect(done.message).toContain('2 ta kanalga')
+    expect(ch.sentTo.get(MAIN)).toBeGreaterThan(5)
+    expect(ch.sentTo.get(MIRROR)).toBe(ch.sentTo.get(MAIN)) // the same pieces and a manifest in each
+    expect(backup.lastBackup()?.channels).toEqual([{ chat: MAIN, ok: true }, { chat: MIRROR, ok: true }])
+    // the channels share no file: a file id of one means nothing in the other
+    const owners = new Set([...ch.files.values()].map((f) => f.chat))
+    expect(owners).toEqual(new Set([MAIN, MIRROR]))
+  })
+
+  test('the main channel is banned: the catalog, the locator, a load and a restore all come from the mirror', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    ch.banned.add(MAIN)
+    const cat = await backup.readRemoteCatalog(PASS)
+    expect(cat.ok && cat.catalog.companies.map((c) => c.tin)).toEqual([TIN])
+    backup.startRestore(PASS)
+    const r = await finished()
+    expect(r.phase).toBe('done')
+    expect(r.message).toContain(`zaxira kanal ${MIRROR} ishlatildi`)
+    const copy = dbm.openDbFile(r.result!.restoredFile!)
+    expect(allBuckets(copy)).toEqual(allBuckets(dbm.getDb()))
+    copy.close()
+    dbm.getDb().prepare('DELETE FROM bills WHERE tin = ?').run(TIN)
+    expect(backup.startLoad(PASS, [TIN]).ok).toBe(true)
+    expect((await finished()).phase).toBe('done')
+    expect(dbm.getDb().prepare('SELECT COUNT(*) n FROM bills WHERE tin = ?').get(TIN)?.n).toBe(600)
+  })
+
+  test('the pinned manifest message of the main channel is deleted: the mirror is read', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    ch.unpin(MAIN)
+    const cat = await backup.readRemoteCatalog(PASS)
+    expect(cat.ok).toBe(true)
+    backup.startRestore(PASS)
+    expect((await finished()).phase).toBe('done')
+  })
+
+  test('a piece deleted from the main channel while its manifest is alive: the restore falls to the mirror', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    const victim = [...ch.files.entries()].find(([, f]) => f.chat === MAIN)![0]
+    ch.files.delete(victim)
+    backup.startRestore(PASS)
+    const r = await finished()
+    expect(r.phase).toBe('done')
+    expect(r.message).toContain('zaxira kanal')
+  })
+
+  test('a banned main channel does not stop the mirror from being updated, and the result says what worked', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    ch.banned.add(MAIN)
+    dbm.getDb().prepare("UPDATE bills SET status = 'USED' WHERE number = 'b5'").run()
+    const done = await runBackup()
+    expect(done.phase).toBe('done')
+    expect(done.message).toContain('Qisman: 1/2')
+    expect(backup.lastBackup()?.channels).toEqual([{ chat: MAIN, ok: false }, { chat: MIRROR, ok: true }])
+    backup.startRestore(PASS)
+    const r = await finished()
+    const copy = dbm.openDbFile(r.result!.restoredFile!)
+    expect(copy.prepare("SELECT status FROM bills WHERE number = 'b5'").get()?.status).toBe('USED')
+    copy.close()
+  })
+
+  test('every channel down is an error that names each of them; a wrong passphrase is not retried on the mirror', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    const bad = await runBackup('some other pass phrase')
+    expect(bad.phase).toBe('error')
+    expect(bad.message).toContain('Parol')
+    ch.banned.add(MAIN)
+    ch.banned.add(MIRROR)
+    const none = await backup.readRemoteCatalog(PASS)
+    expect(none.ok).toBe(false)
+    expect(!none.ok && none.error).toContain(MAIN)
+    expect(!none.ok && none.error).toContain(MIRROR)
   })
 })

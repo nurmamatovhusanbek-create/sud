@@ -42,13 +42,24 @@ describe('input', () => {
   })
 })
 
+describe('mirror channels', () => {
+  test('a list or a comma separated text; the primary and repeats are dropped; at most three; a bad one is refused', () => {
+    const v = (mirrors: unknown) => validateTelegramInput({ token: TOKEN, chat: '@my_channel', mirrors })
+    expect(v(undefined)).toEqual({ ok: true, value: { token: TOKEN, chat: '@my_channel', mirrors: [] } })
+    expect(v(['@a_mirror', '-1001234567890', '@my_channel', '@a_mirror'])).toMatchObject({ ok: true, value: { mirrors: ['@a_mirror', '-1001234567890'] } })
+    expect(v('@a_mirror, -1001234567890\n@third_one')).toMatchObject({ ok: true, value: { mirrors: ['@a_mirror', '-1001234567890', '@third_one'] } })
+    expect(v(['@a_mirror', '@b_mirror', '@c_mirror', '@d_mirror'])).toEqual({ ok: false, error: 'too_many_mirrors' })
+    expect(v(['not a channel'])).toEqual({ ok: false, error: 'bad_chat' })
+  })
+})
+
 describe('saved file', () => {
   test('saved with 0600; status never carries the token; forget removes it', () => {
     expect(cfg.telegramStatus().configured).toBe(false)
-    cfg.saveTelegram({ token: TOKEN, chat: '@my_channel' })
+    cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: ['@backup_channel'] })
     if (process.platform !== 'win32') expect(fs.statSync(cfg.telegramFile()).mode & 0o777).toBe(0o600)
     const s = cfg.telegramStatus()
-    expect(s).toEqual({ configured: true, chat: '@my_channel', tokenHint: '123456789:••••x1Yz' })
+    expect(s).toEqual({ configured: true, chat: '@my_channel', mirrors: ['@backup_channel'], tokenHint: '123456789:••••x1Yz' })
     expect(JSON.stringify(s)).not.toContain('AAFake')
     expect(cfg.readTelegram()?.token).toBe(TOKEN)
     cfg.removeTelegram()

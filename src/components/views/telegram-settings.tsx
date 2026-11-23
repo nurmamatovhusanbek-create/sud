@@ -46,7 +46,7 @@ function BackupCard({ configured }: { configured: boolean }) {
       <div className="card-h">
         <div className="ico"><DatabaseBackup /></div>
         <h2>Shifrlangan zaxira</h2>
-        {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.buckets ?? last.chunks} boʻlak{last.reused ? ` (${last.reused} ta oʻzgarmagan)` : ''}{last.pinned ? '' : ' · mahkamlanmagan'}</span>}
+        {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.buckets ?? last.chunks} boʻlak{last.reused ? ` (${last.reused} ta oʻzgarmagan)` : ''}{last.pinned ? '' : ' · mahkamlanmagan'}{last.channels && last.channels.length > 1 ? ` · ${last.channels.filter((c) => c.ok).length}/${last.channels.length} kanal` : ''}</span>}
       </div>
       <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
         Baza kompaniya va yil boʻyicha boʻlaklarga ajratiladi; har bir boʻlak siqiladi, parolingiz bilan AES-256 yordamida shifrlanadi va kanalga joylanadi.
@@ -143,6 +143,8 @@ export function TelegramTab() {
   const { status, busy, out, channels, find, test, save, forget } = useTelegram()
   const [token, setToken] = useState('')
   const [chat, setChat] = useState('')
+  const [mirrors, setMirrors] = useState<string | null>(null) // null = untouched: the saved mirrors stay
+  const mirrorFirst = (mirrors ?? status?.mirrors.join(' ') ?? '').split(/[\s,;]+/).find(Boolean) ?? ''
   const chatNow = chat.trim() || status?.chat || ''
   const haveToken = !!token.trim() || !!status?.configured
 
@@ -152,7 +154,7 @@ export function TelegramTab() {
         <div className="card-h">
           <div className="ico"><Send /></div>
           <h2>Telegram (zaxira kanali)</h2>
-          {status?.configured && <span className="badge b-pos" style={{ marginLeft: 'auto' }}>{status.chat} · {status.tokenHint}</span>}
+          {status?.configured && <span className="badge b-pos" style={{ marginLeft: 'auto' }}>{status.chat}{status.mirrors.length ? ` + ${status.mirrors.length} zaxira` : ''} · {status.tokenHint}</span>}
         </div>
         <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
           Bazaning shifrlangan nusxalari oʻz Telegram kanalingizga joylanadi. @BotFather orqali bot yarating, kanalni yarating va botni unga admin qiling
@@ -175,6 +177,20 @@ export function TelegramTab() {
           <label className="field" style={{ height: 40 }}>
             <input value={chat} onChange={(e) => setChat(e.target.value)} placeholder={status?.chat ? `Kanal (${status.chat})` : 'Kanal: @nom yoki -100… raqami'} spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
           </label>
+          <label className="field" style={{ height: 40 }}>
+            <input
+              value={mirrors ?? ''}
+              onChange={(e) => setMirrors(e.target.value)}
+              placeholder={status?.mirrors.length ? `Zaxira kanallar (${status.mirrors.join(', ')}): oʻzgartirish uchun yozing, tozalash uchun boʻsh joy` : 'Zaxira kanal (ixtiyoriy, 3 tagacha, vergul bilan): @nom yoki -100…'}
+              spellCheck={false}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}
+            />
+          </label>
+          <p className="faint" style={{ fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+            Zaxira kanal: har bir zaxira asosiy kanalga ham, shu kanallarga ham alohida joylanadi (har birida oʻz manifesti). Asosiy kanal bloklansa yoki manifest xabari
+            oʻchib ketsa, oʻqish (tiklash, kompaniyalarni yuklash, qidiruv) avtomatik zaxira kanaldan davom etadi. Botni zaxira kanalga ham admin qiling. Botdagi
+            <span className="mono"> SUD_CHANNEL</span> ga ham vergul bilan yozing.
+          </p>
         </div>
 
         {channels && channels.length > 0 && (
@@ -197,9 +213,15 @@ export function TelegramTab() {
             {busy === 'test' ? <span className="spinner" /> : <FlaskConical />}
             Sinash
           </button>
+          {mirrorFirst && (
+            <button className="btn btn-outline" onClick={() => void test(token, mirrorFirst)} disabled={!haveToken || !!busy}>
+              <FlaskConical />
+              Zaxira kanalni sinash
+            </button>
+          )}
           <button
             className="btn btn-primary"
-            onClick={() => void save(token, chatNow).then((ok) => ok && (setToken(''), setChat('')))}
+            onClick={() => void save(token, chatNow, mirrors).then((ok) => ok && (setToken(''), setChat(''), setMirrors(null)))}
             disabled={!haveToken || !chatNow || !!busy}
           >
             {busy === 'save' ? <span className="spinner" /> : null}

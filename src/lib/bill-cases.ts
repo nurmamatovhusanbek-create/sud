@@ -18,12 +18,13 @@
  */
 
 import { rowFromDetail } from '@/core/bill-cases'
+import { tallyLinks } from '@/core/bill-link'
 import { searchBillsByInn } from './billing'
 import { toBillRow } from '@/core/bill-rows'
 import { getCaseLean, type CaseLean } from './court-case'
 import type { CourtCase, CourtType } from './court-case-types'
 import { addFound, feedCaseNumbers, openFoundQueue, readFoundRow, triedStats, writeDetail } from './case-store'
-import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, readPasses, recordPass, setKnownFeed, writeBillsPage } from './bills-store'
+import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, readPasses, recordPass, type PassLog, setKnownFeed, writeBillsPage } from './bills-store'
 import { ensureCompany, markRefreshed, readCompany } from './company-meta'
 import { estimateCoverage, passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 
@@ -106,7 +107,7 @@ export interface BillCasesStatus {
   refreshedAt: number
   lastAdded: number
   /** what each pass of the load added (evidence that the union converges) and the estimated share of the company's bills with a case that is stored */
-  passes: Array<{ pass: number; size: number; rows: number; added: number; overlap: number; at: number }>
+  passes: PassLog[]
   coverage: number | null
   /** distinct cases the stored bills name */
   billCases: number
@@ -281,6 +282,7 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
         if (stopped()) return
         const size = passSize(passIndex)
         const counts = { rows: 0, overlap: 0, added: 0, total: 0 }
+        const links = tallyLinks([])
         // every bill number this pass has read (bills WITHOUT a case are not stored, so the database cannot tell a repeat): kept here. A pass resumed in
         // another process has lost the earlier pages' numbers: it is never called stable (another pass follows)
         const seen = new Set<string>()
@@ -335,13 +337,14 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
           // novelty: bills with a case that no earlier read stored (before this page is written)
           const ov = pageOverlap(tin, pass, rows.map((r) => r.number))
           counts.rows += all.length
+          tallyLinks(res.content, links)
           counts.overlap += repeated
           counts.added += ov.added
           const last = page + 1 >= totalPages
           let verdict = last ? passVerdict(counts, passIndex) : { done: false, stable: false }
           if (last && resumedMidPass && verdict.stable) verdict = { done: false, stable: false }
           writeBillsPage(tin, pass, page, rows, { totalElements: res.totalElements, totalPages, pageSize: size }, verdict, deps.now())
-          if (last) recordPass(tin, { pass: passIndex, size, rows: counts.rows, added: counts.added, overlap: counts.overlap, at: deps.now() })
+          if (last) recordPass(tin, { pass: passIndex, size, rows: counts.rows, added: counts.added, overlap: counts.overlap, at: deps.now(), links: { text: links.text, claimCost: links.claimCost, unlinked: links.unlinked } })
           s.page = page + 1
           if (last) {
             s.stable = verdict.stable

@@ -10,6 +10,7 @@ import type { TelegramStepResult } from '@/core/telegram'
 export interface TgStatus {
   configured: boolean
   chat: string
+  mirrors: string[]
   tokenHint: string
 }
 export interface TgTest {
@@ -87,10 +88,11 @@ export function useTelegram() {
     }
   }
 
-  const save = async (token: string, chat: string): Promise<boolean> => {
+  /** `mirrors`: null keeps the saved mirror channels; a text («@a, -100…») replaces them (empty clears) */
+  const save = async (token: string, chat: string, mirrors: string | null = null): Promise<boolean> => {
     setBusy('save')
     try {
-      const r = await unwrap<TgStatus>(await post('/api/settings/telegram', { token, chat }))
+      const r = await unwrap<TgStatus>(await post('/api/settings/telegram', mirrors === null ? { token, chat } : { token, chat, mirrors }))
       if (r.ok) {
         setStatus(r.data)
         toast.success('Saqlandi')

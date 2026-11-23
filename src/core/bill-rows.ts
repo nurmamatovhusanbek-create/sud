@@ -11,7 +11,8 @@
  */
 
 import { categoryLabel, normalizeCourtType, type ApiCourtType, type CheckStatusResponse } from './billing-format'
-import { CASE_NUMBER, courtTypeOfNumber } from './bill-cases'
+import { courtTypeOfNumber } from './bill-cases'
+import { linkOfBill } from './bill-link'
 
 export interface BillRow {
   number: string
@@ -50,7 +51,6 @@ export function toBillRow(raw: unknown): BillRow | null {
   const o = raw as Record<string, unknown>
   const number = str(o.number)
   if (!/^\d{6,}$/.test(number)) return null
-  const caseNumber = str(o.claimCaseNumber)
   return {
     number,
     status: str(o.invoiceStatus),
@@ -65,7 +65,7 @@ export function toBillRow(raw: unknown): BillRow | null {
     court: str(o.court),
     courtId: num(o.courtId),
     courtType: str(o.courtType),
-    caseNumber: CASE_NUMBER.test(caseNumber) ? caseNumber : null,
+    caseNumber: linkOfBill(o).caseNumber, // billing's own field, else the number its description names (core/bill-link)
     decision: num(o.decisionDate),
     desc: str(o.description),
     payer: str(o.payer),

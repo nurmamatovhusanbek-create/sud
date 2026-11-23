@@ -15,11 +15,18 @@ pub const OTHER_TIN: &str = "207324986";
 pub const CASE: &str = "2-1004-2503/8020";
 pub const BILL: &str = "260880770031";
 
-const SALT: [u8; 16] = [7; 16];
+pub const MAIN: &str = "-100123";
+pub const MIRROR: &str = "-100456";
 
-fn key(pass: &str) -> Key {
-    static K: OnceLock<Key> = OnceLock::new();
-    *K.get_or_init(|| derive_key(pass, &SALT).unwrap())
+/// every channel is its own chain with its own salt (so its own key and bucket ids), as a second backup chain really is
+fn salt_of(chat: &str) -> [u8; 16] {
+    [if chat == MAIN { 7 } else { 9 }; 16]
+}
+
+fn key(pass: &str, chat: &str) -> Key {
+    static K: OnceLock<Mutex<std::collections::HashMap<(String, [u8; 16]), Key>>> = OnceLock::new();
+    let salt = salt_of(chat);
+    *K.get_or_init(Default::default).lock().unwrap().entry((pass.to_string(), salt)).or_insert_with(|| derive_key(pass, &salt).unwrap())
 }
 
 fn gz(b: &[u8]) -> Vec<u8> {
@@ -68,28 +75,41 @@ pub struct Backup {
 }
 
 /// seal `buckets` and the manifest into a channel and pin the manifest (message id and file id change with `version`)
-pub fn publish(channel: &Arc<MemoryChannel>, pass: &str, version: u32, content: &[(String, String)]) {
-    let k = key(pass);
+pub fn publish(channel: &Arc<MemoryChannel>, chat: &str, pass: &str, version: u32, content: &[(String, String)]) {
+    let k = key(pass, chat);
     let mut bs = Vec::new();
     for (name, text) in content {
         let id = bucket_id(&k, text.as_bytes());
         let piece = seal(&k, &gz(text.as_bytes()), &bucket_aad(&id, 0));
-        let file_id = format!("F-{id}");
-        channel.put(&file_id, piece.clone());
+        let file_id = format!("F{chat}-{id}");
+        channel.put(chat, &file_id, piece.clone());
         bs.push(json!({ "name": name, "id": id, "rows": text.lines().count(), "bytes": text.len(), "parts": [{ "fileId": file_id, "messageId": 1, "size": piece.len(), "sha256": sha256_hex(&piece) }] }));
     }
     let m = json!({ "v": 2, "id": format!("m{version}"), "created": "2026-11-22T10:00:00.000Z", "app": "sud-tizimi", "prev": null,
         "companies": { TIN: { "firstAt": 1_774_000_000_000i64, "refreshedAt": 1_774_827_370_376i64 }, OTHER_TIN: { "firstAt": 1, "refreshedAt": 2 } }, "buckets": bs });
-    let file_id = format!("MANIFEST-{version}");
-    channel.put(&file_id, seal_manifest(&k, &SALT, m.to_string().as_bytes()));
-    channel.pin(version as i64, &file_id);
+    let file_id = format!("MANIFEST{chat}-{version}");
+    channel.put(chat, &file_id, seal_manifest(&k, &salt_of(chat), m.to_string().as_bytes()));
+    channel.pin(chat, version as i64, &file_id);
 }
 
 pub fn backup() -> Backup {
     let cfg = Config::for_tests();
     let channel = Arc::new(MemoryChannel::default());
-    publish(&channel, &cfg.pass, 1, &buckets(false));
+    publish(&channel, MAIN, &cfg.pass, 1, &buckets(false));
     Backup { channel, pass: cfg.pass }
+}
+
+/// the same backup in the main channel and in a mirror (each its own chain), and a config that lists both
+pub fn mirrored() -> (Backup, Config) {
+    let b = backup();
+    publish(&b.channel, MIRROR, &b.pass, 1, &buckets(false));
+    let mut cfg = Config::for_tests();
+    cfg.channels = vec![MAIN.into(), MIRROR.into()];
+    (b, cfg)
+}
+
+pub fn bot_with(cfg: Config, b: &Backup) -> Arc<Shared> {
+    Shared::with(cfg, Source::Memory(b.channel.clone()), Outbox::Capture(Mutex::new(Vec::new())))
 }
 
 /// a bot over an in-memory channel and a capturing outbox, not yet synced

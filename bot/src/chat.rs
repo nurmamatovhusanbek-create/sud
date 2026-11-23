@@ -245,8 +245,9 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
     }
     match cmd {
         "/status" => {
+            let mirror = if info.channel > 0 { "\nEslatma: asosiy kanal ishlamayapti, zaxira kanaldan oʻqilmoqda.".to_string() } else { String::new() };
             let degraded = if info.failures > 0 { format!("\nOxirgi {} ta yangilash muvaffaqiyatsiz: eski zaxiradan javob beryapman.", info.failures) } else { String::new() };
-            sh.outbox.send(chat, &format!("Zaxira: {}\nYozuvlar: {} · kompaniyalar: {}{degraded}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
+            sh.outbox.send(chat, &format!("Zaxira: {}\nYozuvlar: {} · kompaniyalar: {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
         }
         "/app" => match &sh.cfg.public_url {
             Some(u) => sh.outbox.send(chat, "Qidiruv oynasini oching:", Some(json!({ "inline_keyboard": [[{ "text": "Qidiruv", "web_app": { "url": format!("{u}/app") } }]] }))).await,

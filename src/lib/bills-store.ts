@@ -51,6 +51,8 @@ export interface PassLog {
   added: number
   overlap: number
   at: number
+  /** of the rows read: case numbers taken from the description, claim costs (postal etc.), other bills with no case (`core/bill-link`); older logs have none */
+  links?: { text: number; claimCost: number; unlinked: number }
 }
 
 /** what each pass of the load read and added: the evidence that the union is converging (kept in `meta`, per company) */
