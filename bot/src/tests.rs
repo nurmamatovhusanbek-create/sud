@@ -306,6 +306,24 @@ mod names {
     }
 
     #[tokio::test]
+    async fn a_recorded_name_that_does_not_look_like_the_party_names_does_not_hide_the_side() {
+        // the bills name a branch («ANOR» МЧЖ), the courts write the parent company as the defendant of every case: the learned name settles the side
+        let b = backup();
+        let t = today(now());
+        let rows: Vec<String> = (0..6).map(|i| json!([format!("2-1004-2503/{}", 2000 + i), "civil", add_days(t, i), "10:00", "first", "Тайинлаш", format!("Firma{i} Savdo MChJ"), "Butunlay Boshqacha Nom AJ", 1]).to_string() + "\n").collect();
+        let mut content = buckets(false);
+        content.retain(|(n, _)| !n.starts_with("hearings:"));
+        content.push((format!("hearings:{TIN}"), rows.concat()));
+        publish(&b.channel, MAIN, &b.pass, 2, &content);
+        let sh = bot(&b);
+        sh.sync().await.unwrap();
+        let l = sh.hearings(t, add_days(t, 6)).await.unwrap();
+        assert_eq!(l.len(), 6);
+        assert!(l.iter().all(|h| h.role == "defendant" && h.counterparty.starts_with("Firma")), "{l:?}");
+        assert_eq!(sh.name_of(TIN).await, "«ANOR» МЧЖ"); // the displayed name is still the recorded one
+    }
+
+    #[tokio::test]
     async fn without_a_recorded_name_it_is_learned_from_the_cases() {
         let b = backup();
         publish_named(&b.channel, MAIN, &b.pass, 2, &buckets(false), None);

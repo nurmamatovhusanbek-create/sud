@@ -77,6 +77,17 @@ pub fn side_by_name(company: &str, plaintiff: &str, defendant: &str) -> Side {
     }
 }
 
+/// The side from SEVERAL names of the same company (the one its bills spell, the one its cases use): the first name that settles it wins.
+pub fn side_by_aliases(aliases: &[String], plaintiff: &str, defendant: &str) -> Side {
+    for a in aliases {
+        let s = side_by_name(a, plaintiff, defendant);
+        if !s.role.is_empty() {
+            return s;
+        }
+    }
+    Side::default()
+}
+
 /// The side when the case detail names the parties' TINs: exact, and it wins over any name.
 pub fn side_by_tin(tin: &str, plaintiff: &str, plaintiff_tin: &str, defendant: &str, defendant_tin: &str) -> Side {
     if !tin.is_empty() && plaintiff_tin == tin && defendant_tin != tin {
@@ -139,6 +150,14 @@ mod tests {
         assert_eq!(side_by_name("ANOR TEXTILE MChJ", "ANOR TEXTILE", "ANOR TEXTILE MChJ").role, ""); // both: not known
         assert_eq!(side_by_name("ANOR TEXTILE MChJ", "A MChJ", "B MChJ").role, ""); // neither
         assert_eq!(side_by_name("", "A", "B").role, ""); // no name
+    }
+
+    #[test]
+    fn several_names_of_one_company_the_first_that_settles_it_wins() {
+        let names = vec!["Капиталбанк филиали Термиз".to_string(), "«КАПИТАЛ БАНК» АТБ".to_string()];
+        let s = side_by_aliases(&names, "Боshqa МЧЖ", "«КАПИТАЛ БАНК» АТБ");
+        assert_eq!((s.role, s.counterparty.as_str()), ("defendant", "Боshqa МЧЖ"));
+        assert_eq!(side_by_aliases(&[], "A", "B").role, "");
     }
 
     #[test]

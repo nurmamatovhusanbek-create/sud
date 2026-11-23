@@ -5,7 +5,7 @@ use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, Compan
 use crate::error::{AppError, AppResult};
 use crate::index::is_case_like;
 use crate::date::add_days;
-use crate::party::{learn_name, side_by_name, side_by_tin, Side};
+use crate::party::{learn_name, side_by_aliases, side_by_tin, Side};
 use crate::state::Shared;
 
 /// the furthest the hearings are looked at (days from today)
@@ -59,6 +59,21 @@ impl Shared {
         let Ok(Some(t)) = self.bucket_text(&format!("hearings:{tin}")).await else { return String::new() };
         let parties: Vec<(String, String)> = rows(&t).iter().map(|r| (str_at(r, 6).to_string(), str_at(r, 7).to_string())).collect();
         learn_name(&parties).unwrap_or_default()
+    }
+
+    /// Every name the company goes by: the one its bills spell (the displayed one) and the one its cases use (the party that is in most of them): a
+    /// branch or a short form in one does not hide the company in the other.
+    pub async fn aliases_of(&self, tin: &str) -> Vec<String> {
+        let mut out = vec![self.name_of(tin).await];
+        if let Ok(Some(t)) = self.bucket_text(&format!("hearings:{tin}")).await {
+            let parties: Vec<(String, String)> = rows(&t).iter().map(|r| (str_at(r, 6).to_string(), str_at(r, 7).to_string())).collect();
+            if let Some(l) = learn_name(&parties) {
+                out.push(l);
+            }
+        }
+        out.retain(|n| !n.trim().is_empty());
+        out.dedup();
+        out
     }
 
     pub async fn company(&self, tin: &str) -> Option<Company> {
@@ -251,7 +266,7 @@ impl Shared {
         let mut side = if g.is_object() { side_by_tin(&e.tin, &js(g, "plaintiff"), &js(g, "plaintiffTin"), &js(g, "defendant"), &js(g, "defendantTin")) } else { Side::default() };
         if side.role.is_empty() {
             let src = if g.is_object() { g } else { &row };
-            side = side_by_name(&company_name, &js(src, "plaintiff"), &js(src, "defendant"));
+            side = side_by_aliases(&self.aliases_of(&e.tin).await, &js(src, "plaintiff"), &js(src, "defendant"));
         }
         Ok(CaseView { num: num.to_string(), court: e.court.clone(), tin: e.tin.clone(), year: e.yy, detail, row, bills, companies: entries.iter().map(|x| x.tin.clone()).collect(), company_name, role: side.role, counterparty: side.counterparty })
     }
@@ -266,13 +281,13 @@ impl Shared {
         let mut out = Vec::new();
         for (name, tin) in names {
             let Some(t) = self.bucket_text(&name).await.map_err(Self::upstream)? else { continue };
-            let company = self.name_of(&tin).await;
+            let aliases = self.aliases_of(&tin).await;
             for r in rows(&t) {
                 let day = r.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 if day < from || day > to {
                     continue;
                 }
-                let Side { role, counterparty } = side_by_name(&company, str_at(&r, 6), str_at(&r, 7));
+                let Side { role, counterparty } = side_by_aliases(&aliases, str_at(&r, 6), str_at(&r, 7));
                 out.push(Hearing { tin: tin.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into(), role, counterparty });
             }
         }
