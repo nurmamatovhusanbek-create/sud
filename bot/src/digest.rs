@@ -17,13 +17,20 @@ pub fn due(now_secs: i64, last: u32) -> Option<u32> {
     (s >= SEND_AT && s < SEND_AT + WINDOW && day != last).then_some(day)
 }
 
-/// the text of the message, or None when there is nothing to say (no hearing in the next seven days: silence, not «nothing»)
+/// the most hearings listed in the message itself (a hundred do not fit in one Telegram message; the rest is one tap away in the Mini App)
+const LISTED: usize = 25;
+
+/// The text of the message, or None when there is nothing to say (no hearing in the next seven days: silence, not «nothing»). `hearings` is the whole
+/// week; the message lists the first few and says how many more there are.
 pub fn text(hearings: &[crate::domain::Hearing], today: u32, backup_at: Option<&str>) -> Option<String> {
     if hearings.is_empty() {
         return None;
     }
     let mut out = format!("📅 Yaqin majlislar (7 kun): {} ta\n\n", hearings.len());
-    out.push_str(&fmt_hearing_block(hearings, today));
+    out.push_str(&fmt_hearing_block(&hearings[..hearings.len().min(LISTED)], today));
+    if hearings.len() > LISTED {
+        out.push_str(&format!("\n… va yana {} ta: pastdagi tugma bilan hammasini oching.", hearings.len() - LISTED));
+    }
     if let Some(at) = backup_at.filter(|a| a.len() >= 10) {
         out.push_str(&format!("\nMaʼlumot {} holatiga (zaxira).", crate::chat::dmy_iso(at)));
     }
@@ -41,7 +48,7 @@ pub async fn run(sh: Arc<Shared>) {
             continue; // the backup is not read yet: try again next minute (inside the window)
         }
         last = day;
-        let list = match sh.hearings(day, add_days(day, 7)).await {
+        let list = match sh.hearings(day, add_days(day, 6)).await {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("[bot] ertalabki xabar: {}", e.message());
@@ -49,8 +56,9 @@ pub async fn run(sh: Arc<Shared>) {
             }
         };
         let Some(body) = text(&list, day, info.backup_at.as_deref()) else { continue };
+        let button = sh.cfg.public_url.as_ref().map(|u| serde_json::json!({ "inline_keyboard": [[{ "text": "Majlislar Mini App'da", "web_app": { "url": format!("{u}/app?tab=hearings") } }]] }));
         for user in &sh.cfg.allowed {
-            sh.outbox.send(*user, &body, None).await;
+            sh.outbox.send(*user, &body, button.clone()).await;
         }
     }
 }
@@ -80,6 +88,17 @@ mod tests {
     #[test]
     fn nothing_to_say_is_silence() {
         assert_eq!(text(&[], 20_261_123, None), None);
+    }
+
+    #[test]
+    fn a_crowded_week_lists_the_first_few_and_says_how_many_more_and_fits_a_message() {
+        let list: Vec<Hearing> = (0..120).map(|i| h(20_261_123 + (i % 5) as u32, "10:00", &format!("2-1004-2503/{i}"))).collect();
+        let mut sorted = list.clone();
+        sorted.sort_by_key(|x| x.day);
+        let t = text(&sorted, 20_261_123, None).unwrap();
+        assert!(t.starts_with("📅 Yaqin majlislar (7 kun): 120 ta"));
+        assert!(t.contains("… va yana 95 ta") && t.len() < 4096, "{}", t.len());
+        assert_eq!(t.matches("⏰").count(), 25);
     }
 
     #[test]

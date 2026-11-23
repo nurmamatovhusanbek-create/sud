@@ -47,6 +47,7 @@
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
 
   --tap-size: 44px;
+  --tabbar-height: 58px;
   --content-width: 720px;
   --border-width: 1px;
 

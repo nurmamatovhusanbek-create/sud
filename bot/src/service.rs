@@ -1,10 +1,14 @@
 //! The questions the bot answers, over the locator in memory and the buckets fetched on demand. Pure of HTTP and chat: `http/` and `chat.rs` only
 //! call these and format the result.
 
-use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, CompanyHit, Hearing, Overview, YearCount};
+use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, CompanyHit, Hearing, HearingCompany, HearingPage, Overview, YearBills, YearCount};
 use crate::error::{AppError, AppResult};
 use crate::index::is_case_like;
+use crate::date::add_days;
 use crate::state::Shared;
+
+/// the furthest the hearings are looked at (days from today)
+pub const MAX_HEARING_DAYS: u32 = 90;
 use serde_json::Value;
 use std::{collections::BTreeMap, io::Read};
 
@@ -48,6 +52,7 @@ impl Shared {
         let s = self.st.read().await;
         let m = s.manifest.as_ref()?;
         let (mut bills, mut found, mut listed, mut years) = (0usize, 0usize, 0usize, Vec::new());
+        let mut bill_years: Vec<YearBills> = Vec::new();
         let mut known = false;
         for b in &m.buckets {
             let p: Vec<&str> = b.name.split(':').collect();
@@ -60,6 +65,9 @@ impl Shared {
                     bills += b.rows;
                     if let Some(y) = p.get(2) {
                         years.push(y.to_string());
+                        if let Ok(year) = y.parse::<u32>() {
+                            bill_years.push(YearBills { year, bills: b.rows });
+                        }
                     }
                 }
                 "found" => found += b.rows,
@@ -72,8 +80,9 @@ impl Shared {
         }
         years.sort();
         years.dedup();
+        bill_years.sort_by(|a, b| b.year.cmp(&a.year));
         let d = m.companies.get(tin);
-        Some(Company { tin: tin.to_string(), bills, found, listed, years, first_at: d.map(|d| d.first_at).unwrap_or(0), refreshed_at: d.map(|d| d.refreshed_at).unwrap_or(0) })
+        Some(Company { tin: tin.to_string(), bills, found, listed, years, bill_years, first_at: d.map(|d| d.first_at).unwrap_or(0), refreshed_at: d.map(|d| d.refreshed_at).unwrap_or(0) })
     }
 
     pub async fn companies(&self) -> Vec<Company> {
@@ -237,6 +246,35 @@ impl Shared {
         }
         out.sort_by(|a, b| a.day.cmp(&b.day).then(a.time.cmp(&b.time)).then(a.case_number.cmp(&b.case_number)));
         Ok(out)
+    }
+
+    /// One page of the upcoming hearings of the next `days` days (today included), for one company (`tin`, empty = all) and a text (a part of a case
+    /// number or of a party's name, in Latin), plus the company cards and the range counts the tab shows around it. The whole list is small (a few
+    /// hundred rows from a handful of buckets, cached), so the filters run in memory; only `limit` rows travel to the phone.
+    pub async fn hearing_page(&self, today: u32, days: u32, tin: &str, q: &str, offset: usize, limit: usize) -> AppResult<HearingPage> {
+        let days = days.clamp(1, MAX_HEARING_DAYS);
+        let all = self.hearings(today, add_days(today, i64::from(MAX_HEARING_DAYS) - 1)).await?;
+        let q = crate::translit::to_latin(q.trim()).to_lowercase();
+        let wanted = |h: &Hearing| q.is_empty() || [&h.case_number, &h.plaintiff, &h.defendant].iter().any(|f| crate::translit::to_latin(f).to_lowercase().contains(&q));
+        let matching: Vec<Hearing> = all.into_iter().filter(wanted).collect();
+        let last = add_days(today, i64::from(days) - 1);
+        let in_range: Vec<&Hearing> = matching.iter().filter(|h| h.day <= last).collect();
+
+        let mut companies: Vec<HearingCompany> = Vec::new();
+        for h in &in_range {
+            match companies.iter_mut().find(|c| c.tin == h.tin) {
+                Some(c) => c.count += 1,
+                None => companies.push(HearingCompany { tin: h.tin.clone(), count: 1, next_day: h.day, next_time: h.time.clone() }),
+            }
+        }
+        companies.sort_by(|a, b| b.count.cmp(&a.count).then(a.tin.cmp(&b.tin)));
+
+        let scoped: Vec<&Hearing> = matching.iter().filter(|h| tin.is_empty() || h.tin == tin).collect();
+        let ranges = [1u32, 7, 14, 30, 60, MAX_HEARING_DAYS].into_iter().map(|d| (d, scoped.iter().filter(|h| h.day <= add_days(today, i64::from(d) - 1)).count())).collect();
+        let rows_all: Vec<&Hearing> = scoped.into_iter().filter(|h| h.day <= last).collect();
+        let total = rows_all.len();
+        let rows = rows_all.into_iter().skip(offset).take(limit).cloned().collect();
+        Ok(HearingPage { today, days, total, rows, companies, ranges })
     }
 
     pub async fn bill_view(&self, number: &str) -> AppResult<Bill> {

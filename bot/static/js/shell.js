@@ -3,7 +3,9 @@ import { h } from './ui/h.js'
 import { Field } from './ui/components.js'
 import { icon } from './ui/icons.js'
 import { dmyIso, num } from './core/format.js'
-import { go, remember, route, rerender } from './core/router.js'
+import { go, onRoute, remember, route, rerender } from './core/router.js'
+import { TabBar } from './ui/components.js'
+import { TABS } from './screens/common.js'
 
 let hint = null
 let hintRight = null
@@ -15,7 +17,15 @@ export function setHint(info) {
   hintRight.textContent = info?.backupAt ? `zaxira ${dmyIso(info.backupAt)}` : ''
 }
 
+/** the bottom bar follows the route: a tab is marked only on the home screen, a detail screen marks none */
+function mountTabBar() {
+  const bar = document.getElementById('tabbar')
+  if (!bar) return
+  onRoute((r) => bar.replaceChildren(...TabBar(TABS, r.name === 'home' ? r.tab || 'hearings' : null, (tab) => go({ name: 'home', tab }))))
+}
+
 export function mountShell(headEl) {
+  mountTabBar()
   let timer = 0
   const onInput = (v) => {
     clearTimeout(timer)

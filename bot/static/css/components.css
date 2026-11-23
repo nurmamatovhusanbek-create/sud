@@ -118,3 +118,33 @@ button.bars__row:active { background: var(--color-wash); }
 /* ---- a day heading over the hearings of that day ---- */
 .day-label { margin: var(--space-2) var(--space-1) var(--space-1); font-size: var(--text-sm); font-weight: var(--weight-medium); }
 .row__sub { overflow-wrap: anywhere; }
+
+/* ---- the bottom tab bar ---- */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; background: var(--color-surface); border-top: var(--border-width) solid var(--color-line); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar__item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: var(--tabbar-height); border: 0; background: transparent; color: var(--color-text-muted); font-size: var(--text-xs); }
+.tabbar__item[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); box-shadow: inset 0 2px 0 var(--color-text); }
+
+/* ---- chips that scroll sideways instead of wrapping ---- */
+.chips--scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--space-4)); padding: 0 var(--space-4); }
+.chips--scroll::-webkit-scrollbar { display: none; }
+.chips--scroll .chip { flex: none; }
+
+/* ---- cards to choose one from (swipe sideways) ---- */
+.cardrow { display: flex; gap: var(--space-2); overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: var(--space-4); scrollbar-width: none; margin: 0 calc(-1 * var(--space-4)); padding: 0 var(--space-4); }
+.cardrow::-webkit-scrollbar { display: none; }
+.cardrow--wrap { flex-wrap: wrap; overflow: visible; margin: var(--space-2) 0 0; padding: 0; }
+.mcard { flex: none; scroll-snap-align: start; min-width: 124px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: var(--space-3); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-2); background: var(--color-surface); color: var(--color-text); }
+.mcard[aria-pressed="true"] { background: var(--color-action); color: var(--color-on-action); border-color: var(--color-action); }
+.mcard__title { font-size: var(--text-xs); opacity: 0.7; }
+.mcard__big { font-size: var(--text-xl); font-weight: var(--weight-medium); line-height: var(--leading-tight); }
+.mcard__sub { font-size: var(--text-xs); opacity: 0.7; }
+.mcard--small { min-width: 84px; padding: var(--space-2) var(--space-3); }
+.mcard--small .mcard__big { font-size: var(--text-md); }
+
+/* ---- a company card on the bills tab ---- */
+.bcard__head { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
+.bcard__head .ccard__tin { flex: 1; }
+
+/* a second sub line that never grows past two lines (the parties of a hearing) */
+.row__sub--clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ccard__meta { margin-top: var(--space-2); font-size: var(--text-sm); }

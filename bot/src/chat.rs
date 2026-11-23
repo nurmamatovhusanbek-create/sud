@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 const HELP: &str = "Sud tizimi boti: Telegramdagi shifrlangan zaxiradan qidiradi.\n\n\
 Ish raqami (2-1004-2603/8020), kvitansiya raqami yoki STIR yozing: shunchaki xabar yuborish yetarli.\n\n\
-/find <matn>: qidirish\n/hearings: yaqin majlislar (14 kun)\n/case <ish raqami>: ish maʼlumoti\n/bill <raqam>: kvitansiya\n/company <STIR>: kompaniya\n/app: qidiruv oynasi (Mini App)\n/status: zaxira holati";
+/find <matn>: qidirish\n/hearings [kun] [STIR]: yaqin majlislar (14 kun)\n/case <ish raqami>: ish maʼlumoti\n/bill <raqam>: kvitansiya\n/company <STIR>: kompaniya\n/app: qidiruv oynasi (Mini App)\n/status: zaxira holati";
 
 pub fn authorized(sh: &Shared, user: i64) -> bool {
     sh.cfg.allowed.contains(&user)
@@ -177,6 +177,51 @@ fn app_button(sh: &Shared, param: &str, key: &str) -> Option<Value> {
     Some(json!({ "inline_keyboard": [[{ "text": "Mini App'da ochish", "web_app": { "url": format!("{base}/app?{q}") } }]] }))
 }
 
+/// at most this many hearings in one message (Telegram refuses a text over 4096 characters: a hundred rows do not fit)
+const CHAT_PAGE: usize = 20;
+
+/// the longest text a message may carry, with room to spare
+const CHAT_MAX: usize = 3900;
+
+/// cut a text at a line break below `max` bytes, and say it was cut
+fn clip(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let mut cut = max;
+    while !s.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let head = &s[..cut];
+    format!("{}\n…", head.rsplit_once('\n').map(|(h, _)| h).unwrap_or(head))
+}
+
+/// One page of the hearings: the rows, a «next» button while there are more, and a button that opens the same list in the Mini App.
+async fn hearings_reply(sh: &Arc<Shared>, chat: i64, days: u32, tin: &str, offset: usize) {
+    let today = crate::date::today(crate::state::now());
+    let days = days.clamp(1, crate::service::MAX_HEARING_DAYS);
+    let page = match sh.hearing_page(today, days, tin, "", offset, CHAT_PAGE).await {
+        Ok(p) => p,
+        Err(e) => return sh.outbox.send(chat, &e.message(), None).await,
+    };
+    if page.total == 0 {
+        let scope = if tin.is_empty() { String::new() } else { format!(" (STIR {tin})") };
+        return sh.outbox.send(chat, &format!("Yaqin {days} kunda majlis yoʻq{scope} (zaxira maʼlumotiga koʻra)."), None).await;
+    }
+    let shown_to = offset + page.rows.len();
+    let scope = if tin.is_empty() { String::new() } else { format!(", STIR {tin}") };
+    let head = format!("📅 Yaqin majlislar ({days} kun{scope}): {} ta · {}–{shown_to}\n\n", page.total, offset + 1);
+    let body = clip(&format!("{head}{}", fmt_hearing_block(&page.rows, today)), CHAT_MAX);
+    let mut keys: Vec<Value> = Vec::new();
+    if shown_to < page.total {
+        keys.push(json!([{ "text": format!("Keyingi {} ›", (page.total - shown_to).min(CHAT_PAGE)), "callback_data": format!("h:{days}:{tin}:{shown_to}") }]));
+    }
+    if let Some(base) = sh.cfg.public_url.as_ref() {
+        keys.push(json!([{ "text": "Hammasi Mini App'da", "web_app": { "url": format!("{base}/app?tab=hearings") } }]));
+    }
+    sh.outbox.send(chat, &body, if keys.is_empty() { None } else { Some(json!({ "inline_keyboard": keys })) }).await;
+}
+
 async fn search_reply(sh: &Arc<Shared>, chat: i64, q: &str) {
     let hits = sh.search(q, 8).await;
     if hits.is_empty() {
@@ -208,7 +253,16 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         if !authorized(&sh, uid) || !sh.limiter.allow(uid) {
             return;
         }
-        if let Some((w, k)) = cb["data"].as_str().unwrap_or("").split_once(':') {
+        let data = cb["data"].as_str().unwrap_or("");
+        // «h:<days>:<tin>:<offset>»: the next page of the hearings list
+        if let Some(rest) = data.strip_prefix("h:") {
+            let p: Vec<&str> = rest.split(':').collect();
+            if let [days, tin, offset] = p[..] {
+                hearings_reply(&sh, chat, days.parse().unwrap_or(14), tin, offset.parse().unwrap_or(0)).await;
+            }
+            return;
+        }
+        if let Some((w, k)) = data.split_once(':') {
             show(&sh, chat, w, k).await;
         }
         return;
@@ -254,12 +308,16 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             None => sh.outbox.send(chat, "Mini App manzili sozlanmagan (PUBLIC_URL).", None).await,
         },
         "/hearings" => {
-            let today = crate::date::today(crate::state::now());
-            match sh.hearings(today, crate::date::add_days(today, 14)).await {
-                Ok(l) if l.is_empty() => sh.outbox.send(chat, "Yaqin 14 kunda majlis yoʻq (zaxira maʼlumotiga koʻra).", None).await,
-                Ok(l) => sh.outbox.send(chat, &format!("📅 Yaqin majlislar (14 kun): {} ta\n\n{}", l.len(), fmt_hearing_block(&l, today)), None).await,
-                Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+            // «/hearings», «/hearings 30», «/hearings 207275139», «/hearings 30 207275139»
+            let (mut days, mut tin) = (14u32, String::new());
+            for t in arg.split_whitespace() {
+                if t.len() == 9 && t.chars().all(|c| c.is_ascii_digit()) {
+                    tin = t.to_string();
+                } else if let Ok(n) = t.parse::<u32>() {
+                    days = n.clamp(1, crate::service::MAX_HEARING_DAYS);
+                }
             }
+            hearings_reply(&sh, chat, days, &tin, 0).await;
         }
         "/case" => show(&sh, chat, "c", arg).await,
         "/bill" => show(&sh, chat, "b", arg).await,

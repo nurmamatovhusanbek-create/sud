@@ -20,5 +20,6 @@ export function launchRoute() {
   if (sp.get('case')) return { name: 'case', key: sp.get('case') }
   if (sp.get('bill')) return { name: 'bill', key: sp.get('bill') }
   if (sp.get('company')) return { name: 'company', key: sp.get('company') }
-  return { name: 'home' }
+  const tab = sp.get('tab')
+  return { name: 'home', tab: ['hearings', 'bills', 'companies'].includes(tab) ? tab : 'hearings' }
 }

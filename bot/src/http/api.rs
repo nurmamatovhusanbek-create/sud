@@ -61,10 +61,15 @@ pub async fn company_bills(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<
     Ok(Json(json!({ "ok": true, "bills": page })))
 }
 
-/// the hearings of the next `days` days (default 14, at most 60), today included
+/// A page of the hearings of the next `days` days (default 14, at most 90; today included): `tin` narrows to one company, `q` to a case or a party,
+/// `offset`/`limit` page the rows (30 by default, at most 100). The answer also carries the company cards and the counts behind the range chips.
 pub async fn hearings(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<Value>> {
-    let days = num(&q, "days", 14, 60) as i64;
+    let days = num(&q, "days", 14, crate::service::MAX_HEARING_DAYS as usize) as u32;
+    let tin = get(&q, "tin");
+    if !tin.is_empty() && !(tin.len() == 9 && tin.chars().all(|c| c.is_ascii_digit())) {
+        return Err(AppError::BadRequest("STIR 9 ta raqamdan iborat boʻlishi kerak".into()));
+    }
     let today = crate::date::today(crate::state::now());
-    let list = sh.hearings(today, crate::date::add_days(today, days)).await?;
-    Ok(Json(json!({ "ok": true, "today": today, "hearings": list })))
+    let page = sh.hearing_page(today, days, tin, get(&q, "q"), num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100)).await?;
+    Ok(Json(json!({ "ok": true, "page": page })))
 }

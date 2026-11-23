@@ -11,11 +11,11 @@ export const Kv = (label, value, { raw = false } = {}) => (has(value) ? h('div',
 
 export const SectionLabel = (text) => h('div', { class: 'section-label' }, text)
 
-export const Row = ({ icon: ic, title, sub, tag, onOpen }) =>
+export const Row = ({ icon: ic, title, sub, sub2, tag, onOpen }) =>
   h('div', { class: 'row', role: 'button', tabindex: '0', on: { click: onOpen, keydown: (e) => { if (e.key === 'Enter') onOpen() } } },
     ic && h('span', { class: 'row__icon' }, icon(ic)),
     tag && h('span', { class: 'tag' }, tag),
-    h('div', { class: 'row__main' }, h('div', { class: 'row__title' }, title), sub != null && h('div', { class: 'row__sub' }, sub)),
+    h('div', { class: 'row__main' }, h('div', { class: 'row__title' }, title), sub != null && h('div', { class: 'row__sub' }, sub), sub2 && h('div', { class: 'row__sub row__sub--clamp' }, sub2)),
     h('span', { class: 'row__chev' }, icon('chevron', 18)))
 
 export const List = (...rows) => h('div', { class: 'list' }, ...rows)
@@ -26,8 +26,8 @@ export const Status = (kind, label) => h('span', { class: 'status' }, h('span', 
 export const Button = ({ label, onClick, variant, size, block }) =>
   h('button', { type: 'button', class: ['btn', variant && `btn--${variant}`, size && `btn--${size}`, block && 'btn--block'].filter(Boolean).join(' '), on: { click: onClick } }, label)
 
-export function Chips(options, value, onPick) {
-  return h('div', { class: 'chips' }, ...options.map((o) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(o.value === value), on: { click: () => onPick(o.value) } }, o.label)))
+export function Chips(options, value, onPick, { scroll = false } = {}) {
+  return h('div', { class: scroll ? 'chips chips--scroll' : 'chips' }, ...options.map((o) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(o.value === value), on: { click: () => onPick(o.value) } }, o.label)))
 }
 
 export function Tabs(options, value, onPick) {
@@ -91,3 +91,22 @@ export const Callout = (label, main, sub) =>
 /** the headline of a screen: a small caption, the identifier, a line under it */
 export const Hero = ({ caption, id, line, aside }, ...kids) =>
   h('section', { class: 'hero' }, h('div', { class: 'split' }, h('span', { class: 'hero__caption' }, caption), aside), h('p', { class: 'hero__id mono' }, id), line && h('p', { class: 'hero__line' }, line), ...kids)
+
+/**
+ * A row of cards to choose one from (swipe sideways): [{ value, title, big, sub }]. The chosen card is filled. Used for «all companies / one company» so a
+ * list of a hundred rows can be narrowed with one tap instead of scrolled.
+ */
+export function CardRow(items, value, onPick) {
+  return h('div', { class: 'cardrow', role: 'group' }, ...items.map((i) =>
+    h('button', { type: 'button', class: 'mcard', 'aria-pressed': String(i.value === value), on: { click: () => onPick(i.value) } },
+      h('span', { class: 'mcard__title mono' }, i.title),
+      h('span', { class: 'mcard__big mono' }, i.big),
+      i.sub && h('span', { class: 'mcard__sub' }, i.sub))))
+}
+
+/** the bottom bar: [{ value, label, icon }] */
+export function TabBar(items, value, onPick) {
+  return items.map((i) =>
+    h('button', { type: 'button', class: 'tabbar__item', 'aria-current': i.value === value ? 'page' : undefined, on: { click: () => onPick(i.value) } },
+      icon(i.icon, 22), h('span', {}, i.label)))
+}

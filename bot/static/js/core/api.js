@@ -23,7 +23,8 @@ export const api = {
   search: (text, o) => get(`/api/search?${q({ q: text })}`, o),
   caseOf: (num, o) => get(`/api/case?${q({ num })}`, o),
   bill: (num, o) => get(`/api/bill?${q({ num })}`, o),
-  hearings: (days, o) => get(`/api/hearings?${q({ days })}`, o),
+  /** a page of the upcoming hearings: { days, tin, q, offset, limit } → { page: { today, total, rows, companies, ranges } } */
+  hearings: (p, o) => get(`/api/hearings?${q(p)}`, o),
   overview: (tin, o) => get(`/api/overview?${q({ tin })}`, o),
   company: (tin, o) => get(`/api/company?${q({ tin })}`, o),
   companyCases: (p, o) => get(`/api/company/cases?${q(p)}`, o),

@@ -14,9 +14,18 @@ pub struct Company {
     pub found: usize,
     pub listed: usize,
     pub years: Vec<String>,
+    /// how many bills (with a case) each year holds, newest year first: the «Toʻlovlar» tab shows them without opening a bucket
+    pub bill_years: Vec<YearBills>,
     /// epoch ms; 0 = not known
     pub first_at: i64,
     pub refreshed_at: i64,
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct YearBills {
+    pub year: u32,
+    pub bills: usize,
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq)]
@@ -145,4 +154,30 @@ pub struct Hearing {
     pub status: String,
     pub plaintiff: String,
     pub defendant: String,
+}
+
+/// one company's share of the hearings in a range (a card in the «Majlislar» tab)
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HearingCompany {
+    pub tin: String,
+    pub count: usize,
+    /// the company's first hearing in the range
+    pub next_day: u32,
+    pub next_time: String,
+}
+
+/// a page of the upcoming hearings, with what the tab needs around it: the company cards and the count behind every range chip
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HearingPage {
+    pub today: u32,
+    pub days: u32,
+    /// all rows of the range that match the company and the text filter
+    pub total: usize,
+    pub rows: Vec<Hearing>,
+    /// per company, over the range and the text filter (NOT narrowed by the company filter: they are the way to choose one)
+    pub companies: Vec<HearingCompany>,
+    /// days → how many hearings fall in the first `days` days (today included), for the company and text filter
+    pub ranges: BTreeMap<u32, usize>,
 }

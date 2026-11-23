@@ -9,7 +9,10 @@ let outlet = null
 let token = 0
 let controller = null
 
+const listeners = new Set()
 export const register = (name, fn) => { screens[name] = fn }
+/** called with the route every time a screen is about to be drawn (the tab bar follows it) */
+export const onRoute = (fn) => { listeners.add(fn); return () => listeners.delete(fn) }
 export const route = () => current
 
 export function go(next, { replace = false } = {}) {
@@ -28,6 +31,7 @@ export const rerender = () => render()
 
 async function render() {
   const mine = ++token
+  listeners.forEach((fn) => fn(current))
   controller?.abort()
   controller = new AbortController()
   const fn = screens[current.name] || screens.home

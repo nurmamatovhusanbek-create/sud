@@ -266,16 +266,96 @@ mod hearings {
     }
 
     #[tokio::test]
-    async fn the_api_answers_and_caps_the_range() {
+    async fn the_page_carries_company_cards_and_range_counts() {
+        let (sh, _b) = ready_bot().await;
+        let t = today(now());
+        let p = sh.hearing_page(t, 14, "", "", 0, 30).await.unwrap();
+        assert_eq!((p.total, p.rows.len(), p.days), (3, 3, 14));
+        assert_eq!(p.companies.len(), 1);
+        assert_eq!((p.companies[0].tin.as_str(), p.companies[0].count, p.companies[0].next_day, p.companies[0].next_time.as_str()), (TIN, 3, t, "10:00"));
+        // the chip counts: today 1, a week 3 (the third is five days away), 60 days 4 (the fortieth day), the past one is never counted
+        assert_eq!((p.ranges[&1], p.ranges[&7], p.ranges[&14], p.ranges[&30], p.ranges[&60], p.ranges[&90]), (1, 3, 3, 3, 4, 4));
+        // one day: only today
+        assert_eq!(sh.hearing_page(t, 1, "", "", 0, 30).await.unwrap().total, 1);
+    }
+
+    #[tokio::test]
+    async fn filters_by_company_and_by_text_in_latin_and_pages() {
+        let (sh, _b) = ready_bot().await;
+        let t = today(now());
+        assert_eq!(sh.hearing_page(t, 60, OTHER_TIN, "", 0, 30).await.unwrap().total, 0); // the other company has none
+        // the party's name is Cyrillic in the backup; the person types Latin
+        assert_eq!(sh.hearing_page(t, 60, "", "universal", 0, 30).await.unwrap().total, 4);
+        assert_eq!(sh.hearing_page(t, 60, "", "8021", 0, 30).await.unwrap().total, 1);
+        assert_eq!(sh.hearing_page(t, 60, "", "nothing like it", 0, 30).await.unwrap().total, 0);
+        // the company cards are not narrowed by the company filter (they are how one is chosen), but they follow the text
+        let p = sh.hearing_page(t, 60, OTHER_TIN, "8021", 0, 30).await.unwrap();
+        assert_eq!((p.total, p.companies.len()), (0, 1));
+        let paged = sh.hearing_page(t, 60, "", "", 1, 2).await.unwrap();
+        assert_eq!((paged.total, paged.rows.len(), paged.rows[0].case_number.as_str()), (4, 2, "2-1004-2503/8021"));
+    }
+
+    #[tokio::test]
+    async fn the_api_answers_pages_and_refuses_a_bad_tin() {
         let (sh, _b) = ready_bot().await;
         let i = signed(4242);
-        let (st, b) = get(&sh, "/api/hearings?days=7", Some(&i)).await;
+        let (st, b) = get(&sh, "/api/hearings?days=7&limit=2", Some(&i)).await;
         assert_eq!(st, StatusCode::OK);
-        assert_eq!(b["hearings"].as_array().unwrap().len(), 3);
-        assert_eq!(b["hearings"][0]["caseNumber"], CASE);
-        let (_, b) = get(&sh, "/api/hearings?days=9999", Some(&i)).await; // at most 60 days: the 40-day one is in
-        assert_eq!(b["hearings"].as_array().unwrap().len(), 4);
+        assert_eq!((b["page"]["total"].as_u64(), b["page"]["rows"].as_array().unwrap().len()), (Some(3), 2));
+        assert_eq!(b["page"]["rows"][0]["caseNumber"], CASE);
+        assert_eq!(b["page"]["companies"][0]["tin"], TIN);
+        assert_eq!(b["page"]["ranges"]["7"], 3);
+        let (_, b) = get(&sh, "/api/hearings?days=9999", Some(&i)).await; // at most 90 days
+        assert_eq!((b["page"]["days"].as_u64(), b["page"]["total"].as_u64()), (Some(90), Some(4)));
+        assert_eq!(get(&sh, "/api/hearings?tin=12", Some(&i)).await.0, StatusCode::BAD_REQUEST);
         assert_eq!(get(&sh, "/api/hearings", None).await.0, StatusCode::UNAUTHORIZED);
+    }
+
+    /// a backup whose only hearings are `n` rows spread over the next days
+    fn crowded(n: usize) -> (Backup, crate::config::Config) {
+        let (b, cfg) = (backup(), crate::config::Config::for_tests());
+        let t = today(now());
+        let rows: Vec<String> = (0..n).map(|i| json!([format!("2-1004-2503/{}", 1000 + i), "civil", add_days(t, (i % 10) as i64), format!("{:02}:00", 9 + i % 8), "first", "Тайинлаш", "Универсал Савдо МЧЖ", "ANOR TEXTILE МЧЖ", 1]).to_string() + "\n").collect();
+        let mut content = buckets(false);
+        content.retain(|(name, _)| !name.starts_with("hearings:"));
+        content.push((format!("hearings:{TIN}"), rows.concat()));
+        publish(&b.channel, MAIN, &b.pass, 2, &content);
+        (b, cfg)
+    }
+
+    #[tokio::test]
+    async fn a_hundred_hearings_go_out_in_pages_that_fit_a_telegram_message() {
+        let (b, cfg) = crowded(100);
+        let sh = bot_with(cfg, &b);
+        sh.sync().await.unwrap();
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings 14" } })).await;
+        let first = sh.outbox.captured()[0].clone();
+        assert!(first.text.len() < 4096 && first.text.contains("100 ta · 1–20"), "{}", first.text);
+        let kb = first.markup.unwrap();
+        assert_eq!(kb["inline_keyboard"][0][0]["callback_data"], "h:14::20");
+        assert!(kb["inline_keyboard"][0][0]["text"].as_str().unwrap().contains("Keyingi 20"));
+        assert!(kb["inline_keyboard"][1][0]["web_app"]["url"].as_str().unwrap().ends_with("/app?tab=hearings"));
+        // the «next» button asks for the following page, and the last page has no «next»
+        for (offset, last) in [(20, false), (40, false), (60, false), (80, true)] {
+            let cb = json!({ "callback_query": { "id": "1", "from": { "id": 4242 }, "message": { "chat": { "id": 4242 } }, "data": format!("h:14::{offset}") } });
+            crate::chat::handle_update(sh.clone(), cb).await;
+            let m = sh.outbox.captured().last().unwrap().clone();
+            assert!(m.text.contains(&format!("{}–{}", offset + 1, offset + 20)) && m.text.len() < 4096);
+            assert_eq!(m.markup.unwrap()["inline_keyboard"][0][0]["callback_data"].is_string(), !last);
+        }
+    }
+
+    #[tokio::test]
+    async fn the_command_takes_days_and_a_company() {
+        let (sh, _b) = ready_bot().await;
+        let say = |text: &str| crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": text } }));
+        say("/hearings 1").await;
+        say(&format!("/hearings 30 {OTHER_TIN}")).await;
+        say(&format!("/hearings {TIN}")).await;
+        let sent = sh.outbox.captured();
+        assert!(sent[0].text.contains("(1 kun): 1 ta"));
+        assert!(sent[1].text.contains("Yaqin 30 kunda majlis yoʻq") && sent[1].text.contains(OTHER_TIN));
+        assert!(sent[2].text.contains(&format!("STIR {TIN}")) && sent[2].text.contains("3 ta"));
     }
 
     #[tokio::test]
@@ -291,7 +371,7 @@ mod hearings {
     async fn the_morning_message_goes_to_every_allowed_person_and_only_when_there_is_something() {
         let (sh, _b) = ready_bot().await;
         let t = today(now());
-        let list = sh.hearings(t, add_days(t, 7)).await.unwrap();
+        let list = sh.hearings(t, add_days(t, 6)).await.unwrap();
         let body = crate::digest::text(&list, t, Some("2026-11-22T10:00:00.000Z")).unwrap();
         assert!(body.starts_with("📅 Yaqin majlislar (7 kun): 3 ta"));
     }
