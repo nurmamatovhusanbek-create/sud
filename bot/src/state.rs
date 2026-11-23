@@ -63,7 +63,12 @@ impl Shared {
         let mut errs: Vec<String> = Vec::new();
         let mut last: Option<BackupError> = None;
         for (i, chat) in self.cfg.channels.iter().enumerate() {
-            match self.sync_from(i, chat).await {
+            let tried = self.sync_from(i, chat).await;
+            // which channel said what: the log of a failed start must name the channel (never a token or a passphrase)
+            if let Err(e) = &tried {
+                eprintln!("[bot] kanal {} ({chat}): {e}", i + 1);
+            }
+            match tried {
                 Ok(msg) => {
                     self.st.write().await.degraded = if i == 0 { None } else { Some(errs.join(" · ")) };
                     return Ok(if i == 0 || msg == "oʻzgarmagan" { msg } else { format!("zaxira kanaldan ({chat}): {msg}") });
