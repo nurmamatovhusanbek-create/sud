@@ -216,3 +216,9 @@ export async function pinnedDocument(token: string, chat: string): Promise<TgRes
 export async function fileExists(token: string, fileId: string): Promise<boolean> {
   return (await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId })).ok
 }
+
+/** Send one plain text message to a chat or a person (the Kuzatuv's messages). No markup, so a name with any character is safe. */
+export async function sendMessage(token: string, chat: string | number, text: string): Promise<TgResult<number>> {
+  const r = await post<{ message_id: number }>(token, 'sendMessage', { chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true }, 20_000, 3)
+  return r.ok ? { ok: true, value: r.result.message_id } : { ok: false, error: telegramFailure(r.code, r.description) }
+}

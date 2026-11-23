@@ -7,9 +7,10 @@
  */
 
 import { useState } from 'react'
-import { CheckCircle2, DatabaseBackup, FlaskConical, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
+import { useWatch } from '@/hooks/use-watch'
 import { STEP_LABEL } from '@/core/telegram'
 import { formatDmy } from '@/core/dates'
 
@@ -139,6 +140,93 @@ function BackupCard({ configured }: { configured: boolean }) {
 
 const fmtN = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')
 
+const splitList = (s: string): string[] => s.split(/[\s,;]+/).filter(Boolean)
+
+/** Kuzatuv: the app reads the court lists by itself every few hours and tells the recipients on Telegram what is new. Off until the operator switches it on. */
+function WatchCard({ configured }: { configured: boolean }) {
+  const { snap, busy, save, run, test } = useWatch()
+  const [ids, setIds] = useState<string | null>(null)
+  const [tins, setTins] = useState<string | null>(null)
+  const [hours, setHours] = useState<string | null>(null)
+  const cfg = snap?.config
+  const last = snap?.last
+  const idsNow = ids ?? cfg?.recipients.join(', ') ?? ''
+  const tinsNow = tins ?? cfg?.tins?.join(', ') ?? ''
+  const hoursNow = hours ?? String(cfg?.intervalHours ?? 6)
+  const dirty = ids !== null || tins !== null || hours !== null
+  const apply = async () => {
+    const recipients = splitList(idsNow).map(Number)
+    const list = splitList(tinsNow)
+    const ok = await save({ recipients, tins: list.length ? list : null, intervalHours: Number(hoursNow) })
+    if (ok) {
+      setIds(null)
+      setTins(null)
+      setHours(null)
+    }
+  }
+  const at = (ms: number): string => `${formatDmy(new Date(ms))} ${new Date(ms).toTimeString().slice(0, 5)}`
+  return (
+    <div className="p-card rise-c" style={{ marginTop: 14 }}>
+      <div className="card-h">
+        <div className="ico"><Eye /></div>
+        <h2>Kuzatuv (avtomatik)</h2>
+        {cfg && <span className={`badge ${cfg.enabled ? 'b-pos' : ''}`} style={{ marginLeft: 'auto' }}>{cfg.enabled ? `yoqilgan · ${snap?.watching.length ?? 0} kompaniya` : 'oʻchiq'}</span>}
+      </div>
+      <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
+        Yoqilsa, ilova kompaniyalarning sud roʻyxatlarini har bir necha soatda oʻzi qayta oʻqiydi va yangilikni Telegram orqali yuboradi: <b>yangi ariza</b>, <b>apellyatsiya / kassatsiya / nazorat
+        instansiyasi</b>, <b>majlis sanasi oʻzgargani</b>, <b>ish holati oʻzgargani</b>. Xabarda kompaniya daʼvogar yoki javobgar ekani, tomonlar nomi va STIRi, holati va muddati boʻladi.
+        Birinchi oʻqish faqat eslab qoladi va xabar yubormaydi. Kompyuter yoqilgan va ilova ishlab turishi kerak (<span className="mono">Sud.bat keep</span>). Roʻyxatlar 100–200 qatorgacha qirqilishi mumkin.
+        Xabar yuborilmasa yoki oluvchi boʻlmasa, yangilik eslab qolinmaydi va keyingi safar qayta uriniladi.
+      </p>
+      {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '0 0 12px' }}>Avval yuqorida bot tokenini saqlang: xabarlar shu bot orqali ketadi.</p>}
+      <div style={{ display: 'grid', gap: 10 }}>
+        <label className="field" style={{ height: 40 }}>
+          <input value={idsNow} onChange={(e) => setIds(e.target.value)} placeholder="Xabar oluvchilar: Telegram ID (vergul bilan, 10 tagacha)" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
+        </label>
+        <label className="field" style={{ height: 40 }}>
+          <input value={tinsNow} onChange={(e) => setTins(e.target.value)} placeholder="Kompaniyalar (STIR, vergul bilan): boʻsh = bazadagi hammasi" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
+        </label>
+        <label className="field" style={{ height: 40 }}>
+          <input value={hoursNow} onChange={(e) => setHours(e.target.value)} inputMode="numeric" placeholder="Necha soatda bir (1–48)" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} />
+        </label>
+      </div>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+        {cfg && (
+          <button className={`btn ${cfg.enabled ? 'btn-outline' : 'btn-primary'}`} onClick={() => void save({ enabled: !cfg.enabled })} disabled={!!busy || (!cfg.enabled && !cfg.recipients.length && !splitList(idsNow).length)}>
+            {busy === 'save' ? <span className="spinner" /> : null}
+            {cfg.enabled ? 'Oʻchirish' : 'Yoqish'}
+          </button>
+        )}
+        <button className="btn btn-outline" onClick={() => void apply()} disabled={!dirty || !!busy}>Saqlash</button>
+        <button className="btn btn-outline" onClick={() => void test()} disabled={!configured || !!busy || !cfg?.recipients.length}>
+          {busy === 'test' ? <span className="spinner" /> : <FlaskConical />}
+          Sinash
+        </button>
+        <button className="btn btn-outline" onClick={() => void run()} disabled={!configured || !!busy || !!snap?.running || !cfg?.recipients.length}>
+          {snap?.running || busy === 'run' ? <span className="spinner" /> : <Play />}
+          Hozir tekshirish
+        </button>
+      </div>
+      {(last || snap?.nextAt) && (
+        <div className="list" style={{ marginTop: 14 }}>
+          {last && (
+            <div className="kv">
+              <span className="k">Soʻnggi tekshiruv: {at(last.at)}</span>
+              <span className="faint" style={{ fontSize: 12.5 }}>
+                {fmtN(last.companies)} kompaniya · {fmtN(last.rows)} qator · {fmtN(last.events)} yangilik · {fmtN(last.sent)} xabar{last.baselines ? ` · ${fmtN(last.baselines)} ta birinchi oʻqish` : ''}
+              </span>
+            </div>
+          )}
+          {snap?.nextAt && cfg?.enabled && <div className="kv"><span className="k">Keyingisi</span><span className="faint" style={{ fontSize: 12.5 }}>{snap.running ? 'hozir oʻqilmoqda' : at(snap.nextAt)}</span></div>}
+          {last?.errors.slice(0, 5).map((e, i) => (
+            <div className="kv" key={i}><span className="k faint" style={{ fontSize: 12.5 }}>{e}</span></div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TelegramTab() {
   const { status, busy, out, channels, find, test, save, forget } = useTelegram()
   const [token, setToken] = useState('')
@@ -249,6 +337,7 @@ export function TelegramTab() {
         )}
       </div>
       <BackupCard configured={!!status?.configured} />
+      <WatchCard configured={!!status?.configured} />
     </div>
   )
 }

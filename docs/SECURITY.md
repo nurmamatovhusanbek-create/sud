@@ -110,3 +110,7 @@ The Telegram bot (Settings › Telegram, for encrypted copies of the database) f
 ## Own document templates
 
 `documents/custom` stores an uploaded .docx under `~/.sud-tizimi/templates` (`DOC_TEMPLATES_DIR` overrides; file 0600, folder 0700). The upload is untrusted: ≤ 5 MB, ≤ 1000 entries, ≤ 40 MB unpacked, must be a Word package, **macro-enabled files are refused**, only a generated id (`custom_<slug>_<4 hex>`, validated by regex) becomes a file name, and only `word/document.xml` is rewritten (markers merged into one run each). The template is never executed: it is filled by string replacement and drawn by docx-preview. Code: `lib/documents/custom{,.server}.ts`, `views/custom-templates.tsx`.
+
+## Kuzatuv (automatic court-list watch)
+
+The only scheduler in the app. `src/instrumentation.ts` starts a 60 s timer in the Node runtime; `lib/watch` does nothing unless `meta.watch_config.enabled` is true (default false, set from Settings › Telegram, `privileged` route `/api/settings/watch`). When on, it reads the operator's own companies' court lists (only STIRs already in the database or typed in the setting) at the app's usual pace and sends messages through the saved bot token to the listed Telegram ids only. The token never leaves `lib/telegram-config`; message text holds names and STIRs, so recipients must be the operator's own accounts. Switching it off stops it at the next tick.

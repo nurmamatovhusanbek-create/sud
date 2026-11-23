@@ -92,4 +92,14 @@ CREATE TABLE locator_shards (tin TEXT PRIMARY KEY, id TEXT NOT NULL, rows INTEGE
 DELETE FROM bills WHERE case_number IS NULL OR case_number = '';
 `,
   },
+  {
+    // Kuzatuv (lib/watch): what each watched court list row looked like when it was last read, so a change is news; `ins` NULL = the detail was never read
+    v: 6,
+    sql: `
+CREATE TABLE watch_seen (
+  tin TEXT NOT NULL, num TEXT NOT NULL, court TEXT NOT NULL, sig TEXT NOT NULL, ins TEXT, seen_at INTEGER NOT NULL, checked_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (tin, num)
+) WITHOUT ROWID;
+`,
+  },
 ]
