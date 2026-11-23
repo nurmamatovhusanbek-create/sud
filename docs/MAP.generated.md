@@ -77,7 +77,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `billing-format.ts` | api/bills/export/route, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/found-cases.tsx, components/sections/overview.tsx, core/bill-cases.ts, core/bill-rows.ts, +4 | core/__tests__/billing-format-dates.test.ts, core/__tests__/court-type.test.ts |
 | `brand-mark.ts` | components/proto/brand-mark.tsx, lib/print.ts, lib/report/render-ink.ts, lib/report/render.ts | core/__tests__/brand-mark.test.ts |
 | `case-freeze.ts` | lib/served-case.ts | core/__tests__/case-freeze.test.ts |
-| `case-status.ts` | components/sections/cases.tsx, components/sections/found-cases.tsx, core/case-freeze.ts, core/classify.ts, core/public-orders.ts | core/__tests__/case-status.test.ts |
+| `case-status.ts` | components/sections/cases.tsx, components/sections/found-cases.tsx, core/case-freeze.ts, core/classify.ts, core/public-orders.ts, lib/case-store.ts | core/__tests__/case-status.test.ts |
 | `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, lib/stats.ts | core/__tests__/case-status.test.ts, core/__tests__/classify.test.ts |
 | `dates.ts` | components/proto/date-tile.tsx, components/sections/bill-cases-panel.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/telegram-copy-card.tsx, components/views/telegram-settings.tsx, +9 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |

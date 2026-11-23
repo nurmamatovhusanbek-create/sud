@@ -22,6 +22,7 @@ import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { caseHay, registeredKey } from '@/core/bill-cases'
+import { isConcludedStatus } from '@/core/case-status'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 import { getDb } from './db'
 
@@ -187,12 +188,12 @@ const hayOf = caseHay
 const yymmOf = registeredKey
 
 /** Add found rows (by case number, the new one wins) and the numbers just tried, in one transaction. */
-export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType; row: CourtCase }>, tried: TriedMap): boolean {
+export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType; row: CourtCase }>, tried: TriedMap, at: number = Date.now()): boolean {
   if (!TIN_RE.test(tin)) return false
   const db = getDb()
   const fc = db.prepare('INSERT OR REPLACE INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
   const tr = db.prepare('INSERT OR REPLACE INTO tried (tin, num, t, found) VALUES (?, ?, ?, ?)')
-  const now = Date.now()
+  const now = at
   db.transaction(() => {
     for (const { courtType, row } of rows) {
       if (row.caseNumber && COURTS.has(courtType)) fc.run(courtType, tin, row.caseNumber, yymmOf(row.caseNumber), row.caseStatus, hayOf(row), JSON.stringify(row), now)
@@ -208,11 +209,32 @@ export function readFound(tin: string, courtType: CourtType): CourtCase[] {
   return getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? ORDER BY yymm DESC, num').all(courtType, tin).map((r) => JSON.parse(String(r.row)) as CourtCase)
 }
 
+/** one found case's stored row, or null */
+export function readFoundRow(tin: string, courtType: CourtType, caseNumber: string): CourtCase | null {
+  if (!TIN_RE.test(tin)) return null
+  const r = getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? AND num = ?').get(courtType, tin, caseNumber)
+  return r ? (JSON.parse(String(r.row)) as CourtCase) : null
+}
+
 export function readTried(tin: string): TriedMap {
   if (!TIN_RE.test(tin)) return {}
   const out: TriedMap = {}
   for (const r of getDb().prepare('SELECT num, t, found FROM tried WHERE tin = ?').all(tin)) out[String(r.num)] = { t: Number(r.t), found: Number(r.found) === 1 }
   return out
+}
+
+/**
+ * The refresh queue: found cases that are NOT concluded (ongoing, unknown or no status) and were last fetched before `before`, the longest unrefreshed
+ * first. Only the small columns are read (never the row JSON), once per job; what stays is the open cases only (a few thousand of 80 000).
+ */
+export function openFoundQueue(tin: string, before: number): Array<{ courtType: CourtType; caseNumber: string; status: string; t: number }> {
+  if (!TIN_RE.test(tin)) return []
+  const out: Array<{ courtType: CourtType; caseNumber: string; status: string; t: number }> = []
+  for (const r of getDb().prepare('SELECT court, num, status, t FROM found_cases WHERE tin = ? AND t < ?').all(tin, before)) {
+    if (isConcludedStatus(String(r.status))) continue
+    out.push({ courtType: String(r.court) as CourtType, caseNumber: String(r.num), status: String(r.status), t: Number(r.t) })
+  }
+  return out.sort((a, b) => a.t - b.t || (a.caseNumber < b.caseNumber ? -1 : 1))
 }
 
 /** how many numbers were found / asked without an answer (and not old enough to be asked again) */

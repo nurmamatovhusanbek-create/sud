@@ -22,10 +22,13 @@ import { searchBillsByInn } from './billing'
 import { toBillRow } from '@/core/bill-rows'
 import { getCaseLean, type CaseLean } from './court-case'
 import type { CourtCase, CourtType } from './court-case-types'
-import { addFound, feedCaseNumbers, triedStats, writeDetail } from './case-store'
+import { addFound, feedCaseNumbers, openFoundQueue, readFoundRow, triedStats, writeDetail } from './case-store'
 import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, readPasses, recordPass, setKnownFeed, writeBillsPage } from './bills-store'
 import { ensureCompany, markRefreshed, readCompany } from './company-meta'
 import { estimateCoverage, passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
+
+/** a refresh skips the cases fetched more recently than this */
+export const REFRESH_MIN_AGE_MS = 6 * 3_600_000
 
 /** a case the court's APIs did not know is asked again only after this long (the old system's node is flaky: «not found» is not always true) */
 export const RETRY_MISSING_MS = 14 * 24 * 60 * 60_000
@@ -65,7 +68,7 @@ export type JobState = 'idle' | 'running' | 'paused' | 'done' | 'stopped' | 'err
 export interface JobStatus {
   tin: string | null
   state: JobState
-  phase: 'load' | 'fill' | null
+  phase: 'load' | 'fill' | 'refresh' | null
   startedAt: number | null
   /** the bills pages: read / of */
   page: number
@@ -80,6 +83,8 @@ export interface JobStatus {
   total: number
   found: number
   absent: number
+  /** refresh: how many of the asked cases came back with a different status or hearing */
+  changed: number
   errors: number
   current: string | null
   /** the last event number: a page asks for the events after the one it has */
@@ -140,7 +145,7 @@ interface Job {
 
 const g = globalThis as unknown as { __sudBillJob?: Job | null }
 
-const idle = (): JobStatus => ({ tin: null, state: 'idle', phase: null, startedAt: null, page: 0, pages: 0, pass: 0, stable: false, bills: 0, done: 0, total: 0, found: 0, absent: 0, errors: 0, current: null, seq: 0, lastError: null, waitingUntil: null })
+const idle = (): JobStatus => ({ tin: null, state: 'idle', phase: null, startedAt: null, page: 0, pages: 0, pass: 0, stable: false, bills: 0, done: 0, total: 0, found: 0, absent: 0, changed: 0, errors: 0, current: null, seq: 0, lastError: null, waitingUntil: null })
 
 /** the job of this process (one at a time for the whole app), or null */
 const current = (): Job | null => g.__sudBillJob ?? null
@@ -200,6 +205,8 @@ export interface StartOpts {
   load?: 'auto' | 'refresh' | 'skip'
   /** after the load, ask the court for the cases the bills name */
   fill?: boolean
+  /** `open`: INSTEAD of a load and a fill, ask the court again for the cases found earlier that are not concluded (a manual refresh; what changed is counted) */
+  refresh?: 'open'
   deps?: Partial<BillCasesDeps>
   paceMs?: number
 }
@@ -254,7 +261,7 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
 
   // ---- LOAD ----
   // billing's paging is not stable (core/bill-passes): the bills are read in PASSES with different page sizes until a pass agrees with itself
-  const mode = opts.load ?? 'auto'
+  const mode = opts.refresh ? 'skip' : (opts.load ?? 'auto')
   if (mode !== 'skip') {
     const meta = readBillsMeta(tin)
     const unfinished = !!meta && !meta.complete
@@ -354,6 +361,7 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
     }
   }
   if (stopped()) return
+  if (opts.refresh) return refreshOpen(job, tin, deps, pace, stopped)
   if (!opts.fill) {
     s.state = 'done'
     s.phase = null
@@ -415,6 +423,70 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
       }
       await deps.sleep(pace, signal)
     }
+  }
+  s.state = 'done'
+  s.phase = null
+  s.current = null
+}
+
+/**
+ * REFRESH: the cases found earlier that are not concluded are asked again, the longest unrefreshed first. Concluded cases (finished, archived,
+ * refused) are never asked: they do not change. A case the court no longer answers for keeps its stored row (nothing is marked «tried»), a failed
+ * request backs off like the fill does. What the court answers replaces the stored detail and row; a different status or hearing counts as changed.
+ */
+async function refreshOpen(job: Job, tin: string, deps: BillCasesDeps, pace: number, stopped: () => boolean): Promise<void> {
+  const s = job.status
+  const signal = job.abort.signal
+  s.phase = 'refresh'
+  // only cases not fetched in the last 6 hours: a refresh that was stopped and started again goes on where it was, a second click right after one does nothing
+  const queue = openFoundQueue(tin, deps.now() - REFRESH_MIN_AGE_MS)
+  s.total = queue.length
+  let failures = 0
+  for (const c of queue) {
+    let r: CaseLean
+    for (;;) {
+      if (stopped()) return
+      s.current = c.caseNumber
+      try {
+        r = await deps.getCase(c.courtType, c.caseNumber)
+      } catch (e) {
+        r = { kind: 'error', message: e instanceof Error ? e.message : String(e) }
+      }
+      if (r.kind !== 'error') break
+      s.errors++
+      failures++
+      s.lastError = r.message
+      if (failures >= MAX_FAILURES_IN_ROW) {
+        s.state = 'paused'
+        s.phase = null
+        s.current = null
+        s.lastError = `Sud tizimi ${failures} marta ketma-ket javob bermadi (${r.message}). Jarayon toʻxtatildi: keyinroq davom ettiring.`
+        return
+      }
+      const wait = Math.min(BACKOFF_MAX_MS, BACKOFF_FIRST_MS * 2 ** (failures - 1))
+      s.waitingUntil = deps.now() + wait
+      await deps.sleep(wait, signal)
+      s.waitingUntil = null
+    }
+    failures = 0
+    s.lastError = null
+    s.done++
+    if (r.kind === 'found') {
+      const before = readFoundRow(tin, c.courtType, c.caseNumber)
+      const row = r.row ?? rowFromDetail(r.data, { caseNumber: c.caseNumber, court: before?.courtName ?? '' })
+      writeDetail(c.courtType, c.caseNumber, r.data, deps.now())
+      addFound(tin, [{ courtType: c.courtType, row }], {}, deps.now())
+      s.found++
+      if (!before || before.caseStatus !== row.caseStatus || before.hearingDate !== row.hearingDate || before.hearingTime !== row.hearingTime || before.result !== row.result) {
+        s.changed++
+        s.seq++
+        job.events.push({ seq: s.seq, courtType: c.courtType, row })
+        if (job.events.length > MAX_EVENTS) job.events.splice(0, job.events.length - MAX_EVENTS)
+      }
+    } else {
+      s.absent++
+    }
+    await deps.sleep(pace, signal)
   }
   s.state = 'done'
   s.phase = null

@@ -337,3 +337,52 @@ describe('fill', () => {
     expect(store.readFound(TIN, 'civil').length + store.readFound(TIN, 'economic').length).toBe(2)
   })
 })
+
+describe('refresh of open cases', () => {
+  // the job's clock is a day later than the fill's (the refresh skips cases fetched in the last six hours)
+  const day = 86_400_000
+  let skew = 0
+  const later = () => { skew = day; return { ...deps, now: () => Date.now() + skew } }
+
+  const ongoing = (num: string, status = 'Кўриб чиқиш жараёнида'): CaseLean => {
+    const d = detailOf(num)
+    d.general!.caseStatus = status
+    return { kind: 'found', via: 'new', data: d, row: null }
+  }
+
+  test('asks again only the cases that are not concluded, the longest unrefreshed first; counts what changed; concluded ones are never asked', async () => {
+    // the first fill: two cases stay ongoing, two are finished (detailOf says «Якунланган»)
+    defaultCase = (num) => (num === '2-1004-2603/1' || num === '4-1001-2505/3' ? ongoing(num) : found(num))
+    await run({ fill: true })
+    caseCalls = []
+    expect(await run({ refresh: 'open' })).toMatchObject({ total: 0 }) // just fetched: nothing to refresh yet
+    // the court now says: one of the ongoing cases is finished (a change), the other is still ongoing (no change)
+    script = { '2-1004-2603/1': [found('2-1004-2603/1')], '4-1001-2505/3': [ongoing('4-1001-2505/3')] }
+    const st = await run({ refresh: 'open', deps: later() })
+    expect(caseCalls.sort()).toEqual(['2-1004-2603/1', '4-1001-2505/3'])
+    expect(st).toMatchObject({ state: 'done', total: 2, done: 2, found: 2, changed: 1, absent: 0 })
+    expect(store.readFoundRow(TIN, 'civil', '2-1004-2603/1')?.caseStatus).toBe('Якунланган (Ижро варақасиз)')
+    // the next refresh has nothing left to ask: the finished case is concluded and the other was just refreshed
+    caseCalls = []
+    expect(await run({ refresh: 'open', deps: later() })).toMatchObject({ total: 0, done: 0 })
+    expect(caseCalls).toEqual([])
+  })
+
+  test('a case the court no longer answers for keeps its stored row and is not marked as tried', async () => {
+    defaultCase = (num) => ongoing(num)
+    await run({ fill: true })
+    caseCalls = []
+    script = { '2-1004-2603/1': [{ kind: 'absent' }] }
+    const st = await run({ refresh: 'open', deps: later() })
+    expect(st.absent).toBe(1)
+    expect(store.readFoundRow(TIN, 'civil', '2-1004-2603/1')?.caseStatus).toBe('Кўриб чиқиш жараёнида')
+  })
+
+  test('a refresh never reads the bills and never starts a fill', async () => {
+    defaultCase = (num) => ongoing(num)
+    await run({ fill: true })
+    billCalls = []
+    await run({ refresh: 'open', deps: later() })
+    expect(billCalls).toEqual([])
+  })
+})

@@ -27,7 +27,7 @@ export interface UseBillJob {
   state: BillJobState | null
   running: boolean
   /** start the job; resolves to an error text, or null when it started */
-  start: (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }) => Promise<string | null>
+  start: (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean; refresh?: 'open' }) => Promise<string | null>
   stop: () => Promise<void>
 }
 
@@ -73,7 +73,7 @@ export function useBillJob(stir: string): UseBillJob {
   }, [poll])
 
   const start = useCallback(
-    async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }): Promise<string | null> => {
+    async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean; refresh?: 'open' }): Promise<string | null> => {
       const res = await startBillJob(stir, opts)
       if (!res.ok) return res.error
       wasRunning.current = true

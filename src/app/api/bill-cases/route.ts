@@ -16,7 +16,8 @@ const log = logger('api:bill-cases')
  * GET  /api/bill-cases?tin=…[&after=N]  → what is stored (disk only, no site is asked: `status`), the job (`job`: state, phase, progress) and the
  *                                          cases it has found after event N (`events`, so an open list can append them live; `behind` = the page
  *                                          fell too far behind and should read the list again)
- * POST /api/bill-cases?tin=…&action=start&load=auto|refresh|skip&fill=1|0
+ * POST /api/bill-cases?tin=…&action=start&load=auto|refresh|skip&fill=1|0[&refresh=open]
+ *                                          `refresh=open` INSTEAD asks the court again for the found cases that are not concluded (what changed is counted).
  *                                        → STARTED BY A CLICK (or by opening the Toʻlovlar tab of a company with no stored bills: `fill=0`).
  *                                          Returns at once. 409 when a job is already running (one at a time for the whole app).
  * POST /api/bill-cases?tin=…&action=stop → stops it after the current step; what was found stays.
@@ -40,8 +41,9 @@ export const POST = guard(async (req) => {
   const load = sp.get('load') ?? 'auto'
   if (load !== 'auto' && load !== 'refresh' && load !== 'skip') return jsonFail('load notoʻgʻri', 'bad_request', 400)
   try {
-    const job = startJob(tin, { load, fill: sp.get('fill') === '1' })
-    log.info('bill job started', { load, fill: sp.get('fill') === '1' })
+    const refresh = sp.get('refresh') === 'open' ? ('open' as const) : undefined
+    const job = startJob(tin, { load, fill: sp.get('fill') === '1', refresh })
+    log.info('bill job started', { load, fill: sp.get('fill') === '1', refresh: refresh ?? null })
     return jsonOk({ job })
   } catch (e) {
     return jsonFail(e instanceof Error ? e.message : 'Jarayonni boshlab boʻlmadi', 'conflict', 409)

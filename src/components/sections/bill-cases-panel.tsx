@@ -26,7 +26,7 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
     return () => clearInterval(t)
   }, [job?.waitingUntil])
 
-  const go = async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }) => {
+  const go = async (opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean; refresh?: 'open' }) => {
     const err = await start(opts)
     if (err) toast.error(err, { position: 'top-left' })
   }
@@ -44,6 +44,8 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
     text = `Toʻlovlar oʻqilmoqda: ${job.page}/${job.pages || '…'}-sahifa${job.pass > 0 ? ` · ${job.pass + 1}-oʻtish` : ''}${job.bills ? ` · ${fmt(job.bills)} ta kvitansiya` : ''}. Oʻqilgan sahifalardagi ishlar roʻyxatga keyin qoʻshiladi.`
   } else if (running && job?.phase === 'fill') {
     text = `Ishlar raqam boʻyicha olinmoqda: ${fmt(job.done)}/${fmt(job.total)} · ${fmt(job.found)} tasi topildi${job.absent ? `, ${fmt(job.absent)} tasi sud tizimida yoʻq` : ''}. Topilgan ishlar roʻyxatga shu zahoti qoʻshiladi; sahifadan chiqsangiz ham davom etadi.`
+  } else if (running && job?.phase === 'refresh') {
+    text = `Tugallanmagan ishlar yangilanmoqda: ${fmt(job.done)}/${fmt(job.total)} · ${fmt(job.changed)} tasida oʻzgarish bor. Tugagan ishlar qayta soʻralmaydi; sahifadan chiqsangiz ham davom etadi.`
   } else if (!loaded || !st || st.billCases === 0) {
     text = 'Sud tizimi bu STIR boʻyicha roʻyxatni cheklaydi (yangi tizim 100 ta, eski tizim 200 ta qator): eski ishlar koʻrinmasligi mumkin. Bir marta koʻrilgan ish serverda saqlanadi va roʻyxatdan yoʻqolmaydi. Toʻlovlar (billing.sud.uz) har bir ishning raqamini beradi (har ishga odatda ikkita kvitansiya: davlat boji va pochta xarajati): yetishmayotgan ishlarni shu raqamlar orqali olish mumkin.'
   } else {
@@ -85,6 +87,9 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
               <button className="btn btn-outline btn-sm" onClick={() => void go({ load: 'skip', fill: true })}>
                 {paused || job?.state === 'stopped' ? 'Davom ettirish' : 'Yetishmayotgan ishlarni olish'} ({fmt(st.missing)})
               </button>
+            )}
+            {st.found > 0 && (
+              <button className="btn btn-outline btn-sm" onClick={() => void go({ load: 'skip', fill: false, refresh: 'open' })}>Tugallanmagan ishlarni yangilash</button>
             )}
             <button className="btn btn-ghost btn-sm" onClick={() => void go({ load: 'refresh', fill: true })}>Toʻlovlarni yangilash</button>
           </>

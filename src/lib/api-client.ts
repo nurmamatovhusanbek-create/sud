@@ -158,8 +158,8 @@ export function getBillJob(stir: string, after: number | null, signal?: AbortSig
 }
 
 /** Started by a click (or by opening the Toʻlovlar tab of a company with no stored bills, `fill: false`). Returns at once. */
-export async function startBillJob(stir: string, opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean }): Promise<ApiResult<{ job: BillJobStatus }>> {
-  return post(`/api/bill-cases?tin=${stir}&action=start&load=${opts.load}&fill=${opts.fill ? 1 : 0}`)
+export async function startBillJob(stir: string, opts: { load: 'auto' | 'refresh' | 'skip'; fill: boolean; refresh?: 'open' }): Promise<ApiResult<{ job: BillJobStatus }>> {
+  return post(`/api/bill-cases?tin=${stir}&action=start&load=${opts.load}&fill=${opts.fill ? 1 : 0}${opts.refresh ? '&refresh=open' : ''}`)
 }
 
 export async function stopBillJob(stir: string): Promise<ApiResult<{ job: BillJobStatus }>> {
