@@ -157,3 +157,40 @@ describe('buckets', () => {
     expect(bk.renderBucket('nonsense:1')).toBeNull()
   })
 })
+
+describe('hearings bucket', () => {
+  const row = (date: string, time = '10:00') => JSON.stringify({ hearingDate: date, hearingTime: time, hearingStage: 'first', caseStatus: 'Кўриб чиқиш жараёнида', plaintiff: 'P', defendant: 'D' })
+  const put = (num: string, r: string, t: number) => dbm.getDb().prepare('INSERT INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('civil', A, num, 2509, 's', 'h', r, t)
+
+  test('holds the upcoming hearings only, one row per case, sorted by date and time; a case with no date or a past date is not in it', () => {
+    put('2-1004-2509/1', row('20.12.2090', '11:00'), 5)
+    put('2-1004-2509/2', row('05.01.2090', '09:30'), 6)
+    put('2-1004-2509/3', row('01.01.2001'), 7)
+    put('2-1004-2509/4', '{"hearingDate":"-"}', 8)
+    put('2-1004-2509/5', '{"n":5}', 9)
+    expect(bk.listBuckets()).toContain(`hearings:${A}`)
+    const lines = bk.renderBucket(`hearings:${A}`)!.text.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines.map((l) => [l[0], l[2], l[3]])).toEqual([['2-1004-2509/2', 20900105, '09:30'], ['2-1004-2509/1', 20901220, '11:00']])
+    expect(lines[0].slice(4)).toEqual(['first', 'Кўриб чиқиш жараёнида', 'P', 'D', 6]) // the row's own fetch time, so unchanged rows keep their bytes
+    expect(bk.renderBucket(`hearings:${A}`)!.text.equals(bk.renderBucket(`hearings:${A}`)!.text)).toBe(true)
+  })
+
+  test('a company with no upcoming hearing has no such bucket; the bucket is never imported', () => {
+    put('2-1004-2509/3', row('01.01.2001'), 7)
+    expect(bk.listBuckets()).not.toContain(`hearings:${A}`)
+    expect(bk.importBucket(`hearings:${A}`, Buffer.from('["x","civil",20900101,"","","","","",1]\n'))).toBe(0)
+  })
+
+  test('merging two copies keeps the newer row of a case (a postponed hearing) and drops what has passed', () => {
+    const base = Buffer.from(['["2-1004-2509/1","civil",20900105,"09:00","first","s","P","D",5]', '["2-1004-2509/2","civil",20010101,"09:00","first","s","P","D",5]'].join('\n') + '\n')
+    const local = Buffer.from('["2-1004-2509/1","civil",20900220,"14:00","first","s","P","D",9]\n')
+    const merged = bk.mergeBucketText(`hearings:${A}`, base, local).toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(merged).toEqual([['2-1004-2509/1', 'civil', 20900220, '14:00', 'first', 's', 'P', 'D', 9]])
+  })
+
+  test('the court lists (files) add their hearings too, when no found row has the case', () => {
+    cs.writeFeed(A, 'civil|x', { t: 3, complete: true, items: [{ caseNumber: '2-1004-2601/77', caseType: '', caseStatus: 'Тайинлаш', result: '', courtName: '', dateFiled: '', plaintiff: 'P', defendant: '', claimAmount: '', hearingDate: '03.03.2090', hearingTime: '10:00', judge: '' }] })
+    const lines = bk.renderBucket(`hearings:${A}`)!.text.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines.map((l) => l[0])).toEqual(['2-1004-2601/77'])
+  })
+})

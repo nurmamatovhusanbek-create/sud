@@ -320,7 +320,7 @@ async function runRestore(passphrase: string, token: string, chat: string): Prom
   const dest = path.join(path.dirname(dbPath()), `sud.restored-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
   if (m.v === 1) return restoreV1(m, key, token, dest)
 
-  const buckets = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k !== 'index' && k !== 'lists' }) // locators and court lists are for the search and the bot, not for a database
+  const buckets = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k !== 'index' && k !== 'lists' && k !== 'hearings' }) // locators and court lists are for the search and the bot, not for a database
   const total = buckets.length
   set({ phase: 'download', done: 0, total, message: `Yuklab olinmoqda: 0/${total}` })
   let target: ReturnType<typeof openDbFile> | null = null
@@ -468,7 +468,7 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
   const detailKeys = new Set<string>()
   for (const b of m.buckets) {
     const p = parseBucket(b.name)
-    if (p?.tin && p.kind !== 'index' && p.kind !== 'lists' && want.has(p.tin)) {
+    if (p?.tin && p.kind !== 'index' && p.kind !== 'lists' && p.kind !== 'hearings' && want.has(p.tin)) {
       picked.push(b)
       if (p.kind === 'found') detailKeys.add(`${p.court}:${p.year}`)
     }

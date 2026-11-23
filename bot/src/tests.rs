@@ -153,6 +153,53 @@ mod service {
     }
 }
 
+mod hearings {
+    use super::*;
+    use crate::date::{add_days, today};
+
+    #[tokio::test]
+    async fn the_week_ahead_is_sorted_and_leaves_out_the_past_and_the_far_future() {
+        let (sh, _b) = ready_bot().await;
+        let t = today(now());
+        let l = sh.hearings(t, add_days(t, 7)).await.unwrap();
+        assert_eq!(l.iter().map(|h| h.case_number.as_str()).collect::<Vec<_>>(), [CASE, "2-1004-2503/8021", "2-0001-2401/5"]);
+        assert_eq!(l[0].time, "10:00");
+        assert_eq!(sh.hearings(t, add_days(t, 60)).await.unwrap().len(), 4);
+        assert!(sh.hearings(add_days(t, 6), add_days(t, 7)).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_api_answers_and_caps_the_range() {
+        let (sh, _b) = ready_bot().await;
+        let i = signed(4242);
+        let (st, b) = get(&sh, "/api/hearings?days=7", Some(&i)).await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(b["hearings"].as_array().unwrap().len(), 3);
+        assert_eq!(b["hearings"][0]["caseNumber"], CASE);
+        let (_, b) = get(&sh, "/api/hearings?days=9999", Some(&i)).await; // at most 60 days: the 40-day one is in
+        assert_eq!(b["hearings"].as_array().unwrap().len(), 4);
+        assert_eq!(get(&sh, "/api/hearings", None).await.0, StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn the_chat_command_lists_them_in_latin() {
+        let (sh, _b) = ready_bot().await;
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings" } })).await;
+        let t = &sh.outbox.captured()[0].text;
+        assert!(t.contains("Bugun") && t.contains("Ertaga") && t.contains(CASE) && t.contains("Universal MChJ") && !t.contains("МЧЖ"), "{t}");
+        assert!(!t.contains("2-1004-2603/1")); // forty days away: not in the 14-day list
+    }
+
+    #[tokio::test]
+    async fn the_morning_message_goes_to_every_allowed_person_and_only_when_there_is_something() {
+        let (sh, _b) = ready_bot().await;
+        let t = today(now());
+        let list = sh.hearings(t, add_days(t, 7)).await.unwrap();
+        let body = crate::digest::text(&list, t, Some("2026-11-22T10:00:00.000Z")).unwrap();
+        assert!(body.starts_with("📅 Yaqin majlislar (7 kun): 3 ta"));
+    }
+}
+
 mod http {
     use super::*;
 
@@ -288,7 +335,7 @@ mod chat {
         let (sh, _b) = ready_bot().await;
         handle_update(sh.clone(), message(4242, &format!("/case {CASE}"))).await;
         let sent = sh.outbox.captured();
-        assert!(sent[0].text.contains("Daʼvogar: Daʼvogar MCHJ") && sent[0].text.contains("Daʼvo qanoatlantirilsin"));
+        assert!(sent[0].text.contains("Daʼvogar: Daʼvogar MChJ") && sent[0].text.contains("Daʼvo qanoatlantirilsin"));
         assert!(!sent[0].text.contains("Javobgar")); // "-" is hidden
         assert_eq!(sent[0].markup.as_ref().unwrap()["inline_keyboard"][0][0]["web_app"]["url"], "https://bot.example/app?case=2-1004-2503%2F8020");
     }

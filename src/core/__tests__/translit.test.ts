@@ -26,6 +26,12 @@ describe('uzCyrToLat', () => {
 })
 
 describe('uzLatToRu understands both alphabets', () => {
+  test('an all-capitals word keeps its capitals to the last letter (ШОДИЯ → SHODIYA, not SHODIYa); a single capital stays a capital', () => {
+    expect(uzCyrToLat('ШОДИЯ')).toBe('SHODIYA')
+    expect(uzCyrToLat('Шодия')).toBe('Shodiya')
+    expect(uzCyrToLat('Я.Ш.')).toBe('Ya.Sh.')
+  })
+
   test('the same name gives the same Russian whichever way it was typed', () => {
     for (const [oldName, neuName] of [
       ['Oʻktamov Shuhrat Gʻulomovich', 'Öktamov Şuhrat Ğulomoviç'],

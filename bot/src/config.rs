@@ -15,6 +15,8 @@ pub struct Config {
     pub set_webhook: bool,
     /// calls per person per minute (0 = no limit)
     pub rate_per_minute: usize,
+    /// the morning message with the week's hearings (DIGEST=0 turns it off)
+    pub digest: bool,
 }
 
 fn env(k: &str) -> Option<String> {
@@ -36,6 +38,7 @@ impl Config {
             refresh_secs: env("REFRESH_SECS").and_then(|p| p.parse().ok()).unwrap_or(300),
             set_webhook: env("WEBHOOK").map(|v| v != "0").unwrap_or(true),
             rate_per_minute: env("RATE_PER_MINUTE").and_then(|p| p.parse().ok()).unwrap_or(90),
+            digest: env("DIGEST").map(|v| v != "0").unwrap_or(true),
         })
     }
 }
@@ -56,6 +59,7 @@ impl Config {
             refresh_secs: 300,
             set_webhook: false,
             rate_per_minute: 0,
+            digest: false,
         }
     }
 }

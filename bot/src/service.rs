@@ -1,7 +1,7 @@
 //! The questions the bot answers, over the locator in memory and the buckets fetched on demand. Pure of HTTP and chat: `http/` and `chat.rs` only
 //! call these and format the result.
 
-use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, CompanyHit, Overview, YearCount};
+use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, CompanyHit, Hearing, Overview, YearCount};
 use crate::error::{AppError, AppResult};
 use crate::index::is_case_like;
 use crate::state::Shared;
@@ -215,6 +215,28 @@ impl Shared {
             }
         }
         Ok(CaseView { num: num.to_string(), court: e.court.clone(), tin: e.tin.clone(), year: e.yy, detail, row, bills, companies: entries.iter().map(|x| x.tin.clone()).collect() })
+    }
+
+    /// The hearings from `from` to `to` (yyyymmdd, both included) over every company of the backup, by date and time. Each company's hearings are ONE
+    /// small bucket, so this is a few downloads on a cold start and none afterwards.
+    pub async fn hearings(&self, from: u32, to: u32) -> AppResult<Vec<Hearing>> {
+        let names: Vec<(String, String)> = {
+            let s = self.st.read().await;
+            s.manifest.iter().flat_map(|m| m.buckets.iter()).filter_map(|b| b.name.strip_prefix("hearings:").map(|t| (b.name.clone(), t.to_string()))).collect()
+        };
+        let mut out = Vec::new();
+        for (name, tin) in names {
+            let Some(t) = self.bucket_text(&name).await.map_err(Self::upstream)? else { continue };
+            for r in rows(&t) {
+                let day = r.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                if day < from || day > to {
+                    continue;
+                }
+                out.push(Hearing { tin: tin.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into() });
+            }
+        }
+        out.sort_by(|a, b| a.day.cmp(&b.day).then(a.time.cmp(&b.time)).then(a.case_number.cmp(&b.case_number)));
+        Ok(out)
     }
 
     pub async fn bill_view(&self, number: &str) -> AppResult<Bill> {

@@ -50,6 +50,7 @@ pub fn router(sh: Arc<Shared>) -> Router {
         .route("/tg/{secret}", post(webhook::receive))
         .route("/api/companies", get(api::companies))
         .route("/api/overview", get(api::overview))
+        .route("/api/hearings", get(api::hearings))
         .route("/api/search", get(api::search))
         .route("/api/case", get(api::case))
         .route("/api/bill", get(api::bill))

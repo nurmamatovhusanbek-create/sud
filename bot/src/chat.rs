@@ -1,7 +1,8 @@
 //! The chat side: commands and buttons. Only the listed users are answered; everyone else gets their own Telegram id (so the owner can list it) and
 //! nothing else. Text is built from the typed answers of `service.rs`; sending goes through `Outbox`, so every handler is testable without Telegram.
 
-use crate::domain::{Bill, CaseView, Company};
+use crate::domain::{Bill, CaseView, Company, Hearing};
+use crate::translit::to_latin as lat;
 use crate::error::AppResult;
 use crate::state::Shared;
 use serde_json::{json, Value};
@@ -9,7 +10,7 @@ use std::sync::Arc;
 
 const HELP: &str = "Sud tizimi boti: Telegramdagi shifrlangan zaxiradan qidiradi.\n\n\
 Ish raqami (2-1004-2603/8020), kvitansiya raqami yoki STIR yozing: shunchaki xabar yuborish yetarli.\n\n\
-/find <matn>: qidirish\n/case <ish raqami>: ish maʼlumoti\n/bill <raqam>: kvitansiya\n/company <STIR>: kompaniya\n/app: qidiruv oynasi (Mini App)\n/status: zaxira holati";
+/find <matn>: qidirish\n/hearings: yaqin majlislar (14 kun)\n/case <ish raqami>: ish maʼlumoti\n/bill <raqam>: kvitansiya\n/company <STIR>: kompaniya\n/app: qidiruv oynasi (Mini App)\n/status: zaxira holati";
 
 pub fn authorized(sh: &Shared, user: i64) -> bool {
     sh.cfg.allowed.contains(&user)
@@ -29,7 +30,7 @@ fn fmt_int(n: i64) -> String {
 }
 
 /// `2026-11-22T17:41:29.546Z` → `22.11.2026`
-fn dmy_iso(iso: &str) -> String {
+pub fn dmy_iso(iso: &str) -> String {
     let d = iso.get(0..10).unwrap_or("");
     let p: Vec<&str> = d.split('-').collect();
     if p.len() == 3 { format!("{}.{}.{}", p[2], p[1], p[0]) } else { iso.to_string() }
@@ -65,6 +66,26 @@ fn text(v: &Value) -> &str {
 /// tiyin → so'm
 fn som(v: &Value) -> String {
     fmt_int(v.as_i64().unwrap_or(0) / 100)
+}
+
+/// hearings grouped by day: «Bugun», «Ertaga», then the date; one line per hearing
+pub fn fmt_hearing_block(list: &[Hearing], today: u32) -> String {
+    let mut out = String::new();
+    let mut day = 0;
+    for h in list {
+        if h.day != day {
+            day = h.day;
+            let date = crate::date::dmy(day);
+            let head = if day == today { format!("Bugun, {date}") } else if day == crate::date::add_days(today, 1) { format!("Ertaga, {date}") } else { date };
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&format!("{head}\n"));
+        }
+        let sides = [lat(&h.plaintiff), lat(&h.defendant)].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" — ");
+        out.push_str(&format!("⏰ {} · {}{}\n", if h.time.is_empty() { "—" } else { &h.time }, h.case_number, if sides.is_empty() { String::new() } else { format!("\n    {sides}") }));
+    }
+    out
 }
 
 pub fn hit_line(h: &Value) -> String {
@@ -127,11 +148,11 @@ pub fn case_text(c: &CaseView) -> String {
     for b in &c.bills {
         out.push_str(&format!("🧾 {} · {} · {}\n", text(&b.number), text(&b.cat), som(&b.amount)));
     }
-    out
+    lat(&out)
 }
 
 pub fn bill_text(b: &Bill) -> String {
-    format!(
+    lat(&format!(
         "🧾 Kvitansiya {}\nHolati: {}\nTuri: {}\nSud: {}\nSumma: {} · toʻlangan: {}\nBerilgan: {}\n{}STIR: {}",
         text(&b.number),
         text(&b.status),
@@ -142,7 +163,7 @@ pub fn bill_text(b: &Bill) -> String {
         dmy_ms(b.issued.as_i64().unwrap_or(0)),
         if text(&b.case_number).is_empty() { String::new() } else { format!("Ish: {}\n", text(&b.case_number)) },
         text(&b.tin)
-    )
+    ))
 }
 
 pub fn company_text(c: &Company) -> String {
@@ -231,6 +252,14 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             Some(u) => sh.outbox.send(chat, "Qidiruv oynasini oching:", Some(json!({ "inline_keyboard": [[{ "text": "Qidiruv", "web_app": { "url": format!("{u}/app") } }]] }))).await,
             None => sh.outbox.send(chat, "Mini App manzili sozlanmagan (PUBLIC_URL).", None).await,
         },
+        "/hearings" => {
+            let today = crate::date::today(crate::state::now());
+            match sh.hearings(today, crate::date::add_days(today, 14)).await {
+                Ok(l) if l.is_empty() => sh.outbox.send(chat, "Yaqin 14 kunda majlis yoʻq (zaxira maʼlumotiga koʻra).", None).await,
+                Ok(l) => sh.outbox.send(chat, &format!("📅 Yaqin majlislar (14 kun): {} ta\n\n{}", l.len(), fmt_hearing_block(&l, today)), None).await,
+                Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+            }
+        }
         "/case" => show(&sh, chat, "c", arg).await,
         "/bill" => show(&sh, chat, "b", arg).await,
         "/company" => show(&sh, chat, "k", arg).await,

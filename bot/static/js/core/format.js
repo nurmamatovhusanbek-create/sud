@@ -21,3 +21,10 @@ export function dmyKey(s) {
 }
 /** today in Uzbekistan as the same sortable number */
 export const todayKey = () => dmyKey(dmy(Date.now()))
+/** `20301205` → `05.12.2030` (the bot sends a hearing's day as yyyymmdd) */
+export const dayDmy = (key) => `${String(key % 100).padStart(2, '0')}.${String(Math.floor(key / 100) % 100).padStart(2, '0')}.${Math.floor(key / 10000)}`
+/** the day after `key` (yyyymmdd), through a real calendar */
+export function nextDay(key) {
+  const d = new Date(Date.UTC(Math.floor(key / 10000), (Math.floor(key / 100) % 100) - 1, key % 100 + 1))
+  return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate()
+}

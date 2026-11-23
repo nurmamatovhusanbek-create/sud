@@ -82,6 +82,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `dates.ts` | components/proto/date-tile.tsx, components/sections/bill-cases-panel.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/telegram-copy-card.tsx, components/views/telegram-settings.tsx, +9 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
+| `hearings.ts` | lib/db-buckets.ts | core/__tests__/hearings.test.ts |
 | `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
 | `json-salvage.ts` | lib/court-case.ts | core/__tests__/json-salvage.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |

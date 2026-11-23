@@ -114,3 +114,7 @@ button.bars__row:active { background: var(--color-wash); }
 .callout__label { font-size: var(--text-xs); opacity: 0.7; }
 .callout__main { font-size: var(--text-xl); font-weight: var(--weight-medium); }
 .callout__sub { font-size: var(--text-sm); opacity: 0.8; }
+
+/* ---- a day heading over the hearings of that day ---- */
+.day-label { margin: var(--space-2) var(--space-1) var(--space-1); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.row__sub { overflow-wrap: anywhere; }

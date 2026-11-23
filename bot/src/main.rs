@@ -18,6 +18,9 @@ mod service;
 mod state;
 mod sync;
 mod telegram;
+mod translit;
+mod date;
+mod digest;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
@@ -38,10 +41,14 @@ async fn main() {
     }
     let tg = telegram::Tg::new(&cfg.api_base, &cfg.token);
     let want_webhook = cfg.set_webhook;
+    let digest = cfg.digest;
     let sh = state::Shared::new(cfg);
 
     // the port opens at once (the host's health check); the backup is read in the background
     tokio::spawn(sync::keep_synced(sh.clone()));
+    if digest {
+        tokio::spawn(digest::run(sh.clone()));
+    }
     if want_webhook {
         tokio::spawn(sync::register_webhook(sh.clone(), tg));
     }

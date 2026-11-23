@@ -124,3 +124,20 @@ pub struct Info {
     pub synced_at: i64,
     pub failures: u32,
 }
+
+/// an upcoming hearing (from a company's `hearings:<tin>` bucket)
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Hearing {
+    pub tin: String,
+    pub case_number: String,
+    pub court: String,
+    /// yyyymmdd
+    pub day: u32,
+    pub time: String,
+    /// first | appeal | cassation | inspection | "" (not known)
+    pub stage: String,
+    pub status: String,
+    pub plaintiff: String,
+    pub defendant: String,
+}

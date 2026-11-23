@@ -22,7 +22,11 @@ export function toLatin(s) {
     }
     if (ch !== lo) {
       const n = s[i + 1]
-      const wordUpper = !!n && n === n.toUpperCase() && n !== n.toLowerCase()
+      const pv = s[i - 1]
+      const up = (c) => !!c && c === c.toUpperCase() && c !== c.toLowerCase()
+      const letter = (c) => !!c && c.toLowerCase() !== c.toUpperCase()
+      // the LAST letter of an all-capitals word has no capital after it: the one before it says (ШОДИЯ → SHODIYA)
+      const wordUpper = up(n) || (up(pv) && !letter(n))
       l = wordUpper ? l.toUpperCase() : l.charAt(0).toUpperCase() + l.slice(1)
     }
     out += l

@@ -60,3 +60,11 @@ pub async fn company_bills(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<
     let page = sh.company_bills(&tin(&q)?, num(&q, "year", 0, 3000) as u32, get(&q, "q"), num(&q, "offset", 0, 1_000_000), num(&q, "limit", 30, 100)).await?;
     Ok(Json(json!({ "ok": true, "bills": page })))
 }
+
+/// the hearings of the next `days` days (default 14, at most 60), today included
+pub async fn hearings(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<Value>> {
+    let days = num(&q, "days", 14, 60) as i64;
+    let today = crate::date::today(crate::state::now());
+    let list = sh.hearings(today, crate::date::add_days(today, days)).await?;
+    Ok(Json(json!({ "ok": true, "today": today, "hearings": list })))
+}

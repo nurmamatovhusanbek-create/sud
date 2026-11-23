@@ -48,7 +48,12 @@ pub fn buckets(extra_case: bool) -> Vec<(String, String)> {
         index.push(json!(["c", "2-1004-2603/1", "civil", 26]));
     }
     let bills25 = vec![bill_row(TIN, BILL, 1_774_827_370_376, 206_000_000, CASE), bill_row(TIN, "260880770032", 1_774_000_000_000, 100_000, "2-1004-2503/8021")];
+    // hearings relative to today: today, tomorrow, in five days, in forty days, and one that has passed
+    let t = crate::date::today(crate::state::now());
+    let hearing = |num: &str, day: u32, time: &str| json!([num, "civil", day, time, "first", "Тайинлаш", "Универсал МЧЖ", "ANOR МЧЖ", 1]);
+    let hearings = vec![hearing(CASE, t, "10:00"), hearing("2-1004-2503/8021", crate::date::add_days(t, 1), "09:30"), hearing("2-0001-2401/5", crate::date::add_days(t, 5), "14:00"), hearing("2-1004-2603/1", crate::date::add_days(t, 40), "11:00"), hearing("2-1004-2603/2", crate::date::add_days(t, -3), "11:00")];
     vec![
+        (format!("hearings:{TIN}"), lines(&hearings)),
         (format!("index:{TIN}"), lines(&index)),
         (format!("bills:{TIN}:2025"), lines(&bills25)),
         (format!("details:civil:25"), lines(&[json!(["x", CASE, "x", detail])])),

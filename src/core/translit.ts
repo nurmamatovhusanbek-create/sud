@@ -42,7 +42,11 @@ function transliterate(text: string): string {
     // keep capitalisation: «Ш» → «Sh», a fully upper-case word → «SH»
     if (ch !== low) {
       const next = text[i + 1]
-      const wordUpper = !!next && next === next.toUpperCase() && next !== next.toLowerCase()
+      const prev = text[i - 1]
+      const isUpper = (c: string | undefined) => !!c && c === c.toUpperCase() && c !== c.toLowerCase()
+      const isLetter = (c: string | undefined) => !!c && c.toLowerCase() !== c.toUpperCase()
+      // the LAST letter of an all-capitals word has no capital after it: the one before it says (ШОДИЯ → SHODIYA, not SHODIYa)
+      const wordUpper = isUpper(next) || (isUpper(prev) && !isLetter(next))
       lat = wordUpper ? lat.toUpperCase() : lat.charAt(0).toUpperCase() + lat.slice(1)
     }
     out += lat

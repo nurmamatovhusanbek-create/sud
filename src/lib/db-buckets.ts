@@ -1,6 +1,7 @@
 import { getDb, type Db, type SqlValue } from './db'
 import { courtTypeOfNumber, registeredKey } from '@/core/bill-cases'
 import { feedRows, feedTins } from './case-store'
+import { hearingDateKey, todayKeyUz } from '@/core/hearings'
 
 /**
  * The database cut into BUCKETS for the Telegram backup: stable, small, deterministic pieces, so that a bucket whose rows did not change has the
@@ -12,6 +13,8 @@ import { feedRows, feedTins } from './case-store'
  *   state:<tin>                   the company's load state and its two dates
  *   lists:<tin>                   the rows of the company's TIN lists (what the courts' list endpoints showed: status, parties…), kept as files by the
  *                                 app, not in the database; read by the bot, never imported (the lists are fetched again from the courts)
+ *   hearings:<tin>                the company's UPCOMING hearings (today and later), one row per case: number, court, date key, time, stage, status,
+ *                                 parties, and when the row was made; read by the bot's “Yaqin majlislar” and the morning message, never imported
  *   index:<tin>                   the LOCATOR of the company: every case number and bill number with the court/year of the bucket that holds it (never
  *                                 imported into a database: it is read by the search, `lib/telegram-index`)
  * Text of a bucket: one JSON array per row, rows in primary-key order, binary columns as base64. The bills' `pass` counter is left out (it moves on
@@ -33,7 +36,7 @@ const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ')
 const WITH_CASE = "case_number IS NOT NULL AND case_number != ''"
 const yearOfMs = (c: string) => `CAST(strftime('%Y', ${c} / 1000, 'unixepoch') AS INTEGER)`
 
-export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists'
+export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists' | 'hearings'
 export interface BucketName {
   kind: BucketKind
   tin: string | null
@@ -51,6 +54,7 @@ export function parseBucket(name: string): BucketName | null {
     case 'state': return p.length === 2 ? { kind: 'state', tin: p[1]!, court: null, year: null } : null
     case 'index': return p.length === 2 ? { kind: 'index', tin: p[1]!, court: null, year: null } : null
     case 'lists': return p.length === 2 ? { kind: 'lists', tin: p[1]!, court: null, year: null } : null
+    case 'hearings': return p.length === 2 ? { kind: 'hearings', tin: p[1]!, court: null, year: null } : null
     default: return null
   }
 }
@@ -66,12 +70,39 @@ export function listBuckets(db: Db = getDb()): string[] {
     if (db.prepare('SELECT 1 FROM bill_loads WHERE tin = ?').get(tin) || db.prepare('SELECT 1 FROM companies WHERE tin = ?').get(tin)) out.push(`state:${tin}`)
     if (db.prepare('SELECT 1 FROM tried WHERE tin = ? LIMIT 1').get(tin)) out.push(`tried:${tin}`)
     if (listed.has(tin) && feedRows(tin).length) out.push(`lists:${tin}`)
+    if (upcomingHearings(tin, db).length) out.push(`hearings:${tin}`)
     if (db.prepare(`SELECT 1 FROM bills WHERE tin = ? AND ${WITH_CASE} LIMIT 1`).get(tin) || db.prepare('SELECT 1 FROM found_cases WHERE tin = ? LIMIT 1').get(tin) || (listed.has(tin) && feedRows(tin).length)) out.push(`index:${tin}`)
     for (const r of db.prepare(`SELECT DISTINCT COALESCE(${yearOfMs('issued')}, 0) y FROM bills WHERE tin = ? AND ${WITH_CASE} ORDER BY y`).all(tin)) out.push(`bills:${tin}:${Number(r.y)}`)
     for (const r of db.prepare('SELECT DISTINCT court, CASE WHEN yymm < 0 THEN 0 ELSE yymm / 100 END y FROM found_cases WHERE tin = ? ORDER BY court, y').all(tin)) out.push(`found:${tin}:${r.court}:${Number(r.y)}`)
   }
   for (const r of db.prepare('SELECT DISTINCT court, CASE WHEN yymm < 0 THEN 0 ELSE yymm / 100 END y FROM case_details ORDER BY court, y').all()) out.push(`details:${r.court}:${Number(r.y)}`)
   return out
+}
+
+/** a hearing as the bot reads it: [case number, court, yyyymmdd, time, stage, status, plaintiff, defendant, when the row was fetched (ms)] */
+export type HearingLine = [string, string, number, string, string, string, string, string, number]
+
+const clean = (v: unknown): string => (typeof v === 'string' && v !== '-' ? v : '')
+
+/**
+ * The company's hearings from today on: cases found by number and cases of its TIN lists whose row names a hearing date. Concluded cases keep no
+ * hearing date worth showing, so none is filtered by status; a past date is simply not upcoming. One row per case number (the lists' row only when no
+ * found row has the case).
+ */
+export function upcomingHearings(tin: string, db: Db = getDb(), now: number = Date.now()): HearingLine[] {
+  const today = todayKeyUz(now)
+  const out = new Map<string, HearingLine>()
+  const add = (court: string, row: Record<string, unknown>, num: string, t: number) => {
+    const day = hearingDateKey(clean(row.hearingDate))
+    if (!num || day < today || out.has(num)) return
+    out.set(num, [num, court, day, clean(row.hearingTime), clean(row.hearingStage), clean(row.caseStatus), clean(row.plaintiff), clean(row.defendant), t])
+  }
+  // the database filters first (json_extract): of 80 000 found cases only the ones with a date are read as JSON
+  for (const r of db.prepare("SELECT court, num, row, t FROM found_cases WHERE tin = ? AND json_extract(row, '$.hearingDate') IS NOT NULL AND json_extract(row, '$.hearingDate') NOT IN ('', '-')").all(tin)) {
+    try { add(String(r.court), JSON.parse(String(r.row)) as Record<string, unknown>, String(r.num), Number(r.t)) } catch { /* an unreadable row shows nothing */ }
+  }
+  for (const r of feedRows(tin)) add(r.court, r.row as unknown as Record<string, unknown>, r.num, r.t)
+  return [...out.values()].sort((a, b) => a[2] - b[2] || (a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : a[0] < b[0] ? -1 : 1))
 }
 
 const b64 = (v: unknown): string => (v == null ? '' : Buffer.from(v as Uint8Array).toString('base64'))
@@ -110,6 +141,9 @@ export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | n
     }
     case 'tried':
       take(db.prepare(`SELECT ${list(TRIED)} FROM tried WHERE tin = ? ORDER BY num`).all(b.tin), TRIED)
+      break
+    case 'hearings':
+      for (const h of upcomingHearings(b.tin!, db)) lines.push(line(h))
       break
     case 'lists': {
       for (const r of feedRows(b.tin!)) lines.push(line([r.court, r.num, JSON.stringify(r.row)]))
@@ -154,7 +188,7 @@ export interface ImportCount {
 export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), opts: { bills?: 'replace' | 'keep' } = {}): number {
   const b = parseBucket(name)
   if (!b) throw new Error(`noma'lum bo'lak: ${name.slice(0, 40)}`)
-  if (b.kind === 'index' || b.kind === 'lists') return 0 // a locator and the court lists are read by the search / the bot, never imported
+  if (b.kind === 'index' || b.kind === 'lists' || b.kind === 'hearings') return 0 // a locator, the court lists and the hearings are read by the search / the bot, never imported
   const rows = Buffer.from(text).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SqlValue[])
   let n = 0
   db.transaction(() => {
@@ -211,6 +245,7 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
     case 'tried': return { key: String(r[1]), t: Number(r[2]) || 0 }
     case 'index': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'lists': return { key: `${r[0]}:${r[1]}`, t: null }
+    case 'hearings': return { key: String(r[0]), t: Number(r[8]) || 0 } // one row per case: the newer one is the case's current hearing
     default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
   }
 }
@@ -232,6 +267,7 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
       // a bill without a case (an older backup holds many) is dropped: it is not kept any more
       if (b.kind === 'bills' && !r[BILL.indexOf('case_number')]) continue
       if (b.kind === 'index' && r[0] === 'b' && !r[3]) continue
+      if (b.kind === 'hearings' && Number(r[2]) < todayKeyUz()) continue // a hearing that has passed is not kept
       const { key, t } = rowKey(b.kind, r)
       const have = rows.get(key)
       if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t })
