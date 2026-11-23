@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 #[serde(rename_all = "camelCase")]
 pub struct Company {
     pub tin: String,
+    /// the company's name in the courts' spelling (Cyrillic or Latin); "" when the backup does not know it
+    pub name: String,
     /// bills with a case, cases found by number, cases the court lists show
     pub bills: usize,
     pub found: usize,
@@ -81,6 +83,11 @@ pub struct CaseView {
     pub bills: Vec<Bill>,
     /// every company whose backup knows this number
     pub companies: Vec<String>,
+    /// the first company's name, its side in this case ("plaintiff" | "defendant" | "") and the other party; decided by the parties' TINs when the detail
+    /// names them, else by the names
+    pub company_name: String,
+    pub role: &'static str,
+    pub counterparty: String,
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq)]
@@ -116,6 +123,7 @@ pub struct CompanyHit {
     pub kind: &'static str,
     pub key: String,
     pub tin: String,
+    pub name: String,
     pub bills: usize,
     pub found: usize,
     pub refreshed_at: i64,
@@ -154,6 +162,9 @@ pub struct Hearing {
     pub status: String,
     pub plaintiff: String,
     pub defendant: String,
+    /// the company's side: "plaintiff" | "defendant" | "" (not known), and the other party's name
+    pub role: &'static str,
+    pub counterparty: String,
 }
 
 /// one company's share of the hearings in a range (a card in the «Majlislar» tab)

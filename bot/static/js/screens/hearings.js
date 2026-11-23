@@ -6,7 +6,7 @@ import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { dayDmy, nextDay, num } from '../core/format.js'
 import { d } from '../core/text.js'
-import { courtName, STAGE } from './common.js'
+import { courtName, ROLE, STAGE } from './common.js'
 
 const PAGE = 30
 const RANGES = [[1, 'Bugun'], [7, '7 kun'], [14, '14 kun'], [30, '30 kun'], [60, '60 kun']]
@@ -21,13 +21,16 @@ function dayLabel(day, today) {
 }
 
 function item(x) {
-  const sides = [d(x.plaintiff), d(x.defendant)].filter(Boolean).join(' — ')
+  // the company's side is known: «Javobgar · qarshi tomon: X»; otherwise both parties as they are
+  const sides = x.role ? `${ROLE[x.role]} · qarshi tomon: ${d(x.counterparty)}` : [d(x.plaintiff), d(x.defendant)].filter(Boolean).join(' — ')
   const sub = [courtName(x.court), STAGE[x.stage]].filter(Boolean).join(' · ')
   return Row({ icon: 'case', title: x.caseNumber, tag: x.time || undefined, sub, sub2: sides, onOpen: () => go({ name: 'case', key: x.caseNumber }) })
 }
 
 export function hearingsTab(route, { signal }) {
   const st = { days: Number(route.days) || 14, tin: route.tin || '', q: route.q || '' }
+  const names = {} // STIR → name, for the company cards
+  api.companies({ signal }).then((j) => { for (const c of j.companies || []) names[c.tin] = c.name ? d(c.name) : ''; }).catch(() => {})
   const chipsHost = h('div', {})
   const cardsHost = h('div', {})
   const listHost = h('div', { class: 'stack' })
@@ -46,7 +49,7 @@ export function hearingsTab(route, { signal }) {
       const total = page.companies.reduce((a, c) => a + c.count, 0)
       cardsHost.replaceChildren(page.companies.length > 1 || st.tin
         ? CardRow([{ value: '', title: 'Hammasi', big: num(total), sub: `${page.companies.length} kompaniya` },
-          ...page.companies.map((c) => ({ value: c.tin, title: c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, page.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))], st.tin, (v) => { st.tin = v; keep(); load(true) })
+          ...page.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, page.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))], st.tin, (v) => { st.tin = v; keep(); load(true) })
         : '')
       listHost.replaceChildren()
       lastDay = 0

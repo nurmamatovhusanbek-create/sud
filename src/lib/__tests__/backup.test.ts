@@ -598,3 +598,39 @@ describe('mirror channels: a banned channel or a deleted manifest message does n
     expect(!none.ok && none.error).toContain(MIRROR)
   })
 })
+
+describe('company names in the backup', () => {
+  const name = (c: unknown) => (c as { name?: string }).name
+  test('the manifest names a company by what its own bills say (the most common payer whose TIN is the company\'s)', async () => {
+    fakeChannel()
+    const db = dbm.getDb()
+    const ins = db.prepare('UPDATE bills SET payer = ?, payer_tin = ? WHERE number = ?')
+    for (let i = 0; i < 5; i++) ins.run('"ANOR TEXTILE" МЧЖ', TIN, `a${i}`)
+    ins.run('"ANOR TEXTILE MChJ"', TIN, 'a5') // a rarer spelling
+    ins.run('Somebody Else', '111111111', 'a6') // a bill paid by another person: not the company
+    expect(bk.companyNameOf(TIN)).toBe('"ANOR TEXTILE" МЧЖ')
+    expect((await runBackup()).phase).toBe('done')
+    const cat = await backup.readRemoteCatalog(PASS)
+    expect(cat.ok && name(cat.catalog.companies.find((c) => c.tin === TIN))).toBe('"ANOR TEXTILE" МЧЖ')
+  })
+
+  test('a company with no bill that names it has no name; another computer\'s company keeps its name and dates when this one backs up', async () => {
+    fakeChannel()
+    const first = await runBackup()
+    expect(first.phase).toBe('done')
+    const none = await backup.readRemoteCatalog(PASS)
+    expect(none.ok && name(none.catalog.companies[0])).toBeUndefined()
+    // another computer's company is in the channel (bills + a name); this computer knows nothing about it
+    const db = dbm.getDb()
+    db.prepare("UPDATE bills SET payer = 'Boshqa MChJ', payer_tin = ? WHERE number = 'b1'").run(TIN)
+    expect((await runBackup()).phase).toBe('done')
+    // the local company row goes away (a computer that never scraped it): the next backup still carries its name and dates
+    db.prepare('DELETE FROM bills WHERE tin = ?').run(TIN)
+    db.prepare('DELETE FROM companies WHERE tin = ?').run(TIN)
+    expect((await runBackup()).phase).toBe('done')
+    const kept = await backup.readRemoteCatalog(PASS)
+    const c = kept.ok ? kept.catalog.companies.find((x) => x.tin === TIN) : undefined
+    expect(name(c)).toBe('Boshqa MChJ')
+    expect(c?.refreshedAt).toBe(777)
+  })
+})

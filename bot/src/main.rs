@@ -18,6 +18,7 @@ mod service;
 mod state;
 mod sync;
 mod telegram;
+mod party;
 mod translit;
 mod date;
 mod digest;

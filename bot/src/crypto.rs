@@ -111,6 +111,9 @@ pub struct CompanyDates {
     pub first_at: i64,
     #[serde(default)]
     pub refreshed_at: i64,
+    /// the company's name as its own bills spell it (absent in older backups and for a company no bill names)
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

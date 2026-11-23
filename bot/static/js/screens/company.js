@@ -5,7 +5,7 @@ import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { dmy, has, money, num } from '../core/format.js'
 import { d } from '../core/text.js'
-import { COURT, courtName, TopBar } from './common.js'
+import { COURT, companyTitle, courtName, TopBar } from './common.js'
 
 const PAGE = 30
 
@@ -108,7 +108,7 @@ export async function company(route, { signal }) {
   const dates = [o.firstAt ? `Birinchi yuklash ${dmy(o.firstAt)}` : '', o.refreshedAt ? `maʼlumot ${dmy(o.refreshedAt)} holatiga` : ''].filter(Boolean).join(' · ') || 'Zaxiradagi kompaniya'
   return h('div', { class: 'screen stack' },
     TopBar(),
-    Hero({ caption: 'Kompaniya · STIR', id: o.tin, line: dates }),
+    Hero({ caption: o.name ? `Kompaniya · STIR ${o.tin}` : 'Kompaniya · STIR', id: companyTitle(o), line: dates, name: !!o.name }),
     Stats([num(o.cases), 'ish'], [num(o.bills), 'toʻlov'], [String(o.byYear.length), 'yil']),
     Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
     tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : billsPane(o.tin, years, route, signal))

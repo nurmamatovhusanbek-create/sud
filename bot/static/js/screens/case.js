@@ -5,7 +5,7 @@ import { api } from '../core/api.js'
 import { go } from '../core/router.js'
 import { dmyKey, has, money, todayKey } from '../core/format.js'
 import { d } from '../core/text.js'
-import { courtName, TopBar } from './common.js'
+import { companyTitle, courtName, ROLE, TopBar } from './common.js'
 
 const INSTANCE = { first: '1-instansiya', appellate: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' }
 
@@ -59,7 +59,8 @@ export async function caseScreen(route, { signal }) {
     TopBar(Button({ label: `STIR ${c.tin} ›`, size: 'small', onClick: () => go({ name: 'company', key: c.tin }) })),
     Hero({ caption: `${courtName(c.court)} ish`, id: c.num, line: `20${c.year} yilda roʻyxatga olingan`, aside: copy }, status && h('div', { class: 'screen__status' }, CourtStatus(status))),
     next && Callout('Navbatdagi majlis', [next.date, next.time].filter(has).join(' '), next.instance),
-    side && Parties({ role: 'Daʼvogar', name: d(side.plaintiff) || '—', tin: g?.plaintiffTin }, { role: 'Javobgar', name: d(side.defendant) || '—', tin: g?.defendantTin }),
+    c.role && h('p', { class: 'sideline' }, h('b', {}, `${companyTitle({ name: c.companyName, tin: c.tin })} — ${ROLE[c.role]}`), ` · qarshi tomon: ${d(c.counterparty)}`),
+    side && Parties({ role: 'Daʼvogar', name: d(side.plaintiff) || '—', tin: g?.plaintiffTin, mine: c.role === 'plaintiff' }, { role: 'Javobgar', name: d(side.defendant) || '—', tin: g?.defendantTin, mine: c.role === 'defendant' }),
     g ? Card({ title: 'Umumiy' }, Kv('Turi', g.caseType), Kv('Daʼvo predmeti', g.claimSubject), Kv('Daʼvo summasi', g.claimAmount), Kv('Davlat boji', g.stateDuty), Kv('Sud', g.court), Kv('Hudud', g.region), Kv('Sudya', g.judge), Kv('Kotib', g.secretary), Kv('Joriy instansiya', INSTANCE[g.currentInstance] || g.currentInstance), Kv('Ariza sanasi', g.applicationDate), Kv('Ish qoʻzgatilgan', g.initiatedDate), Kv('Muddat', g.deadlineDate), Kv('Uchinchi shaxs', g.thirdParty), Kv('Vakil', g.representative), Kv('Prokuror', g.prosecutor))
       : row ? Card({ title: 'Umumiy (sud roʻyxatidan)' }, Kv('Turi', row.caseType), Kv('Daʼvo summasi', row.claimAmount), Kv('Sud', row.courtName), Kv('Sudya', row.judge), Kv('Ariza sanasi', row.dateFiled), Kv('Natija', row.result))
         : Card({}, h('p', { class: 'muted small' }, 'Batafsil maʼlumot zaxirada yoʻq: bu ish faqat kvitansiyalar orqali maʼlum. Ilovada kompaniya ishlari yangilanganda zaxiraga tushadi.')),

@@ -76,6 +76,11 @@ pub struct Backup {
 
 /// seal `buckets` and the manifest into a channel and pin the manifest (message id and file id change with `version`)
 pub fn publish(channel: &Arc<MemoryChannel>, chat: &str, pass: &str, version: u32, content: &[(String, String)]) {
+    publish_named(channel, chat, pass, version, content, Some("«ANOR» МЧЖ"))
+}
+
+/// the same, with the name of the first company in the manifest (None: the backup does not know it)
+pub fn publish_named(channel: &Arc<MemoryChannel>, chat: &str, pass: &str, version: u32, content: &[(String, String)], name: Option<&str>) {
     let k = key(pass, chat);
     let mut bs = Vec::new();
     for (name, text) in content {
@@ -86,7 +91,7 @@ pub fn publish(channel: &Arc<MemoryChannel>, chat: &str, pass: &str, version: u3
         bs.push(json!({ "name": name, "id": id, "rows": text.lines().count(), "bytes": text.len(), "parts": [{ "fileId": file_id, "messageId": 1, "size": piece.len(), "sha256": sha256_hex(&piece) }] }));
     }
     let m = json!({ "v": 2, "id": format!("m{version}"), "created": "2026-11-22T10:00:00.000Z", "app": "sud-tizimi", "prev": null,
-        "companies": { TIN: { "firstAt": 1_774_000_000_000i64, "refreshedAt": 1_774_827_370_376i64 }, OTHER_TIN: { "firstAt": 1, "refreshedAt": 2 } }, "buckets": bs });
+        "companies": { TIN: { "firstAt": 1_774_000_000_000i64, "refreshedAt": 1_774_827_370_376i64, "name": name }, OTHER_TIN: { "firstAt": 1, "refreshedAt": 2 } }, "buckets": bs });
     let file_id = format!("MANIFEST{chat}-{version}");
     channel.put(chat, &file_id, seal_manifest(&k, &salt_of(chat), m.to_string().as_bytes()));
     channel.pin(chat, version as i64, &file_id);
@@ -144,4 +149,10 @@ pub fn init_data(token: &str, user: i64, auth_date: i64) -> String {
     }
     s.append_pair("hash", &hash);
     s.finish()
+}
+
+/// a details bucket with one case whose general part is `general` (so a test can put TINs in it)
+pub fn detail_bucket(num: &str, general: Value) -> (String, String) {
+    let detail = base64::engine::general_purpose::STANDARD.encode(gz(json!({ "general": general }).to_string().as_bytes()));
+    ("details:civil:25".to_string(), lines(&[json!(["x", num, "x", detail])]))
 }

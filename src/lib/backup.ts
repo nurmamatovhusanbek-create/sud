@@ -9,7 +9,7 @@ import {
   CHUNK_PLAIN, MIN_PASSPHRASE, bucketAad, bucketId, chunkAad, chunkPlain, deriveKey, newSalt, open, openManifest, openManifestWithKey, seal, sealManifest, sha256,
   type AnyManifest, type BucketRef, type Manifest, type ManifestV2, type PartRef,
 } from './backup-crypto'
-import { importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
+import { companyNameOf, importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
 import { billJobRunning } from './bill-cases'
@@ -321,8 +321,17 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       carried++
     }
     set({ phase: 'manifest', message: 'Manifest yuborilmoqda…' })
-    const companies: ManifestV2['companies'] = {}
-    for (const c of snapDb.prepare('SELECT tin, first_at, refreshed_at FROM companies').all()) companies[String(c.tin)] = { firstAt: Number(c.first_at), refreshedAt: Number(c.refreshed_at) }
+    // the companies the channel already knows come first (a backup never takes data away: another computer's company keeps its dates and its name),
+    // this computer's own rows are merged over them (first date: the earlier; «as of»: the later; the name this computer's bills give, else the old one)
+    const companies: ManifestV2['companies'] = prev.value?.m.v === 2 ? { ...prev.value.m.companies } : {}
+    for (const c of snapDb.prepare('SELECT tin, first_at, refreshed_at FROM companies').all()) {
+      const tin = String(c.tin)
+      const old = companies[tin]
+      const name = companyNameOf(tin, snapDb) ?? old?.name
+      companies[tin] = { firstAt: old?.firstAt ? Math.min(old.firstAt, Number(c.first_at)) : Number(c.first_at), refreshedAt: Math.max(old?.refreshedAt ?? 0, Number(c.refreshed_at)), ...(name ? { name } : {}) }
+    }
+    // a company whose bills name it but that has no `companies` row here is still named
+    for (const tin of Object.keys(companies)) if (!companies[tin]!.name) { const n = companyNameOf(tin, snapDb); if (n) companies[tin] = { ...companies[tin]!, name: n } }
     const created = new Date().toISOString()
     const manifest: ManifestV2 = {
       v: 2, id, created, app: 'sud-tizimi', companies, buckets: refs,

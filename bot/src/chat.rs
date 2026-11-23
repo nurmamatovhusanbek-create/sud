@@ -82,15 +82,25 @@ pub fn fmt_hearing_block(list: &[Hearing], today: u32) -> String {
             }
             out.push_str(&format!("{head}\n"));
         }
-        let sides = [lat(&h.plaintiff), lat(&h.defendant)].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" — ");
+        // when the company's side is known: «Javobgar · qarshi tomon: X»; otherwise both parties as they are
+        let sides = if h.role.is_empty() { [lat(&h.plaintiff), lat(&h.defendant)].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" — ") } else { format!("{} · qarshi tomon: {}", role_word(h.role), lat(&h.counterparty)) };
         out.push_str(&format!("⏰ {} · {}{}\n", if h.time.is_empty() { "—" } else { &h.time }, h.case_number, if sides.is_empty() { String::new() } else { format!("\n    {sides}") }));
     }
     out
 }
 
+/// the company's side in words
+pub fn role_word(role: &str) -> &'static str {
+    match role {
+        "plaintiff" => "Daʼvogar",
+        "defendant" => "Javobgar",
+        _ => "",
+    }
+}
+
 pub fn hit_line(h: &Value) -> String {
     match h["kind"].as_str() {
-        Some("company") => format!("🏢 STIR {} · {} toʻlov · {} ish", h["tin"].as_str().unwrap_or(""), fmt_int(h["bills"].as_i64().unwrap_or(0)), fmt_int(h["found"].as_i64().unwrap_or(0))),
+        Some("company") => format!("🏢 {}STIR {} · {} toʻlov · {} ish", match h["name"].as_str().filter(|n| !n.is_empty()) { Some(n) => format!("{} · ", lat(n)), None => String::new() }, h["tin"].as_str().unwrap_or(""), fmt_int(h["bills"].as_i64().unwrap_or(0)), fmt_int(h["found"].as_i64().unwrap_or(0))),
         Some("bill") => format!("🧾 {} · {}{}", h["key"].as_str().unwrap_or(""), h["year"], if s(h, "caseNumber").is_empty() { String::new() } else { format!(" · ish {}", h["caseNumber"].as_str().unwrap_or("")) }),
         _ => format!("⚖️ {} · {} · 20{}", h["key"].as_str().unwrap_or(""), h["court"].as_str().unwrap_or(""), h["year"]),
     }
@@ -108,6 +118,9 @@ pub fn hit_button(h: &Value) -> Value {
 
 pub fn case_text(c: &CaseView) -> String {
     let mut out = format!("⚖️ Ish {}\n", c.num);
+    if !c.role.is_empty() {
+        out.push_str(&format!("{}: {} · qarshi tomon: {}\n", if c.company_name.is_empty() { "Tomon".to_string() } else { c.company_name.clone() }, role_word(c.role), c.counterparty));
+    }
     let mut line = |label: &str, v: &str| {
         if !v.is_empty() {
             out.push_str(&format!("{label}: {v}\n"));
@@ -153,7 +166,7 @@ pub fn case_text(c: &CaseView) -> String {
 
 pub fn bill_text(b: &Bill) -> String {
     lat(&format!(
-        "🧾 Kvitansiya {}\nHolati: {}\nTuri: {}\nSud: {}\nSumma: {} · toʻlangan: {}\nBerilgan: {}\n{}STIR: {}",
+        "🧾 Kvitansiya {}\nHolati: {}\nTuri: {}\nSud: {}\nSumma: {} · toʻlangan: {}\nBerilgan: {}\n{}{}STIR: {}",
         text(&b.number),
         text(&b.status),
         text(&b.cat),
@@ -162,12 +175,13 @@ pub fn bill_text(b: &Bill) -> String {
         som(&b.paid),
         dmy_ms(b.issued.as_i64().unwrap_or(0)),
         if text(&b.case_number).is_empty() { String::new() } else { format!("Ish: {}\n", text(&b.case_number)) },
+        if text(&b.payer).is_empty() { String::new() } else { format!("Toʻlovchi: {}\n", text(&b.payer)) },
         text(&b.tin)
     ))
 }
 
 pub fn company_text(c: &Company) -> String {
-    format!("🏢 STIR {}\nToʻlovlar: {}\nTopilgan ishlar: {}\nBirinchi yuklash: {}\nMaʼlumot holati: {}", c.tin, fmt_int(c.bills as i64), fmt_int(c.found as i64), dmy_ms(c.first_at), dmy_ms(c.refreshed_at))
+    lat(&format!("🏢 {}STIR {}\nToʻlovlar: {}\nTopilgan ishlar: {}\nBirinchi yuklash: {}\nMaʼlumot holati: {}", if c.name.is_empty() { String::new() } else { format!("{}\n", c.name) }, c.tin, fmt_int(c.bills as i64), fmt_int(c.found as i64), dmy_ms(c.first_at), dmy_ms(c.refreshed_at)))
 }
 
 /// a button that opens the Mini App straight on this item (`/app?case=…`)

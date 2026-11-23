@@ -5,6 +5,7 @@ use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, Compan
 use crate::error::{AppError, AppResult};
 use crate::index::is_case_like;
 use crate::date::add_days;
+use crate::party::{learn_name, side_by_name, side_by_tin, Side};
 use crate::state::Shared;
 
 /// the furthest the hearings are looked at (days from today)
@@ -48,7 +49,20 @@ impl Shared {
         set.into_iter().collect()
     }
 
+    /// The company's name in the courts' spelling: the one the backup recorded (its own bills spell it), else the party that is in most of its hearings'
+    /// cases (the list was found by its TIN, so the company is nearly every case's party); "" when neither is known.
+    pub async fn name_of(&self, tin: &str) -> String {
+        let recorded = { self.st.read().await.manifest.as_ref().and_then(|m| m.companies.get(tin)).and_then(|c| c.name.clone()) };
+        if let Some(n) = recorded.filter(|n| !n.trim().is_empty()) {
+            return n;
+        }
+        let Ok(Some(t)) = self.bucket_text(&format!("hearings:{tin}")).await else { return String::new() };
+        let parties: Vec<(String, String)> = rows(&t).iter().map(|r| (str_at(r, 6).to_string(), str_at(r, 7).to_string())).collect();
+        learn_name(&parties).unwrap_or_default()
+    }
+
     pub async fn company(&self, tin: &str) -> Option<Company> {
+        let name = self.name_of(tin).await;
         let s = self.st.read().await;
         let m = s.manifest.as_ref()?;
         let (mut bills, mut found, mut listed, mut years) = (0usize, 0usize, 0usize, Vec::new());
@@ -82,7 +96,7 @@ impl Shared {
         years.dedup();
         bill_years.sort_by(|a, b| b.year.cmp(&a.year));
         let d = m.companies.get(tin);
-        Some(Company { tin: tin.to_string(), bills, found, listed, years, bill_years, first_at: d.map(|d| d.first_at).unwrap_or(0), refreshed_at: d.map(|d| d.refreshed_at).unwrap_or(0) })
+        Some(Company { tin: tin.to_string(), name, bills, found, listed, years, bill_years, first_at: d.map(|d| d.first_at).unwrap_or(0), refreshed_at: d.map(|d| d.refreshed_at).unwrap_or(0) })
     }
 
     pub async fn companies(&self) -> Vec<Company> {
@@ -134,9 +148,16 @@ impl Shared {
         if digits && q.len() <= 9 {
             for t in self.tins().await.into_iter().filter(|t| t.starts_with(q)).take(limit) {
                 if let Some(c) = self.company(&t).await {
-                    let hit = CompanyHit { kind: "company", key: t.clone(), tin: t, bills: c.bills, found: c.found, refreshed_at: c.refreshed_at };
+                    let hit = CompanyHit { kind: "company", key: t.clone(), tin: t, name: c.name, bills: c.bills, found: c.found, refreshed_at: c.refreshed_at };
                     out.push(serde_json::to_value(hit).unwrap_or(Value::Null));
                 }
+            }
+        }
+        // a name (the first letters of its words, in either script): the companies of the backup
+        if !digits && !is_case_like(q) {
+            for c in self.companies().await.into_iter().filter(|c| crate::party::name_matches_query(&c.name, q)).take(limit) {
+                let hit = CompanyHit { kind: "company", key: c.tin.clone(), tin: c.tin, name: c.name, bills: c.bills, found: c.found, refreshed_at: c.refreshed_at };
+                out.push(serde_json::to_value(hit).unwrap_or(Value::Null));
             }
         }
         let s = self.st.read().await;
@@ -223,7 +244,16 @@ impl Shared {
                 bills.extend(rows(&t).into_iter().filter(|r| str_at(r, 14) == num).map(|r| bill_of(&r)));
             }
         }
-        Ok(CaseView { num: num.to_string(), court: e.court.clone(), tin: e.tin.clone(), year: e.yy, detail, row, bills, companies: entries.iter().map(|x| x.tin.clone()).collect() })
+        // the company's side: a party's TIN in the detail decides (exact), otherwise the names
+        let company_name = self.name_of(&e.tin).await;
+        let g = &detail["general"];
+        let js = |v: &Value, k: &str| v[k].as_str().unwrap_or("").to_string();
+        let mut side = if g.is_object() { side_by_tin(&e.tin, &js(g, "plaintiff"), &js(g, "plaintiffTin"), &js(g, "defendant"), &js(g, "defendantTin")) } else { Side::default() };
+        if side.role.is_empty() {
+            let src = if g.is_object() { g } else { &row };
+            side = side_by_name(&company_name, &js(src, "plaintiff"), &js(src, "defendant"));
+        }
+        Ok(CaseView { num: num.to_string(), court: e.court.clone(), tin: e.tin.clone(), year: e.yy, detail, row, bills, companies: entries.iter().map(|x| x.tin.clone()).collect(), company_name, role: side.role, counterparty: side.counterparty })
     }
 
     /// The hearings from `from` to `to` (yyyymmdd, both included) over every company of the backup, by date and time. Each company's hearings are ONE
@@ -236,12 +266,14 @@ impl Shared {
         let mut out = Vec::new();
         for (name, tin) in names {
             let Some(t) = self.bucket_text(&name).await.map_err(Self::upstream)? else { continue };
+            let company = self.name_of(&tin).await;
             for r in rows(&t) {
                 let day = r.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 if day < from || day > to {
                     continue;
                 }
-                out.push(Hearing { tin: tin.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into() });
+                let Side { role, counterparty } = side_by_name(&company, str_at(&r, 6), str_at(&r, 7));
+                out.push(Hearing { tin: tin.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into(), role, counterparty });
             }
         }
         out.sort_by(|a, b| a.day.cmp(&b.day).then(a.time.cmp(&b.time)).then(a.case_number.cmp(&b.case_number)));

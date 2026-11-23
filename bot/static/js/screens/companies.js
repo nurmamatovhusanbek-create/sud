@@ -5,6 +5,7 @@ import { icon } from '../ui/icons.js'
 import { api } from '../core/api.js'
 import { go } from '../core/router.js'
 import { dayDmy, dmy, num } from '../core/format.js'
+import { companyTitle } from './common.js'
 
 export async function companiesTab(_route, { signal }) {
   const j = await api.companies({ signal })
@@ -15,7 +16,8 @@ export async function companiesTab(_route, { signal }) {
   return h('div', { class: 'stack' }, h('div', { class: 'ccards' }, ...cs.map((c) => {
     const hc = hs.find((x) => x.tin === c.tin)
     return h('button', { type: 'button', class: 'ccard', on: { click: () => go({ name: 'company', key: c.tin }) } },
-      h('div', { class: 'split' }, h('span', { class: 'ccard__tin mono' }, c.tin), h('span', { class: 'row__chev' }, icon('chevron', 18))),
+      h('div', { class: 'split' }, h('span', { class: c.name ? 'ccard__name' : 'ccard__tin mono' }, companyTitle(c)), h('span', { class: 'row__chev' }, icon('chevron', 18))),
+      c.name && h('div', { class: 'ccard__id mono muted' }, `STIR ${c.tin}`),
       h('div', { class: 'ccard__figs' },
         h('span', {}, h('b', { class: 'mono' }, num(c.found + c.listed)), ' ish'),
         h('span', {}, h('b', { class: 'mono' }, num(c.bills)), ' toʻlov'),

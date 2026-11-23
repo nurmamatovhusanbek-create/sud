@@ -91,7 +91,7 @@ export interface ManifestV2 {
   app: string
   prev: { messageId: number; fileId: string; created: string } | null
   /** every company's first-scrape and «as of» dates at the time of this backup */
-  companies: Record<string, { firstAt: number; refreshedAt: number }>
+  companies: Record<string, { firstAt: number; refreshedAt: number; /** the company's name as its own bills spell it (the courts' spelling); absent when no bill names it */ name?: string }>
   buckets: BucketRef[]
 }
 

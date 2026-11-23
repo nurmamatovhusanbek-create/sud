@@ -80,17 +80,17 @@ export function Columns(items) {
 /** the two sides of a case, side by side */
 export const Parties = (left, right) =>
   h('div', { class: 'parties' },
-    h('div', { class: 'party' }, h('span', { class: 'party__role' }, left.role), h('span', { class: 'party__name' }, left.name), left.tin && h('span', { class: 'party__tin mono' }, left.tin)),
+    h('div', { class: left.mine ? 'party party--mine' : 'party' }, h('span', { class: 'party__role' }, left.mine ? `${left.role} · siz` : left.role), h('span', { class: 'party__name' }, left.name), left.tin && h('span', { class: 'party__tin mono' }, left.tin)),
     h('span', { class: 'parties__vs', 'aria-hidden': 'true' }, 'vs'),
-    h('div', { class: 'party' }, h('span', { class: 'party__role' }, right.role), h('span', { class: 'party__name' }, right.name), right.tin && h('span', { class: 'party__tin mono' }, right.tin)))
+    h('div', { class: right.mine ? 'party party--mine' : 'party' }, h('span', { class: 'party__role' }, right.mine ? `${right.role} · siz` : right.role), h('span', { class: 'party__name' }, right.name), right.tin && h('span', { class: 'party__tin mono' }, right.tin)))
 
 /** one line that must not be missed (the next hearing) */
 export const Callout = (label, main, sub) =>
   h('div', { class: 'callout' }, h('span', { class: 'callout__label' }, label), h('span', { class: 'callout__main mono' }, main), sub && h('span', { class: 'callout__sub' }, sub))
 
 /** the headline of a screen: a small caption, the identifier, a line under it */
-export const Hero = ({ caption, id, line, aside }, ...kids) =>
-  h('section', { class: 'hero' }, h('div', { class: 'split' }, h('span', { class: 'hero__caption' }, caption), aside), h('p', { class: 'hero__id mono' }, id), line && h('p', { class: 'hero__line' }, line), ...kids)
+export const Hero = ({ caption, id, line, aside, name = false }, ...kids) =>
+  h('section', { class: 'hero' }, h('div', { class: 'split' }, h('span', { class: 'hero__caption' }, caption), aside), h('p', { class: name ? 'hero__id hero__id--name' : 'hero__id mono' }, id), line && h('p', { class: 'hero__line' }, line), ...kids)
 
 /**
  * A row of cards to choose one from (swipe sideways): [{ value, title, big, sub }]. The chosen card is filled. Used for «all companies / one company» so a

@@ -4,12 +4,13 @@ import { api } from '../core/api.js'
 import { go } from '../core/router.js'
 import { num } from '../core/format.js'
 import { courtName } from './common.js'
+import { d } from '../core/text.js'
 import { setHint } from '../shell.js'
 
 const GROUPS = [['company', 'Kompaniyalar', 'company'], ['case', 'Ishlar', 'case'], ['bill', 'Kvitansiyalar', 'bill']]
 
 function subOf(x) {
-  if (x.kind === 'company') return `${num(x.bills)} toʻlov · ${num(x.found)} ish`
+  if (x.kind === 'company') return `${x.name ? `STIR ${x.tin} · ` : ''}${num(x.bills)} toʻlov · ${num(x.found)} ish`
   if (x.kind === 'bill') return `${x.caseNumber ? `ish ${x.caseNumber} · ` : ''}${x.year}`
   return `${courtName(x.court)} · 20${x.year}`
 }
@@ -23,7 +24,7 @@ export async function search(route, { signal }) {
     const xs = j.hits.filter((x) => x.kind === kind)
     if (!xs.length) continue
     out.append(SectionLabel(`${label} (${xs.length}${xs.length >= 30 ? '+' : ''})`),
-      List(...xs.map((x) => Row({ icon: ic, title: x.key, sub: subOf(x), onOpen: () => go(kind === 'company' ? { name: 'company', key: x.tin } : { name: kind, key: x.key }) }))))
+      List(...xs.map((x) => Row({ icon: ic, title: x.kind === 'company' && x.name ? d(x.name) : x.key, sub: subOf(x), onOpen: () => go(kind === 'company' ? { name: 'company', key: x.tin } : { name: kind, key: x.key }) }))))
   }
   return out
 }

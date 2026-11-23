@@ -250,6 +250,83 @@ mod mirrors {
     }
 }
 
+mod names {
+    use super::*;
+    use crate::date::{add_days, today};
+
+    #[tokio::test]
+    async fn a_company_is_shown_by_its_name_everywhere() {
+        let (sh, _b) = ready_bot().await;
+        let i = signed(4242);
+        let (_, c) = get(&sh, "/api/companies", Some(&i)).await;
+        assert_eq!(c["companies"][0]["name"], "«ANOR» МЧЖ");
+        assert_eq!(c["companies"][1]["name"], ""); // the other company: no bill names it
+        let (_, o) = get(&sh, &format!("/api/overview?tin={TIN}"), Some(&i)).await;
+        assert_eq!(o["overview"]["name"], "«ANOR» МЧЖ");
+    }
+
+    #[tokio::test]
+    async fn the_search_finds_a_company_by_its_name_in_either_script() {
+        let (sh, _b) = ready_bot().await;
+        for q in ["anor", "АНОР", "ano", "«anor» mchj"] {
+            let hits = sh.search(q, 10).await;
+            assert_eq!(hits.len(), 1, "{q}: {hits:?}");
+            assert_eq!((hits[0]["kind"].as_str(), hits[0]["tin"].as_str()), (Some("company"), Some(TIN)));
+        }
+        assert!(sh.search("mchj", 10).await.is_empty()); // a legal form is not a name
+        assert!(sh.search("nothing", 10).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_companys_side_is_decided_for_hearings_by_the_names() {
+        let (sh, _b) = ready_bot().await;
+        let t = today(now());
+        let l = sh.hearings(t, add_days(t, 6)).await.unwrap();
+        // the fixture's hearings: plaintiff «Универсал МЧЖ», defendant «ANOR МЧЖ»; the company is «ANOR» МЧЖ
+        assert!(l.iter().all(|h| h.role == "defendant" && h.counterparty == "Универсал МЧЖ"), "{l:?}");
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings 7" } })).await;
+        let text = &sh.outbox.captured()[0].text;
+        assert!(text.contains("Javobgar · qarshi tomon: Universal MChJ") && !text.contains("Universal MChJ — ANOR"), "{text}");
+    }
+
+    #[tokio::test]
+    async fn a_tin_in_the_case_detail_decides_the_side_before_any_name() {
+        let b = backup();
+        let mut content = buckets(false);
+        content.retain(|(n, _)| n != "details:civil:25");
+        // the party names do NOT look like the company's name, but the defendant's TIN is the company's
+        content.push(detail_bucket(CASE, json!({ "plaintiff": "Boshqa Kompaniya", "plaintiffTin": "201234567", "defendant": "Nomi boshqacha", "defendantTin": TIN })));
+        publish(&b.channel, MAIN, &b.pass, 2, &content);
+        let sh = bot(&b);
+        sh.sync().await.unwrap();
+        let c = sh.case_view(CASE).await.unwrap();
+        assert_eq!((c.role, c.counterparty.as_str(), c.company_name.as_str()), ("defendant", "Boshqa Kompaniya", "«ANOR» МЧЖ"));
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": format!("/case {CASE}") } })).await;
+        assert!(sh.outbox.captured()[0].text.contains("«ANOR» МЧЖ: Javobgar · qarshi tomon: Boshqa Kompaniya") || sh.outbox.captured()[0].text.contains("«ANOR» MChJ: Javobgar · qarshi tomon: Boshqa Kompaniya"), "{}", sh.outbox.captured()[0].text);
+    }
+
+    #[tokio::test]
+    async fn without_a_recorded_name_it_is_learned_from_the_cases() {
+        let b = backup();
+        publish_named(&b.channel, MAIN, &b.pass, 2, &buckets(false), None);
+        let sh = bot(&b);
+        sh.sync().await.unwrap();
+        // every hearing of the fixture names «ANOR МЧЖ» as a party: that is the company
+        assert_eq!(sh.name_of(TIN).await, "ANOR МЧЖ");
+        let l = sh.hearings(today(now()), add_days(today(now()), 6)).await.unwrap();
+        assert!(l.iter().all(|h| h.role == "defendant"));
+        assert_eq!(sh.name_of(OTHER_TIN).await, ""); // a company with no hearings and no recorded name stays unnamed
+    }
+
+    #[tokio::test]
+    async fn an_old_backup_without_names_still_works() {
+        let (sh, _b) = ready_bot().await;
+        let c = sh.company(OTHER_TIN).await.unwrap();
+        assert_eq!(c.name, "");
+        assert!(sh.search("2072", 5).await.iter().all(|h| h["kind"] != "company" || h["name"].is_string()));
+    }
+}
+
 mod hearings {
     use super::*;
     use crate::date::{add_days, today};

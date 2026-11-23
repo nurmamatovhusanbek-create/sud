@@ -79,6 +79,17 @@ export function listBuckets(db: Db = getDb()): string[] {
   return out
 }
 
+/**
+ * A company's name, as its OWN bills spell it: the most common `payer` among the bills whose payer is the company (billing names who paid). The courts'
+ * spelling (Cyrillic or Latin), which is also the spelling the court lists use for it, so the bot can tell its side of a case by the name. Null when no
+ * bill names it.
+ */
+export function companyNameOf(tin: string, db: Db = getDb()): string | null {
+  const r = db.prepare("SELECT payer, COUNT(*) n FROM bills WHERE tin = ? AND payer_tin = ? AND payer != '' GROUP BY payer ORDER BY n DESC, payer LIMIT 1").get(tin, tin)
+  const name = r ? String(r.payer).trim() : ''
+  return name || null
+}
+
 /** a hearing as the bot reads it: [case number, court, yyyymmdd, time, stage, status, plaintiff, defendant, when the row was fetched (ms)] */
 export type HearingLine = [string, string, number, string, string, string, string, string, number]
 

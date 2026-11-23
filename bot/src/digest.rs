@@ -69,7 +69,7 @@ mod tests {
     use crate::domain::Hearing;
 
     fn h(day: u32, time: &str, num: &str) -> Hearing {
-        Hearing { tin: "1".into(), case_number: num.into(), court: "civil".into(), day, time: time.into(), stage: "first".into(), status: "Тайинлаш".into(), plaintiff: "Универсал МЧЖ".into(), defendant: "ANOR МЧЖ".into() }
+        Hearing { tin: "1".into(), case_number: num.into(), court: "civil".into(), day, time: time.into(), stage: "first".into(), status: "Тайинлаш".into(), plaintiff: "Универсал МЧЖ".into(), defendant: "ANOR МЧЖ".into(), role: "", counterparty: String::new() }
     }
 
     #[test]

@@ -15,6 +15,8 @@ export interface CatalogEntry {
   refreshedAt: number
   bills: number
   found: number
+  /** the company's name as its bills spell it, when the backup knows it */
+  name?: string
 }
 
 export interface Catalog {
@@ -25,7 +27,7 @@ export interface Catalog {
 
 export function buildCatalog(m: ManifestV2): Catalog {
   const by = new Map<string, CatalogEntry>()
-  const co = (tin: string): CatalogEntry => by.get(tin) ?? by.set(tin, { tin, firstAt: m.companies[tin]?.firstAt ?? 0, refreshedAt: m.companies[tin]?.refreshedAt ?? 0, bills: 0, found: 0 }).get(tin)!
+  const co = (tin: string): CatalogEntry => by.get(tin) ?? by.set(tin, { tin, firstAt: m.companies[tin]?.firstAt ?? 0, refreshedAt: m.companies[tin]?.refreshedAt ?? 0, bills: 0, found: 0, ...(m.companies[tin]?.name ? { name: m.companies[tin]!.name } : {}) }).get(tin)!
   for (const b of m.buckets) {
     const p = parseBucket(b.name)
     if (!p?.tin) continue

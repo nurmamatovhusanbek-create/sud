@@ -148,3 +148,11 @@ button.bars__row:active { background: var(--color-wash); }
 /* a second sub line that never grows past two lines (the parties of a hearing) */
 .row__sub--clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ccard__meta { margin-top: var(--space-2); font-size: var(--text-sm); }
+
+/* a company named in the courts' spelling: bold text, its STIR small under it */
+.ccard__name { font-size: var(--text-lg); font-weight: var(--weight-medium); word-break: break-word; }
+.ccard__id { font-size: var(--text-xs); margin-top: 2px; }
+.hero__id--name { font-family: var(--font-sans); font-size: var(--text-xl); word-break: break-word; }
+.party--mine { border-color: var(--color-text); border-width: 2px; }
+.mcard__title { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sideline { margin: 0 var(--space-1); font-size: var(--text-sm); }
