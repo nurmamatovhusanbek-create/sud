@@ -1,0 +1,20 @@
+/*
+ * The ONE stylesheet the pages load. The order IS the cascade (no layers: older Telegram web views do not know them):
+ *   fonts → tokens (primitives, then the look's palette, then the roles) → base → components → nothing else
+ * There is no per-screen stylesheet: a screen composes components, so a screen can never invent a look. Spacing between components is `.stack`/`.cluster`/`.split`.
+ * Rules and the token vocabulary: docs/design-notes.md › «Mini App design system», and the live page /static/styleguide.html.
+ */
+@import url("fonts.css");
+@import url("tokens/primitives.css");
+@import url("tokens/look-navy.css");
+@import url("tokens/semantic.css");
+@import url("base.css");
+@import url("components/surface.css");
+@import url("components/list.css");
+@import url("components/control.css");
+@import url("components/status.css");
+@import url("components/choice.css");
+@import url("components/chart.css");
+@import url("components/case.css");
+@import url("components/nav.css");
+@import url("components/feedback.css");

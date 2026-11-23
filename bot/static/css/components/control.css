@@ -1,0 +1,27 @@
+/* CONTROLS: button, search field, tabs, chips, tag. Heights come from --size-control(-sm); the chosen state is the --accent fill everywhere. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--size-control); padding: 0 var(--space-4); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
+.btn--primary { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.btn--small { min-height: var(--size-control-sm); padding: 0 var(--space-3); font-size: var(--text-xs); border-radius: var(--radius-1); }
+.btn--block { display: flex; width: 100%; }
+
+.field { flex: 1; display: flex; align-items: center; gap: var(--space-2); height: var(--size-tap); padding: 0 var(--space-3); background: var(--surface); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); min-width: 0; }
+.field:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--ring); }
+.field--compact { height: var(--size-control); }
+.field svg { flex: none; color: var(--text-3); }
+.field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: var(--font-mono); }
+.field input::placeholder { color: var(--text-3); }
+.field__clear { border: 0; background: transparent; color: var(--text-3); padding: var(--space-1); display: none; }
+.field--filled .field__clear { display: inline-flex; }
+
+.tabs { display: flex; gap: var(--space-2); }
+.tabs button { flex: 1; min-height: var(--size-control); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); color: var(--text-2); font-size: var(--text-sm); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip { min-height: var(--size-control-sm); padding: 0 var(--space-3); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-pill); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.chips--scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--space-4)); padding: 0 var(--space-4); }
+.chips--scroll::-webkit-scrollbar { display: none; }
+.chips--scroll .chip { flex: none; }
+
+.tag { flex: none; padding: 2px var(--space-2); border: var(--border-width) solid var(--brand-line); border-radius: var(--radius-pill); background: var(--brand-soft); color: var(--brand-ink); font-size: var(--text-xs); }

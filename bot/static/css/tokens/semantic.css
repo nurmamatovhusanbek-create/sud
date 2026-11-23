@@ -1,0 +1,59 @@
+/*
+ * TIER 2: SEMANTIC ROLES. What a colour is FOR. Components read only these (never a ramp, never a hex), and the names are the app's own
+ * (`--bg-canvas`, `--surface`, `--text-1/2/3`, `--border-*`, `--brand`, `--accent`, `--status-*`), so a word means the same in the app and in the bot.
+ * They are written once, in terms of the look's ramp; the dark theme needs no rules here because the look reverses the ramp under the same names.
+ *
+ *   surfaces   --bg-canvas (the page) · --surface (a card) · --surface-inset (a field, a track) · --surface-hover · --surface-active
+ *   text       --text-1 (body) · --text-2 (secondary) · --text-3 (hint) · --text-inverse (on --accent)
+ *   lines      --border-subtle · --border-default · --border-strong · --border-focus
+ *   action     --brand (links, focus, the current tab) · --accent / --accent-contrast (the high-emphasis fill: primary button, chosen chip)
+ *   status     --status-{positive|negative|info|neutral}-{solid|soft|text|line}
+ */
+:root {
+  --bg-canvas: var(--canvas);
+  --surface: var(--ramp-0);
+  --surface-inset: var(--ramp-50);
+  --surface-hover: var(--hover);
+  --surface-active: var(--press);
+  --scrim-overlay: var(--scrim);
+
+  --text-1: var(--ramp-900);
+  --text-2: var(--ramp-600);
+  --text-3: var(--ramp-500);
+  --text-inverse: var(--ramp-0);
+
+  --border-subtle: var(--line-1);
+  --border-default: var(--line-2);
+  --border-strong: var(--line-3);
+  --border-focus: var(--brand);
+  --ring: var(--focus-ring);
+
+  --accent: var(--ramp-1000);
+  --accent-contrast: var(--ramp-0);
+  --accent-soft: var(--brand-soft);
+  --brand-tile: linear-gradient(135deg, var(--brand-tile-from), var(--brand-tile-to));
+  --on-brand-tile: var(--white);
+
+  --status-positive-solid: var(--signal-positive);
+  --status-positive-soft: var(--signal-positive-soft);
+  --status-positive-text: var(--signal-positive-ink);
+  --status-positive-line: var(--signal-positive-line);
+  --status-negative-solid: var(--signal-negative);
+  --status-negative-soft: var(--signal-negative-soft);
+  --status-negative-text: var(--signal-negative-ink);
+  --status-negative-line: var(--signal-negative-line);
+  --status-info-solid: var(--brand);
+  --status-info-soft: var(--brand-soft);
+  --status-info-text: var(--brand-ink);
+  --status-info-line: var(--brand-line);
+  --status-neutral-solid: var(--ramp-500);
+  --status-neutral-soft: var(--ramp-50);
+  --status-neutral-text: var(--ramp-600);
+  --status-neutral-line: var(--ramp-200);
+}
+
+:root[data-theme="dark"] {
+  /* the only roles that are not the same ramp step in both themes: a card sits one step above the page in dark, and text on the accent is the page colour */
+  --surface: var(--ramp-25);
+  --text-inverse: var(--canvas);
+}

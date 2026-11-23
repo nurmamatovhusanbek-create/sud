@@ -1,4 +1,4 @@
-// What a court status or a bill status MEANS, as one of four shapes (see components.js Status). Words stay the court's own.
+// What a court status or a bill status MEANS, as one of five kinds (see kit/feedback.js Status). Words stay the court's own.
 import { Status } from './components.js'
 import { d } from '../core/text.js'
 
@@ -13,6 +13,6 @@ export function CourtStatus(text) {
   return Status(kind, d(text))
 }
 
-const BILL = { PAID: ['Toʻlangan', 'done'], USED: ['Ishlatilgan', 'done'], CREATED: ['Yaratilgan', 'live'], OVERDUE: ['Muddati oʻtgan', 'hold'], CANCELED: ['Bekor qilingan', 'void'], CANCELLED: ['Bekor qilingan', 'void'], EXPIRED: ['Muddati tugagan', 'void'] }
+const BILL = { PAID: ['Toʻlangan', 'done'], USED: ['Ishlatilgan', 'done'], CREATED: ['Yaratilgan', 'live'], OVERDUE: ['Muddati oʻtgan', 'bad'], SENT_TO_MIB: ['MIBga yuborilgan', 'bad'], CANCELED: ['Bekor qilingan', 'void'], CANCELLED: ['Bekor qilingan', 'void'], EXPIRED: ['Muddati tugagan', 'void'] }
 export const billWord = (s) => BILL[s]?.[0] || s || ''
 export const BillStatus = (s) => Status(BILL[s]?.[1] || 'live', billWord(s))

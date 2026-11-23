@@ -1,0 +1,13 @@
+/* STATUS: a pill with a dot. The words say what it is; the colour and the dot shape help the eye (done = green filled, live = blue ring, hold = blue half,
+ * bad = rose filled, void = grey dashed). One modifier sets all four colour roles. */
+.status { --s-solid: var(--status-info-solid); --s-soft: var(--status-info-soft); --s-text: var(--status-info-text); --s-line: var(--status-info-line);
+  display: inline-flex; align-items: center; gap: var(--space-2); padding: 3px var(--space-3); border: var(--border-width) solid var(--s-line); border-radius: var(--radius-pill); background: var(--s-soft); color: var(--s-text); font-size: var(--text-sm); }
+.status--done { --s-solid: var(--status-positive-solid); --s-soft: var(--status-positive-soft); --s-text: var(--status-positive-text); --s-line: var(--status-positive-line); }
+.status--bad { --s-solid: var(--status-negative-solid); --s-soft: var(--status-negative-soft); --s-text: var(--status-negative-text); --s-line: var(--status-negative-line); }
+.status--void { --s-solid: var(--status-neutral-solid); --s-soft: var(--status-neutral-soft); --s-text: var(--status-neutral-text); --s-line: var(--status-neutral-line); }
+
+.dot { width: var(--size-dot); height: var(--size-dot); border-radius: 50%; border: var(--border-width-strong) solid var(--s-solid, var(--text-2)); flex: none; }
+.dot--done, .dot--bad { background: var(--s-solid); }
+.dot--live { background: transparent; }
+.dot--hold { background: linear-gradient(90deg, var(--s-solid) 50%, transparent 50%); }
+.dot--void { border-style: dashed; background: transparent; }

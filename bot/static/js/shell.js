@@ -1,7 +1,7 @@
 // The frame around every screen: home button, search field, the one-line hint. It owns the search box (a search is a route of its own).
 import { h } from './ui/h.js'
 import { Field } from './ui/components.js'
-import { icon } from './ui/icons.js'
+import { logo } from './ui/icons.js'
 import { dmyIso, num } from './core/format.js'
 import { go, onRoute, remember, route, rerender } from './core/router.js'
 import { TabBar } from './ui/components.js'
@@ -36,7 +36,7 @@ export function mountShell(headEl) {
     }, 220)
   }
   field = Field({ placeholder: 'Ish, kvitansiya, STIR', onInput })
-  const homeBtn = h('button', { type: 'button', class: 'brand', 'aria-label': 'Bosh sahifa', on: { click: () => go({ name: 'home' }) } }, icon('company', 20))
+  const homeBtn = h('button', { type: 'button', class: 'brand', 'aria-label': 'Bosh sahifa', on: { click: () => go({ name: 'home' }) } }, logo(28))
   hint = h('span', {})
   hintRight = h('span', {})
   headEl.append(h('div', { class: 'shell-bar' }, homeBtn, field.el), h('div', { class: 'shell-hint' }, hint, hintRight))

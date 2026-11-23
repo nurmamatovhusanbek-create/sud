@@ -696,6 +696,114 @@ mod assets {
         }
     }
 
+    fn css() -> Vec<(String, String)> {
+        texts().into_iter().filter(|(p, _)| p.ends_with(".css")).collect()
+    }
+
+    /// every `--name:` a stylesheet defines
+    fn defined(text: &str) -> std::collections::BTreeSet<String> {
+        let mut out = std::collections::BTreeSet::new();
+        for (i, _) in text.match_indices("--") {
+            let rest = &text[i..];
+            let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+            if rest[name.len()..].trim_start().starts_with(':') && name.len() > 2 {
+                out.insert(name);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn colours_are_written_in_the_look_and_nowhere_else() {
+        // a hex colour or rgb()/hsl() belongs in css/tokens/look-navy.css (the palette); everything else reads a token
+        for (p, t) in css() {
+            if p.ends_with("tokens/look-navy.css") || p.ends_with("fonts.css") {
+                continue;
+            }
+            let has_hex = t.split(|c: char| !(c.is_ascii_alphanumeric() || c == '#')).any(|w| w.len() >= 4 && w.starts_with('#') && w[1..].chars().all(|c| c.is_ascii_hexdigit()) && matches!(w.len() - 1, 3 | 4 | 6 | 8));
+            assert!(!has_hex, "{p}: a hex colour outside the look");
+            assert!(!t.contains("rgb(") && !t.contains("rgba(") && !t.contains("hsl("), "{p}: an rgb()/hsl() colour outside the look");
+        }
+    }
+
+    #[test]
+    fn every_token_a_component_reads_is_defined() {
+        let mut known = std::collections::BTreeSet::new();
+        for (_, t) in css() {
+            known.extend(defined(&t));
+        }
+        // `--v` is set per element from JS (a bar's share) and `--s-*` are a status pill's local roles
+        let local = |n: &str| n == "--v" || n.starts_with("--s-");
+        for (p, t) in css() {
+            for (i, _) in t.match_indices("var(--") {
+                let name: String = t[i + 4..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+                assert!(known.contains(&name) || local(&name), "{p}: var({name}) is not defined by any token");
+            }
+        }
+    }
+
+    #[test]
+    fn components_and_screens_read_roles_not_the_looks_raw_palette() {
+        // the ramp, the signals and the brand's raw values are tier 1 of the look: a component uses the role (--surface, --text-2, --status-info-text …)
+        let raw = ["var(--ramp-", "var(--signal-", "var(--canvas)", "var(--hover)", "var(--press)", "var(--focus-ring)", "var(--scrim)", "var(--brand-tile-"];
+        for (p, t) in css() {
+            if p.contains("/tokens/") || p.ends_with("styleguide.css") {
+                continue;
+            }
+            for r in raw {
+                assert!(!t.contains(r), "{p} reads the look's raw {r}…");
+            }
+        }
+    }
+
+    #[test]
+    fn the_pages_load_one_stylesheet_that_imports_every_file_once() {
+        let index = std::str::from_utf8(ASSETS.get_file("index.html").unwrap().contents()).unwrap();
+        assert_eq!(index.matches("rel=\"stylesheet\"").count(), 1);
+        assert!(index.contains("/static/css/main.css"));
+        let main = std::str::from_utf8(ASSETS.get_file("css/main.css").unwrap().contents()).unwrap();
+        for (p, _) in css() {
+            let name = p.trim_start_matches("css/");
+            if name == "main.css" || name == "styleguide.css" {
+                continue;
+            }
+            assert_eq!(main.matches(&format!("url(\"{name}\")")).count(), 1, "{name} must be imported by main.css exactly once");
+        }
+        // the palette is imported before the roles that read it, and the roles before anything that uses them
+        let pos = |s: &str| main.find(s).unwrap_or_else(|| panic!("{s}"));
+        assert!(pos("tokens/primitives.css") < pos("tokens/look-navy.css") && pos("tokens/look-navy.css") < pos("tokens/semantic.css") && pos("tokens/semantic.css") < pos("base.css") && pos("base.css") < pos("components/surface.css"));
+    }
+
+    #[test]
+    fn the_style_guide_lists_every_token() {
+        let guide = std::str::from_utf8(ASSETS.get_file("js/styleguide.js").unwrap().contents()).unwrap();
+        for (p, t) in css() {
+            if !p.contains("/tokens/") {
+                continue;
+            }
+            for name in defined(&t) {
+                assert!(guide.contains(&format!("'{name}'")) || guide.contains(&format!("`{name}`")) || RAMP_OK(&name, guide), "{name} (in {p}) is missing from js/styleguide.js");
+            }
+        }
+    }
+
+    /// the neutral ramp is listed by a generator (`--ramp-${n}`), so its names are checked against the numbers written there
+    #[allow(non_snake_case)]
+    fn RAMP_OK(name: &str, guide: &str) -> bool {
+        name.strip_prefix("--ramp-").is_some_and(|n| guide.contains("[0, 25, 50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000]") && ["0", "25", "50", "100", "150", "200", "300", "400", "500", "600", "700", "800", "900", "1000"].contains(&n))
+    }
+
+    #[test]
+    fn the_component_kit_has_a_stylesheet_per_family() {
+        // ui/kit/<family>.js and css/components/<family>.css: a family that has code but no styles (or the reverse) is a leftover
+        let kit: Vec<String> = ASSETS.get_dir("js/ui/kit").unwrap().files().map(|f| f.path().file_stem().unwrap().to_string_lossy().to_string()).collect();
+        assert!(kit.len() >= 6, "{kit:?}");
+        let barrel = std::str::from_utf8(ASSETS.get_file("js/ui/components.js").unwrap().contents()).unwrap();
+        for k in &kit {
+            assert!(barrel.contains(&format!("./kit/{k}.js")), "{k} is not exported by ui/components.js");
+        }
+    }
+
     #[test]
     fn the_mini_app_is_latin_only() {
         for (p, t) in texts() {

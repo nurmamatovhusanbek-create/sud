@@ -1,0 +1,54 @@
+/*
+ * TIER 1: PRIMITIVES. Raw, theme-independent scales: the only place a size, a radius, a weight or a duration is decided. No colour here (colours are
+ * tier 1 of the LOOK, `look-navy.css`) and no meaning (meaning is tier 2, `semantic.css`). Components never write a literal; they read a token.
+ *
+ * Naming: `--space-N` steps of 4px, `--radius-N`, `--text-SIZE`, `--weight-NAME`, `--duration-NAME`, `--size-NAME` for fixed UI sizes, `--z-NAME`.
+ */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-1: 8px;
+  --radius-2: 12px;
+  --radius-3: 16px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+  --border-width-strong: 2px;
+
+  --font-sans: "IBM Plex Sans", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-hero: 26px;
+  --leading-tight: 1.25;
+  --leading-body: 1.45;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  --size-tap: 44px;        /* the smallest thing a thumb is asked to hit */
+  --size-control: 40px;    /* a button / tab / filter field */
+  --size-control-sm: 32px; /* a small button / chip */
+  --size-tabbar: 58px;
+  --size-content: 720px;   /* the widest the content grows on a tablet */
+  --size-dot: 9px;
+
+  --z-sticky: 5;
+  --z-bar: 6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration-base: 0ms; }
+}

@@ -1,0 +1,32 @@
+/* SURFACES: a card, a section label, a key/value line, the headline of a screen. */
+.card { background: var(--surface); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-3); padding: var(--space-4); }
+.card__title { margin: 0 0 var(--space-3); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-2); }
+.card__id { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-strong); word-break: break-all; }
+.section-label { margin: var(--space-3) var(--space-1) var(--space-2); color: var(--text-2); font-size: var(--text-sm); }
+.day-label { margin: var(--space-2) var(--space-1) var(--space-1); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+
+.kv { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-top: var(--border-width) solid var(--border-subtle); }
+.kv:first-of-type { border-top: 0; }
+.kv__k { flex: none; max-width: 42%; color: var(--text-2); }
+.kv__v { text-align: right; word-break: break-word; }
+
+/* the headline of a screen: a small caption, the identifier (a number in mono, a name in sans), a line under it */
+.hero { padding: var(--space-4) var(--space-1) var(--space-2); }
+.hero__caption { font-size: var(--text-sm); color: var(--brand-ink); font-weight: var(--weight-medium); }
+.hero__id { margin: var(--space-1) 0 0; font-size: var(--text-hero); font-weight: var(--weight-medium); letter-spacing: -0.01em; line-height: var(--leading-tight); word-break: break-all; }
+.hero__id--name { font-family: var(--font-sans); font-size: var(--text-xl); word-break: break-word; }
+.hero__line { margin: var(--space-1) 0 0; color: var(--text-2); font-size: var(--text-sm); }
+
+/* a company: a card on the Kompaniyalar tab, its name in the courts' spelling and its STIR small under it */
+.ccards { display: grid; gap: var(--space-2); }
+.ccard { display: block; width: 100%; text-align: left; background: var(--surface); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-3); padding: var(--space-4); transition: background var(--duration-fast) var(--ease-out); }
+.ccard:active { background: var(--surface-hover); }
+.ccard__tin { font-size: var(--text-lg); font-weight: var(--weight-medium); }
+.ccard__name { font-size: var(--text-lg); font-weight: var(--weight-medium); word-break: break-word; }
+.ccard__id { font-size: var(--text-xs); margin-top: 2px; }
+.ccard__figs { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-2); font-size: var(--text-sm); color: var(--text-2); }
+.ccard__figs b { color: var(--text-1); font-weight: var(--weight-medium); }
+.ccard__meta { margin-top: var(--space-2); font-size: var(--text-sm); }
+.bcard__head { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
+.bcard__head .ccard__tin, .bcard__head .ccard__name { flex: 1; }
+.hint { padding: 0 var(--space-1); }

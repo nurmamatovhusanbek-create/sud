@@ -1,0 +1,104 @@
+/*
+ * TIER 1 OF THE LOOK: the «Moviy» (navy) palette, the same hues as the app (`src/app/look-navy.css`). This is the ONLY file that knows a hex value, and the
+ * only one to change for a different look. Nothing else reads these directly: `semantic.css` turns them into roles.
+ *
+ *   --ramp-0 … --ramp-1000   the neutral spine, indigo-biased (light: white → navy; dark: the same names reversed, so a role never changes)
+ *   --brand-*                the ONE interactive hue (indigo → blue)
+ *   --signal-*               status hues: green (done, paid), rose (overdue, lost); pending and info are the brand blue (there is no orange)
+ *   --line-1 … --line-3      hairlines (a solid ramp step in light, a white veil in dark)
+ *   --white, --canvas, --scrim, --hover, --press, --focus-ring, --logo-0 … --logo-3
+ */
+:root {
+  --ramp-0: #ffffff;
+  --ramp-25: #fafbff;
+  --ramp-50: #f4f5fd;
+  --ramp-100: #edeef6;
+  --ramp-150: #e6e9f5;
+  --ramp-200: #dadff0;
+  --ramp-300: #c4cce8;
+  --ramp-400: #aab3d8;
+  --ramp-500: #98a0c4;
+  --ramp-600: #5c6489;
+  --ramp-700: #414a78;
+  --ramp-800: #2c3873;
+  --ramp-900: #1f2547;
+  --ramp-1000: #1a2350;
+
+  --brand: #3b5bdb;
+  --brand-ink: #2f49b0;
+  --brand-soft: #e7ecfd;
+  --brand-line: #d3ddfb;
+  --brand-tile-from: #1a2350;
+  --brand-tile-to: #2c3873;
+
+  --signal-positive: #0f9070;
+  --signal-positive-ink: #0c785d;
+  --signal-positive-soft: #e3f2ec;
+  --signal-positive-line: #b7e0d0;
+  --signal-negative: #c04a68;
+  --signal-negative-ink: #a53c56;
+  --signal-negative-soft: #f7e7ec;
+  --signal-negative-line: #eec3ce;
+
+  --white: #ffffff;
+  --line-1: var(--ramp-150);
+  --line-2: var(--ramp-200);
+  --line-3: var(--ramp-300);
+  --canvas: #eef0fa;
+  --scrim: rgba(26, 35, 80, 0.45);
+  --hover: rgba(26, 35, 80, 0.04);
+  --press: rgba(26, 35, 80, 0.08);
+  --focus-ring: rgba(59, 91, 219, 0.28);
+
+  --logo-0: #1a2350;
+  --logo-1: #3b5bdb;
+  --logo-2: #6d84ec;
+  --logo-3: #aab3d8;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --ramp-0: #12162b;
+  --ramp-25: #161b33;
+  --ramp-50: #1b2140;
+  --ramp-100: #222a4d;
+  --ramp-150: #2b3357;
+  --ramp-200: #353e66;
+  --ramp-300: #464f7d;
+  --ramp-400: #5c6489;
+  --ramp-500: #8b93b8;
+  --ramp-600: #aab3d8;
+  --ramp-700: #c4cce8;
+  --ramp-800: #dadff0;
+  --ramp-900: #edeef6;
+  --ramp-1000: #eef1fd;
+
+  --brand: #6d84ec;
+  --brand-ink: #a9b8f5;
+  --brand-soft: rgba(109, 132, 236, 0.18);
+  --brand-line: rgba(109, 132, 236, 0.35);
+
+  --signal-positive: #2fb58f;
+  --signal-positive-ink: #5fd0ad;
+  --signal-positive-soft: rgba(47, 181, 143, 0.16);
+  --signal-positive-line: rgba(47, 181, 143, 0.35);
+  --signal-negative: #e0708a;
+  --signal-negative-ink: #f09bb0;
+  --signal-negative-soft: rgba(224, 112, 138, 0.16);
+  --signal-negative-line: rgba(224, 112, 138, 0.35);
+
+  --line-1: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.11);
+  --line-3: rgba(255, 255, 255, 0.18);
+  --canvas: #0c0f22;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --hover: rgba(255, 255, 255, 0.04);
+  --press: rgba(255, 255, 255, 0.08);
+  --focus-ring: rgba(109, 132, 236, 0.4);
+
+  --logo-0: #eef1fd;
+  --logo-1: #6d84ec;
+  --logo-2: #aab3d8;
+  --logo-3: #5a68a8;
+  color-scheme: dark;
+}

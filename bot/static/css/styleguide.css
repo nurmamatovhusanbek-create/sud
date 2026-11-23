@@ -1,0 +1,14 @@
+/* Only the style guide page uses this: swatches and specimen frames. It reads the same tokens as everything else. */
+.sg { max-width: var(--size-content); margin: 0 auto; padding: var(--space-4); display: grid; gap: var(--space-6); }
+.sg h1 { margin: 0; font-size: var(--text-xl); }
+.sg h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.sg__bar { display: flex; gap: var(--space-2); align-items: center; justify-content: space-between; }
+.sg__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
+.sg__swatch { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); font-size: var(--text-xs); }
+.sg__chip { flex: none; width: 28px; height: 28px; border-radius: var(--radius-1); border: var(--border-width) solid var(--border-default); }
+.sg__name { font-family: var(--font-mono); word-break: break-all; }
+.sg__val { color: var(--text-2); font-family: var(--font-mono); }
+.sg__frame { display: grid; gap: var(--space-3); padding: var(--space-4); border: var(--border-width) dashed var(--border-strong); border-radius: var(--radius-3); background: var(--bg-canvas); }
+.sg__bar-space { height: var(--space-4); background: var(--brand); border-radius: var(--radius-1); }
+.sg__radius { width: 64px; height: 40px; background: var(--surface-inset); border: var(--border-width) solid var(--border-strong); }
+.sg__type { margin: 0; }
