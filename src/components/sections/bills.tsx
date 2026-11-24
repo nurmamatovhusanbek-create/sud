@@ -206,7 +206,7 @@ function LoadCard({ page, pages, pass, stored, total, wait, error, onStop }: { p
         <div>
           <b style={{ fontSize: 14 }}>Toʻlovlar yuklab olinmoqda…</b>
           <div className="faint mono" style={{ fontSize: 12 }}>
-            {pages > 0 ? `${Math.min(page + 1, pages)}/${pages}-sahifa` : 'billing javobi kutilmoqda…'}{pass > 0 ? ` · ${pass + 1}-oʻtish` : ''} · {total ? `${formatCount(total)} ta kvitansiya` : '…'} · <span>{formatCount(stored)}</span> tasi ish raqamli (saqlanadi)
+            {pages > 0 ? `${Math.min(page + 1, pages)}/${pages}-sahifa` : 'billing javobi kutilmoqda…'}{pass > 0 ? ` · ${pass + 1}-oʻtish` : ''} · {total ? `${formatCount(total)} ta kvitansiya` : '…'} · <span>{formatCount(stored)}</span> tasi saqlangan
           </div>
         </div>
         <div style={{ flex: 1 }} />
@@ -217,7 +217,7 @@ function LoadCard({ page, pages, pass, stored, total, wait, error, onStop }: { p
         <div className="stream-fill" style={{ width: `${pages > 0 ? Math.min(100, Math.max(4, Math.round((page / pages) * 100))) : 4}%` }} />
       </div>
       <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--text-3)' }}>
-        Yuklangan sahifalar hozirdan qidirilishi va ochilishi mumkin; qolganlari ketma-ket qoʻshiladi. Ish raqamisiz kvitansiyalar saqlanmaydi, shuning uchun saqlanganlar soni jami sondan kam boʻladi. Sahifadan chiqsangiz ham yuklash davom etadi.
+        Yuklangan sahifalar hozirdan qidirilishi va ochilishi mumkin; qolganlari ketma-ket qoʻshiladi. Katta kompaniyalarda ish raqamisiz kvitansiyalar saqlanmaydi, shuning uchun saqlanganlar soni jami sondan kam boʻlishi mumkin. Sahifadan chiqsangiz ham yuklash davom etadi.
       </div>
       {wait > 0 && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--text-2)' }}>billing.sud.uz javob bermadi: {wait} soniyadan keyin qayta uriniladi.</div>}
       {error && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--neg-text)' }}>{error}</div>}
@@ -480,7 +480,7 @@ export function BillsSection() {
 
             {!loadingBills && meta?.complete && meta.stable && summary && meta.totalElements > summary.count && (
               <div className="faint" style={{ fontSize: 12.5, margin: '8px 0 12px' }}>
-                Billingda {formatCount(meta.totalElements)} ta kvitansiya bor, {formatCount(summary.count)} tasi ish raqamli va saqlangan. Qolgan {formatCount(meta.totalElements - summary.count)} tasida ish raqami yoʻq (daʼvo xarajatlari: ish hali ochilmagan, va boshqa toʻlovlar), shuning uchun saqlanmaydi: bu yuklash xatosi emas.
+                Billingda {formatCount(meta.totalElements)} ta kvitansiya bor, {formatCount(summary.count)} tasi ish raqamli va saqlangan. Qolgan {formatCount(meta.totalElements - summary.count)} tasida ish raqami yoʻq (daʼvo xarajatlari: ish hali ochilmagan, va boshqa toʻlovlar): katta kompaniyada ular saqlanmaydi, bu yuklash xatosi emas. «Toʻlovlarni yangilash» kichik kompaniyada ularni ham saqlaydi.
               </div>
             )}
             {loadingBills && job && <LoadCard page={job.page} pages={job.pages} pass={job.pass} stored={bills?.total ?? 0} total={job.bills || meta?.totalElements || 0} wait={wait} error={store.error} onStop={() => void store.stop()} />}

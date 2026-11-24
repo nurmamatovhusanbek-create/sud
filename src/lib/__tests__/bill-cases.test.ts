@@ -73,6 +73,7 @@ const run = async (o: Parameters<typeof lib.startJob>[1] = {}) => {
 }
 
 beforeEach(() => {
+  process.env.BILLS_KEEP_ALL_MAX = '1' // the older tests below are about a BIG company: only the bills that name a case are kept
   dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
   fs.mkdirSync(DIR, { recursive: true })
@@ -80,6 +81,7 @@ beforeEach(() => {
   n = 0; billCalls = []; billSizes = []; pagesFor = null; bigTotal = null; callNo = 0; billFails = {}; caseCalls = []; waits = []; script = {}; defaultCase = found
 })
 afterAll(() => {
+  delete process.env.BILLS_KEEP_ALL_MAX
   dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
 })
@@ -208,7 +210,7 @@ describe('load', () => {
     expect(lib.billCasesStatus(TIN).passes[0]).toMatchObject({ pass: 0, size: 10_000, rows: 25_000, added: 25_000 })
   })
 
-  test('bills with no case are told apart: claim costs, other bills, and a case number taken from the description are counted; only bills with a case are stored', async () => {
+  test('bills with no case are told apart: claim costs, other bills, and a case number taken from the description are counted', async () => {
     const mk = (extra: Record<string, unknown>) => ({ ...bill(null, 'CITIZEN', 'Почта харажатлари'), isInFavor: true, decisionDate: null, description: 'Почта харажатлари', ...extra })
     bigTotal = 5
     pagesFor = (page) => (page === 0 ? [
@@ -220,8 +222,26 @@ describe('load', () => {
     const st = await run({})
     const p = lib.billCasesStatus(TIN).passes[0]
     expect(p?.links).toEqual({ text: 1, claimCost: 2, unlinked: 1 })
-    expect(bills.billCountOf(TIN)).toBe(2) // the bill with the case and the one recovered from its text
     expect(st.state).toBe('done')
+  })
+
+  test('a SMALL company keeps every bill, also the ones with no case; a BIG one keeps only the bills that name a case', async () => {
+    const mk = (extra: Record<string, unknown> = {}) => ({ ...bill(null, 'CITIZEN', 'Почта харажатлари'), isInFavor: true, decisionDate: null, description: 'Почта харажатлари', ...extra })
+    const content = [bill('2-1004-2603/1'), mk(), mk(), mk({ payCategory: 'Давлат божи', description: 'Давлат божи', isInFavor: false })]
+    process.env.BILLS_KEEP_ALL_MAX = '100'
+    bigTotal = 4
+    pagesFor = (page) => (page === 0 ? content : [])
+    await run({})
+    expect(bills.billCountOf(TIN)).toBe(4) // the three with no case are stored
+    expect(lib.billCasesStatus(TIN)).toMatchObject({ keepsAll: true, totalBills: 4, billCases: 1 })
+    // the same bills of a company over the limit
+    forgetAll()
+    process.env.BILLS_KEEP_ALL_MAX = '3'
+    pagesFor = (page) => (page === 0 ? content : [])
+    bigTotal = 4
+    await run({})
+    expect(bills.billCountOf(TIN)).toBe(1) // only the bill with the case
+    expect(lib.billCasesStatus(TIN).keepsAll).toBe(false)
   })
 
   test('an empty page inside the range is an error, not the end', async () => {

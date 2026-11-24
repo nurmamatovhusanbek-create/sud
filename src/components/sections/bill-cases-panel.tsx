@@ -87,7 +87,7 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
         const l = st.passes[st.passes.length - 1]!.links!
         return (
           <div style={{ marginTop: 4, color: 'var(--text-2)', fontSize: 12.5 }}>
-            Ish raqamisiz kvitansiyalar saqlanmaydi (oxirgi oʻtishda): {fmt(l.claimCost)} tasi daʼvo xarajati (pochta, video, sud toʻlovlari: ish hali ochilmagan), {fmt(l.unlinked)} tasi boshqa
+            {st.keepsAll ? 'Ish raqamisiz kvitansiyalar ham saqlanadi (Toʻlovlar tabida koʻrinadi, zaxiraga kirmaydi; oxirgi oʻtishda)' : 'Ish raqamisiz kvitansiyalar saqlanmaydi (oxirgi oʻtishda)'}: {fmt(l.claimCost)} tasi daʼvo xarajati (pochta, video, sud toʻlovlari: ish hali ochilmagan), {fmt(l.unlinked)} tasi boshqa
             {l.text > 0 ? `; ${fmt(l.text)} tasida ish raqami tavsifdan olindi` : ''}.
           </div>
         )

@@ -354,6 +354,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `APP_API_TOKEN` | server/config.ts |
 | `APP_GIT_SHA` | lib/version-server.ts, server/config.ts |
 | `APP_TRUST_PROXY` | server/config.ts |
+| `BILLS_KEEP_ALL_MAX` | lib/bill-cases.ts |
 | `CACHE_BACKEND` | server/config.ts |
 | `CACHE_KV_URL` | server/config.ts |
 | `CACHE_TTL_COMPANY_MS` | server/config.ts |

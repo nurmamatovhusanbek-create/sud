@@ -40,13 +40,14 @@ export function FoundCases({ stir }: { stir: string }) {
 
   return (
     <div className="p-card" style={{ marginTop: 16 }}>
-      <div style={{ padding: '14px 18px 0' }}>
+      <div style={{ padding: '16px 18px 0' }}>
         <b style={{ fontSize: 14 }}>Toʻlovlar orqali topilgan ishlar</b>
-        <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
+        <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-3)', marginTop: 3 }}>
           Sud roʻyxati koʻrsatmagan, kvitansiyalarda nomi bor ishlar: raqam boʻyicha olingan va serverda saqlangan.
         </div>
       </div>
-      <div className="filterbar">
+      {/* the filter row sits INSIDE the card: the same 18 px side padding as the heading above it and room between the two (it was flush with the card's edge and touching the text) */}
+      <div className="filterbar" style={{ padding: '14px 18px', marginBottom: 0 }}>
         <div className="f-search">
           <Search />
           <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ish raqami, sud yoki tomon…" />

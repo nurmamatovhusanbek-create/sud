@@ -29,6 +29,15 @@ import { retireCaseSnapshots } from './snapshot-store'
 import { ensureCompany, markRefreshed, readCompany } from './company-meta'
 import { estimateCoverage, passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 
+/**
+ * A company with up to this many bills keeps ALL of them (the Toʻlovlar tab shows every receipt billing lists, also the ones that name no case:
+ * claim costs of a case not opened yet, other payments). A bigger company (a bank has 140 000, a third of them with no case) keeps only the bills
+ * that name a case: the rest is of no use there and would bloat the database. The bills with no case are local: they are not in the Telegram backup
+ * (the bot only needs the ones that lead to a case), and a refresh («Toʻlovlarni yangilash») reads them again.
+ */
+export const keepAllBillsMax = (): number => (Number(process.env.BILLS_KEEP_ALL_MAX) > 0 ? Number(process.env.BILLS_KEEP_ALL_MAX) : 20_000)
+export const keepsAllBills = (totalElements: number): boolean => totalElements <= keepAllBillsMax()
+
 /** a refresh skips the cases fetched more recently than this */
 export const REFRESH_MIN_AGE_MS = 6 * 3_600_000
 
@@ -101,6 +110,8 @@ export interface JobStatus {
 export interface BillCasesStatus {
   /** the company's bills at billing (as of the last page stored), pages stored / of */
   totalBills: number
+  /** all of them are kept (a small company), not only the ones that name a case */
+  keepsAll: boolean
   pagesDone: number
   totalPages: number
   loaded: boolean
@@ -188,6 +199,7 @@ export function billCasesStatus(tin: string, now: number = Date.now()): BillCase
   const tried = triedStats(tin, retryBefore)
   return {
     totalBills: meta?.totalElements ?? 0,
+    keepsAll: keepsAllBills(meta?.totalElements ?? 0),
     pagesDone: meta?.pagesDone ?? 0,
     totalPages: meta?.totalPages ?? 0,
     loaded: meta?.complete ?? false,
@@ -341,8 +353,8 @@ async function run(job: Job, tin: string, opts: StartOpts, deps: BillCasesDeps, 
             break
           }
           const all = res.content.map(toBillRow).filter((r): r is NonNullable<typeof r> => !!r)
-          // only a bill that names a case is kept: the others are of no use (and about a third of a bank's bills are such)
-          const rows = all.filter((r) => r.caseNumber)
+          // a small company keeps every bill; a big one only the bills that name a case (`keepsAllBills`)
+          const rows = keepsAllBills(res.totalElements) ? all : all.filter((r) => r.caseNumber)
           // instability: distinct bills of this page that an EARLIER page of this pass already had (repeats inside a page are one bill used twice)
           const onPage = new Set(all.map((r) => r.number))
           let repeated = 0

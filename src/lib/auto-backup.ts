@@ -90,7 +90,7 @@ export function fingerprint(): string {
     h.update(JSON.stringify(db.prepare(sql).get()))
     h.update('\n')
   }
-  one('SELECT COUNT(*) n, COALESCE(SUM(paid),0) p, COALESCE(SUM(balance),0) b, COALESCE(SUM(decision),0) d, COALESCE(SUM(amount),0) a, COALESCE(SUM(overdue),0) o, COALESCE(SUM(LENGTH(status)),0) s FROM bills')
+  one('SELECT COUNT(*) n, COALESCE(SUM(paid),0) p, COALESCE(SUM(balance),0) b, COALESCE(SUM(decision),0) d, COALESCE(SUM(amount),0) a, COALESCE(SUM(overdue),0) o, COALESCE(SUM(LENGTH(status)),0) s FROM bills WHERE case_number IS NOT NULL AND case_number != \'\'')
   one('SELECT COUNT(*) n, COALESCE(SUM(LENGTH(row)),0) r, COALESCE(SUM(LENGTH(status)),0) s FROM found_cases')
   one('SELECT COUNT(*) n, COALESCE(SUM(LENGTH(d)),0) s FROM case_details')
   one('SELECT COUNT(*) n, COALESCE(SUM(found),0) f FROM tried')
