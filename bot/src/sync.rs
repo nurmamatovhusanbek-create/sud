@@ -51,6 +51,7 @@ pub async fn register_webhook(sh: Arc<Shared>, tg: crate::telegram::Tg) {
         match tg.set_webhook(&format!("{base}/tg/{}", sh.cfg.webhook_secret), &sh.cfg.webhook_secret).await {
             Ok(()) => {
                 let _ = tg.set_menu_button(&format!("{base}/app")).await;
+                let _ = tg.set_commands().await;
                 println!("[bot] webhook oʻrnatildi: {base}/tg/…");
                 return;
             }

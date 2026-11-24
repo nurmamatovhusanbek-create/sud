@@ -152,6 +152,8 @@ pub struct Info {
 #[serde(rename_all = "camelCase")]
 pub struct Hearing {
     pub tin: String,
+    /// the company's name in the courts' spelling; "" when the backup does not know it
+    pub company: String,
     pub case_number: String,
     pub court: String,
     /// yyyymmdd

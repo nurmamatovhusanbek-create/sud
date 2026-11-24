@@ -282,13 +282,14 @@ impl Shared {
         for (name, tin) in names {
             let Some(t) = self.bucket_text(&name).await.map_err(Self::upstream)? else { continue };
             let aliases = self.aliases_of(&tin).await;
+            let company = self.name_of(&tin).await;
             for r in rows(&t) {
                 let day = r.get(2).and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 if day < from || day > to {
                     continue;
                 }
                 let Side { role, counterparty } = side_by_aliases(&aliases, str_at(&r, 6), str_at(&r, 7));
-                out.push(Hearing { tin: tin.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into(), role, counterparty });
+                out.push(Hearing { tin: tin.clone(), company: company.clone(), case_number: str_at(&r, 0).into(), court: str_at(&r, 1).into(), day, time: str_at(&r, 3).into(), stage: str_at(&r, 4).into(), status: str_at(&r, 5).into(), plaintiff: str_at(&r, 6).into(), defendant: str_at(&r, 7).into(), role, counterparty });
             }
         }
         out.sort_by(|a, b| a.day.cmp(&b.day).then(a.time.cmp(&b.time)).then(a.case_number.cmp(&b.case_number)));

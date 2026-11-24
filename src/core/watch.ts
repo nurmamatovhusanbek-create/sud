@@ -107,46 +107,47 @@ const lat = (s: string): string => uzCyrToLat(s)
 const ROLE_WORD: Record<string, string> = { plaintiff: 'daʼvogarsiz', defendant: 'javobgarsiz' }
 const COURT_WORD: Record<string, string> = { economic: 'Iqtisodiy', civil: 'Fuqarolik', administrative: 'Maʼmuriy' }
 
-const party = (label: string, p: { name: string; tin: string }): string => (p.name ? `${label}: ${lat(p.name)}${p.tin ? ` (STIR ${p.tin})` : ''}` : '')
+/** HTML-safe text: a party's name may hold any character, and the message is sent as Telegram HTML */
+export const escapeHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** the status line: the court's status, and the deadline when the court gave one («Muddat») */
+const party = (label: string, p: { name: string; tin: string }): string => (p.name ? `<b>${label}:</b> ${escapeHtml(lat(p.name))}${p.tin ? ` <i>(STIR ${escapeHtml(p.tin)})</i>` : ''}` : '')
+
+/** the status line: the court's status, and the deadline when the court gave one («Muddat»). Telegram HTML. */
 export function statusLine(row: CourtCase, detail: FullCaseData | null): string {
   const g = detail?.general
   const status = lat(clean(g?.caseStatus) || clean(row.caseStatus))
   const deadline = clean(g?.deadlineDate)
-  return `Holati: ${status || 'nomaʼlum'}${deadline ? ` · Muddat: ${deadline}` : ''}`
+  return `<b>Holati:</b> ${escapeHtml(status || 'nomaʼlum')}${deadline ? ` · <b>Muddat:</b> ${escapeHtml(deadline)}` : ''}`
 }
 
-/** The message the operator reads. Latin Uzbek, plain text (no markup: a party's name may hold any character). */
+/**
+ * The message the operator reads, as Telegram HTML (the same look as the bot's reminders): a bold headline, then who you are in the case, the case
+ * number (tap to copy), both parties, the status and deadline, the hearing, and a dim line saying which company it came from. Latin Uzbek; every
+ * piece of data is escaped.
+ */
 export function buildMessage(ev: WatchEvent): string {
   const { row, sides } = ev
   const head =
     ev.kind === 'new'
-      ? '⚖️ Sudga yangi ariza topshirildi'
+      ? '⚖️ <b>Sudga yangi ariza topshirildi</b>'
       : ev.kind === 'instance'
-        ? `⚖️ ${INSTANCE_WORD[ev.instance ?? ''] ?? 'Yuqori instansiya'}ga shikoyat topshirildi`
+        ? `⚖️ <b>${INSTANCE_WORD[ev.instance ?? ''] ?? 'Yuqori instansiya'}ga shikoyat topshirildi</b>`
         : ev.kind === 'hearing'
-          ? '📅 Majlis sanasi yangilandi'
-          : '🔔 Ish holati oʻzgardi'
-  const side = sides.role ? `Siz: ${ROLE_WORD[sides.role]}` : ''
+          ? '📅 <b>Majlis sanasi yangilandi</b>'
+          : '🔔 <b>Ish holati oʻzgardi</b>'
+  const side = sides.role ? `<b>Siz: ${ROLE_WORD[sides.role]}</b>` : ''
   const hearing = [clean(row.hearingDate), clean(row.hearingTime)].filter(Boolean).join(' ')
-  return [
-    head,
-    side,
-    `Ish: ${row.caseNumber}${COURT_WORD[ev.courtType] ? ` · ${COURT_WORD[ev.courtType]}` : ''}`,
-    party('Daʼvogar', sides.plaintiff),
-    party('Javobgar', sides.defendant),
-    ev.companyName ? `Kuzatuv: ${lat(ev.companyName)} (STIR ${ev.tin})` : `Kuzatuv: STIR ${ev.tin}`,
-    statusLine(row, ev.detail),
-    hearing && ev.kind !== 'status' ? `Majlis: ${hearing}` : '',
-  ]
+  const case_ = `<b>Ish:</b> <code>${escapeHtml(row.caseNumber)}</code>${COURT_WORD[ev.courtType] ? ` · ${COURT_WORD[ev.courtType]}` : ''}`
+  const body = [side, case_, party('Daʼvogar', sides.plaintiff), party('Javobgar', sides.defendant), statusLine(row, ev.detail), hearing && ev.kind !== 'status' ? `<b>Majlis:</b> ${escapeHtml(hearing)}` : '']
     .filter(Boolean)
     .join('\n')
+  const from = ev.companyName ? `Kuzatuv: ${escapeHtml(lat(ev.companyName))} (STIR ${escapeHtml(ev.tin)})` : `Kuzatuv: STIR ${escapeHtml(ev.tin)}`
+  return `${head}\n\n${body}\n\n<i>${from}</i>`
 }
 
 /** a long run is cut: at most `max` messages, then one that says how many more there are */
 export function overflowMessage(n: number, tin: string): string {
-  return `…yana ${n} ta yangi xabar bor (STIR ${tin}). Ilovada «Sud ishlari» ni oching.`
+  return `…yana <b>${n}</b> ta yangi xabar bor <i>(STIR ${escapeHtml(tin)})</i>. Ilovada «Sud ishlari» ni oching.`
 }
 
 // ---- the setting --------------------------------------------------------------------------------------------------------------------------

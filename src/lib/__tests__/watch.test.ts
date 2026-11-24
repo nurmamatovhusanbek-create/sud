@@ -74,9 +74,9 @@ describe('the first read and what is new after it', () => {
     expect(sent).toHaveLength(1)
     expect(sent[0]!.chat).toBe(4242)
     expect(sent[0]!.text).toContain('Sudga yangi ariza topshirildi')
-    expect(sent[0]!.text).toContain('Siz: javobgarsiz') // the TIN in the detail is the company's, on the defendant's side
-    expect(sent[0]!.text).toContain('Daʼvogar: Universal Savdo MChJ (STIR 201234567)')
-    expect(sent[0]!.text).toContain('Holati: Tayinlash · Muddat: 05.12.2030')
+    expect(sent[0]!.text).toContain('<b>Siz: javobgarsiz</b>') // the TIN in the detail is the company's, on the defendant's side
+    expect(sent[0]!.text).toContain('<b>Daʼvogar:</b> Universal Savdo MChJ <i>(STIR 201234567)</i>')
+    expect(sent[0]!.text).toContain('<b>Holati:</b> Tayinlash · <b>Muddat:</b> 05.12.2030')
     // and never again
     expect((await run()).events).toBe(0)
     expect(sent).toHaveLength(1)
@@ -88,8 +88,8 @@ describe('the first read and what is new after it', () => {
     lists[`economic:${TIN}`] = [row(1, { caseStatus: 'Кўриб чиқиш жараёнида' }), row(2, { hearingDate: '15.12.2030', hearingTime: '10:00' })]
     const r = await run()
     expect(r.events).toBe(2)
-    expect(sent.map((s) => s.text.split('\n')[0]).sort()).toEqual(['📅 Majlis sanasi yangilandi', '🔔 Ish holati oʻzgardi'])
-    expect(sent.find((s) => s.text.includes('Majlis sanasi'))!.text).toContain('Majlis: 15.12.2030 10:00')
+    expect(sent.map((s) => s.text.split('\n')[0]).sort()).toEqual(['📅 <b>Majlis sanasi yangilandi</b>', '🔔 <b>Ish holati oʻzgardi</b>'])
+    expect(sent.find((s) => s.text.includes('Majlis sanasi'))!.text).toContain('<b>Majlis:</b> 15.12.2030 10:00')
   })
 
   test('a case that reached the appeal court is announced as such (the detail shows it), and an instance that was already there is not news', async () => {
@@ -116,7 +116,7 @@ describe('the first read and what is new after it', () => {
     details['2-1004-2611/9'] = { kind: 'error', message: 'timeout' }
     await run()
     expect(sent).toHaveLength(1)
-    expect(sent[0]!.text).toContain('Siz: javobgarsiz') // the defendant's name is the company's
+    expect(sent[0]!.text).toContain('<b>Siz: javobgarsiz</b>') // the defendant's name is the company's
     expect(sent[0]!.text).not.toMatch(/[А-Яа-я]/)
   })
 })
@@ -172,7 +172,7 @@ describe('nothing is lost', () => {
     expect(r.events).toBe(20)
     expect(r.sent).toBe(15)
     expect(sent).toHaveLength(16)
-    expect(sent.at(-1)!.text).toContain('yana 5 ta')
+    expect(sent.at(-1)!.text).toContain('yana <b>5</b> ta')
     const next = await run()
     expect(next.sent).toBe(5)
   })

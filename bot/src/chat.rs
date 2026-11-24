@@ -2,15 +2,28 @@
 //! nothing else. Text is built from the typed answers of `service.rs`; sending goes through `Outbox`, so every handler is testable without Telegram.
 
 use crate::domain::{Bill, CaseView, Company, Hearing};
+use crate::format::{court_word, day_head, esc};
 use crate::translit::to_latin as lat;
 use crate::error::AppResult;
 use crate::state::Shared;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-const HELP: &str = "Sud tizimi boti: Telegramdagi shifrlangan zaxiradan qidiradi.\n\n\
-Ish raqami (2-1004-2603/8020), kvitansiya raqami yoki STIR yozing: shunchaki xabar yuborish yetarli.\n\n\
-/find <matn>: qidirish\n/hearings [kun] [STIR]: yaqin majlislar (14 kun)\n/case <ish raqami>: ish maʼlumoti\n/bill <raqam>: kvitansiya\n/company <STIR>: kompaniya\n/app: qidiruv oynasi (Mini App)\n/status: zaxira holati";
+const HELP: &str = "<b>Sud tizimi boti</b>\n\
+Telegramdagi shifrlangan zaxiradan qidiradi. Sud saytlariga kirmaydi: maʼlumot oxirgi zaxira vaqtidagidek.\n\n\
+<b>Qidirish</b>\n\
+Shunchaki yozing: ish raqami (<code>2-1004-2603/8020</code>), kvitansiya raqami, STIR yoki kompaniya nomi.\n\n\
+<b>Buyruqlar</b>\n\
+/hearings [kun] [STIR]: yaqin majlislar (14 kun)\n\
+/stats [STIR]: sonlar, kompaniyalar va ishlar\n\
+/company STIR: kompaniya\n\
+/case raqam: ish maʼlumoti\n\
+/bill raqam: kvitansiya\n\
+/find matn: qidirish\n\
+/app: qidiruv oynasi (Mini App)\n\
+/status: zaxira holati\n\n\
+<b>Eslatma</b>\n\
+Har kuni soat 08:00 dan keyin yaqin 7 kunlik majlislar oʻzi yuboriladi.";
 
 pub fn authorized(sh: &Shared, user: i64) -> bool {
     sh.cfg.allowed.contains(&user)
@@ -68,23 +81,53 @@ fn som(v: &Value) -> String {
     fmt_int(v.as_i64().unwrap_or(0) / 100)
 }
 
-/// hearings grouped by day: «Bugun», «Ertaga», then the date; one line per hearing
+/// one hearing, in three short lines: time and case, whose it is, and the other side
+fn hearing_entry(h: &Hearing) -> String {
+    let time = if h.time.is_empty() { "vaqti nomaʼlum".to_string() } else { h.time.clone() };
+    let stage = match h.stage.as_str() {
+        "appeal" => " · apellyatsiya",
+        "cassation" => " · kassatsiya",
+        "inspection" => " · taftish",
+        _ => "",
+    };
+    let court = court_word(&h.court).to_lowercase();
+    let mut out = format!("🕙 <b>{}</b> · <code>{}</code>{}{}\n", esc(&time), esc(&h.case_number), if court.is_empty() { String::new() } else { format!(" · {court}") }, stage);
+    let who = lat(&h.company);
+    if !h.role.is_empty() {
+        // the company's side is known: «Javobgar» and the other party
+        out.push_str(&format!("<b>{}</b> · {}\n", if who.is_empty() { "Kompaniya".to_string() } else { esc(&who) }, role_word(h.role).to_lowercase()));
+        if !h.counterparty.is_empty() {
+            out.push_str(&format!("↔ {}\n", esc(&lat(&h.counterparty))));
+        }
+    } else {
+        if !who.is_empty() {
+            out.push_str(&format!("<b>{}</b>\n", esc(&who)));
+        }
+        for (label, v) in [("Daʼvogar", &h.plaintiff), ("Javobgar", &h.defendant)] {
+            let t = lat(v);
+            if !t.is_empty() {
+                out.push_str(&format!("{label}: {}\n", esc(&t)));
+            }
+        }
+    }
+    out
+}
+
+/// hearings grouped by day (a bold heading: «Bugun · 24.11.2026 · seshanba»), each one as `hearing_entry`, a blank line between them
 pub fn fmt_hearing_block(list: &[Hearing], today: u32) -> String {
     let mut out = String::new();
     let mut day = 0;
     for h in list {
         if h.day != day {
             day = h.day;
-            let date = crate::date::dmy(day);
-            let head = if day == today { format!("Bugun, {date}") } else if day == crate::date::add_days(today, 1) { format!("Ertaga, {date}") } else { date };
             if !out.is_empty() {
                 out.push('\n');
             }
-            out.push_str(&format!("{head}\n"));
+            out.push_str(&format!("📅 <b>{}</b>\n", esc(&day_head(day, today))));
+        } else {
+            out.push('\n');
         }
-        // when the company's side is known: «Javobgar · qarshi tomon: X»; otherwise both parties as they are
-        let sides = if h.role.is_empty() { [lat(&h.plaintiff), lat(&h.defendant)].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" — ") } else { format!("{} · qarshi tomon: {}", role_word(h.role), lat(&h.counterparty)) };
-        out.push_str(&format!("⏰ {} · {}{}\n", if h.time.is_empty() { "—" } else { &h.time }, h.case_number, if sides.is_empty() { String::new() } else { format!("\n    {sides}") }));
+        out.push_str(&hearing_entry(h));
     }
     out
 }
@@ -116,37 +159,38 @@ pub fn hit_button(h: &Value) -> Value {
     json!([{ "text": label, "callback_data": data }])
 }
 
+/// «<b>Label:</b> value», when there is a value
+fn labelled(label: &str, v: &str) -> String {
+    if v.is_empty() { String::new() } else { format!("<b>{label}:</b> {}\n", esc(&lat(v))) }
+}
+
 pub fn case_text(c: &CaseView) -> String {
-    let mut out = format!("⚖️ Ish {}\n", c.num);
+    let mut out = format!("⚖️ <b>Ish</b> <code>{}</code>\n", esc(&c.num));
     if !c.role.is_empty() {
-        out.push_str(&format!("{}: {} · qarshi tomon: {}\n", if c.company_name.is_empty() { "Tomon".to_string() } else { c.company_name.clone() }, role_word(c.role), c.counterparty));
+        out.push_str(&format!("<b>{}</b> · {}\n↔ {}\n", if c.company_name.is_empty() { "Tomon".to_string() } else { esc(&lat(&c.company_name)) }, role_word(c.role).to_lowercase(), esc(&lat(&c.counterparty))));
     }
-    let mut line = |label: &str, v: &str| {
-        if !v.is_empty() {
-            out.push_str(&format!("{label}: {v}\n"));
-        }
-    };
+    out.push('\n');
     let g = &c.detail["general"];
     if g.is_object() {
         for (label, k) in [("Holati", "caseStatus"), ("Turi", "caseType"), ("Sud", "court"), ("Sudya", "judge"), ("Daʼvogar", "plaintiff"), ("Javobgar", "defendant"), ("Daʼvo summasi", "claimAmount"), ("Ariza sanasi", "applicationDate")] {
-            line(label, s(g, k));
+            out.push_str(&labelled(label, s(g, k)));
         }
     } else if c.row.is_object() {
         for (label, k) in [("Holati", "caseStatus"), ("Turi", "caseType"), ("Sud", "courtName"), ("Sudya", "judge"), ("Daʼvogar", "plaintiff"), ("Javobgar", "defendant"), ("Daʼvo summasi", "claimAmount"), ("Ariza sanasi", "dateFiled"), ("Natija", "result")] {
-            line(label, s(&c.row, k));
+            out.push_str(&labelled(label, s(&c.row, k)));
         }
     } else {
-        out.push_str("Batafsil maʼlumot zaxirada yoʻq (faqat kvitansiyalar orqali maʼlum).\n");
+        out.push_str("<i>Batafsil maʼlumot zaxirada yoʻq (faqat kvitansiyalar orqali maʼlum).</i>\n");
     }
     for (title, key) in [("1-instansiya", "firstInstance"), ("Apellyatsiya", "appellate"), ("Kassatsiya", "cassation"), ("Taftish", "inspection")] {
         let ins = &c.detail[key];
         if !ins.is_object() {
             continue;
         }
-        out.push_str(&format!("\n— {title}\n"));
+        out.push_str(&format!("\n<b>{title}</b>\n"));
         if let Some(hs) = ins["hearings"].as_array() {
             for h in hs.iter().take(4) {
-                out.push_str(&format!("📅 {} {} · {}\n", s(h, "date"), s(h, "time"), s(h, "status")));
+                out.push_str(&format!("📅 {} {} · {}\n", esc(s(h, "date")), esc(s(h, "time")), esc(&lat(s(h, "status")))));
             }
             if hs.len() > 4 {
                 out.push_str(&format!("… yana {} ta majlis\n", hs.len() - 4));
@@ -154,45 +198,80 @@ pub fn case_text(c: &CaseView) -> String {
         }
         let d = &ins["decision"];
         if d.is_object() {
-            out.push_str(&format!("⚖️ Qaror {}: {}\n", s(d, "date"), s(d, "text")));
+            out.push_str(&format!("⚖️ <b>Qaror</b> {}: {}\n", esc(s(d, "date")), esc(&lat(s(d, "text")))));
         }
     }
-    out.push_str(&format!("\nSTIR: {} · {}\n", c.tin, c.court));
-    for b in &c.bills {
-        out.push_str(&format!("🧾 {} · {} · {}\n", text(&b.number), text(&b.cat), som(&b.amount)));
+    if !c.bills.is_empty() {
+        out.push_str("\n<b>Kvitansiyalar</b>\n");
+        for b in &c.bills {
+            out.push_str(&format!("🧾 <code>{}</code> · {} · {} soʻm\n", esc(text(&b.number)), esc(&lat(text(&b.cat))), som(&b.amount)));
+        }
     }
-    lat(&out)
+    out.push_str(&format!("\n<i>STIR {} · {}</i>", esc(&c.tin), esc(&c.court)));
+    out
 }
 
 pub fn bill_text(b: &Bill) -> String {
-    lat(&format!(
-        "🧾 Kvitansiya {}\nHolati: {}\nTuri: {}\nSud: {}\nSumma: {} · toʻlangan: {}\nBerilgan: {}\n{}{}STIR: {}",
-        text(&b.number),
-        text(&b.status),
-        text(&b.cat),
-        text(&b.court),
-        som(&b.amount),
-        som(&b.paid),
-        dmy_ms(b.issued.as_i64().unwrap_or(0)),
-        if text(&b.case_number).is_empty() { String::new() } else { format!("Ish: {}\n", text(&b.case_number)) },
-        if text(&b.payer).is_empty() { String::new() } else { format!("Toʻlovchi: {}\n", text(&b.payer)) },
-        text(&b.tin)
-    ))
+    let mut out = format!("🧾 <b>Kvitansiya</b> <code>{}</code>\n\n", esc(text(&b.number)));
+    out.push_str(&labelled("Holati", text(&b.status)));
+    out.push_str(&labelled("Turi", text(&b.cat)));
+    out.push_str(&labelled("Sud", text(&b.court)));
+    out.push_str(&format!("<b>Summa:</b> {} soʻm · <b>toʻlangan:</b> {} soʻm\n", som(&b.amount), som(&b.paid)));
+    out.push_str(&labelled("Berilgan", &dmy_ms(b.issued.as_i64().unwrap_or(0))));
+    if !text(&b.case_number).is_empty() {
+        out.push_str(&format!("<b>Ish:</b> <code>{}</code>\n", esc(text(&b.case_number))));
+    }
+    out.push_str(&labelled("Toʻlovchi", text(&b.payer)));
+    out.push_str(&format!("\n<i>STIR {}</i>", esc(text(&b.tin))));
+    out
 }
 
 pub fn company_text(c: &Company) -> String {
-    lat(&format!("🏢 {}STIR {}\nToʻlovlar: {}\nTopilgan ishlar: {}\nBirinchi yuklash: {}\nMaʼlumot holati: {}", if c.name.is_empty() { String::new() } else { format!("{}\n", c.name) }, c.tin, fmt_int(c.bills as i64), fmt_int(c.found as i64), dmy_ms(c.first_at), dmy_ms(c.refreshed_at)))
+    let mut out = format!("🏢 <b>{}</b>\n<code>STIR {}</code>\n\n", if c.name.is_empty() { "Nomi zaxirada yoʻq".to_string() } else { esc(&lat(&c.name)) }, esc(&c.tin));
+    out.push_str(&format!("<b>Sud roʻyxatidagi ishlar:</b> {}\n", fmt_int(c.listed as i64)));
+    out.push_str(&format!("<b>Toʻlovlar orqali topilgan ishlar:</b> {}\n", fmt_int(c.found as i64)));
+    out.push_str(&format!("<b>Ish raqamli toʻlovlar:</b> {}\n", fmt_int(c.bills as i64)));
+    out.push_str(&format!("\n<i>Birinchi yuklash {} · maʼlumot {} holatiga</i>", dmy_ms(c.first_at), dmy_ms(c.refreshed_at)));
+    out
+}
+
+/// «/stats»: all companies in a few lines, or one company's courts and years
+pub fn stats_text(rows: &[crate::domain::Overview]) -> String {
+    let mut out = format!("📊 <b>Umumiy sonlar</b>\nKompaniyalar: <b>{}</b>\n", rows.len());
+    for o in rows {
+        out.push_str(&format!("\n🏢 <b>{}</b>\n<code>{}</code> · ishlar <b>{}</b> · toʻlovlar {}\n", if o.company.name.is_empty() { "Nomi yoʻq".to_string() } else { esc(&lat(&o.company.name)) }, esc(&o.company.tin), fmt_int(o.cases as i64), fmt_int(o.company.bills as i64)));
+    }
+    out
+}
+
+pub fn overview_text(o: &crate::domain::Overview) -> String {
+    let c = &o.company;
+    let mut out = format!("📊 <b>{}</b>\n<code>STIR {}</code>\n\n", if c.name.is_empty() { "Nomi zaxirada yoʻq".to_string() } else { esc(&lat(&c.name)) }, esc(&c.tin));
+    out.push_str(&format!("<b>Ishlar:</b> {}\n<b>Ish raqamli toʻlovlar:</b> {}\n", fmt_int(o.cases as i64), fmt_int(c.bills as i64)));
+    let courts: Vec<String> = o.courts.iter().map(|(k, n)| format!("{} {}", { let w = court_word(k); if w.is_empty() { k.as_str() } else { w } }, fmt_int(*n as i64))).collect();
+    if !courts.is_empty() {
+        out.push_str(&format!("\n<b>Sudlar boʻyicha:</b> {}\n", esc(&courts.join(" · "))));
+    }
+    let years: Vec<&crate::domain::YearCount> = o.by_year.iter().rev().take(8).collect();
+    if !years.is_empty() {
+        out.push_str("\n<b>Yillar boʻyicha</b> (ariza yili)\n");
+        for y in years {
+            out.push_str(&format!("{} · {} ish · {} toʻlov\n", y.year, fmt_int(y.cases as i64), fmt_int(y.bills as i64)));
+        }
+    }
+    out.push_str(&format!("\n<i>Maʼlumot {} holatiga</i>", dmy_ms(c.refreshed_at)));
+    out
 }
 
 /// a button that opens the Mini App straight on this item (`/app?case=…`)
 fn app_button(sh: &Shared, param: &str, key: &str) -> Option<Value> {
     let base = sh.cfg.public_url.as_ref()?;
     let q: String = form_urlencoded::Serializer::new(String::new()).append_pair(param, key).finish();
-    Some(json!({ "inline_keyboard": [[{ "text": "Mini App'da ochish", "web_app": { "url": format!("{base}/app?{q}") } }]] }))
+    Some(json!({ "inline_keyboard": [[{ "text": "Mini Appʼda ochish", "web_app": { "url": format!("{base}/app?{q}") } }]] }))
 }
 
 /// at most this many hearings in one message (Telegram refuses a text over 4096 characters: a hundred rows do not fit)
-const CHAT_PAGE: usize = 20;
+const CHAT_PAGE: usize = 10;
 
 /// the longest text a message may carry, with room to spare
 const CHAT_MAX: usize = 3900;
@@ -210,6 +289,12 @@ fn clip(s: &str, max: usize) -> String {
     format!("{}\n…", head.rsplit_once('\n').map(|(h, _)| h).unwrap_or(head))
 }
 
+/// like `clip`, for HTML: cut at a line break below `max` bytes (every tag of this bot's messages opens and closes on one line, so a line break is
+/// always a safe place) and say it was cut
+fn clip_html(s: &str, max: usize) -> String {
+    clip(s, max)
+}
+
 /// One page of the hearings: the rows, a «next» button while there are more, and a button that opens the same list in the Mini App.
 async fn hearings_reply(sh: &Arc<Shared>, chat: i64, days: u32, tin: &str, offset: usize) {
     let today = crate::date::today(crate::state::now());
@@ -224,16 +309,16 @@ async fn hearings_reply(sh: &Arc<Shared>, chat: i64, days: u32, tin: &str, offse
     }
     let shown_to = offset + page.rows.len();
     let scope = if tin.is_empty() { String::new() } else { format!(", STIR {tin}") };
-    let head = format!("📅 Yaqin majlislar ({days} kun{scope}): {} ta · {}–{shown_to}\n\n", page.total, offset + 1);
-    let body = clip(&format!("{head}{}", fmt_hearing_block(&page.rows, today)), CHAT_MAX);
+    let head = format!("📋 <b>Yaqin majlislar</b> · {days} kun{}\n<b>{}</b> ta · {}–{shown_to}\n\n", esc(&scope), page.total, offset + 1);
+    let body = clip_html(&format!("{head}{}", fmt_hearing_block(&page.rows, today)), CHAT_MAX);
     let mut keys: Vec<Value> = Vec::new();
     if shown_to < page.total {
         keys.push(json!([{ "text": format!("Keyingi {} ›", (page.total - shown_to).min(CHAT_PAGE)), "callback_data": format!("h:{days}:{tin}:{shown_to}") }]));
     }
     if let Some(base) = sh.cfg.public_url.as_ref() {
-        keys.push(json!([{ "text": "Hammasi Mini App'da", "web_app": { "url": format!("{base}/app?tab=hearings") } }]));
+        keys.push(json!([{ "text": "Hammasi Mini Appʼda", "web_app": { "url": format!("{base}/app?tab=hearings") } }]));
     }
-    sh.outbox.send(chat, &body, if keys.is_empty() { None } else { Some(json!({ "inline_keyboard": keys })) }).await;
+    sh.outbox.send_html(chat, &body, if keys.is_empty() { None } else { Some(json!({ "inline_keyboard": keys })) }).await;
 }
 
 async fn search_reply(sh: &Arc<Shared>, chat: i64, q: &str) {
@@ -254,7 +339,7 @@ async fn show(sh: &Arc<Shared>, chat: i64, what: &str, key: &str) {
         _ => (sh.company(key).await.map(|c| company_text(&c)).ok_or_else(|| crate::error::AppError::NotFound("Bunday kompaniya zaxirada yoʻq".into())), "company"),
     };
     match reply {
-        Ok(t) => sh.outbox.send(chat, &t, app_button(sh, param, key)).await,
+        Ok(t) => sh.outbox.send_html(chat, &clip_html(&t, CHAT_MAX), app_button(sh, param, key)).await,
         Err(e) => sh.outbox.send(chat, &e.message(), None).await,
     }
 }
@@ -303,7 +388,7 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
     };
     let cmd = cmd.split('@').next().unwrap_or(cmd);
     if matches!(cmd, "/start" | "/help") {
-        sh.outbox.send(chat, HELP, None).await;
+        sh.outbox.send_html(chat, HELP, None).await;
         return;
     }
     let info = sh.info().await;
@@ -313,9 +398,26 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
     }
     match cmd {
         "/status" => {
-            let mirror = if info.channel > 0 { "\nEslatma: asosiy kanal ishlamayapti, zaxira kanaldan oʻqilmoqda.".to_string() } else { String::new() };
-            let degraded = if info.failures > 0 { format!("\nOxirgi {} ta yangilash muvaffaqiyatsiz: eski zaxiradan javob beryapman.", info.failures) } else { String::new() };
-            sh.outbox.send(chat, &format!("Zaxira: {}\nYozuvlar: {} · kompaniyalar: {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
+            let mirror = if info.channel > 0 { "\n⚠️ Asosiy kanal ishlamayapti: zaxira kanaldan oʻqilmoqda.".to_string() } else { String::new() };
+            let degraded = if info.failures > 0 { format!("\n⚠️ Oxirgi {} ta yangilash muvaffaqiyatsiz: eski zaxiradan javob beryapman.", info.failures) } else { String::new() };
+            sh.outbox.send_html(chat, &format!("🗄 <b>Zaxira holati</b>\n<b>Oxirgi zaxira:</b> {}\n<b>Yozuvlar:</b> {}\n<b>Kompaniyalar:</b> {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
+        }
+        "/stats" => {
+            let tin: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
+            if tin.len() == 9 {
+                match sh.overview(&tin).await {
+                    Ok(o) => sh.outbox.send_html(chat, &clip_html(&overview_text(&o), CHAT_MAX), app_button(&sh, "company", &tin)).await,
+                    Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+                }
+            } else {
+                let mut rows = Vec::new();
+                for c in sh.companies().await {
+                    if let Ok(o) = sh.overview(&c.tin).await {
+                        rows.push(o);
+                    }
+                }
+                sh.outbox.send_html(chat, &clip_html(&stats_text(&rows), CHAT_MAX), None).await;
+            }
         }
         "/app" => match &sh.cfg.public_url {
             Some(u) => sh.outbox.send(chat, "Qidiruv oynasini oching:", Some(json!({ "inline_keyboard": [[{ "text": "Qidiruv", "web_app": { "url": format!("{u}/app") } }]] }))).await,
@@ -337,7 +439,7 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         "/bill" => show(&sh, chat, "b", arg).await,
         "/company" => show(&sh, chat, "k", arg).await,
         "/find" => search_reply(&sh, chat, arg).await,
-        _ if body.starts_with('/') => sh.outbox.send(chat, HELP, None).await,
+        _ if body.starts_with('/') => sh.outbox.send_html(chat, HELP, None).await,
         _ => search_reply(&sh, chat, body).await,
     }
 }

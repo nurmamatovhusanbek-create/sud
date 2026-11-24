@@ -98,6 +98,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `schemas/index.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/rating/route, +5 |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
 | `security-events.ts` | components/views/security-settings.tsx, lib/api-client.ts, server/audit.ts |  |
+| `setup-guide.ts` | components/views/telegram-settings.tsx | core/__tests__/setup-guide.test.ts |
 | `status.ts` | components/company/context-bar.tsx, components/proto/primitives.tsx, components/sections/bills-helpers.ts, components/sections/profile.tsx, lib/report/model.ts | core/__tests__/status.test.ts |
 | `telegram.ts` | api/settings/telegram/find/route, api/settings/telegram/route, api/settings/telegram/test/route, components/views/telegram-settings.tsx, hooks/use-telegram.ts, lib/telegram-client.ts, lib/telegram-config.ts, +1 | lib/__tests__/telegram.test.ts |
 | `translit.ts` | core/classify.ts, core/public-orders.ts, core/watch.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |

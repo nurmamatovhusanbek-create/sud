@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildMessage, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
+import { buildMessage, escapeHtml, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
 import type { CourtCase, FullCaseData } from '@/lib/court-case-types'
 
 const row = (o: Partial<CourtCase> = {}): CourtCase => ({ caseNumber: '2-1004-2611/1', caseType: '', caseStatus: 'Тайинлаш', result: '', courtName: '', dateFiled: '', plaintiff: 'Универсал Савдо МЧЖ', defendant: '«ANOR» МЧЖ', claimAmount: '', hearingDate: '', hearingTime: '', judge: '', ...o })
@@ -58,12 +58,12 @@ describe('the message', () => {
   test('a new filing says which side you are, who is who with TINs, the status and the deadline', () => {
     const m = buildMessage(ev())
     expect(m).toContain('Sudga yangi ariza topshirildi')
-    expect(m).toContain('Siz: javobgarsiz')
-    expect(m).toContain('Daʼvogar: Universal Savdo MChJ (STIR 201234567)')
-    expect(m).toContain('Javobgar: «ANOR» MChJ (STIR 207275139)')
-    expect(m).toContain('Ish: 2-1004-2611/1 · Fuqarolik')
-    expect(m).toContain('Holati: Tayinlash · Muddat: 05.12.2030')
-    expect(m).toContain('Majlis: 15.12.2030 10:00')
+    expect(m).toContain('<b>Siz: javobgarsiz</b>')
+    expect(m).toContain('<b>Daʼvogar:</b> Universal Savdo MChJ <i>(STIR 201234567)</i>')
+    expect(m).toContain('<b>Javobgar:</b> «ANOR» MChJ <i>(STIR 207275139)</i>')
+    expect(m).toContain('<b>Ish:</b> <code>2-1004-2611/1</code> · Fuqarolik')
+    expect(m).toContain('<b>Holati:</b> Tayinlash · <b>Muddat:</b> 05.12.2030')
+    expect(m).toContain('<b>Majlis:</b> 15.12.2030 10:00')
     expect(m).not.toMatch(/[А-Яа-я]/) // Latin only
   })
   test('the other kinds have their own headline; an appeal names the instance', () => {
@@ -76,8 +76,8 @@ describe('the message', () => {
     const r = row({ caseStatus: '-', plaintiff: 'A MChJ', defendant: 'B MChJ' })
     const m = buildMessage(ev({ row: r, detail: null, sides: sidesOf('207275139', 'ANOR', r, null) }))
     expect(m).not.toContain('Siz:')
-    expect(m).toContain('Holati: nomaʼlum')
-    expect(statusLine(r, null)).toBe('Holati: nomaʼlum')
+    expect(m).toContain('<b>Holati:</b> nomaʼlum')
+    expect(statusLine(r, null)).toBe('<b>Holati:</b> nomaʼlum')
   })
 })
 
@@ -93,5 +93,24 @@ describe('the setting', () => {
     expect(parseWatchConfig({ recipients: ['abc'] })).toBeNull()
     expect(parseWatchConfig({ enabled: 'yes' })).toBeNull()
     expect(parseWatchConfig('x')).toBeNull()
+  })
+})
+
+describe('the message is Telegram HTML: a name cannot break it', () => {
+  test('markup characters in a party, a company or a case number are escaped; the layout is headline, blank line, lines, blank line, source', () => {
+    const r = row({ plaintiff: 'A & B <x> MChJ', defendant: 'C MChJ' })
+    const m = buildMessage({ kind: 'new', tin: '207275139', companyName: 'Firma <z> & Ko', courtType: 'civil', row: r, detail: null, sides: sidesOf('207275139', 'Firma <z> & Ko', r, null) })
+    expect(m).toContain('A &amp; B &lt;x&gt; MChJ')
+    expect(m).toContain('Firma &lt;z&gt; &amp; Ko')
+    expect(m).not.toMatch(/<x>|<z>/)
+    const [head, blank1, ...rest] = m.split('\n')
+    expect(head).toBe('⚖️ <b>Sudga yangi ariza topshirildi</b>')
+    expect(blank1).toBe('')
+    expect(rest.at(-2)).toBe('')
+    expect(rest.at(-1)).toMatch(/^<i>Kuzatuv: .*\(STIR \d+\)<\/i>$/)
+  })
+
+  test('escapeHtml touches only & < >', () => {
+    expect(escapeHtml('«A» & <B> oʻ')).toBe('«A» &amp; &lt;B&gt; oʻ')
   })
 })

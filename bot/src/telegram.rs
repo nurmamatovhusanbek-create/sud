@@ -66,8 +66,16 @@ impl Tg {
     }
 
     pub async fn send(&self, chat_id: i64, text: &str, markup: Option<Value>) {
+        self.send_as(chat_id, text, markup, false).await;
+    }
+
+    /// `html`: the text is Telegram HTML (every piece of data in it escaped, see `format::esc`)
+    pub async fn send_as(&self, chat_id: i64, text: &str, markup: Option<Value>, html: bool) {
         let text: String = text.chars().take(4000).collect();
         let mut body = json!({ "chat_id": chat_id, "text": text, "disable_web_page_preview": true });
+        if html {
+            body["parse_mode"] = json!("HTML");
+        }
         if let Some(m) = markup {
             body["reply_markup"] = m;
         }
@@ -87,6 +95,26 @@ impl Tg {
     /// Telegram allows either a webhook or getUpdates, never both: the app's «Kanalni topish» reads getUpdates, so while the operator tests it the webhook is taken off.
     pub async fn delete_webhook(&self) -> Result<(), String> {
         self.call::<Value>("deleteWebhook", &json!({ "drop_pending_updates": false })).await.map(|_| ())
+    }
+
+    /// the «/» menu of the chat: the commands and what they do
+    pub async fn set_commands(&self) -> Result<(), String> {
+        let list: Vec<Value> = [
+            ("start", "Boshlash va yordam"),
+            ("find", "Qidirish: ish, kvitansiya, STIR yoki nom"),
+            ("hearings", "Yaqin majlislar"),
+            ("stats", "Sonlar: kompaniyalar va ishlar"),
+            ("company", "Kompaniya: STIR"),
+            ("case", "Ish: raqam"),
+            ("bill", "Kvitansiya: raqam"),
+            ("app", "Qidiruv oynasi (Mini App)"),
+            ("status", "Zaxira holati"),
+            ("help", "Yordam"),
+        ]
+        .iter()
+        .map(|(c, d)| json!({ "command": c, "description": d }))
+        .collect();
+        self.call::<Value>("setMyCommands", &json!({ "commands": list })).await.map(|_| ())
     }
 
     pub async fn set_menu_button(&self, app_url: &str) -> Result<(), String> {
@@ -186,6 +214,13 @@ impl Outbox {
     pub async fn send(&self, chat: i64, text: &str, markup: Option<Value>) {
         match self {
             Outbox::Telegram(t) => t.send(chat, text, markup).await,
+            Outbox::Capture(v) => v.lock().unwrap().push(Sent { chat, text: text.to_string(), markup }),
+        }
+    }
+    /// the text is Telegram HTML
+    pub async fn send_html(&self, chat: i64, text: &str, markup: Option<Value>) {
+        match self {
+            Outbox::Telegram(t) => t.send_as(chat, text, markup, true).await,
             Outbox::Capture(v) => v.lock().unwrap().push(Sent { chat, text: text.to_string(), markup }),
         }
     }

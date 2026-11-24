@@ -53,9 +53,32 @@ pub fn dmy(key: u32) -> String {
     format!("{:02}.{:02}.{}", key % 100, key / 100 % 100, key / 10_000)
 }
 
+/// the weekday of a date, in Uzbek (`20261124` → «seshanba»)
+pub fn weekday(key: u32) -> &'static str {
+    let (y, m, d) = (i64::from(key / 10_000), i64::from(key / 100 % 100), i64::from(key % 100));
+    // 1970-01-01 was a Thursday
+    match (days_from(y, m, d) + 3).rem_euclid(7) {
+        0 => "dushanba",
+        1 => "seshanba",
+        2 => "chorshanba",
+        3 => "payshanba",
+        4 => "juma",
+        5 => "shanba",
+        _ => "yakshanba",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_weekday_is_right_for_known_dates() {
+        assert_eq!(weekday(20_261_124), "seshanba");
+        assert_eq!(weekday(20_260_101), "payshanba");
+        assert_eq!(weekday(20_240_229), "payshanba");
+        assert_eq!(weekday(20_261_129), "yakshanba");
+    }
 
     #[test]
     fn today_follows_uzbekistan_time() {

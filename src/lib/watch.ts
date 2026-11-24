@@ -225,7 +225,7 @@ export async function sendWatchTest(): Promise<{ ok: boolean; sent: number; erro
   if (!tg) return { ok: false, sent: 0, error: 'Avval Telegram botini saqlang' }
   if (!cfg.recipients.length) return { ok: false, sent: 0, error: 'Xabar oluvchi koʻrsatilmagan' }
   let sent = 0
-  for (const chat of cfg.recipients) if ((await sendMessage(tg.token, chat, '🔔 Kuzatuv: sinov xabari. Sozlama ishlayapti.')).ok) sent++
+  for (const chat of cfg.recipients) if ((await sendMessage(tg.token, chat, '🔔 <b>Kuzatuv</b>: sinov xabari.\nSozlama ishlayapti: yangi ish, instansiya, majlis va holat oʻzgarishlari shu yerga keladi.')).ok) sent++
   return { ok: sent > 0, sent, ...(sent === 0 ? { error: 'Xabar yuborilmadi: oluvchi botga /start bosganmi?' } : {}) }
 }
 

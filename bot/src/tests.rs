@@ -286,7 +286,7 @@ mod names {
         assert!(l.iter().all(|h| h.role == "defendant" && h.counterparty == "Универсал МЧЖ"), "{l:?}");
         crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings 7" } })).await;
         let text = &sh.outbox.captured()[0].text;
-        assert!(text.contains("Javobgar · qarshi tomon: Universal MChJ") && !text.contains("Universal MChJ — ANOR"), "{text}");
+        assert!(text.contains("· javobgar\n↔ Universal MChJ") && !text.contains("Universal MChJ — ANOR"), "{text}");
     }
 
     #[tokio::test]
@@ -302,7 +302,7 @@ mod names {
         let c = sh.case_view(CASE).await.unwrap();
         assert_eq!((c.role, c.counterparty.as_str(), c.company_name.as_str()), ("defendant", "Boshqa Kompaniya", "«ANOR» МЧЖ"));
         crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": format!("/case {CASE}") } })).await;
-        assert!(sh.outbox.captured()[0].text.contains("«ANOR» МЧЖ: Javobgar · qarshi tomon: Boshqa Kompaniya") || sh.outbox.captured()[0].text.contains("«ANOR» MChJ: Javobgar · qarshi tomon: Boshqa Kompaniya"), "{}", sh.outbox.captured()[0].text);
+        assert!(sh.outbox.captured()[0].text.contains("<b>«ANOR» MChJ</b> · javobgar\n↔ Boshqa Kompaniya"), "{}", sh.outbox.captured()[0].text);
     }
 
     #[tokio::test]
@@ -425,17 +425,17 @@ mod hearings {
         sh.sync().await.unwrap();
         crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings 14" } })).await;
         let first = sh.outbox.captured()[0].clone();
-        assert!(first.text.len() < 4096 && first.text.contains("100 ta · 1–20"), "{}", first.text);
+        assert!(first.text.len() < 4096 && first.text.contains("<b>100</b> ta · 1–10"), "{}", first.text);
         let kb = first.markup.unwrap();
-        assert_eq!(kb["inline_keyboard"][0][0]["callback_data"], "h:14::20");
-        assert!(kb["inline_keyboard"][0][0]["text"].as_str().unwrap().contains("Keyingi 20"));
+        assert_eq!(kb["inline_keyboard"][0][0]["callback_data"], "h:14::10");
+        assert!(kb["inline_keyboard"][0][0]["text"].as_str().unwrap().contains("Keyingi 10"));
         assert!(kb["inline_keyboard"][1][0]["web_app"]["url"].as_str().unwrap().ends_with("/app?tab=hearings"));
         // the «next» button asks for the following page, and the last page has no «next»
-        for (offset, last) in [(20, false), (40, false), (60, false), (80, true)] {
+        for (offset, last) in [(10, false), (30, false), (50, false), (70, false), (90, true)] {
             let cb = json!({ "callback_query": { "id": "1", "from": { "id": 4242 }, "message": { "chat": { "id": 4242 } }, "data": format!("h:14::{offset}") } });
             crate::chat::handle_update(sh.clone(), cb).await;
             let m = sh.outbox.captured().last().unwrap().clone();
-            assert!(m.text.contains(&format!("{}–{}", offset + 1, offset + 20)) && m.text.len() < 4096);
+            assert!(m.text.contains(&format!("{}–{}", offset + 1, offset + 10)) && m.text.len() < 4096);
             assert_eq!(m.markup.unwrap()["inline_keyboard"][0][0]["callback_data"].is_string(), !last);
         }
     }
@@ -448,9 +448,9 @@ mod hearings {
         say(&format!("/hearings 30 {OTHER_TIN}")).await;
         say(&format!("/hearings {TIN}")).await;
         let sent = sh.outbox.captured();
-        assert!(sent[0].text.contains("(1 kun): 1 ta"));
+        assert!(sent[0].text.contains("1 kun") && sent[0].text.contains("<b>1</b> ta"), "{}", sent[0].text);
         assert!(sent[1].text.contains("Yaqin 30 kunda majlis yoʻq") && sent[1].text.contains(OTHER_TIN));
-        assert!(sent[2].text.contains(&format!("STIR {TIN}")) && sent[2].text.contains("3 ta"));
+        assert!(sent[2].text.contains(&format!("STIR {TIN}")) && sent[2].text.contains("<b>3</b> ta"), "{}", sent[2].text);
     }
 
     #[tokio::test]
@@ -468,7 +468,7 @@ mod hearings {
         let t = today(now());
         let list = sh.hearings(t, add_days(t, 6)).await.unwrap();
         let body = crate::digest::text(&list, t, Some("2026-11-22T10:00:00.000Z")).unwrap();
-        assert!(body.starts_with("📅 Yaqin majlislar (7 kun): 3 ta"));
+        assert!(body.starts_with("📋 <b>Yaqin majlislar</b>\nKeyingi 7 kun: <b>3 ta</b>"), "{body}");
     }
 }
 
@@ -607,8 +607,8 @@ mod chat {
         let (sh, _b) = ready_bot().await;
         handle_update(sh.clone(), message(4242, &format!("/case {CASE}"))).await;
         let sent = sh.outbox.captured();
-        assert!(sent[0].text.contains("Daʼvogar: Daʼvogar MChJ") && sent[0].text.contains("Daʼvo qanoatlantirilsin"));
-        assert!(!sent[0].text.contains("Javobgar")); // "-" is hidden
+        assert!(sent[0].text.contains("<b>Daʼvogar:</b> Daʼvogar M") && sent[0].text.contains("Daʼvo qanoatlantirilsin"), "{}", sent[0].text);
+        assert!(!sent[0].text.contains("<b>Javobgar:</b>")); // "-" is hidden
         assert_eq!(sent[0].markup.as_ref().unwrap()["inline_keyboard"][0][0]["web_app"]["url"], "https://bot.example/app?case=2-1004-2503%2F8020");
     }
 
@@ -620,7 +620,37 @@ mod chat {
         assert_eq!(kb["inline_keyboard"][0][0]["callback_data"], format!("c:{CASE}"));
         let cb = json!({ "callback_query": { "id": "1", "from": { "id": 4242 }, "message": { "chat": { "id": 4242 } }, "data": format!("b:{BILL}") } });
         handle_update(sh.clone(), cb).await;
-        assert!(sh.outbox.captured()[1].text.contains("Kvitansiya 260880770031"));
+        assert!(sh.outbox.captured()[1].text.contains("Kvitansiya</b> <code>260880770031</code>"), "{}", sh.outbox.captured()[1].text);
+    }
+
+    #[tokio::test]
+    async fn stats_counts_every_company_or_one_company_by_court_and_year() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/stats")).await;
+        handle_update(sh.clone(), message(4242, &format!("/stats {TIN}"))).await;
+        let sent = sh.outbox.captured();
+        assert!(sent[0].text.contains("Umumiy sonlar") && sent[0].text.contains("Kompaniyalar: <b>") && sent[0].text.contains(TIN), "{}", sent[0].text);
+        assert!(sent[1].text.contains("Sudlar boʻyicha") && sent[1].text.contains("Yillar boʻyicha") && sent[1].text.contains(&format!("STIR {TIN}")), "{}", sent[1].text);
+        assert!(sent[1].text.len() < 4096);
+    }
+
+    #[tokio::test]
+    async fn help_is_formatted_and_lists_every_command() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/help")).await;
+        let t = &sh.outbox.captured()[0].text;
+        for c in ["/hearings", "/stats", "/company", "/case", "/bill", "/find", "/app", "/status"] {
+            assert!(t.contains(c), "{c}");
+        }
+        assert!(t.starts_with("<b>Sud tizimi boti</b>") && !t.contains("<matn>"));
+    }
+
+    #[test]
+    fn names_with_markup_characters_are_escaped_in_company_and_bill_texts() {
+        let c = crate::domain::Company { tin: "123456789".into(), name: "A & B <x> МЧЖ".into(), bills: 1, found: 2, listed: 3, years: vec![], bill_years: vec![], first_at: 0, refreshed_at: 0 };
+        let t = crate::chat::company_text(&c);
+        assert!(t.contains("A &amp; B &lt;x&gt; MChJ") && !t.contains("<x>"), "{t}");
+        assert!(t.contains("<b>Sud roʻyxatidagi ishlar:</b> 3"));
     }
 
     #[tokio::test]

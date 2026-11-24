@@ -218,7 +218,8 @@ export async function fileExists(token: string, fileId: string): Promise<boolean
 }
 
 /** Send one plain text message to a chat or a person (the Kuzatuv's messages). No markup, so a name with any character is safe. */
+/** a message as Telegram HTML: the caller has escaped every piece of data (`core/watch.escapeHtml`) */
 export async function sendMessage(token: string, chat: string | number, text: string): Promise<TgResult<number>> {
-  const r = await post<{ message_id: number }>(token, 'sendMessage', { chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true }, 20_000, 3)
+  const r = await post<{ message_id: number }>(token, 'sendMessage', { chat_id: chat, text: text.slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true }, 20_000, 3)
   return r.ok ? { ok: true, value: r.result.message_id } : { ok: false, error: telegramFailure(r.code, r.description) }
 }

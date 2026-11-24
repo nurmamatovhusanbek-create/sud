@@ -10,6 +10,7 @@ mod chat;
 mod config;
 mod crypto;
 mod domain;
+mod format;
 mod error;
 mod http;
 mod index;
