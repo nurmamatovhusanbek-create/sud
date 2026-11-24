@@ -82,7 +82,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `case-freeze.ts` | lib/served-case.ts | core/__tests__/case-freeze.test.ts |
 | `case-number.ts` | lib/case-store.ts, lib/db-buckets.ts, lib/stats.ts | core/__tests__/case-number.test.ts |
 | `case-status.ts` | components/sections/cases.tsx, components/sections/found-cases.tsx, core/case-freeze.ts, core/classify.ts, core/public-orders.ts, lib/case-store.ts, lib/watch.ts | core/__tests__/case-status.test.ts |
-| `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, core/watch.ts, lib/stats.ts | core/__tests__/case-status.test.ts, core/__tests__/classify.test.ts |
+| `classify.ts` | components/sections/cases.tsx, core/public-orders.ts, core/watch.ts, lib/stats.ts | core/__tests__/case-status.test.ts, core/__tests__/classify.test.ts, core/__tests__/party-text.test.ts |
 | `dates.ts` | components/proto/date-tile.tsx, components/sections/bill-cases-panel.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/telegram-copy-card.tsx, components/views/telegram-settings.tsx, +9 | core/__tests__/dates.test.ts, lib/__tests__/ui-boundary.test.ts |
 | `envelope.ts` | components/ui-custom/states.tsx, hooks/use-resource.ts, lib/api-types.ts, server/envelope.ts |  |
 | `hearing-pick.ts` | lib/court-case.ts | core/__tests__/hearing-pick.test.ts |
@@ -90,6 +90,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `instance-track.ts` | components/sections/cases.tsx | core/__tests__/instance-track.test.ts |
 | `json-salvage.ts` | lib/court-case.ts | core/__tests__/json-salvage.test.ts |
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
+| `party-text.ts` | core/classify.ts, lib/case-store.ts, lib/court-case.ts, lib/stats.ts | core/__tests__/party-text.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
 | `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +11 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/classic.tsx, components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render-ink.ts, +1 | core/__tests__/rates.test.ts |
@@ -142,7 +143,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts, lib/__tests__/stats-found.test.ts |
 | `company-meta.ts` | lib/backup.ts, lib/bill-cases.ts | lib/__tests__/company-meta.test.ts |
 | `count-tween.ts` | components/proto/primitives.tsx | lib/__tests__/count-tween.test.ts |
-| `court-case-types.ts` | api/court-cases/export/route, api/found-cases/route, components/sections/cases.tsx, core/bill-cases.ts, core/watch.ts, lib/api-types.ts, lib/bill-cases.ts, +6 | core/__tests__/bill-cases.test.ts, core/__tests__/watch.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/watch.test.ts |
+| `court-case-types.ts` | api/court-cases/export/route, api/found-cases/route, components/sections/cases.tsx, core/bill-cases.ts, core/party-text.ts, core/watch.ts, lib/api-types.ts, +7 | core/__tests__/bill-cases.test.ts, core/__tests__/party-text.test.ts, core/__tests__/watch.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/watch.test.ts |
 | `court-case.ts` | api/court-cases/export/route, api/court-cases/route, lib/bill-cases.ts, lib/stats.ts, lib/watch.ts, sources/index.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/stats-found.test.ts, lib/__tests__/upcoming-appeal.test.ts, lib/__tests__/watch.test.ts |
 | `data-age.ts` | components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/overview.tsx, components/sections/profile.tsx, lib/hard-refresh.ts |  |
 | `db-admin.ts` | api/settings/db/compact/route, api/settings/db/download/route, api/settings/db/forget/route, api/settings/db/route, hooks/use-db-admin.ts, lib/backup.ts | lib/__tests__/backup.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts |

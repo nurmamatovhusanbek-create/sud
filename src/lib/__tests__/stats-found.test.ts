@@ -61,6 +61,15 @@ describe('Statistika and the cases found by number', () => {
     expect(s.summary.total).toBe(1)
   })
 
+  test('a found case whose parties the court sent as EMPTY LISTS (200248856, 3-1709-1901/856) does not break Statistika', async () => {
+    listed = [row(1), row(2)]
+    // stored by an earlier version exactly as the court answered: plaintiff: [] and defendant: []
+    dbm.getDb().prepare('INSERT INTO found_cases (court, tin, num, yymm, status, hay, row, t) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('administrative', TIN, '3-1709-1901/856', 1901, 'Якунланган', '', JSON.stringify({ ...row(0), caseNumber: '3-1709-1901/856', plaintiff: [], defendant: [] }), 1)
+    const s = await getCompanyStats(TIN, { force: true })
+    expect(s.summary.total).toBe(3)
+    expect(s.cases.find((c) => c.caseNumber === '3-1709-1901/856')).toBeTruthy()
+  })
+
   test('with no found cases nothing changes', async () => {
     listed = [row(1)]
     const s = await getCompanyStats(TIN, { force: true })

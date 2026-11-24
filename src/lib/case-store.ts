@@ -18,6 +18,7 @@
  */
 
 import { isCaseNumber } from '@/core/case-number'
+import { normalizeRow } from '@/core/party-text'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -216,7 +217,8 @@ export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType
   const tr = db.prepare('INSERT OR REPLACE INTO tried (tin, num, t, found) VALUES (?, ?, ?, ?)')
   const now = at
   db.transaction(() => {
-    for (const { courtType, row } of rows) {
+    for (const { courtType, row: raw } of rows) {
+      const row = normalizeRow(raw) // a party the court sent as a list is stored as text
       if (row.caseNumber && COURTS.has(courtType)) fc.run(courtType, tin, row.caseNumber, yymmOf(row.caseNumber), row.caseStatus, hayOf(row), JSON.stringify(row), now)
     }
     for (const [num, v] of Object.entries(tried)) tr.run(tin, num, v.t, v.found ? 1 : 0)
@@ -227,14 +229,14 @@ export function addFound(tin: string, rows: ReadonlyArray<{ courtType: CourtType
 /** the found cases of one court (all of them: tests and the importer; the app reads pages) */
 export function readFound(tin: string, courtType: CourtType): CourtCase[] {
   if (!TIN_RE.test(tin)) return []
-  return getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? ORDER BY yymm DESC, num').all(courtType, tin).map((r) => JSON.parse(String(r.row)) as CourtCase)
+  return getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? ORDER BY yymm DESC, num').all(courtType, tin).map((r) => normalizeRow(JSON.parse(String(r.row)) as CourtCase))
 }
 
 /** one found case's stored row, or null */
 export function readFoundRow(tin: string, courtType: CourtType, caseNumber: string): CourtCase | null {
   if (!TIN_RE.test(tin)) return null
   const r = getDb().prepare('SELECT row FROM found_cases WHERE court = ? AND tin = ? AND num = ?').get(courtType, tin, caseNumber)
-  return r ? (JSON.parse(String(r.row)) as CourtCase) : null
+  return r ? normalizeRow(JSON.parse(String(r.row)) as CourtCase) : null
 }
 
 export function readTried(tin: string): TriedMap {
@@ -300,7 +302,7 @@ export function queryFound(tin: string, f: FoundQuery): FoundPage {
   const page = Math.max(1, Math.min(Math.ceil(matched / size), Math.trunc(f.page ?? 1)))
   const order = f.sort === 'old' ? 'yymm ASC, num ASC' : 'yymm DESC, num ASC'
   const rows = db.prepare(`SELECT court, row FROM found_cases WHERE ${w} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...params, size, (page - 1) * size)
-  return { byCourt, matched, rows: rows.map((r) => ({ courtType: String(r.court) as CourtType, row: JSON.parse(String(r.row)) as CourtCase })) }
+  return { byCourt, matched, rows: rows.map((r) => ({ courtType: String(r.court) as CourtType, row: normalizeRow(JSON.parse(String(r.row)) as CourtCase) })) }
 }
 
 /** a found case replaced by a fresher row («Yangilash»): returns whether it was one of the found cases */

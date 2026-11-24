@@ -93,6 +93,7 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
 import { salvageJsonArray } from '@/core/json-salvage'
 import { backupFeedKey, mergeRows, readFeed, writeFeed } from './case-store'
+import { firstText } from '@/core/party-text'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -681,8 +682,8 @@ function mapJadvalApiCase(raw: any): CourtCase {
     courtName: raw.court || '-',
     dateFiled: raw.reg_date || raw.hearing_date || '-',
     // jadvalapi has a typo: "claiment" instead of "claimant"
-    plaintiff: raw.claiment || raw.claimant || raw.plaintiff || '-',
-    defendant: raw.defendant || '-',
+    plaintiff: firstText(raw.claiment, raw.claimant, raw.plaintiff),
+    defendant: firstText(raw.defendant),
     claimAmount: raw.claim_amount || raw.amount || '-',
     ...hearingFields(raw),
   }
@@ -696,8 +697,8 @@ function mapJadvalCase(raw: any): CourtCase {
     result: raw.result || '-',
     courtName: raw.court || '-',
     dateFiled: raw.reg_date || '-',
-    plaintiff: raw.claimant || raw.claiment || raw.plaintiff || '-',
-    defendant: raw.defendant || '-',
+    plaintiff: firstText(raw.claimant, raw.claiment, raw.plaintiff),
+    defendant: firstText(raw.defendant),
     claimAmount: raw.claim_amount || raw.amount || '-',
     ...hearingFields(raw),
   }
@@ -900,9 +901,9 @@ function buildCaseBundle(
       currentInstance: now.stage,
       region: String(d.region || ''),
       secretary: '-',
-      plaintiff: d.claiment || d.claimant || d.plaintiff || '-',
+      plaintiff: firstText(d.claiment, d.claimant, d.plaintiff),
       plaintiffTin: '-',
-      defendant: d.defendant || '-',
+      defendant: firstText(d.defendant),
       defendantTin: '-',
       thirdParty: '-',
       claimSubject: d.sub_category || d.category || '-',

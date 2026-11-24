@@ -20,6 +20,7 @@
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { readFound } from './case-store'
 import { isCaseNumber } from '@/core/case-number'
+import { normalizeRow } from '@/core/party-text'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRatingDetailed } from './chamber'
 import { assignRoles, classifyOutcome } from '@/core/classify'
@@ -280,7 +281,7 @@ async function fetchCompanyStatsInternal(
         else if (cn.startsWith('2-') || cn.startsWith('3-')) actualCourtType = 'civil'
         else if (cn.startsWith('4-')) actualCourtType = 'economic'
 
-        pooled.push({ raw, courtType: actualCourtType })
+        pooled.push({ raw: normalizeRow(raw), courtType: actualCourtType })
       }
     } else {
       const msg = res.reason instanceof Error ? res.reason.message : String(res.reason)
@@ -298,7 +299,7 @@ async function fetchCompanyStatsInternal(
         if (!raw.caseNumber || listed.has(raw.caseNumber)) continue
         listed.add(raw.caseNumber)
         const cn = raw.caseNumber
-        pooled.push({ raw, courtType: cn.startsWith('5-') ? 'administrative' : cn.startsWith('2-') || cn.startsWith('3-') ? 'civil' : cn.startsWith('4-') ? 'economic' : ct })
+        pooled.push({ raw: normalizeRow(raw), courtType: cn.startsWith('5-') ? 'administrative' : cn.startsWith('2-') || cn.startsWith('3-') ? 'civil' : cn.startsWith('4-') ? 'economic' : ct })
       }
     }
   } catch (e) {

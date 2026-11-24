@@ -220,3 +220,16 @@ describe('list rows loaded from a backup (load from Telegram)', () => {
     expect(store.importFeedRows(TIN, store.backupFeedKey('civil'), [])).toBe(0)
   })
 })
+
+describe('rows the court filled with lists instead of text', () => {
+  test('a found case stored with a party list is written and read back as text', () => {
+    const odd = { caseNumber: '3-1709-1901/856', caseType: '', caseStatus: 'Якунланган', result: '', courtName: '', dateFiled: '', plaintiff: [], defendant: ['B MChJ'], claimAmount: '', hearingDate: '', hearingTime: '', judge: '' }
+    store.addFound(TIN, [{ courtType: 'administrative', row: odd as never }], {})
+    expect(store.readFound(TIN, 'administrative')[0]).toMatchObject({ plaintiff: '', defendant: 'B MChJ' })
+    expect(store.readFoundRow(TIN, 'administrative', '3-1709-1901/856')).toMatchObject({ plaintiff: '' })
+    // a row an older version stored as it came
+    dbm.getDb().prepare("UPDATE found_cases SET row = ? WHERE num = '3-1709-1901/856'").run(JSON.stringify(odd))
+    expect(typeof store.readFound(TIN, 'administrative')[0]!.plaintiff).toBe('string')
+    expect(typeof store.queryFound(TIN, { court: 'administrative' }).rows[0]!.row.plaintiff).toBe('string')
+  })
+})

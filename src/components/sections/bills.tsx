@@ -478,6 +478,11 @@ export function BillsSection() {
               <Seg options={KIND_CHIPS.map((c) => ({ key: c.key || 'all', label: c.label }))} value={kind || 'all'} onChange={(k) => setKind(k === 'all' ? '' : (k as CategoryKind))} />
             </div>
 
+            {!loadingBills && meta?.complete && meta.stable && summary && meta.totalElements > summary.count && (
+              <div className="faint" style={{ fontSize: 12.5, margin: '8px 0 12px' }}>
+                Billingda {formatCount(meta.totalElements)} ta kvitansiya bor, {formatCount(summary.count)} tasi ish raqamli va saqlangan. Qolgan {formatCount(meta.totalElements - summary.count)} tasida ish raqami yoʻq (daʼvo xarajatlari: ish hali ochilmagan, va boshqa toʻlovlar), shuning uchun saqlanmaydi: bu yuklash xatosi emas.
+              </div>
+            )}
             {loadingBills && job && <LoadCard page={job.page} pages={job.pages} pass={job.pass} stored={bills?.total ?? 0} total={job.bills || meta?.totalElements || 0} wait={wait} error={store.error} onStop={() => void store.stop()} />}
             {/* billing's paging is not stable (the same page asked twice returns other bills): the load reads several passes; if they never agreed, say so */}
             {!loadingBills && meta?.complete && !meta.stable && bills && (

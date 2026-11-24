@@ -5,4 +5,4 @@
  */
 export const CASE_NUMBER_RE = /^\d+-[\d-]+\/\d+$/
 
-export const isCaseNumber = (s: string | null | undefined): boolean => !!s && CASE_NUMBER_RE.test(s.trim())
+export const isCaseNumber = (s: unknown): boolean => typeof s === 'string' && CASE_NUMBER_RE.test(s.trim())

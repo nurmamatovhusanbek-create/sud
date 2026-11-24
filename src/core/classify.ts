@@ -15,6 +15,7 @@
  * «qanoatlantir…» (and not «qanoatlantirilmasin») counts as the claim being granted.
  */
 
+import { partyText } from './party-text'
 import { uzCyrToLat } from './translit'
 import { isConcludedStatus } from './case-status'
 
@@ -133,8 +134,8 @@ export interface RoleResult {
   keys: string[][]
 }
 
-const clean = (v: string | null | undefined): string => {
-  const s = (v ?? '').trim()
+const clean = (v: unknown): string => {
+  const s = partyText(v).trim()
   return s === '-' || s === '—' ? '' : s
 }
 
