@@ -534,6 +534,84 @@ describe('mirror channels: a banned channel or a deleted manifest message does n
     expect(owners).toEqual(new Set([MAIN, MIRROR]))
   })
 
+  const OTHER = '201052713'
+  const seedOtherCompany = (numbers: string[]) => {
+    const db = dbm.getDb()
+    for (const n of numbers) db.prepare("INSERT INTO bills (tin, number, pass, status, issued, amount, case_number, ctype, kind, yymm, hay) VALUES (?, ?, 0, 'PAID', ?, 5, ?, 'civil', 'duty', 2402, 'h')").run(OTHER, n, ms('2024-02-02'), `2-1004-2402/${n.slice(1)}`)
+    db.prepare('INSERT OR REPLACE INTO bill_loads (tin, total_elements, total_pages, page_size, pass, pages_done, complete, stable, loaded_at) VALUES (?, ?, 1, 10000, 0, 1, 1, 1, 5)').run(OTHER, numbers.length)
+    db.prepare('INSERT OR REPLACE INTO companies (tin, first_at, refreshed_at, last_added) VALUES (?, 1, 5, 0)').run(OTHER)
+  }
+  const forgetOtherHere = () => {
+    const db = dbm.getDb()
+    db.prepare('DELETE FROM bills WHERE tin = ?').run(OTHER)
+    db.prepare('DELETE FROM bill_loads WHERE tin = ?').run(OTHER)
+    db.prepare('DELETE FROM companies WHERE tin = ?').run(OTHER)
+  }
+
+  test('CATCH-UP: a mirror started later gets what the main channel holds from another computer, and says so', async () => {
+    const ch = fakeChannels()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [] })
+    seedOtherCompany(['z1', 'z2'])
+    expect((await runBackup()).phase).toBe('done') // computer B backs up TWO companies to the main channel only
+    // this computer holds only the first company; the mirror is new
+    forgetOtherHere()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [MIRROR] })
+    const done = await runBackup()
+    expect(done.phase).toBe('done')
+    expect(done.message).toContain('2 ta kanalga')
+    expect(done.message).toContain('asosiy kanaldan koʻchirildi')
+    // the main channel is lost: the mirror alone has BOTH companies, and a load brings the other one back
+    ch.banned.add(MAIN)
+    const cat = await backup.readRemoteCatalog(PASS)
+    expect(cat.ok && cat.catalog.companies.map((c) => c.tin).sort()).toEqual([OTHER, TIN].sort())
+    expect(backup.startLoad(PASS, [OTHER]).ok).toBe(true)
+    expect((await finished()).phase).toBe('done')
+    expect(dbm.getDb().prepare('SELECT COUNT(*) n FROM bills WHERE tin = ?').get(OTHER)?.n).toBe(2)
+    expect(dbm.getDb().prepare('SELECT first_at FROM companies WHERE tin = ?').get(OTHER)?.first_at).toBe(1)
+  })
+
+  test('CATCH-UP: a bucket the mirror has with FEWER rows than the main channel is merged, not replaced', async () => {
+    fakeChannels()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [] })
+    seedOtherCompany(['z1', 'z2', 'z3'])
+    await runBackup()
+    forgetOtherHere()
+    seedOtherCompany(['z1']) // this computer has one of the three
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [MIRROR] })
+    const done = await runBackup()
+    expect(done.phase).toBe('done')
+    // the mirror's bucket holds all three (its own text was only z1)
+    cfg.saveTelegram({ token: TOKEN, chat: MIRROR, mirrors: [] }) // read the mirror as if it were the only channel
+    forgetOtherHere()
+    expect(backup.startLoad(PASS, [OTHER]).ok).toBe(true)
+    expect((await finished()).phase).toBe('done')
+    expect(dbm.getDb().prepare('SELECT COUNT(*) n FROM bills WHERE tin = ?').get(OTHER)?.n).toBe(3)
+  })
+
+  test('CATCH-UP costs nothing once the channels agree: a second backup copies nothing and the message does not mention it', async () => {
+    const ch = fakeChannels()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [] })
+    seedOtherCompany(['z1'])
+    await runBackup()
+    forgetOtherHere()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [MIRROR] })
+    await runBackup() // copies
+    const before = ch.sentTo.get(MIRROR) ?? 0
+    const again = await runBackup()
+    expect(again.phase).toBe('done')
+    expect(again.message).not.toContain('koʻchirildi')
+    expect((ch.sentTo.get(MIRROR) ?? 0) - before).toBe(1) // only the new manifest
+  })
+
+  test('a main channel that failed is not a donor: the mirror backs up from this computer alone, as before', async () => {
+    const ch = fakeChannels()
+    await runBackup()
+    ch.banned.add(MAIN)
+    const done = await runBackup()
+    expect(done.message).toContain('Qisman: 1/2')
+    expect(done.message).not.toContain('koʻchirildi')
+  })
+
   test('the main channel is banned: the catalog, the locator, a load and a restore all come from the mirror', async () => {
     const ch = fakeChannels()
     await runBackup()

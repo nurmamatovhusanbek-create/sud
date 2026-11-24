@@ -187,6 +187,24 @@ async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limi
   return out
 }
 
+/** a channel whose backup just finished: its key, its buckets by name and its companies: what the channels after it must hold at least */
+interface Donor {
+  key: Buffer
+  refs: Map<string, BucketRef>
+  companies: ManifestV2['companies']
+}
+
+/** two `companies` maps as one: the earlier first date, the later «as of», the name either one has */
+function unionCompanies(a: ManifestV2['companies'], b: ManifestV2['companies']): ManifestV2['companies'] {
+  const out: ManifestV2['companies'] = { ...a }
+  for (const [tin, c] of Object.entries(b)) {
+    const o = out[tin]
+    const name = o?.name || c.name
+    out[tin] = { firstAt: o?.firstAt ? Math.min(o.firstAt, c.firstAt || o.firstAt) : c.firstAt, refreshedAt: Math.max(o?.refreshedAt ?? 0, c.refreshedAt), ...(name ? { name } : {}) }
+  }
+  return out
+}
+
 /**
  * MIRROR channels: the backup is kept in the main channel AND in each mirror, every one with its OWN chain (own manifest, own pinned message, own
  * pieces: a file id from one channel means nothing in another, and a banned channel takes its files with it). Each channel is brought up to date
@@ -194,16 +212,23 @@ async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limi
  */
 async function runBackupAll(passphrase: string, token: string, chats: string[]): Promise<void> {
   const outcomes: Array<{ chat: string; ok: boolean; message: string; result: BackupResult | null }> = []
+  // the first channel that worked is the DONOR of the ones after it: what it holds and a later channel lacks is copied across (see runBackup)
+  let donor: Donor | null = null
   for (const [i, chat] of chats.entries()) {
     set({ phase: 'snapshot', done: 0, total: 0, result: null, finishedAt: 0, message: i === 0 ? 'Nusxa olinmoqda…' : `Zaxira kanal ${i}/${chats.length - 1} yangilanmoqda…` })
-    await runBackup(passphrase, token, chat)
+    const mine = await runBackup(passphrase, token, chat, donor ?? undefined)
+    if (!donor && mine) donor = mine
     const s = state()
     outcomes.push({ chat, ok: s.phase === 'done', message: s.message, result: s.result })
     if (!outcomes[i]!.ok && /Parol/.test(s.message)) break // a wrong passphrase is wrong for every channel's chain
   }
   if (chats.length === 1) return
   const okN = outcomes.filter((o) => o.ok).length
-  const line = outcomes.map((o, i) => `${i === 0 ? 'asosiy' : 'zaxira'} ${o.chat}: ${o.ok ? 'tayyor' : `xato (${o.message})`}`).join(' · ')
+  const copied = (o: { message: string }): string => {
+    const n = /(\d+) ta asosiy kanaldan koʻchirildi/.exec(o.message)?.[1]
+    return n ? `, ${n} ta boʻlak asosiy kanaldan koʻchirildi` : ''
+  }
+  const line = outcomes.map((o, i) => `${i === 0 ? 'asosiy' : 'zaxira'} ${o.chat}: ${o.ok ? `tayyor${copied(o)}` : `xato (${o.message})`}`).join(' · ')
   try {
     const last = getDb().prepare('SELECT v FROM meta WHERE k = ?').get('last_backup')
     if (last) getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...(JSON.parse(String(last.v)) as object), channels: outcomes.map((o) => ({ chat: o.chat, ok: o.ok })) }))
@@ -237,9 +262,13 @@ async function withFallback(chats: string[], op: (chat: string) => Promise<void>
   }
 }
 
-async function runBackup(passphrase: string, token: string, chat: string): Promise<void> {
+async function runBackup(passphrase: string, token: string, chat: string, donor?: Donor): Promise<Donor | null> {
+  const bail = (message: string): null => {
+    fail(message)
+    return null
+  }
   const prev = await pinnedManifest(token, chat, passphrase, 'Parol notoʻgʻri: kanaldagi zaxira boshqa parol bilan yaratilgan (avvalgi parolni kiriting)')
-  if (!prev.ok) return fail(prev.error)
+  if (!prev.ok) return bail(prev.error)
   // the SAME key as the chain before (same salt), so earlier pieces still open; a fresh one when there is no chain
   const salt = prev.value?.salt ?? newSalt()
   const key = prev.value?.key ?? deriveKey(passphrase, salt)
@@ -266,6 +295,28 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
     let reused = 0
     let plainBytes = 0
     set({ phase: 'upload', done: 0, total, message: `Tekshirilmoqda: 0/${total}` })
+    let putFailed = ''
+    /** gzip, seal and send one bucket's text in pieces; its reference, or null (the reason is in `putFailed`) */
+    const put = async (name: string, text: Buffer, rows: number): Promise<BucketRef | null> => {
+      const bid = bucketId(key, text)
+      const gz = zlib.gzipSync(text, { level: 6 })
+      const size = chunkPlain()
+      const count = Math.max(1, Math.ceil(gz.length / size))
+      const parts: PartRef[] = []
+      for (let i = 0; i < count; i++) {
+        const sealed = seal(key, gz.subarray(i * size, (i + 1) * size), bucketAad(bid, i))
+        const sent = await sendFile(token, chat, sealed, `sud-${bid.slice(0, 12)}-${i + 1}.bin`, 'Sud tizimi zaxirasi')
+        if (!sent.ok) {
+          putFailed = sent.error
+          return null
+        }
+        parts.push({ fileId: sent.value.fileId, messageId: sent.value.messageId, size: sealed.length, sha256: sha256(sealed) })
+        sentBytes += sealed.length
+        sentParts++
+        await pause(gapMs())
+      }
+      return { name, id: bid, rows, bytes: text.length, parts }
+    }
 
     for (let n = 0; n < total; n++) {
       const name = names[n]!
@@ -277,6 +328,15 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       const held = base.get(name)
       if (held && held.id !== bucketId(key, text)) {
         const theirs = await downloadBucket(token, key, held)
+        if (theirs) {
+          text = mergeBucketText(name, theirs, text)
+          rows = text.toString('utf8').split('\n').filter(Boolean).length
+        }
+      }
+      // the DONOR channel (the first one that worked) holds MORE rows of this bucket than this computer and this channel's own chain: they are merged in
+      const dref = donor?.refs.get(name)
+      if (donor && dref && dref.rows > rows) {
+        const theirs = await downloadBucket(token, donor.key, dref)
         if (theirs) {
           text = mergeBucketText(name, theirs, text)
           rows = text.toString('utf8').split('\n').filter(Boolean).length
@@ -296,25 +356,38 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
           continue
         }
       }
-      const gz = zlib.gzipSync(text, { level: 6 })
-      const size = chunkPlain()
-      const count = Math.max(1, Math.ceil(gz.length / size))
-      const parts: PartRef[] = []
-      for (let i = 0; i < count; i++) {
-        const sealed = seal(key, gz.subarray(i * size, (i + 1) * size), bucketAad(bid, i))
-        const sent = await sendFile(token, chat, sealed, `sud-${bid.slice(0, 12)}-${i + 1}.bin`, 'Sud tizimi zaxirasi')
-        if (!sent.ok) return fail(`${n + 1}/${total}-boʻlakni yuborib boʻlmadi: ${sent.error}`)
-        parts.push({ fileId: sent.value.fileId, messageId: sent.value.messageId, size: sealed.length, sha256: sha256(sealed) })
-        sentBytes += sealed.length
-        sentParts++
-        await pause(gapMs())
-      }
-      refs.push({ name, id: bid, rows, bytes: text.length, parts })
+      const ref = await put(name, text, rows)
+      if (!ref) return bail(`${n + 1}/${total}-boʻlakni yuborib boʻlmadi: ${putFailed}`)
+      refs.push(ref)
       set({ done: n + 1, message: `Yuklanmoqda: ${n + 1}/${total}` })
     }
 
-    // buckets of other companies / years that this computer has nothing for stay in the manifest: a backup never takes data away from the channel
     const have = new Set(refs.map((x) => x.name))
+    // CATCH-UP: a bucket the donor channel holds and this channel's chain lacks (or holds with fewer rows) is copied across: downloaded from the donor,
+    // merged with this channel's own version, sealed with THIS channel's key and sent. Each channel has its own chain, so a mirror started later would
+    // otherwise never get what the main channel got from another computer.
+    let caught = 0
+    if (donor) {
+      for (const [bname, dref] of donor.refs) {
+        if (have.has(bname)) continue
+        const mine = base.get(bname)
+        if (mine && mine.rows >= dref.rows) continue // carried over below
+        set({ phase: 'upload', message: `Asosiy kanaldan koʻchirilmoqda: ${caught + 1}…` })
+        const theirs = await downloadBucket(token, donor.key, dref)
+        if (!theirs) continue // the donor's piece is gone or damaged: nothing to copy, the backup itself goes on
+        let text: Buffer = theirs
+        if (mine) {
+          const own = await downloadBucket(token, key, mine)
+          if (own) text = mergeBucketText(bname, theirs, own)
+        }
+        const ref = await put(bname, text, text.toString('utf8').split('\n').filter(Boolean).length)
+        if (!ref) return bail(`${bname} boʻlagini yuborib boʻlmadi: ${putFailed}`)
+        refs.push(ref)
+        have.add(bname)
+        caught++
+      }
+    }
+    // buckets of other companies / years that this computer has nothing for stay in the manifest: a backup never takes data away from the channel
     let carried = 0
     for (const [bname, ref] of base) {
       if (have.has(bname)) continue
@@ -324,7 +397,8 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
     set({ phase: 'manifest', message: 'Manifest yuborilmoqda…' })
     // the companies the channel already knows come first (a backup never takes data away: another computer's company keeps its dates and its name),
     // this computer's own rows are merged over them (first date: the earlier; «as of»: the later; the name this computer's bills give, else the old one)
-    const companies: ManifestV2['companies'] = prev.value?.m.v === 2 ? { ...prev.value.m.companies } : {}
+    let companies: ManifestV2['companies'] = prev.value?.m.v === 2 ? { ...prev.value.m.companies } : {}
+    if (donor) companies = unionCompanies(companies, donor.companies)
     for (const c of snapDb.prepare('SELECT tin, first_at, refreshed_at FROM companies').all()) {
       const tin = String(c.tin)
       const old = companies[tin]
@@ -339,9 +413,9 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       prev: prev.value ? { messageId: prev.value.pin.messageId, fileId: prev.value.pin.fileId, created: prev.value.m.created } : null,
     }
     const sealedManifest = sealManifest(manifest, salt, key)
-    if (sealedManifest.length > CHUNK_PLAIN) return fail('Manifest juda katta (bo‘laklar soni haddan oshdi)')
+    if (sealedManifest.length > CHUNK_PLAIN) return bail('Manifest juda katta (bo‘laklar soni haddan oshdi)')
     const m = await sendFile(token, chat, sealedManifest, `sud-${day}-${id.slice(0, 6)}-manifest.bin`, `Sud tizimi: zaxira manifesti ${created.slice(0, 10)}`)
-    if (!m.ok) return fail(`Manifestni yuborib boʻlmadi: ${m.error}`)
+    if (!m.ok) return bail(`Manifestni yuborib boʻlmadi: ${m.error}`)
     const pin = await pinMessage(token, chat, m.value.messageId)
 
     const result: BackupResult = { id, created, dbBytes: plainBytes, uploadedBytes: sentBytes + sealedManifest.length, chunks: sentParts, buckets: refs.length, reused }
@@ -352,9 +426,10 @@ async function runBackup(passphrase: string, token: string, chat: string): Promi
       result,
       finishedAt: Date.now(),
       message: pin.ok
-        ? `Tayyor: ${refs.length - reused - carried} ta yangi/oʻzgargan, ${reused} ta oʻzgarmagan${carried ? `, ${carried} ta kanaldan olingan` : ''} boʻlak; manifest mahkamlandi`
+        ? `Tayyor: ${refs.length - reused - carried - caught} ta yangi/oʻzgargan, ${reused} ta oʻzgarmagan${carried ? `, ${carried} ta kanaldan olingan` : ''}${caught ? `, ${caught} ta asosiy kanaldan koʻchirildi` : ''} boʻlak; manifest mahkamlandi`
         : `Zaxira joylandi, lekin manifestni mahkamlab boʻlmadi (${pin.error}): botga «Pin messages» huquqini bering`,
     })
+    return { key, refs: new Map(refs.map((r) => [r.name, r])), companies }
   } finally {
     try {
       snapDb?.close()

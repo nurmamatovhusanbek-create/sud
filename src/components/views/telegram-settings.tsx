@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react'
-import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Info, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { useWatch } from '@/hooks/use-watch'
@@ -253,6 +253,48 @@ function WatchCard({ configured }: { configured: boolean }) {
   )
 }
 
+const HELP_STEPS: ReadonlyArray<{ title: string; text: string }> = [
+  { title: 'Telegram bot yarating', text: 'Telegramda @BotFather › /newbot. U token beradi (123456789:AA… koʻrinishida): uni hech kimga bermang va chatga yozmang.' },
+  { title: 'Ikkita yopiq kanal yarating', text: 'Biri asosiy, ikkinchisi ehtiyot nusxa uchun. Har ikkalasida botni admin qiling va «Post messages», «Pin messages» ruxsatlarini yoqing. Kanal raqami -100 bilan boshlanadi (kanaldan xabarni @getidsbot ga forward qilsangiz, raqamini koʻrsatadi).' },
+  { title: 'Bu sahifaga kiriting', text: 'Quyidagi maydonlarga: bot tokeni, asosiy kanal, zaxira kanal. Keyin «Saqlash», soʻng «Sinash»: hamma belgi yashil boʻlishi kerak. «Kanalni topish» bot Renderda ishlayotganda xato beradi: raqamni qoʻlda yozing.' },
+  { title: 'Zaxira parolini tanlang', text: 'Kamida 10 belgi, daftarga yozib qoʻying: yoʻqolsa, zaxirani ochib boʻlmaydi. Parol ilovada va botda (Render › SUD_PASSPHRASE) aynan bir xil boʻlishi shart.' },
+  { title: 'Birinchi zaxirani oling', text: '«Shifrlangan zaxira» kartasida parolni kiriting va «Zaxiralash» bosing. Oxirida «2 ta kanalga zaxira olindi» chiqadi.' },
+  { title: 'Avtomatik zaxirani yoqing', text: 'Shu kartadagi «Avtomatik zaxirani yoqish»: bazada yangilik paydo boʻlsa, zaxira oʻzi olinadi va bot 5 daqiqa ichida koʻradi. Kompyuter yoqilgan va ilova ishlab turishi kerak (Sud.bat keep).' },
+  { title: 'Botni tekshiring', text: 'Brauzerda https://<bot-manzili>/health ochilsin: "ready": true va kompaniyalar soni chiqsin. Keyin Telegramda botga /start yozing.' },
+]
+
+/** Settings › Telegram: the first-time setup in plain steps, closed until asked for (docs/QOLLANMA.md has the long version) */
+function HelpCard() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="p-card rise-c" style={{ marginBottom: 14 }}>
+      <button className="card-h" onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{ width: '100%', background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+        <div className="ico"><Info /></div>
+        <h2>Qanday sozlanadi? Qadamma-qadam</h2>
+        <span className="badge" style={{ marginLeft: 'auto' }}>{open ? 'yopish' : 'koʻrish'}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '0 0 10px' }}>
+            Hammasi bitta zanjir: <b>ilova</b> (kompyuteringizda, baza shu yerda) › <b>zaxira</b> (shifrlangan nusxa, yopiq Telegram kanalida) › <b>bot</b> (Renderda, zaxirani oʻqib telefoningizdan qidirish imkonini beradi).
+            Bot ilovaga bogʻlanmaydi: ilovadagi yangilik botga faqat zaxira orqali yetadi.
+          </p>
+          <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 8 }}>
+            {HELP_STEPS.map((st) => (
+              <li key={st.title} style={{ fontSize: 13, lineHeight: 1.5 }}>
+                <b>{st.title}.</b> <span className="faint">{st.text}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="faint" style={{ fontSize: 12, lineHeight: 1.5, margin: '10px 0 0' }}>
+            Yangi kompyuterda: botni va kanallarni kiriting, «Kanaldagi kompaniyalar» › tanlab yuklang, keyin har bir kompaniyada «Toʻlovlarni yangilash». Muammolar va parolni almashtirish: loyiha papkasidagi <span className="mono">docs/QOLLANMA.md</span>.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TelegramTab() {
   const { status, busy, out, channels, find, test, save, forget } = useTelegram()
   const [token, setToken] = useState('')
@@ -264,6 +306,7 @@ export function TelegramTab() {
 
   return (
     <div className="dash" style={{ gridTemplateColumns: '1fr' }}>
+      <HelpCard />
       <div className="p-card rise-c">
         <div className="card-h">
           <div className="ico"><Send /></div>
