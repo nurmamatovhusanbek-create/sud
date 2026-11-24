@@ -236,13 +236,59 @@ pub fn company_text(c: &Company) -> String {
     out
 }
 
-/// «/stats»: all companies in a few lines, or one company's courts and years
-pub fn stats_text(rows: &[crate::domain::Overview]) -> String {
-    let mut out = format!("📊 <b>Umumiy sonlar</b>\nKompaniyalar: <b>{}</b>\n", rows.len());
+/// companies on one page of «/stats» (about 150 characters each: ten fit under Telegram's limit with room)
+const STATS_PAGE: usize = 10;
+
+/// «/stats»: one page of companies (`rows`), `total` of them in all, the page starting at `offset`
+pub fn stats_text(rows: &[crate::domain::Overview], total: usize, offset: usize) -> String {
+    let mut out = format!("📊 <b>Umumiy sonlar</b>\nKompaniyalar: <b>{}</b>", fmt_int(total as i64));
+    if total > rows.len() {
+        out.push_str(&format!(" · {}-{} koʻrsatilmoqda", fmt_int(offset as i64 + 1), fmt_int((offset + rows.len()) as i64)));
+    }
+    out.push('\n');
     for o in rows {
         out.push_str(&format!("\n🏢 <b>{}</b>\n<code>{}</code> · ishlar <b>{}</b> · toʻlovlar {}\n", if o.company.name.is_empty() { "Nomi yoʻq".to_string() } else { esc(&lat(&o.company.name)) }, esc(&o.company.tin), fmt_int(o.cases as i64), fmt_int(o.company.bills as i64)));
     }
     out
+}
+
+/// the buttons under a «/stats» page: `‹ Oldingi · 2/7 · Keyingi ›` (none when everything fits one page)
+pub fn stats_keys(total: usize, offset: usize) -> Option<Value> {
+    if total <= STATS_PAGE {
+        return None;
+    }
+    let (page, pages) = (offset / STATS_PAGE + 1, total.div_ceil(STATS_PAGE));
+    let mut row = Vec::new();
+    if offset > 0 {
+        row.push(json!({ "text": "‹ Oldingi", "callback_data": format!("t:{}", offset.saturating_sub(STATS_PAGE)) }));
+    }
+    row.push(json!({ "text": format!("{page}/{pages}"), "callback_data": "s:noop" }));
+    if offset + STATS_PAGE < total {
+        row.push(json!({ "text": "Keyingi ›", "callback_data": format!("t:{}", offset + STATS_PAGE) }));
+    }
+    Some(json!({ "inline_keyboard": [row] }))
+}
+
+/// the companies, the biggest first (most bills with a case, then most cases found), the same order on every page
+async fn stats_companies(sh: &Arc<Shared>) -> Vec<crate::domain::Company> {
+    let mut all = sh.companies().await;
+    all.sort_by(|a, b| (b.bills + b.found).cmp(&(a.bills + a.found)).then_with(|| a.tin.cmp(&b.tin)));
+    all
+}
+
+/// one page of «/stats» as (text, buttons); the overview is read only for the companies shown
+async fn stats_page(sh: &Arc<Shared>, offset: usize) -> (String, Option<Value>) {
+    let all = stats_companies(sh).await;
+    let total = all.len();
+    // a page that is gone (companies were removed) falls back to the last one
+    let offset = if offset >= total { (total.saturating_sub(1) / STATS_PAGE) * STATS_PAGE } else { offset / STATS_PAGE * STATS_PAGE };
+    let mut rows = Vec::new();
+    for c in all.iter().skip(offset).take(STATS_PAGE) {
+        if let Ok(o) = sh.overview(&c.tin).await {
+            rows.push(o);
+        }
+    }
+    (clip_html(&stats_text(&rows, total, offset), CHAT_MAX), stats_keys(total, offset))
 }
 
 pub fn overview_text(o: &crate::domain::Overview) -> String {
@@ -354,7 +400,7 @@ async fn company_names(sh: &Arc<Shared>) -> Vec<(String, String)> {
 async fn settings_reply(sh: &Arc<Shared>, chat: i64, user: i64) {
     let p = sh.prefs_of(user).await;
     let companies = company_names(sh).await;
-    let Some(id) = sh.outbox.send_html_id(chat, &p.text(&companies), Some(p.keyboard(&companies))).await else { return };
+    let Some(id) = sh.outbox.send_html_id(chat, &p.text(&companies), Some(p.keyboard(&companies, 0))).await else { return };
     sh.outbox.pin(chat, id).await;
     sh.remember_prefs(user, p, Some(id));
 }
@@ -364,10 +410,8 @@ async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, res
     let mut p = sh.prefs_of(user).await;
     let companies = company_names(sh).await;
     let all: Vec<String> = companies.iter().map(|(t, _)| t.clone()).collect();
-    if !p.apply(rest, &all) {
-        return;
-    }
-    let (text, keys) = (p.text(&companies), p.keyboard(&companies));
+    let Some(page) = p.apply(rest, &all) else { return };
+    let (text, keys) = (p.text(&companies), p.keyboard(&companies, page));
     let pinned = sh.settings_msg(user);
     sh.remember_prefs(user, p, if pinned.is_none() { Some(msg_id) } else { None });
     sh.outbox.edit_html(chat, msg_id, &text, Some(keys.clone())).await;
@@ -392,6 +436,14 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         if let Some(rest) = data.strip_prefix("s:") {
             if rest != "noop" {
                 settings_press(&sh, uid, chat, cb["message"]["message_id"].as_i64().unwrap_or(0), rest).await;
+            }
+            return;
+        }
+        // «t:<offset>»: another page of «/stats», drawn over the message that was pressed
+        if let Some(rest) = data.strip_prefix("t:") {
+            if let Ok(offset) = rest.parse::<usize>() {
+                let (text, keys) = stats_page(&sh, offset).await;
+                sh.outbox.edit_html(chat, cb["message"]["message_id"].as_i64().unwrap_or(0), &text, keys).await;
             }
             return;
         }
@@ -453,13 +505,8 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
                     Err(e) => sh.outbox.send(chat, &e.message(), None).await,
                 }
             } else {
-                let mut rows = Vec::new();
-                for c in sh.companies().await {
-                    if let Ok(o) = sh.overview(&c.tin).await {
-                        rows.push(o);
-                    }
-                }
-                sh.outbox.send_html(chat, &clip_html(&stats_text(&rows), CHAT_MAX), None).await;
+                let (text, keys) = stats_page(&sh, 0).await;
+                sh.outbox.send_html(chat, &text, keys).await;
             }
         }
         "/app" => match &sh.cfg.public_url {

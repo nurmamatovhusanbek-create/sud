@@ -634,6 +634,44 @@ mod chat {
         assert!(sent[1].text.len() < 4096);
     }
 
+    fn fake_overview(i: usize) -> crate::domain::Overview {
+        crate::domain::Overview {
+            company: crate::domain::Company { tin: format!("{}", 200_000_000 + i), name: format!("«SHIRKAT NOMI JUDA UZUN BOʻLGAN JAMIYAT {i}» MAS'ULIYATI CHEKLANGAN JAMIYAT"), bills: 70_000 + i, found: 40_000, ..Default::default() },
+            cases: 40_000 + i,
+            courts: Default::default(),
+            by_year: vec![],
+        }
+    }
+
+    #[test]
+    fn stats_pages_stay_under_telegrams_limit_and_the_buttons_walk_the_list() {
+        use crate::chat::{stats_keys, stats_text};
+        let rows: Vec<_> = (0..10).map(fake_overview).collect();
+        let t = stats_text(&rows, 95, 20);
+        assert!(t.len() < 3900, "{}", t.len());
+        assert!(t.contains("Kompaniyalar: <b>95</b> · 21-30 koʻrsatilmoqda"), "{t}");
+        assert!(stats_text(&rows[..3], 3, 0).contains("Kompaniyalar: <b>3</b>\n") && !stats_text(&rows[..3], 3, 0).contains("koʻrsatilmoqda"));
+        assert!(stats_keys(10, 0).is_none());
+        let first = stats_keys(95, 0).unwrap().to_string();
+        assert!(first.contains("1/10") && first.contains("t:10") && !first.contains("Oldingi"), "{first}");
+        let mid = stats_keys(95, 40).unwrap().to_string();
+        assert!(mid.contains("t:30") && mid.contains("t:50") && mid.contains("5/10"), "{mid}");
+        let last = stats_keys(95, 90).unwrap().to_string();
+        assert!(last.contains("t:80") && last.contains("10/10") && !last.contains("Keyingi"), "{last}");
+    }
+
+    #[tokio::test]
+    async fn a_stats_button_redraws_the_same_message_and_a_stale_page_falls_back() {
+        let (sh, _b) = ready_bot().await;
+        let cb = |data: &str| json!({ "callback_query": { "id": "1", "from": { "id": 4242 }, "message": { "message_id": 77, "chat": { "id": 4242 } }, "data": data } });
+        handle_update(sh.clone(), cb("t:0")).await;
+        handle_update(sh.clone(), cb("t:900")).await; // the list is shorter now
+        handle_update(sh.clone(), cb("t:zzz")).await; // nonsense
+        let edited = sh.outbox.edited();
+        assert_eq!(edited.len(), 2, "{edited:?}");
+        assert!(edited.iter().all(|e| e.id == 77 && e.text.contains("Umumiy sonlar") && e.text.contains(TIN)), "{edited:?}");
+    }
+
     #[tokio::test]
     async fn help_is_formatted_and_lists_every_command() {
         let (sh, _b) = ready_bot().await;
