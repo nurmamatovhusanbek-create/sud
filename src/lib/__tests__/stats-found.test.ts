@@ -55,6 +55,12 @@ describe('Statistika and the cases found by number', () => {
     expect(s.summary.total).toBe(4)
   })
 
+  test('a claim that was never sent to court has no number: it is not a case, and two of them are not one case (the bot and the app count alike)', async () => {
+    listed = [row(1), row(2, { caseNumber: '-', caseStatus: 'Қабул қилиш рад этилган' }), row(3, { caseNumber: '-' })]
+    const s = await getCompanyStats(TIN, { force: true })
+    expect(s.summary.total).toBe(1)
+  })
+
   test('with no found cases nothing changes', async () => {
     listed = [row(1)]
     const s = await getCompanyStats(TIN, { force: true })

@@ -1,5 +1,6 @@
 import { getDb, type Db, type SqlValue } from './db'
 import { courtTypeOfNumber, registeredKey } from '@/core/bill-cases'
+import { isCaseNumber } from '@/core/case-number'
 import { backupFeedKey, feedRows, feedTins, importFeedRows } from './case-store'
 import type { CourtCase, CourtType } from './court-case-types'
 import { hearingDateKey, todayKeyUz } from '@/core/hearings'
@@ -200,7 +201,7 @@ function importLists(tin: string, text: Uint8Array): number {
     try {
       const [court, , json] = JSON.parse(l) as [string, string, string]
       const row = JSON.parse(json) as CourtCase
-      if (typeof court === 'string' && row && typeof row === 'object') byCourt.set(court, [...(byCourt.get(court) ?? []), row])
+      if (typeof court === 'string' && row && typeof row === 'object' && isCaseNumber(row.caseNumber)) byCourt.set(court, [...(byCourt.get(court) ?? []), row])
     } catch {
       /* a damaged line is skipped: the list is read again from the court */
     }

@@ -19,6 +19,7 @@
 
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
 import { readFound } from './case-store'
+import { isCaseNumber } from '@/core/case-number'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRatingDetailed } from './chamber'
 import { assignRoles, classifyOutcome } from '@/core/classify'
@@ -268,6 +269,7 @@ async function fetchCompanyStatsInternal(
         })
       }
       for (const raw of rawCases) {
+        if (!isCaseNumber(raw.caseNumber)) continue // a claim never sent to court has no number: not a case, and two of them are not one case
         // v149: Re-classify court type based on case number prefix.
         // jadval.sud.uz/case/findByTin returns ALL case types (economic + civil + admin),
         // not just economic. Case number prefixes:

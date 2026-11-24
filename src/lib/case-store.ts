@@ -17,6 +17,7 @@
  * Server-only: imports `fs`.
  */
 
+import { isCaseNumber } from '@/core/case-number'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -325,7 +326,7 @@ export function feedRows(tin: string): Array<{ court: string; num: string; row: 
   for (const [key, f] of Object.entries(file.feeds)) {
     const court = key.split('|')[0] ?? ''
     for (const row of f.items) {
-      if (!row.caseNumber) continue
+      if (!isCaseNumber(row.caseNumber)) continue // a claim with no number yet is not a case (core/case-number)
       const k = `${court}:${row.caseNumber}`
       const have = out.get(k)
       if (!have || f.t >= have.t) out.set(k, { court, num: row.caseNumber, row, t: f.t })

@@ -159,6 +159,15 @@ describe('buckets', () => {
     cs.forgetCaseStoreMemory()
   })
 
+  test('a list row with no case number («-», a claim never sent to court) is neither backed up for the bot nor loaded back', () => {
+    cs.writeFeed(A, 'economic|jadvalapi/ECONOMIC/findByTin', { t: 100, complete: true, items: [{ caseNumber: '-', caseStatus: 'x' } as never, { caseNumber: '4-1001-2602/5', caseStatus: 'y' } as never] })
+    const lines = bk.renderBucket(`lists:${A}`)!.text.toString('utf8').trim().split('\n').map((l) => JSON.parse(l))
+    expect(lines.map((r) => r[1])).toEqual(['4-1001-2602/5'])
+    const old = Buffer.from(JSON.stringify(['economic', '-', JSON.stringify({ caseNumber: '-' })]) + '\n' + JSON.stringify(['economic', '4-1001-2602/6', JSON.stringify({ caseNumber: '4-1001-2602/6' })]) + '\n')
+    expect(bk.importBucket(`lists:${A}`, old)).toBe(1) // an older backup that still has the placeholder rows
+    cs.forgetCaseStoreMemory()
+  })
+
   test('an unknown name is refused', () => {
     expect(() => bk.importBucket('nonsense:1', Buffer.from('[]\n'))).toThrow()
     expect(bk.renderBucket('nonsense:1')).toBeNull()

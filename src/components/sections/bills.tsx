@@ -206,7 +206,7 @@ function LoadCard({ page, pages, pass, stored, total, wait, error, onStop }: { p
         <div>
           <b style={{ fontSize: 14 }}>Toʻlovlar yuklab olinmoqda…</b>
           <div className="faint mono" style={{ fontSize: 12 }}>
-            <span>{formatCount(stored)}</span> / {total ? formatCount(total) : '…'} kvitansiya · {Math.min(page + 1, pages || page + 1)}/{pages || '…'}-sahifa{pass > 0 ? ` · ${pass + 1}-oʻtish` : ''}
+            {pages > 0 ? `${Math.min(page + 1, pages)}/${pages}-sahifa` : 'billing javobi kutilmoqda…'}{pass > 0 ? ` · ${pass + 1}-oʻtish` : ''} · {total ? `${formatCount(total)} ta kvitansiya` : '…'} · <span>{formatCount(stored)}</span> tasi ish raqamli (saqlanadi)
           </div>
         </div>
         <div style={{ flex: 1 }} />
@@ -214,10 +214,10 @@ function LoadCard({ page, pages, pass, stored, total, wait, error, onStop }: { p
         <span className="spinner" />
       </div>
       <div className="stream-bar">
-        <div className="stream-fill" style={{ width: `${total ? Math.min(100, Math.round((stored / total) * 100)) : 4}%` }} />
+        <div className="stream-fill" style={{ width: `${pages > 0 ? Math.min(100, Math.max(4, Math.round((page / pages) * 100))) : 4}%` }} />
       </div>
       <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--text-3)' }}>
-        Yuklangan sahifalar hozirdan qidirilishi va ochilishi mumkin; qolganlari ketma-ket qoʻshiladi. Sahifadan chiqsangiz ham yuklash davom etadi.
+        Yuklangan sahifalar hozirdan qidirilishi va ochilishi mumkin; qolganlari ketma-ket qoʻshiladi. Ish raqamisiz kvitansiyalar saqlanmaydi, shuning uchun saqlanganlar soni jami sondan kam boʻladi. Sahifadan chiqsangiz ham yuklash davom etadi.
       </div>
       {wait > 0 && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--text-2)' }}>billing.sud.uz javob bermadi: {wait} soniyadan keyin qayta uriniladi.</div>}
       {error && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--neg-text)' }}>{error}</div>}
