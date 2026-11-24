@@ -74,7 +74,7 @@ export function BillCasesPanel({ stir, capped }: { stir: string; capped: boolean
       : null
 
   return (
-    <div className="dw-orders-empty" style={{ marginBottom: 10 }}>
+    <div className="dw-orders-empty" style={{ margin: '16px 0 10px' }}>
       {text}
       {dates && <div style={{ marginTop: 6, color: 'var(--text-2)', fontSize: 12.5 }}>{dates}</div>}
       {st && st.passes.length > 0 && (
