@@ -29,8 +29,11 @@ pub async fn keep_synced(sh: Arc<Shared>) {
                 s.error = Some(e.to_string());
             }
         }
+        // people whose `/refresh` this backup answered are told now, once the bot has looked (read or not)
+        crate::link::deliver(&sh).await;
         let failures = sh.st.read().await.failures;
-        tokio::time::sleep(Duration::from_secs(delay_secs(sh.cfg.refresh_secs, failures))).await;
+        // the app's ping (`/link/synced`) cuts the wait short
+        let _ = tokio::time::timeout(Duration::from_secs(delay_secs(sh.cfg.refresh_secs, failures)), sh.wake.notified()).await;
     }
 }
 

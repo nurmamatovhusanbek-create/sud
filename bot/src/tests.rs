@@ -1052,3 +1052,99 @@ mod assets {
         }
     }
 }
+
+mod the_app_link {
+    use super::*;
+    use crate::chat::handle_update;
+
+    fn message(user: i64, text: &str) -> Value {
+        json!({ "message": { "from": { "id": user }, "chat": { "id": user }, "text": text } })
+    }
+
+    async fn call(sh: &std::sync::Arc<crate::state::Shared>, path: &str, body: &str, ts: i64, sig: Option<String>) -> (StatusCode, Value) {
+        let sig = sig.unwrap_or_else(|| crate::link::sign(&Config::for_tests().token, ts, path, body.as_bytes()));
+        let r = Request::builder().method("POST").uri(path).header("x-sud-ts", ts.to_string()).header("x-sud-sig", sig).body(Body::from(body.to_string())).unwrap();
+        let res = crate::http::router(sh.clone()).oneshot(r).await.unwrap();
+        let status = res.status();
+        let bytes = axum::body::to_bytes(res.into_body(), 1_000_000).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    }
+
+    #[tokio::test]
+    async fn both_doors_refuse_a_wrong_old_or_missing_signature() {
+        let (sh, _b) = ready_bot().await;
+        for path in ["/link/pull", "/link/synced"] {
+            assert_eq!(call(&sh, path, "{}", now(), Some("00".repeat(32))).await.0, StatusCode::UNAUTHORIZED, "{path} wrong signature");
+            assert_eq!(call(&sh, path, "{}", now() - 600, None).await.0, StatusCode::UNAUTHORIZED, "{path} old");
+            let r = Request::builder().method("POST").uri(path).body(Body::from("{}")).unwrap();
+            assert_eq!(crate::http::router(sh.clone()).oneshot(r).await.unwrap().status(), StatusCode::UNAUTHORIZED, "{path} unsigned");
+        }
+        assert!(sh.link.lock().unwrap().last_seen == 0, "a refused call changes nothing");
+    }
+
+    #[tokio::test]
+    async fn refresh_is_asked_pulled_finished_and_told_after_the_bot_has_read_the_backup() {
+        let (sh, b) = ready_bot().await;
+        // the app has not been seen: the bot says so and queues nothing
+        handle_update(sh.clone(), message(4242, &format!("/refresh {TIN}"))).await;
+        assert!(sh.outbox.captured()[0].text.contains("Ilova ulanmagan"), "{}", sh.outbox.captured()[0].text);
+        assert!(sh.link.lock().unwrap().jobs.is_empty());
+
+        // the app asks for work (nothing yet), then a person asks
+        let (st, body) = call(&sh, "/link/pull", "{}", now(), None).await;
+        assert!(st == StatusCode::OK && body["jobs"].as_array().unwrap().is_empty(), "{body}");
+        handle_update(sh.clone(), message(4242, "/refresh abc")).await;
+        handle_update(sh.clone(), message(4242, &format!("/refresh {TIN}"))).await;
+        handle_update(sh.clone(), message(4242, &format!("/refresh {TIN}"))).await;
+        let sent = sh.outbox.captured();
+        assert!(sent[1].text.contains("/refresh 207275139") && sent[2].text.contains("navbatga qoʻyildi") && sent[3].text.contains("allaqachon navbatda"), "{sent:?}");
+
+        // the next pull hands the job out once
+        let (_, body) = call(&sh, "/link/pull", "{}", now(), None).await;
+        assert_eq!(body["jobs"].as_array().unwrap().len(), 1);
+        assert_eq!(body["jobs"][0]["tin"], TIN);
+        let id = body["jobs"][0]["id"].as_u64().unwrap();
+        assert!(call(&sh, "/link/pull", "{}", now(), None).await.1["jobs"].as_array().unwrap().is_empty());
+
+        // the app made a backup and reports the result: the person is NOT told yet (the bot has not read it)
+        publish(&b.channel, MAIN, &b.pass, 2, &buckets(true));
+        let (st, _) = call(&sh, "/link/synced", &format!(r#"{{"done":[{{"id":{id},"ok":true}}]}}"#), now(), None).await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(sh.outbox.captured().len(), 4);
+        // the sync loop wakes, reads, and then tells
+        tokio::time::timeout(std::time::Duration::from_secs(1), sh.wake.notified()).await.expect("the ping wakes the sync loop");
+        sh.sync().await.unwrap();
+        crate::link::deliver(&sh).await;
+        let sent = sh.outbox.captured();
+        assert_eq!(sent.len(), 5, "{sent:?}");
+        assert!(sent[4].text.contains("yangilandi") && sent[4].text.contains(TIN), "{}", sent[4].text);
+        // told once, and the queue is empty
+        crate::link::deliver(&sh).await;
+        assert_eq!(sh.outbox.captured().len(), 5);
+        // a company just refreshed is not asked again at once
+        handle_update(sh.clone(), message(4242, &format!("/refresh {TIN}"))).await;
+        assert!(sh.outbox.captured()[5].text.contains("yangilangan"), "{}", sh.outbox.captured()[5].text);
+    }
+
+    #[tokio::test]
+    async fn a_failed_run_is_told_with_its_reason_and_html_is_escaped() {
+        let (sh, _b) = ready_bot().await;
+        call(&sh, "/link/pull", "{}", now(), None).await;
+        handle_update(sh.clone(), message(4242, "/refresh 302678824")).await;
+        let (_, body) = call(&sh, "/link/pull", "{}", now(), None).await;
+        let id = body["jobs"][0]["id"].as_u64().unwrap();
+        call(&sh, "/link/synced", &format!(r#"{{"done":[{{"id":{id},"ok":false,"note":"billing <b>rad</b> etdi"}}]}}"#), now(), None).await;
+        crate::link::deliver(&sh).await;
+        let last = sh.outbox.captured().last().unwrap().text.clone();
+        assert!(last.contains("yangilanmadi") && last.contains("billing &lt;b&gt;rad&lt;/b&gt; etdi") && !last.contains("<b>rad"), "{last}");
+        assert!(sh.outbox.captured().iter().all(|s| s.text.len() < 4096));
+    }
+
+    #[tokio::test]
+    async fn a_stranger_cannot_refresh() {
+        let (sh, _b) = ready_bot().await;
+        call(&sh, "/link/pull", "{}", now(), None).await;
+        handle_update(sh.clone(), message(999, &format!("/refresh {TIN}"))).await;
+        assert!(sh.link.lock().unwrap().jobs.is_empty());
+    }
+}

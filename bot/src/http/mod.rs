@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod assets;
+pub mod link;
 pub mod webhook;
 
 use crate::auth::validate_init_data;
@@ -48,6 +49,8 @@ pub fn router(sh: Arc<Shared>) -> Router {
         .route("/app", get(assets::app_page))
         .route("/static/{*path}", get(assets::static_file))
         .route("/tg/{secret}", post(webhook::receive))
+        .route("/link/synced", post(link::synced))
+        .route("/link/pull", post(link::pull))
         .route("/api/companies", get(api::companies))
         .route("/api/overview", get(api::overview))
         .route("/api/hearings", get(api::hearings))

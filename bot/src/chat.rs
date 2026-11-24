@@ -17,6 +17,7 @@ Shunchaki yozing: ish raqami (<code>2-1004-2603/8020</code>), kvitansiya raqami,
 /hearings [kun] [STIR]: yaqin majlislar (14 kun)\n\
 /stats [STIR]: sonlar, kompaniyalar va ishlar\n\
 /company STIR: kompaniya\n\
+/refresh STIR: kompaniyani sud saytlaridan qayta yigʻdirish (ilova yoqilgan boʻlsa)\n\
 /case raqam: ish maʼlumoti\n\
 /bill raqam: kvitansiya\n\
 /find matn: qidirish\n\
@@ -423,6 +424,26 @@ async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, res
     }
 }
 
+/// «/refresh STIR»: ask the app (the computer that scrapes) to update one company; it tells the person when the backup and the bot have it
+async fn refresh_reply(sh: &Arc<Shared>, chat: i64, arg: &str) {
+    use crate::link::Queued;
+    let tin: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
+    if tin.len() != 9 {
+        sh.outbox.send_html(chat, "Kompaniya STIRini yozing: <code>/refresh 207275139</code>", None).await;
+        return;
+    }
+    let asked = sh.link.lock().unwrap().ask(&tin, chat, crate::state::now());
+    let text = match asked {
+        Queued::New => format!("⏳ <code>{tin}</code> navbatga qoʻyildi. Ilova uni sud saytlaridan yigʻadi, zaxiraga yozadi va men sizga xabar beraman (odatda bir necha daqiqa)."),
+        Queued::Joined => format!("⏳ <code>{tin}</code> allaqachon navbatda: tugagach sizga ham xabar beraman."),
+        Queued::NotLinked => "Ilova ulanmagan: kompyuter oʻchiq yoki Sozlamalar › Telegram da «Bot bilan ulanish» yoqilmagan. Yangilash ilova ochiq paytida ishlaydi.".to_string(),
+        Queued::Full => "Navbat toʻla: bir necha daqiqadan soʻng qayta urining.".to_string(),
+        Queued::TooMany => "Bir vaqtning oʻzida uchtagacha kompaniya soʻrash mumkin: avvalgilari tugashini kuting.".to_string(),
+        Queued::Recent(secs) => format!("<code>{tin}</code> {} daqiqa oldin yangilangan: bir oz keyin qayta urining.", secs / 60),
+    };
+    sh.outbox.send_html(chat, &text, None).await;
+}
+
 pub async fn handle_update(sh: Arc<Shared>, u: Value) {
     if let Some(cb) = u.get("callback_query") {
         let uid = cb["from"]["id"].as_i64().unwrap_or(0);
@@ -497,6 +518,7 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             sh.outbox.send_html(chat, &format!("🗄 <b>Zaxira holati</b>\n<b>Oxirgi zaxira:</b> {}\n<b>Yozuvlar:</b> {}\n<b>Kompaniyalar:</b> {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
         }
         "/settings" | "/reminders" => settings_reply(&sh, chat, uid).await,
+        "/refresh" => refresh_reply(&sh, chat, arg).await,
         "/stats" => {
             let tin: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
             if tin.len() == 9 {

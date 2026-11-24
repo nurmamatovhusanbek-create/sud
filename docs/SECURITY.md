@@ -118,3 +118,7 @@ The only scheduler in the app. `src/instrumentation.ts` starts a 60 s timer in t
 ## Automatic backup passphrase
 
 Only when the operator switches «Avtomatik zaxira» on: the backup passphrase is kept in `~/.sud-tizimi/backup-pass.json` (0600, folder 0700), outside the project and git, like `telegram.json` and `vlm.json`. It is never sent back to the browser or logged; switching the feature off deletes the file. Whoever can read that file and `telegram.json` can read the channel's backups: protect the computer's account accordingly.
+
+## The bot link (`lib/bot-link`, bot `link.rs`)
+Opt-in (Settings › Telegram › «Bot bilan ulanish»). The app only makes OUTBOUND HTTPS calls to the bot address the operator typed (https only; plain http for localhost) and nothing new listens on the computer. The calls are signed with a key derived from the bot token (`HMAC-SHA256(token, "sud-link-v1")` over time, path and body, 2-minute window), so no new secret exists; the bot's two doors `/link/synced` and `/link/pull` answer 401 to anything else and read at most 64 KB. The app accepts from the bot only STIRs of nine digits and number ids, and never runs anything the bot sends. What the link can make the app do: re-read ONE company's public court lists and take a backup, at most one company at a time, queued with caps (3 per person, 20 in all, 5-minute cooldown per company); the people able to ask are the ones on the bot's `ALLOWED_USER_IDS`. Whoever holds the bot token can sign calls: the same trust as holding the token itself (it already lets them read the channel).
+

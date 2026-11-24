@@ -6,7 +6,7 @@ Ilovaning ichida ham xuddi shu yoʻriqnoma bor: **Sozlamalar › Telegram › «
 
 ## 1. Avval tushunib oling: nima nima bilan bogʻlangan
 
-Tizim uch qismdan iborat va ular bitta zanjirda ishlaydi: sud saytlari › ilova (kompyuteringizda) › zaxira (Telegram kanalida) › bot (telefoningizda). Ilova sud saytlaridan maʼlumot yigʻadi va bazaga yozadi. Zaxira: baza shifrlanib, sizning yopiq Telegram kanalingizga yuklanadi. Bot esa shu zaxirani oʻqiydi va telefoningizdan qidirish imkonini beradi. Bot ilovaga bogʻlanmaydi: ilovadagi yangilik botga faqat zaxira orqali yetadi.
+Tizim uch qismdan iborat va ular bitta zanjirda ishlaydi: sud saytlari › ilova (kompyuteringizda) › zaxira (Telegram kanalida) › bot (telefoningizda). Ilova sud saytlaridan maʼlumot yigʻadi va bazaga yozadi. Zaxira: baza shifrlanib, sizning yopiq Telegram kanalingizga yuklanadi. Bot esa shu zaxirani oʻqiydi va telefoningizdan qidirish imkonini beradi. Bot sud saytlariga kirmaydi: ilovadagi yangilik botga faqat zaxira orqali yetadi. Xohlasangiz, ilova va botni «Bot bilan ulanish» (13-boʻlim) bilan bogʻlaysiz: shunda bot zaxirani darhol oʻqiydi va telefondan kompaniyani yangilatish mumkin.
 
 **Soʻzlar: nima degani**
 
@@ -90,7 +90,7 @@ Zaxira parol bilan shifrlanadi. Parolsiz hech kim, hatto Telegram ham, maʼlumot
 
 **Tekshirish:** Parol tanlandi va xavfsiz joyda yozib qoʻyilgan.
 
-> **Diqqat:** Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (17-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.
+> **Diqqat:** Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (18-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.
 
 ## 6. Birinchi zaxirani olish
 
@@ -196,6 +196,7 @@ Botga shunchaki yozing: ish raqami (2-1004-2603/8020), kvitansiya raqami, STIR y
 | /find matn | Qidirish (oddiy xabar yozish bilan bir xil) |
 | /app | Qidiruv oynasi (Mini App): roʻyxatlar, kompaniya kartalari, majlislar |
 | /settings | Eslatma sozlamalari: vaqt, kunlar soni, kompaniyalar (12-boʻlim) |
+| /refresh STIR | Kompaniyani sud saytlaridan qayta yigʻdirish (ilova bilan ulanish yoqilgan boʻlsa, 13-boʻlim) |
 | /status | Zaxira holati: qachon olingan, nechta yozuv |
 
 **Har kungi eslatma**
@@ -225,7 +226,25 @@ Har bir odam eslatmalarini oʻzi uchun sozlaydi: bu boshqa odamning sozlamasiga 
 
 > **Diqqat:** Sozlamalar sizning chatingizdagi mahkamlangan oynaning ichida saqlanadi (bot joylashgan serverda fayl saqlanmaydi, qayta ishga tushganda yoʻqoladi). Shu mahkamlangan xabarni oʻchirmang va chatda boshqa xabarni mahkamlamang: aks holda sozlamalar standartga qaytadi. Vaqt Oʻzbekiston vaqti (UTC+5) bilan.
 
-## 13. Har kungi ish tartibi va kompyuter oʻchiq boʻlsa
+## 13. Ilova va botni bogʻlash: darhol yangilanish va /refresh
+
+Bogʻlamasangiz ham hammasi ishlaydi: bot zaxirani 5 daqiqada bir marta oʻzi tekshiradi. Bogʻlasangiz ikkita narsa qoʻshiladi: (1) ilova zaxira olishi bilan botga xabar beradi va bot darhol oʻqiydi; (2) telefondan botga /refresh STIR deb yozsangiz, ilova shu kompaniyani sud saytlaridan qayta oʻqiydi, zaxiraga yozadi va bot sizga natijani yozadi. Ilova botga oʻzi murojaat qiladi: kompyuterda hech qanday port ochilmaydi, internetdan unga hech kim kira olmaydi.
+
+1. Avtomatik zaxira yoqilgan boʻlsin (7-boʻlim).
+   - Telefondan soʻralgan yangilanish zaxiraga shu orqali yoziladi. Yoqilmagan boʻlsa, bot «zaxira yoqilmagan» deb javob beradi.
+2. Sozlamalar › Telegram › «Bot bilan ulanish» kartasiga botning manzilini yozing, masalan https://nom.onrender.com (Render sahifasining tepasidagi manzil).
+   - Faqat https:// bilan boshlanadigan manzil qabul qilinadi; oxiridagi /app yoki boshqa qismi shart emas.
+3. «Ulanishni yoqish» ni bosing.
+   - Bot uxlab qolgan boʻlsa, uygʻonishi bir daqiqagacha oladi.
+4. Telefondan botga yozing: /refresh 207275139 (oʻz kompaniyangiz STIRi).
+5. Bot «navbatga qoʻyildi» deydi. Bir necha daqiqadan soʻng u «yangilandi» deb ish va toʻlovlar sonini yozadi.
+   - Bir vaqtning oʻzida har kimdan uchtagacha kompaniya soʻrash mumkin; yaqinda yangilangan kompaniya 5 daqiqa ichida qayta soʻralmaydi.
+
+**Tekshirish:** Kartada «ulangan» yozuvi chiqadi va «Botdan soʻnggi javob» vaqti har daqiqada yangilanib turadi. Botga /refresh yozsangiz, «navbatga qoʻyildi» javobi keladi.
+
+> **Diqqat:** Ulanish faqat kompyuter yoqilgan va ilova ishlab turganda ishlaydi (Sud.bat keep). Oʻchiq boʻlsa, bot «Ilova ulanmagan» deb javob beradi: hech narsa yoʻqolmaydi, faqat yangilanmaydi. Imzo bot tokeniga bogʻliq: tokenni oʻzgartirsangiz, ilovada ham yangi tokenni saqlang.
+
+## 14. Har kungi ish tartibi va kompyuter oʻchiq boʻlsa
 
 1. Kompyuterda ilovani yoqib qoʻying: Sud.bat keep.
 2. Kompaniyani oching, kerak boʻlsa «Toʻlovlarni yangilash», keyin «Yetishmayotgan ishlarni olish» ni bosing.
@@ -238,7 +257,7 @@ Har bir odam eslatmalarini oʻzi uchun sozlaydi: bu boshqa odamning sozlamasiga 
 2. Ilova oʻchiq paytda hech narsa yangilanmaydi: sud roʻyxatlari oʻqilmaydi, Kuzatuv xabar bermaydi, avtomatik zaxira olinmaydi.
 3. Bot ishlayveradi: u Renderda va oxirgi zaxirani koʻrsatadi. Faqat yangiliklar kompyuter yoqilgunicha kelmaydi.
 
-## 14. Yangi zaxira kanal qoʻshish va kanallar holatini koʻrish
+## 15. Yangi zaxira kanal qoʻshish va kanallar holatini koʻrish
 
 Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtda.
 
@@ -254,7 +273,7 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 
 > **Diqqat:** Yangi kanalning zanjiri uni qoʻshgan sanadan boshlanadi, lekin ichiga bazadagi hamma maʼlumot koʻchiriladi: eski maʼlumot ham unda boʻladi.
 
-## 15. Yangi kompyuterda tiklash
+## 16. Yangi kompyuterda tiklash
 
 1. Ilovani yangi kompyuterga oʻrnating va ishga tushiring.
 2. Sozlamalar › Telegram: bot tokeni va kanal(lar)ni kiriting, «Saqlash».
@@ -265,7 +284,7 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 
 **Tekshirish:** Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada.
 
-## 16. Tez-tez uchraydigan muammolar
+## 17. Tez-tez uchraydigan muammolar
 
 | Muammo | Sababi va yechimi |
 |---|---|
@@ -280,7 +299,7 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 | Eslatma kelmayapti | /settings da eslatma «Oʻchiq» emasligini va tanlangan kompaniyalarni tekshiring. Majlis boʻlmasa, xabar kelmaydi. ID ingiz ALLOWED_USER_IDS da bormi? Bot uygʻoqmi (/health)? Zaxira oʻqilganmi (/status)? |
 | Kuzatuv xabar yubormayapti | Kompyuter va ilova yoqilganmi (Sud.bat keep)? «Xabar oluvchilar» da ID bormi? Siz botga kamida bir marta /start yozganmisiz? «Sinash» tugmasi xato sababini koʻrsatadi. |
 
-## 17. Parolni almashtirish
+## 18. Parolni almashtirish
 
 Parol ikki joyda turadi: ilovada (zaxira olayotganda kiritasiz) va Renderda (SUD_PASSPHRASE). Ikkalasi har doim bir xil boʻlishi kerak: faqat bittasini oʻzgartirsangiz, bot «Parol notoʻgʻri» deydi. Eski kanallardagi zaxira faqat eski parol bilan ochiladi, shuning uchun parolni almashtirish yangi zanjir boshlash demak.
 
@@ -293,7 +312,7 @@ Parol ikki joyda turadi: ilovada (zaxira olayotganda kiritasiz) va Renderda (SUD
 
 **Tekshirish:** Bot yangi parol bilan javob beradi, ilovada «Kanallar holatini tekshirish» yangi kanallarni «toʻliq» deb koʻrsatadi.
 
-## 18. Xavfsizlik, qisqacha
+## 19. Xavfsizlik, qisqacha
 
 1. Token va parolni hech qachon chatga, gitga yoki skrinshotga qoʻymang. Qoʻyib yuborgan boʻlsangiz, tokenni BotFather da /revoke qiling va parolni almashtiring.
 2. Parol Renderda saqlanadi: bot uni oʻqiy olishi uchun shu kerak. Render hisobingizga kirishni himoya qiling (ikki bosqichli tasdiqlash).

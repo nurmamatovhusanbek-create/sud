@@ -14,6 +14,7 @@ mod format;
 mod error;
 mod http;
 mod index;
+mod link;
 mod ratelimit;
 mod service;
 mod state;

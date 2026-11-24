@@ -40,6 +40,10 @@ pub struct Shared {
     pub limiter: RateLimiter,
     /// each person's reminder settings (read back from the message pinned in their chat, see `prefs.rs`)
     pub prefs: Mutex<HashMap<i64, PrefSlot>>,
+    /// the queue of `/refresh` requests for the app (see `link.rs`)
+    pub link: Mutex<crate::link::Link>,
+    /// «read the backup now»: the app has just made one (the sync loop waits on this instead of only sleeping)
+    pub wake: tokio::sync::Notify,
 }
 
 #[derive(Default)]
@@ -67,7 +71,7 @@ impl Shared {
 
     pub fn with(cfg: Config, source: Source, outbox: Outbox) -> Arc<Shared> {
         let limiter = RateLimiter::new(cfg.rate_per_minute);
-        Arc::new(Shared { cfg, source, outbox, st: RwLock::new(State::default()), cache: Mutex::new(BucketCache::default()), inflight: Mutex::new(HashMap::new()), limiter, prefs: Mutex::new(HashMap::new()) })
+        Arc::new(Shared { cfg, source, outbox, st: RwLock::new(State::default()), cache: Mutex::new(BucketCache::default()), inflight: Mutex::new(HashMap::new()), limiter, prefs: Mutex::new(HashMap::new()), link: Mutex::new(Default::default()), wake: tokio::sync::Notify::new() })
     }
 
     /// A person's reminder settings: from the cache, else read back from the message pinned in their chat (once; the defaults when there is none, and

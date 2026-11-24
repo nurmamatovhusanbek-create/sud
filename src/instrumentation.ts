@@ -1,5 +1,5 @@
 /**
- * Runs once when the server starts. It only starts two timers, Kuzatuv's (lib/watch) and the automatic backup's (lib/auto-backup); each does nothing until the operator
+ * Runs once when the server starts. It only starts three timers, Kuzatuv's (lib/watch), the automatic backup's (lib/auto-backup) and the bot link's (lib/bot-link); each does nothing until the operator
  * switches its setting on (Settings › Telegram). Node runtime only: the edge runtime has no database and no timers worth having.
  */
 export async function register(): Promise<void> {
@@ -10,4 +10,6 @@ export async function register(): Promise<void> {
   startWatchScheduler()
   const { startAutoBackup } = await import('./lib/auto-backup')
   startAutoBackup()
+  const { startBotLink } = await import('./lib/bot-link')
+  startBotLink()
 }

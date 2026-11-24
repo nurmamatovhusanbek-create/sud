@@ -170,6 +170,35 @@ export function autoBackupTick(deps: AutoDeps = REAL): void {
   }
 }
 
+export type BackupNow = 'started' | 'unchanged' | 'busy' | 'unavailable'
+
+/**
+ * A backup right now, for the link with the bot (`lib/bot-link`): somebody asked from Telegram for a company to be refreshed, and it is not worth waiting
+ * for the 15-minute gap. Needs the automatic backup to be on (that is what keeps the passphrase). `unchanged`: nothing new since the last automatic backup,
+ * so what is in the channel already is the whole database. The result is recorded by the usual tick, like any automatic backup.
+ */
+export function backupNow(deps: AutoDeps = REAL): BackupNow {
+  try {
+    const st = readAuto()
+    const pass = deps.readPass()
+    if (!st.enabled || !pass) return 'unavailable'
+    const sl = slot()
+    if (sl.pending !== null || deps.busy()) return 'busy'
+    const fp = deps.fingerprint()
+    if (fp === st.fp) return 'unchanged'
+    const r = deps.start(pass)
+    if (!r.ok) {
+      writeAuto({ ...st, lastAttemptAt: deps.now(), failures: st.failures + 1, lastError: r.error })
+      return 'unavailable'
+    }
+    writeAuto({ ...st, lastAttemptAt: deps.now() })
+    sl.pending = fp
+    return 'started'
+  } catch {
+    return 'unavailable'
+  }
+}
+
 export function startAutoBackup(): void {
   const sl = slot()
   if (sl.timer) return

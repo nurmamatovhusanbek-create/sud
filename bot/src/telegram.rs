@@ -152,6 +152,7 @@ impl Tg {
             ("case", "Ish: raqam"),
             ("bill", "Kvitansiya: raqam"),
             ("app", "Qidiruv oynasi (Mini App)"),
+            ("refresh", "Kompaniyani yangilash: STIR"),
             ("settings", "Eslatma sozlamalari"),
             ("status", "Zaxira holati"),
             ("help", "Yordam"),

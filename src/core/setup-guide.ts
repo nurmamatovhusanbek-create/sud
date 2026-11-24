@@ -39,7 +39,7 @@ export const GUIDE: GuideSection[] = [
     id: 'umumiy',
     title: 'Avval tushunib oling: nima nima bilan bogʻlangan',
     intro:
-      'Tizim uch qismdan iborat va ular bitta zanjirda ishlaydi: sud saytlari › ilova (kompyuteringizda) › zaxira (Telegram kanalida) › bot (telefoningizda). Ilova sud saytlaridan maʼlumot yigʻadi va bazaga yozadi. Zaxira: baza shifrlanib, sizning yopiq Telegram kanalingizga yuklanadi. Bot esa shu zaxirani oʻqiydi va telefoningizdan qidirish imkonini beradi. Bot ilovaga bogʻlanmaydi: ilovadagi yangilik botga faqat zaxira orqali yetadi.',
+      'Tizim uch qismdan iborat va ular bitta zanjirda ishlaydi: sud saytlari › ilova (kompyuteringizda) › zaxira (Telegram kanalida) › bot (telefoningizda). Ilova sud saytlaridan maʼlumot yigʻadi va bazaga yozadi. Zaxira: baza shifrlanib, sizning yopiq Telegram kanalingizga yuklanadi. Bot esa shu zaxirani oʻqiydi va telefoningizdan qidirish imkonini beradi. Bot sud saytlariga kirmaydi: ilovadagi yangilik botga faqat zaxira orqali yetadi. Xohlasangiz, ilova va botni «Bot bilan ulanish» (13-boʻlim) bilan bogʻlaysiz: shunda bot zaxirani darhol oʻqiydi va telefondan kompaniyani yangilatish mumkin.',
     tableTitle: 'Soʻzlar: nima degani',
     stepsTitle: 'Sizga nima kerak',
     table: {
@@ -116,7 +116,7 @@ export const GUIDE: GuideSection[] = [
       { text: 'Boshqa joyda ishlatilgan paroldan va chatda yozilgan paroldan foydalanmang.' },
     ],
     check: 'Parol tanlandi va xavfsiz joyda yozib qoʻyilgan.',
-    warn: 'Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (17-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.',
+    warn: 'Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (18-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.',
   },
   {
     id: 'zaxira',
@@ -219,6 +219,7 @@ export const GUIDE: GuideSection[] = [
         ['/find matn', 'Qidirish (oddiy xabar yozish bilan bir xil)'],
         ['/app', 'Qidiruv oynasi (Mini App): roʻyxatlar, kompaniya kartalari, majlislar'],
         ['/settings', 'Eslatma sozlamalari: vaqt, kunlar soni, kompaniyalar (12-boʻlim)'],
+        ['/refresh STIR', 'Kompaniyani sud saytlaridan qayta yigʻdirish (ilova bilan ulanish yoqilgan boʻlsa, 13-boʻlim)'],
         ['/status', 'Zaxira holati: qachon olingan, nechta yozuv'],
       ],
     },
@@ -244,6 +245,21 @@ export const GUIDE: GuideSection[] = [
     ],
     check: 'Oynadagi matn tanlovingizni koʻrsatadi, masalan «Kechki eslatma: 20:00 · ertangi majlislar». Tanlangan tugmada ✓ belgisi turadi.',
     warn: 'Sozlamalar sizning chatingizdagi mahkamlangan oynaning ichida saqlanadi (bot joylashgan serverda fayl saqlanmaydi, qayta ishga tushganda yoʻqoladi). Shu mahkamlangan xabarni oʻchirmang va chatda boshqa xabarni mahkamlamang: aks holda sozlamalar standartga qaytadi. Vaqt Oʻzbekiston vaqti (UTC+5) bilan.',
+  },
+  {
+    id: 'ulanish',
+    title: 'Ilova va botni bogʻlash: darhol yangilanish va /refresh',
+    intro:
+      'Bogʻlamasangiz ham hammasi ishlaydi: bot zaxirani 5 daqiqada bir marta oʻzi tekshiradi. Bogʻlasangiz ikkita narsa qoʻshiladi: (1) ilova zaxira olishi bilan botga xabar beradi va bot darhol oʻqiydi; (2) telefondan botga /refresh STIR deb yozsangiz, ilova shu kompaniyani sud saytlaridan qayta oʻqiydi, zaxiraga yozadi va bot sizga natijani yozadi. Ilova botga oʻzi murojaat qiladi: kompyuterda hech qanday port ochilmaydi, internetdan unga hech kim kira olmaydi.',
+    steps: [
+      { text: 'Avtomatik zaxira yoqilgan boʻlsin (7-boʻlim).', note: 'Telefondan soʻralgan yangilanish zaxiraga shu orqali yoziladi. Yoqilmagan boʻlsa, bot «zaxira yoqilmagan» deb javob beradi.' },
+      { text: 'Sozlamalar › Telegram › «Bot bilan ulanish» kartasiga botning manzilini yozing, masalan https://nom.onrender.com (Render sahifasining tepasidagi manzil).', note: 'Faqat https:// bilan boshlanadigan manzil qabul qilinadi; oxiridagi /app yoki boshqa qismi shart emas.' },
+      { text: '«Ulanishni yoqish» ni bosing.', note: 'Bot uxlab qolgan boʻlsa, uygʻonishi bir daqiqagacha oladi.' },
+      { text: 'Telefondan botga yozing: /refresh 207275139 (oʻz kompaniyangiz STIRi).' },
+      { text: 'Bot «navbatga qoʻyildi» deydi. Bir necha daqiqadan soʻng u «yangilandi» deb ish va toʻlovlar sonini yozadi.', note: 'Bir vaqtning oʻzida har kimdan uchtagacha kompaniya soʻrash mumkin; yaqinda yangilangan kompaniya 5 daqiqa ichida qayta soʻralmaydi.' },
+    ],
+    check: 'Kartada «ulangan» yozuvi chiqadi va «Botdan soʻnggi javob» vaqti har daqiqada yangilanib turadi. Botga /refresh yozsangiz, «navbatga qoʻyildi» javobi keladi.',
+    warn: 'Ulanish faqat kompyuter yoqilgan va ilova ishlab turganda ishlaydi (Sud.bat keep). Oʻchiq boʻlsa, bot «Ilova ulanmagan» deb javob beradi: hech narsa yoʻqolmaydi, faqat yangilanmaydi. Imzo bot tokeniga bogʻliq: tokenni oʻzgartirsangiz, ilovada ham yangi tokenni saqlang.',
   },
   {
     id: 'kunlik',

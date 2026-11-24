@@ -7,12 +7,13 @@
  */
 
 import { useRef, useState } from 'react'
-import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Info, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Info, Link2, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { useWatch } from '@/hooks/use-watch'
 import { useAutoBackup } from '@/hooks/use-auto-backup'
 import { useChannels } from '@/hooks/use-channels'
+import { useBotLink } from '@/hooks/use-bot-link'
 import { GUIDE, GUIDE_LEAD, type GuideSection, type GuideStep } from '@/core/setup-guide'
 import { STEP_LABEL } from '@/core/telegram'
 import { formatDmy } from '@/core/dates'
@@ -285,6 +286,53 @@ function WatchCard({ configured }: { configured: boolean }) {
   )
 }
 
+/** Settings › Telegram › Bot bilan ulanish: the app tells the bot about every backup, and answers `/refresh STIR` sent from a phone (outbound calls only) */
+function BotLinkCard({ configured }: { configured: boolean }) {
+  const link = useBotLink()
+  const [url, setUrl] = useState<string | null>(null)
+  const st = link.status
+  const urlNow = url ?? st?.url ?? ''
+  const at = (ms: number): string => `${formatDmy(new Date(ms))} ${new Date(ms).toTimeString().slice(0, 5)}`
+  // «ulangan» = the bot answered within the last three minutes
+  const live = !!st?.enabled && st.lastPullAt > 0 && Date.now() - st.lastPullAt < 180_000
+  return (
+    <div className="p-card rise-c" style={{ marginTop: 14 }}>
+      <div className="card-h">
+        <div className="ico"><Link2 /></div>
+        <h2>Bot bilan ulanish</h2>
+        {st && <span className={`badge ${live ? 'b-pos' : ''}`} style={{ marginLeft: 'auto' }}>{!st.enabled ? 'oʻchiq' : live ? 'ulangan' : 'ulanmagan'}</span>}
+      </div>
+      <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
+        Yoqilsa, ilova har zaxiradan soʻng botga xabar beradi: bot yangi zaxirani 5 daqiqa kutmasdan oʻqiydi. Telefondan botga <span className="mono">/refresh STIR</span> yozsangiz, ilova
+        shu kompaniyani sud saytlaridan qayta oʻqiydi, zaxiraga yozadi va bot sizga xabar beradi. Ilova botga oʻzi murojaat qiladi (kompyuterda port ochilmaydi); soʻrovlar bot tokenidan
+        olingan imzo bilan yuboriladi. Kompyuter yoqilgan boʻlishi va <b>Avtomatik zaxira</b> yoqilgan boʻlishi kerak.
+      </p>
+      {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '0 0 12px' }}>Avval yuqorida bot tokenini saqlang: imzo shu tokendan olinadi.</p>}
+      <label className="field" style={{ height: 40 }}>
+        <input value={urlNow} onChange={(e) => setUrl(e.target.value)} placeholder="Botning manzili: https://sud-bot.onrender.com" spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }} disabled={!!st?.enabled} />
+      </label>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+        {st?.enabled ? (
+          <button className="btn btn-outline" onClick={() => void link.disable()} disabled={link.busy}>Ulanishni oʻchirish</button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => void link.enable(urlNow).then((ok) => ok && setUrl(null))} disabled={!configured || link.busy || !urlNow.trim()}>
+            {link.busy ? <span className="spinner" /> : null}
+            Ulanishni yoqish
+          </button>
+        )}
+      </div>
+      {st?.enabled && (
+        <div className="list" style={{ marginTop: 14 }}>
+          <div className="kv"><span className="k">Botdan soʻnggi javob</span><span className="faint" style={{ fontSize: 12.5 }}>{st.lastPullAt > 0 ? at(st.lastPullAt) : 'hali yoʻq'}</span></div>
+          {st.lastPingAt > 0 && <div className="kv"><span className="k">Botga soʻnggi xabar (zaxira)</span><span className="faint" style={{ fontSize: 12.5 }}>{at(st.lastPingAt)}</span></div>}
+          {(st.running || st.queued > 0) && <div className="kv"><span className="k">Telegramdan soʻralgan</span><span className="faint" style={{ fontSize: 12.5 }}>{st.running ? `${st.running} oʻqilmoqda` : ''}{st.running && st.queued ? ' · ' : ''}{st.queued ? `${st.queued} ta navbatda` : ''}</span></div>}
+          {st.lastError && <div className="kv"><span className="k" style={{ color: 'var(--neg-text)' }}>{st.lastError}</span></div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** a block of numbered actions: a circle with the number, the action, and under it the tip or what you should see */
 function GuideSteps({ list }: { list: ReadonlyArray<GuideStep> }) {
   return (
@@ -502,6 +550,7 @@ export function TelegramTab() {
       </div>
       <BackupCard configured={!!status?.configured} />
       <WatchCard configured={!!status?.configured} />
+      <BotLinkCard configured={!!status?.configured} />
     </div>
   )
 }
