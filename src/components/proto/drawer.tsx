@@ -210,8 +210,8 @@ export function DwKv({ rows }: { rows: DwRow[] }) {
   if (!shown.length) return null
   return (
     <div className="dw-kv">
-      {shown.map(([k, v, o]) => (
-        <div key={k}>
+      {shown.map(([k, v, o], i) => (
+        <div key={`${i}:${k}`}>
           <span className="k">{k}</span>
           <span className={`v${o?.mono ? ' mono' : ''}${o?.tone ? ` ${o.tone}` : ''}`}>{v}</span>
         </div>

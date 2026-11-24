@@ -18,6 +18,7 @@
  */
 
 import { searchCourtCasesDetailed, clearCourtCaseCache, type CourtCase } from './court-case'
+import { readFound } from './case-store'
 import { getCompanyByTin } from './orginfo'
 import { getCompanyRatingDetailed } from './chamber'
 import { assignRoles, classifyOutcome } from '@/core/classify'
@@ -285,6 +286,22 @@ async function fetchCompanyStatsInternal(
       errors.push({ courtType: ct, error: msg })
     }
   })
+
+  // the cases the bills named and the court was asked for by number (lib/bill-cases) are the company's cases too, and the capped lists may not show
+  // them: counted with the lists (a case in both is counted once, below, the list's row first)
+  try {
+    const listed = new Set(pooled.map((x) => x.raw.caseNumber))
+    for (const ct of courtTypes) {
+      for (const raw of readFound(tin, ct)) {
+        if (!raw.caseNumber || listed.has(raw.caseNumber)) continue
+        listed.add(raw.caseNumber)
+        const cn = raw.caseNumber
+        pooled.push({ raw, courtType: cn.startsWith('5-') ? 'administrative' : cn.startsWith('2-') || cn.startsWith('3-') ? 'civil' : cn.startsWith('4-') ? 'economic' : ct })
+      }
+    }
+  } catch (e) {
+    console.warn(`[stats] ${tin}: the cases found by number could not be read: ${e instanceof Error ? e.message : String(e)}`)
+  }
 
   // which side is the company on, in every case (TIN → the name found in most cases → the known names)
   const { roles, method } = assignRoles(pooled.map((x) => x.raw), { names: companyNames, tin })

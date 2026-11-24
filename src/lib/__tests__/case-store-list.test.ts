@@ -192,3 +192,31 @@ describe('a big list through the disk memory', () => {
     expect(a.incomplete).toBe(true)
   })
 })
+
+describe('list rows loaded from a backup (load from Telegram)', () => {
+  const asRows = (n: number) => ({ caseNumber: `2-1103-2604/${String(n).padStart(5, '0')}`, caseType: '', caseStatus: 'Кўриб чиқиш жараёнида', result: '', courtName: 'Backup court', dateFiled: '', plaintiff: 'BANK AJ', defendant: `JAMSHID ${n}`, claimAmount: '', hearingDate: '', hearingTime: '', judge: '' })
+
+  test('stay in the list next to what the court shows now: a live endpoint that answers with less does not remove them', async () => {
+    store.importFeedRows(TIN, store.backupFeedKey('civil'), [asRows(1), asRows(2), asRows(3)])
+    script = [{ status: 200, etag: 'W/"a"', rows: [mk(1)] }]
+    const a = await open()
+    expect(a.cases.map((c) => c.caseNumber)).toEqual(['2-1103-2604/00001', '2-1103-2604/00002', '2-1103-2604/00003'])
+    expect(a.cases[0]!.courtName).toBe('Sud') // the live row wins for a case both know
+    // a complete live answer replaces its OWN feed only: the backup's rows are still there at the next open
+    script = [{ status: 200, etag: 'W/"b"', rows: [mk(1)] }]
+    expect((await open()).cases).toHaveLength(3)
+  })
+
+  test('are the list when the court cannot be reached (the cases are not lost, the answer says it is incomplete)', async () => {
+    store.importFeedRows(TIN, store.backupFeedKey('civil'), [asRows(7)])
+    script = [{ status: 500 }, { status: 500 }, { status: 500 }]
+    const a = await open()
+    expect(a.cases.map((c) => c.caseNumber)).toEqual(['2-1103-2604/00007'])
+    expect(a.incomplete).toBe(true)
+  })
+
+  test('a list of another company is not touched, and a damaged TIN imports nothing', () => {
+    expect(store.importFeedRows('12', store.backupFeedKey('civil'), [asRows(1)])).toBe(0)
+    expect(store.importFeedRows(TIN, store.backupFeedKey('civil'), [])).toBe(0)
+  })
+})

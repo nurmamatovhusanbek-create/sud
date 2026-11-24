@@ -92,7 +92,7 @@ const JADVAL_ALT_IP = process.env.JADVAL_RESOLVE_IP !== undefined
 // scheduler records per-worker health for the Settings dashboard).
 import { fetchViaWorkers, readBodyIdle } from './net/worker-fetch'
 import { salvageJsonArray } from '@/core/json-salvage'
-import { mergeRows, readFeed, writeFeed } from './case-store'
+import { backupFeedKey, mergeRows, readFeed, writeFeed } from './case-store'
 
 // ---- Types (re-exported from court-case-types.ts) ----
 export type { CourtType, SearchMode, CourtCase, CaseDetail, Hearing, Decision, CaseDocument, InstanceData, FullCaseData } from './court-case-types'
@@ -535,6 +535,16 @@ async function searchCourtCasesInternal(
         // the two APIs disagree: keep the row that knows the hearing still ahead
         // the court and judge come WITH the hearing (an appeal hearing in the first court's row would show the wrong judge)
         merged[i] = { ...merged[i], hearingDate: item.hearingDate, hearingTime: item.hearingTime, judge: item.judge, courtName: item.hearingStage && item.hearingStage !== 'first' ? item.courtName : merged[i].courtName, hearingStage: item.hearingStage }
+      }
+    }
+  }
+
+  // what a backup knew and the live lists do not show now: kept (a case seen once is not lost because an endpoint answered with less)
+  if (mode === 'tin' && /^\d{9}$/.test(value)) {
+    for (const item of readFeed(value, backupFeedKey(courtType))?.items ?? []) {
+      if (item.caseNumber && !at.has(item.caseNumber)) {
+        at.set(item.caseNumber, merged.length)
+        merged.push(item)
       }
     }
   }

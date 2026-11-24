@@ -535,7 +535,7 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
   const detailKeys = new Set<string>()
   for (const b of m.buckets) {
     const p = parseBucket(b.name)
-    if (p?.tin && p.kind !== 'index' && p.kind !== 'lists' && p.kind !== 'hearings' && want.has(p.tin)) {
+    if (p?.tin && p.kind !== 'index' && p.kind !== 'hearings' && want.has(p.tin)) {
       picked.push(b)
       if (p.kind === 'found') detailKeys.add(`${p.court}:${p.year}`)
     }

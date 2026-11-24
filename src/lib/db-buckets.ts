@@ -1,6 +1,7 @@
 import { getDb, type Db, type SqlValue } from './db'
 import { courtTypeOfNumber, registeredKey } from '@/core/bill-cases'
-import { feedRows, feedTins } from './case-store'
+import { backupFeedKey, feedRows, feedTins, importFeedRows } from './case-store'
+import type { CourtCase, CourtType } from './court-case-types'
 import { hearingDateKey, todayKeyUz } from '@/core/hearings'
 
 /**
@@ -192,6 +193,25 @@ export interface ImportCount {
   rows: number
 }
 
+/** the rows of a `lists:<tin>` bucket back into the stored feeds, each court's rows under that court's `backup` feed */
+function importLists(tin: string, text: Uint8Array): number {
+  const byCourt = new Map<string, CourtCase[]>()
+  for (const l of Buffer.from(text).toString('utf8').split('\n').filter(Boolean)) {
+    try {
+      const [court, , json] = JSON.parse(l) as [string, string, string]
+      const row = JSON.parse(json) as CourtCase
+      if (typeof court === 'string' && row && typeof row === 'object') byCourt.set(court, [...(byCourt.get(court) ?? []), row])
+    } catch {
+      /* a damaged line is skipped: the list is read again from the court */
+    }
+  }
+  let n = 0
+  for (const [court, rows] of byCourt) {
+    n += importFeedRows(tin, backupFeedKey(court as CourtType), rows)
+  }
+  return n
+}
+
 /**
  * Put a bucket's rows into `db`. Existing rows are replaced only when the bucket's row is NEWER (`t` of cases, `loaded_at`/`refreshed_at` of a
  * company); bills carry no time of their own, so for them the bucket wins (a bill's status only moves forward in time). Returns the rows applied.
@@ -199,7 +219,8 @@ export interface ImportCount {
 export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), opts: { bills?: 'replace' | 'keep' } = {}): number {
   const b = parseBucket(name)
   if (!b) throw new Error(`noma'lum bo'lak: ${name.slice(0, 40)}`)
-  if (b.kind === 'index' || b.kind === 'lists' || b.kind === 'hearings') return 0 // a locator, the court lists and the hearings are read by the search / the bot, never imported
+  if (b.kind === 'index' || b.kind === 'hearings') return 0 // a locator and the hearings are read by the search / the bot, never imported
+  if (b.kind === 'lists') return importLists(b.tin!, text) // the court lists go back into the company's stored feeds (files, not the database)
   const rows = Buffer.from(text).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SqlValue[])
   let n = 0
   db.transaction(() => {

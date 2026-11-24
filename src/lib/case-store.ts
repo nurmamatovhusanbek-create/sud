@@ -150,6 +150,26 @@ export function mergeRows(kept: readonly CourtCase[], arrived: readonly CourtCas
 }
 
 /**
+ * The stored feed that holds a court's list rows loaded from a backup (`lib/db-buckets`, load from Telegram). It is not an endpoint: no ask of the
+ * court ever overwrites it, so what the backup knew (the two list endpoints of a court together, as an earlier scrape saw them) stays in the list when
+ * a live endpoint answers with less, fails, or is throttled. A row the live lists also show is the live one.
+ */
+export const backupFeedKey = (courtType: CourtType): string => `${courtType}|backup`
+
+/**
+ * Put list rows that came from a backup into the company's stored feed `key` (a load from Telegram; `backupFeedKey`). The feed carries time 0, so
+ * the next backup never prefers it to a live list's rows, and no ETag, so nothing treats it as a court's answer. Returns the rows taken.
+ */
+export function importFeedRows(tin: string, key: string, rows: readonly CourtCase[]): number {
+  if (!TIN_RE.test(tin)) return 0
+  const arrived = rows.filter((r) => r.caseNumber)
+  if (!arrived.length) return 0
+  const known = readFeed(tin, key)
+  writeFeed(tin, key, { t: 0, complete: false, items: mergeRows(known?.items ?? [], arrived) })
+  return arrived.length
+}
+
+/**
  * Put one freshly fetched case row into every stored feed of the company that holds it (the operator pressed «Yangilash» on that case).
  * `courtType` limits it to that court's feeds (keys start with `<court>|`). A case no feed holds is added to the court's first feed.
  * Returns whether a stored row changed or was added.

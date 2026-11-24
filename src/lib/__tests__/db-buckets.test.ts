@@ -145,10 +145,17 @@ describe('buckets', () => {
     const index = bk.renderBucket(`index:${A}`)!.text.toString('utf8')
     expect(index).toContain('["c","2-1004-2601/77","civil",26]')
     expect(index).toContain('["c","4-1001-2602/5","economic",26]')
-    // never imported into a database
+    // loaded back from a backup, the lists go into the stored feeds (files), never into a database, under a feed of their own that no live answer overwrites
+    const text = bk.renderBucket(`lists:${A}`)!.text
     const target = dbm.openDbFile(path.join(DIR, 'lists.db'))
-    expect(bk.importBucket(`lists:${A}`, bk.renderBucket(`lists:${A}`)!.text, target)).toBe(0)
+    expect(bk.importBucket(`lists:${A}`, text, target)).toBe(2)
     target.close()
+    expect(cs.readFeed(A, 'civil|backup')?.items.map((r) => r.caseNumber)).toEqual(['2-1004-2601/77'])
+    expect(cs.readFeed(A, 'economic|backup')?.t).toBe(0) // time 0: a later backup always prefers a live list's row
+    expect(cs.readFeed(A, 'civil|jadvalapi/CIVIL/findByTin')?.items).toHaveLength(1) // the live feed is untouched
+    expect(bk.importBucket(`lists:${A}`, text)).toBe(2) // again: the same rows, nothing doubled
+    expect(cs.readFeed(A, 'economic|backup')?.items).toHaveLength(1)
+    expect(bk.renderBucket(`lists:${A}`)!.text.toString('utf8')).toBe(text.toString('utf8')) // the next backup carries the same rows
     cs.forgetCaseStoreMemory()
   })
 

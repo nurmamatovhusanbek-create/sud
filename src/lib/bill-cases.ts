@@ -69,6 +69,8 @@ export type JobState = 'idle' | 'running' | 'paused' | 'done' | 'stopped' | 'err
 export interface JobStatus {
   tin: string | null
   state: JobState
+  /** what was asked of the job (stays after it ends, so the page can say what a finished run did) */
+  kind: 'load' | 'fill' | 'refresh' | null
   phase: 'load' | 'fill' | 'refresh' | null
   startedAt: number | null
   /** the bills pages: read / of */
@@ -146,7 +148,7 @@ interface Job {
 
 const g = globalThis as unknown as { __sudBillJob?: Job | null }
 
-const idle = (): JobStatus => ({ tin: null, state: 'idle', phase: null, startedAt: null, page: 0, pages: 0, pass: 0, stable: false, bills: 0, done: 0, total: 0, found: 0, absent: 0, changed: 0, errors: 0, current: null, seq: 0, lastError: null, waitingUntil: null })
+const idle = (): JobStatus => ({ tin: null, state: 'idle', kind: null, phase: null, startedAt: null, page: 0, pages: 0, pass: 0, stable: false, bills: 0, done: 0, total: 0, found: 0, absent: 0, changed: 0, errors: 0, current: null, seq: 0, lastError: null, waitingUntil: null })
 
 /** the job of this process (one at a time for the whole app), or null */
 const current = (): Job | null => g.__sudBillJob ?? null
@@ -222,7 +224,7 @@ export function startJob(tin: string, opts: StartOpts = {}): JobStatus {
     throw new Error(running.status.tin === tin ? 'Bu kompaniya uchun jarayon allaqachon ketmoqda' : 'Boshqa kompaniya uchun jarayon ketmoqda: avval uni toʻxtating')
   }
   const abort = new AbortController()
-  const job: Job = { status: { ...idle(), tin, state: 'running', startedAt: Date.now() }, events: [], abort, done: Promise.resolve() }
+  const job: Job = { status: { ...idle(), tin, state: 'running', kind: opts.refresh ? 'refresh' : opts.fill ? 'fill' : 'load', startedAt: Date.now() }, events: [], abort, done: Promise.resolve() }
   g.__sudBillJob = job
   const deps: BillCasesDeps = { ...REAL, ...opts.deps }
   const pace = opts.paceMs ?? (Number(process.env.CASE_FETCH_GAP_MS) >= 0 && process.env.CASE_FETCH_GAP_MS ? Number(process.env.CASE_FETCH_GAP_MS) : DEFAULT_PACE_MS)
