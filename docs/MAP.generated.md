@@ -136,7 +136,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
 | `case-store.ts` | api/found-cases/route, lib/api-types.ts, lib/bill-cases.ts, lib/court-case.ts, lib/db-buckets.ts, lib/served-case.ts, lib/stats.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/stats-found.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
-| `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts |
+| `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts, lib/__tests__/stats-found.test.ts |
 | `company-meta.ts` | lib/backup.ts, lib/bill-cases.ts | lib/__tests__/company-meta.test.ts |
 | `count-tween.ts` | components/proto/primitives.tsx | lib/__tests__/count-tween.test.ts |
 | `court-case-types.ts` | api/court-cases/export/route, api/found-cases/route, components/sections/cases.tsx, core/bill-cases.ts, core/watch.ts, lib/api-types.ts, lib/bill-cases.ts, +6 | core/__tests__/bill-cases.test.ts, core/__tests__/watch.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/watch.test.ts |
@@ -179,7 +179,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `net/pacer.ts` | lib/public-orders/pace.ts | lib/net/__tests__/pacer.test.ts |
 | `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/net/chain-fetch.ts, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/read-body-idle.test.ts, lib/net/__tests__/worker-fetch-pin.test.ts |
-| `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts |
+| `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts, lib/__tests__/stats-found.test.ts |
 | `pretenzia/constants.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
 | `pretenzia/fill.server.ts` | api/pretenzia/generate/route | lib/documents/__tests__/banner.test.ts, lib/pretenzia/__tests__/parties.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `pretenzia/parse.ts` | components/views/pretenzia-view.tsx | lib/pretenzia/__tests__/parties.test.ts |
