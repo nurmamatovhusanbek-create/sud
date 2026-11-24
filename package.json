@@ -14,6 +14,7 @@
     "map": "node scripts/gen-map.mjs",
     "map:check": "node scripts/gen-map.mjs --check",
     "audit": "bun audit",
+    "diag": "bun scripts/diag.mjs",
     "ui:shots": "node scripts/ui-shots.mjs"
   },
   "dependencies": {

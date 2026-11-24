@@ -4,6 +4,8 @@ out/
 .env
 .env.local
 *.log
+# the report scripts/diag.mjs writes (holds counts and log lines of one company)
+diag-*.txt
 .DS_Store
 *.tsbuildinfo
 .sud-restart
