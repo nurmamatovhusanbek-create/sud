@@ -69,24 +69,34 @@ Bittasi asosiy, ikkinchisi ehtiyot nusxa (agar asosiy kanal bloklansa yoki oʻch
 
 Shu yerning oʻzida **Kuzatuv (avtomatik)** kartasi bor: yoqsangiz, ilova sud roʻyxatlarini oʻzi oʻqiydi va yangi ish, yangi instansiya, majlis oʻzgarishi haqida Telegramdan xabar beradi. Xabar oluvchi sifatida oʻz Telegram ID ingizni yozing (ID ni @userinfobot dan bilib oling).
 
-## 6. Botni Renderda ishga tushirish
+## 6. Botni Renderda ishga tushirish (bir marta)
 
-(Bot allaqachon ishlayotgan boʻlsa, bu qadam kerak emas.)
+Bot sizning kompyuteringizda emas, **Renderda** ishlaydi: shuning uchun telefoningizdan, kompyuter oʻchiq boʻlsa ham qidirish mumkin. Baza esa faqat kompyuteringizdagi fayl; bot uni zaxira orqali oʻqiydi. Botni har kim oʻzi uchun alohida yaratadi: u faqat `ALLOWED_USER_IDS` dagi odamlarga javob beradi.
 
-Render › xizmat › **Environment** boʻlimida:
+**A. Tayyorgarlik.** render.com da hisob oching (bepul tarif yetadi). Loyiha kodi GitHub da sizning hisobingizda boʻlishi kerak (loyihani oʻz hisobingizga nusxalang yoki fork qiling), chunki Render kodni shu yerdan oladi.
+
+**B. Xizmat yaratish.**
+1. Render › **New** › **Web Service** › GitHub hisobingizni ulang va loyiha repozitoriysini tanlang.
+2. **Language**: Docker. **Branch**: `main`. **Region**: istalgan (Frankfurt yaqin).
+3. **Dockerfile Path**: `./bot/Dockerfile`. **Docker Build Context Directory** (Advanced): `./bot`.
+4. **Instance Type**: Free. **Auto-Deploy**: No (yangilanishni oʻzingiz tanlaysiz).
+5. **Environment Variables** (Add): quyidagi jadval.
+6. **Create Web Service** bosing. Birinchi qurish 3-6 daqiqa oladi.
 
 | Oʻzgaruvchi | Nima yoziladi |
 |---|---|
 | `BOT_TOKEN` | 1-qadamdagi token |
 | `SUD_CHANNEL` | `-100asosiy,-100zaxira` (asosiy birinchi, vergul bilan) |
 | `SUD_PASSPHRASE` | 4-qadamdagi parol (ilovadagi bilan **bir xil**) |
-| `ALLOWED_USER_IDS` | botdan foydalanishi mumkin boʻlganlarning Telegram ID lari (vergul bilan) |
-| `WEBHOOK_SECRET` | uzun tasodifiy qator |
-| `PUBLIC_URL` | xizmatning `https://...onrender.com` manzili |
+| `WEBHOOK_SECRET` | uzun tasodifiy qator (kamida 30 belgi) |
+| `PUBLIC_URL` | xizmatning `https://<nom>.onrender.com` manzili (xizmat yaratilgach Render koʻrsatadi; boʻsh qoldirsangiz Render oʻzi beradi) |
+| `ALLOWED_USER_IDS` | botdan foydalanishi mumkin boʻlganlarning Telegram ID lari, vergul bilan |
 
-Saqlang va qayta joylang (Deploy). **Tekshirish:** brauzerda `https://<bot-manzili>/health` oching: `"ready": true` va `companies` soni chiqishi kerak. Keyin Telegramda botga `/start` yozing.
+**C. Oʻz Telegram ID ingizni bilish.** `ALLOWED_USER_IDS` ni dastlab **boʻsh qoldiring**: botga istalgan xabar yozsangiz, u sizga ID ingizni yozib beradi (yoki @userinfobot dan ham bilsa boʻladi). Keyin shu ID ni `ALLOWED_USER_IDS` ga yozing va Render da **Manual Deploy** bosing. Bot faqat shu roʻyxatdagilarga javob beradi; boshqalarga faqat ularning ID sini aytadi.
 
-Bepul Render tarifi 15 daqiqadan keyin uxlaydi: uni uygʻoq tutish uchun UptimeRobot kabi xizmatdan `/health` manzilini har 5 daqiqada chaqirtiring.
+**D. Tekshirish.** Brauzerda `https://<bot-manzili>/health` oching: `"ready": true` va `companies` soni chiqishi kerak (zaxira birinchi marta oʻqilgunicha 1 daqiqa kuting). Telegramda botga `/start` yozing; chap pastdagi menyu tugmasi (**Qidiruv**) Mini Appni ochadi.
+
+**E. Uygʻoq tutish.** Bepul Render tarifi 15 daqiqa soʻrov boʻlmasa uxlaydi. uptimerobot.com da bepul hisob oching va `https://<bot-manzili>/health` manzilini har 5 daqiqada chaqiradigan monitor qoʻying.
 
 ## 7. Har kungi ish tartibi
 
@@ -95,7 +105,26 @@ Bepul Render tarifi 15 daqiqadan keyin uxlaydi: uni uygʻoq tutish uchun UptimeR
 3. Avtomatik zaxira yoqilgan boʻlsa, boshqa hech narsa shart emas: yangilik 15 daqiqa ichida zaxiraga tushadi, bot 5 daqiqa ichida koʻradi. Yoqilmagan boʻlsa, **Zaxiralash** ni qoʻlda bosing.
 4. Botda yangilik koʻrinmasa: `https://<bot-manzili>/health` dagi `backupAt` vaqtini zaxira vaqti bilan solishtiring.
 
-## 8. Yangi kompyuterda tiklash
+**Kompyuter oʻchiq boʻlsa nima boʻladi?**
+- Baza fayli kompyuterda qoladi, hech narsa yoʻqolmaydi. Kompyuter va ilova yoqilganda ilova xuddi oʻsha bazadan davom etadi.
+- Ilova oʻchiq paytda hech narsa **yangilanmaydi**: sud roʻyxatlari oʻqilmaydi, Kuzatuv xabar bermaydi, avtomatik zaxira olinmaydi.
+- **Bot ishlayveradi**: u Renderda va oxirgi zaxirani koʻrsatadi (kompyuter yoqilgunicha yangiliklar kelmaydi).
+- Shuning uchun Kuzatuv va avtomatik zaxira ishlashi uchun kompyuter yoqilgan va ilova ishlab turishi kerak (`Sud.bat keep`).
+
+## 8. Yangi zaxira kanal qoʻshish va kanallar holatini koʻrish
+
+Asosiy kanaldan tashqari **3 tagacha** zaxira kanal qoʻshish mumkin, istalgan vaqtda:
+
+1. Yangi yopiq kanal yarating, botni admin qiling (2-qadam).
+2. **Sozlamalar › Telegram › Zaxira kanallar** maydoniga yangi kanal ID sini qoʻshing (vergul bilan), **Yangilash** bosing.
+3. **Shifrlangan zaxira** kartasida parolni kiriting va **Zaxiralash** bosing. Ilova yangi kanalga asosiy kanaldagi hamma narsani oʻzi koʻchiradi.
+4. Renderda `SUD_CHANNEL` ga ham yangi kanalni qoʻshing (agar botning ham shu kanaldan oʻqishini xohlasangiz).
+
+**Kanallar holatini koʻrish:** parolni kiriting va **Kanallar holatini tekshirish** bosing. Har bir kanal uchun koʻrasiz: zanjir qaysi sanadan boshlangan (kanalda zaxira qachondan beri bor), soʻnggi zaxira vaqti, boʻlaklar va kompaniyalar soni, kanaldan oʻchib ketgan fayllar va asosiy kanalda bor, lekin shu kanalda yoʻq boʻlaklar. Agar «eʼtibor bering» chiqsa, **Zaxiralash** bosing: yetishmaganini ilova oʻzi toʻldiradi.
+
+> Yangi kanalning zanjiri oʻz qoʻshilgan sanasidan boshlanadi, lekin ichiga bazadagi hamma maʼlumot koʻchiriladi: eski maʼlumot ham unda boʻladi.
+
+## 9. Yangi kompyuterda tiklash
 
 1. Ilovani oʻrnating va ishga tushiring.
 2. **Sozlamalar › Telegram**: bot tokeni va kanal(lar)ni kiriting, **Saqlash**.
@@ -103,7 +132,7 @@ Bepul Render tarifi 15 daqiqadan keyin uxlaydi: uni uygʻoq tutish uchun UptimeR
 4. Kerakli kompaniyalarni tanlab **Tanlanganlarni yuklash** bosing.
 5. Har bir kompaniyada **Toʻlovlarni yangilash** bosing: ish raqamisiz kvitansiyalar zaxiraga kirmaydi va shu yerda qayta oʻqiladi.
 
-## 9. Tez-tez uchraydigan muammolar
+## 10. Tez-tez uchraydigan muammolar
 
 | Muammo | Sababi va yechimi |
 |---|---|
@@ -115,7 +144,7 @@ Bepul Render tarifi 15 daqiqadan keyin uxlaydi: uni uygʻoq tutish uchun UptimeR
 | Statistika eski son koʻrsatadi | Statistika kuniga bir marta qayta quriladi. **Yangilash** bosing. |
 | Toʻlovlar «94 dan 42» | Katta kompaniyada ish raqamisiz kvitansiyalar saqlanmaydi (20 000 tadan kichik kompaniyalarda saqlanadi). Bu xato emas. |
 
-## 10. Parolni almashtirish
+## 11. Parolni almashtirish
 
 Parol **ikki joyda** turadi: ilovada (zaxira olayotganda kiritasiz) va Renderda (`SUD_PASSPHRASE`). Ikkalasi **har doim bir xil** boʻlishi kerak. Faqat bittasini oʻzgartirsangiz, bot «Parol notoʻgʻri» deydi.
 

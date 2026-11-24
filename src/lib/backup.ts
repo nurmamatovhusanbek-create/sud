@@ -173,18 +173,20 @@ async function downloadBucket(token: string, key: Buffer, b: BucketRef): Promise
  * A computer that holds only part of the data (a second machine, a fresh scrape) must not take the rest away from the channel, so a backup starts from
  * this union: buckets it has nothing new for are carried over, buckets both have are merged.
  */
-async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limit = 60): Promise<Map<string, BucketRef>> {
+async function chainBuckets(token: string, key: Buffer, newest: ManifestV2, limit = 60): Promise<{ buckets: Map<string, BucketRef>; oldest: string }> {
   const out = new Map<string, BucketRef>()
+  let oldest = newest.created
   let m: ManifestV2 | null = newest
   for (let depth = 0; m && depth < limit; depth++) {
     for (const b of m.buckets) if (!out.has(b.name)) out.set(b.name, b)
+    for (const d of [m.created, m.since]) if (d && d < oldest) oldest = d
     if (!m.prev) break
     const f = await getFileBytes(token, m.prev.fileId)
     if (!f.ok) break // an older manifest that is gone: what was gathered so far is what the channel certainly holds
     const older = openManifestWithKey(key, f.value)
     m = older && older.v === 2 ? older : null
   }
-  return out
+  return { buckets: out, oldest }
 }
 
 /** a channel whose backup just finished: its key, its buckets by name and its companies: what the channels after it must hold at least */
@@ -274,10 +276,13 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
   const key = prev.value?.key ?? deriveKey(passphrase, salt)
   const known = new Map<string, BucketRef>()
   let base = new Map<string, BucketRef>()
+  let since = '' // when this channel's chain began: set from the chain that is there, else it is this backup
   if (prev.value?.m.v === 2) {
     for (const b of prev.value.m.buckets) known.set(b.id, b)
     set({ phase: 'snapshot', message: 'Kanaldagi zaxira tarixi oʻqilmoqda…' })
-    base = await chainBuckets(token, key, prev.value.m)
+    const chain = await chainBuckets(token, key, prev.value.m)
+    base = chain.buckets
+    since = prev.value.m.since && prev.value.m.since < chain.oldest ? prev.value.m.since : chain.oldest
     for (const b of base.values()) known.set(b.id, b)
   }
 
@@ -409,7 +414,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
     for (const tin of Object.keys(companies)) if (!companies[tin]!.name) { const n = companyNameOf(tin, snapDb); if (n) companies[tin] = { ...companies[tin]!, name: n } }
     const created = new Date().toISOString()
     const manifest: ManifestV2 = {
-      v: 2, id, created, app: 'sud-tizimi', companies, buckets: refs,
+      v: 2, id, created, since: since || created, app: 'sud-tizimi', companies, buckets: refs,
       prev: prev.value ? { messageId: prev.value.pin.messageId, fileId: prev.value.pin.fileId, created: prev.value.m.created } : null,
     }
     const sealedManifest = sealManifest(manifest, salt, key)
@@ -560,6 +565,78 @@ async function restoreV1(m: Manifest, key: Buffer, token: string, dest: string):
 }
 
 /** the companies the channel holds (needs the passphrase: the manifest is sealed); saved locally so the app can offer them before it scrapes */
+export interface ChannelReport {
+  chat: string
+  role: 'asosiy' | 'zaxira'
+  ok: boolean
+  error?: string
+  /** the pinned manifest: its message, when it was made, when this channel's chain began */
+  messageId?: number
+  created?: string
+  since?: string
+  buckets?: number
+  parts?: number
+  /** pieces the manifest lists that the channel no longer has */
+  partsMissing?: number
+  companies?: number
+  /** buckets the first working channel holds and this one lacks (the next backup copies them) */
+  lacking?: number
+}
+
+/**
+ * What each channel really holds, read from Telegram (nothing is changed): the pinned manifest, when this channel's chain began, whether every piece it
+ * lists still exists, and what it lacks compared with the first working channel. A wrong passphrase stops at once (it is wrong for every chain).
+ */
+export async function inspectChannels(passphrase: string): Promise<{ ok: true; channels: ChannelReport[] } | { ok: false; error: string }> {
+  const pre = precheck(passphrase)
+  if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre
+  const out: ChannelReport[] = []
+  let donorNames: Set<string> | null = null
+  for (const [i, chat] of pre.chats.entries()) {
+    const rep: ChannelReport = { chat, role: i === 0 ? 'asosiy' : 'zaxira', ok: false }
+    out.push(rep)
+    const r = await pinnedManifest(pre.token, chat, passphrase, 'Parol notoʻgʻri: bu kanaldagi zaxira boshqa parol bilan yaratilgan')
+    if (!r.ok) {
+      rep.error = r.error
+      if (/Parol/.test(r.error) && i === 0) return { ok: false, error: r.error }
+      continue
+    }
+    if (!r.value) {
+      rep.error = 'Mahkamlangan zaxira yoʻq (kanal hali toʻldirilmagan: «Zaxiralash» bosing)'
+      continue
+    }
+    const m = r.value.m
+    rep.messageId = r.value.pin.messageId
+    rep.created = m.created
+    if (m.v !== 2) {
+      rep.ok = true
+      rep.error = 'Eski formatdagi zaxira'
+      continue
+    }
+    rep.since = m.since
+    rep.buckets = m.buckets.length
+    rep.companies = Object.keys(m.companies).length
+    const ids = m.buckets.flatMap((b) => b.parts.map((p) => p.fileId))
+    rep.parts = ids.length
+    let missing = 0
+    let next = 0
+    const worker = async () => {
+      for (;;) {
+        const k = next++
+        if (k >= ids.length) return
+        if (!(await fileExists(pre.token, ids[k]!))) missing++
+      }
+    }
+    await Promise.all(Array.from({ length: 6 }, worker))
+    rep.partsMissing = missing
+    const names = new Set(m.buckets.map((b) => b.name))
+    if (donorNames) rep.lacking = [...donorNames].filter((n) => !names.has(n)).length
+    else donorNames = names
+    rep.ok = true
+  }
+  return { ok: true, channels: out }
+}
+
 export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true; catalog: Catalog; index: SyncResult | null; indexError?: string } | { ok: false; error: string }> {
   const pre = precheck(passphrase)
   if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre

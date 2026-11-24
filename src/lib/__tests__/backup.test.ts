@@ -612,6 +612,38 @@ describe('mirror channels: a banned channel or a deleted manifest message does n
     expect(done.message).not.toContain('koʻchirildi')
   })
 
+  test('inspectChannels: what each channel really holds, since when its chain exists, missing pieces, and what it lacks', async () => {
+    const ch = fakeChannels()
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [] })
+    await runBackup()
+    // a mirror added LATER: nothing in it yet
+    cfg.saveTelegram({ token: TOKEN, chat: MAIN, mirrors: [MIRROR] })
+    const before = await backup.inspectChannels(PASS)
+    expect(before.ok && before.channels.map((c) => [c.role, c.ok])).toEqual([['asosiy', true], ['zaxira', false]])
+    expect(before.ok && before.channels[1]!.error).toContain('yoʻq')
+    await runBackup()
+    const a = await backup.inspectChannels(PASS)
+    if (!a.ok) throw new Error(a.error)
+    const [main, mirror] = a.channels as [typeof a.channels[number], typeof a.channels[number]]
+    expect(main).toMatchObject({ role: 'asosiy', ok: true, partsMissing: 0 })
+    expect(mirror).toMatchObject({ role: 'zaxira', ok: true, partsMissing: 0, lacking: 0 })
+    expect(mirror.buckets).toBe(main.buckets)
+    // the main chain began with the FIRST backup; the mirror's chain began with the second: «since» tells them apart
+    expect(Date.parse(main.since!)).toBeLessThan(Date.parse(mirror.since!))
+    expect(main.since! <= main.created!).toBe(true)
+    // a third backup moves «created» on and keeps «since»
+    await runBackup()
+    const b = await backup.inspectChannels(PASS)
+    expect(b.ok && b.channels[0]!.since).toBe(main.since)
+    expect(b.ok && b.channels[0]!.created! > main.created!).toBe(true)
+    // a piece of the mirror is gone: it is counted
+    const victim = [...ch.files.entries()].find(([, f]) => f.chat === MIRROR)![0]
+    ch.files.delete(victim)
+    const c = await backup.inspectChannels(PASS)
+    expect(c.ok && c.channels[1]!.partsMissing).toBe(1)
+    expect(await backup.inspectChannels('another long passphrase')).toMatchObject({ ok: false })
+  })
+
   test('the main channel is banned: the catalog, the locator, a load and a restore all come from the mirror', async () => {
     const ch = fakeChannels()
     await runBackup()

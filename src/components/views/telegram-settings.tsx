@@ -12,12 +12,14 @@ import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { useWatch } from '@/hooks/use-watch'
 import { useAutoBackup } from '@/hooks/use-auto-backup'
+import { useChannels } from '@/hooks/use-channels'
 import { STEP_LABEL } from '@/core/telegram'
 import { formatDmy } from '@/core/dates'
 
 function BackupCard({ configured }: { configured: boolean }) {
   const { snap, running, start, load, catalog, reload } = useBackup()
   const auto = useAutoBackup()
+  const chk = useChannels()
   const [pass, setPass] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [reading, setReading] = useState(false)
@@ -79,6 +81,35 @@ function BackupCard({ configured }: { configured: boolean }) {
           </button>
         )}
       </div>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+        <button className="btn btn-outline" onClick={() => void chk.check(pass)} disabled={!configured || !ok || running || chk.busy}>
+          {chk.busy ? <span className="spinner" /> : null}
+          Kanallar holatini tekshirish
+        </button>
+      </div>
+      {chk.channels && (
+        <div className="list" style={{ marginTop: 10 }}>
+          {chk.channels.map((c) => {
+            const day = (iso?: string): string => (iso ? `${formatDmy(new Date(iso))} ${new Date(iso).toTimeString().slice(0, 5)}` : '-')
+            return (
+              <div className="kv" key={c.chat} style={{ alignItems: 'flex-start' }}>
+                <span className="k" style={{ display: 'grid', gap: 2 }}>
+                  <span><b>{c.role === 'asosiy' ? 'Asosiy kanal' : 'Zaxira kanal'}</b> <span className="faint mono" style={{ fontSize: 12 }}>{c.chat}</span></span>
+                  {c.ok && !c.error && (
+                    <span className="faint" style={{ fontSize: 12.5 }}>
+                      Zanjir {day(c.since)} dan boshlangan · soʻnggi zaxira {day(c.created)} · {c.buckets} boʻlak, {c.companies} kompaniya
+                    </span>
+                  )}
+                  {(c.error || !c.ok) && <span style={{ fontSize: 12.5, color: 'var(--neg-text)' }}>{c.error ?? 'Oʻqib boʻlmadi'}</span>}
+                  {c.ok && (c.partsMissing ?? 0) > 0 && <span style={{ fontSize: 12.5, color: 'var(--neg-text)' }}>{c.partsMissing} ta fayl kanaldan oʻchib ketgan: «Zaxiralash» ularni qayta yuboradi</span>}
+                  {c.ok && (c.lacking ?? 0) > 0 && <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Asosiy kanalda bor, bu yerda yoʻq: {c.lacking} ta boʻlak. «Zaxiralash» ularni koʻchiradi.</span>}
+                </span>
+                <span className={`badge ${c.ok && !c.error && !(c.partsMissing ?? 0) && !(c.lacking ?? 0) ? 'b-pos' : ''}`}>{c.ok && !c.error && !(c.partsMissing ?? 0) && !(c.lacking ?? 0) ? 'toʻliq' : 'eʼtibor bering'}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {companies.length > 0 && (
         <div className="list" style={{ marginTop: 12 }}>
           {companies.map((c) => (
@@ -260,7 +291,9 @@ const HELP_STEPS: ReadonlyArray<{ title: string; text: string }> = [
   { title: 'Zaxira parolini tanlang', text: 'Kamida 10 belgi, daftarga yozib qoʻying: yoʻqolsa, zaxirani ochib boʻlmaydi. Parol ilovada va botda (Render › SUD_PASSPHRASE) aynan bir xil boʻlishi shart.' },
   { title: 'Birinchi zaxirani oling', text: '«Shifrlangan zaxira» kartasida parolni kiriting va «Zaxiralash» bosing. Oxirida «2 ta kanalga zaxira olindi» chiqadi.' },
   { title: 'Avtomatik zaxirani yoqing', text: 'Shu kartadagi «Avtomatik zaxirani yoqish»: bazada yangilik paydo boʻlsa, zaxira oʻzi olinadi va bot 5 daqiqa ichida koʻradi. Kompyuter yoqilgan va ilova ishlab turishi kerak (Sud.bat keep).' },
-  { title: 'Botni tekshiring', text: 'Brauzerda https://<bot-manzili>/health ochilsin: "ready": true va kompaniyalar soni chiqsin. Keyin Telegramda botga /start yozing.' },
+  { title: 'Botni Renderda ishga tushiring (bir marta)', text: 'Render › New › Web Service › loyiha repozitoriysi › Docker (Dockerfile ./bot/Dockerfile, kontekst ./bot) › Free. Oʻzgaruvchilar: BOT_TOKEN, SUD_CHANNEL (asosiy,zaxira), SUD_PASSPHRASE (ilovadagi bilan bir xil), WEBHOOK_SECRET (uzun tasodifiy qator), PUBLIC_URL. ALLOWED_USER_IDS ni dastlab boʻsh qoldiring: botga xabar yozsangiz, u ID ingizni yozib beradi; shuni oʻzgaruvchiga qoʻyib qayta joylang.' },
+  { title: 'Botni tekshiring', text: 'Brauzerda https://<bot-manzili>/health ochilsin: "ready": true va kompaniyalar soni chiqsin. Keyin Telegramda botga /start yozing. Zaxirani yangilab turing: kompyuter oʻchiq boʻlsa, bot ishlayveradi, lekin yangilik kelmaydi.' },
+  { title: 'Yana kanal qoʻshish va tekshirish', text: '«Zaxira kanallar» ga 3 tagacha kanal qoʻshish mumkin (vergul bilan), keyin «Zaxiralash»: ilova ularni oʻzi toʻldiradi. «Kanallar holatini tekshirish» har bir kanalda zaxira qachondan beri borligini va nima yetishmasligini koʻrsatadi.' },
 ]
 
 /** Settings › Telegram: the first-time setup in plain steps, closed until asked for (docs/QOLLANMA.md has the long version) */
