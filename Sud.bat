@@ -65,7 +65,7 @@ if %tries% gtr 150 goto slow
 rem the page answers only after it is compiled, so the browser opens onto a ready page
 curl.exe -s -o nul --max-time 5 "%URL%/"
 if not errorlevel 1 goto open
-timeout /t 2 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 2 /nobreak >nul
 goto wait
 
 :slow
@@ -117,7 +117,7 @@ taskkill /FI "WINDOWTITLE eq Sud tizimi server*" /T /F >nul 2>nul
 rem then whatever still listens on port 3000 (an old run left behind)
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":3000 .*LISTENING"') do taskkill /PID %%P /T /F >nul 2>nul
 echo Sud tizimi to'xtatildi.
-timeout /t 2 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 2 /nobreak >nul
 exit /b 0
 
 :shortcut
