@@ -34,6 +34,14 @@ pub async fn keep_synced(sh: Arc<Shared>) {
     }
 }
 
+/// `WEBHOOK=0`: the chat commands are paused on purpose (Mini App and backup reading keep working): the webhook is removed so getUpdates can be used elsewhere.
+pub async fn pause_webhook(tg: crate::telegram::Tg) {
+    match tg.delete_webhook().await {
+        Ok(()) => println!("[bot] WEBHOOK=0: webhook olib tashlandi (chat buyruqlari toʻxtatilgan)"),
+        Err(e) => eprintln!("[bot] webhookni olib tashlab boʻlmadi: {e}"),
+    }
+}
+
 pub async fn register_webhook(sh: Arc<Shared>, tg: crate::telegram::Tg) {
     let Some(base) = sh.cfg.public_url.clone() else {
         println!("[bot] PUBLIC_URL yoʻq: webhook oʻrnatilmadi");

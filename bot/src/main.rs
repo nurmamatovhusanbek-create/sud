@@ -52,6 +52,8 @@ async fn main() {
     }
     if want_webhook {
         tokio::spawn(sync::register_webhook(sh.clone(), tg));
+    } else {
+        tokio::spawn(sync::pause_webhook(tg));
     }
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port)).await.expect("port");

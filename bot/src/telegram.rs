@@ -84,6 +84,11 @@ impl Tg {
         self.call::<Value>("setWebhook", &json!({ "url": url, "secret_token": secret, "allowed_updates": ["message", "callback_query"], "max_connections": 4 })).await.map(|_| ())
     }
 
+    /// Telegram allows either a webhook or getUpdates, never both: the app's «Kanalni topish» reads getUpdates, so while the operator tests it the webhook is taken off.
+    pub async fn delete_webhook(&self) -> Result<(), String> {
+        self.call::<Value>("deleteWebhook", &json!({ "drop_pending_updates": false })).await.map(|_| ())
+    }
+
     pub async fn set_menu_button(&self, app_url: &str) -> Result<(), String> {
         self.call::<Value>("setChatMenuButton", &json!({ "menu_button": { "type": "web_app", "text": "Qidiruv", "web_app": { "url": app_url } } })).await.map(|_| ())
     }
