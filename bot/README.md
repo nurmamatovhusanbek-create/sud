@@ -24,6 +24,6 @@ cargo run --release
 ```
 The Mini App is `bot/static/` (tokens → components → screens, see design-notes › «Mini App architecture and design tokens»).
 `GET /health` → `{ready, indexed, companies, backupAt}` (what UptimeRobot pings). `GET /app` is the Mini App; its `/api/*` calls carry Telegram's signed
-`initData`, checked against the bot token and the allowed ids. Commands: `/find`, `/case`, `/bill`, `/company`, `/app`, `/status`; any plain text is a search.
+`initData`, checked against the bot token and the allowed ids. Commands: `/find`, `/case`, `/bill`, `/company`, `/hearings`, `/stats`, `/settings`, `/app`, `/status`; any plain text is a search. Reminders: a morning message (the next days' hearings) and an evening one (tomorrow's), each person's own times, number of days and companies, chosen with `/settings` and kept in the message pinned in their chat (see `src/prefs.rs`); `DIGEST=0` turns the scheduler off.
 
 `bun bot/tests/make-fixture.ts` rewrites `tests/fixtures/compat.json` from `src/lib/backup-crypto.ts` (run it when the app's format changes).

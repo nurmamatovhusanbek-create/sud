@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::crypto::{BucketRef, Key, Manifest};
 use crate::domain::Info;
 use crate::index::Index;
+use crate::prefs::Prefs;
 use crate::ratelimit::RateLimiter;
 use crate::telegram::{Outbox, Source, Tg};
 use std::{collections::HashMap, sync::{Arc, Mutex}};
@@ -37,6 +38,19 @@ pub struct Shared {
     /// at most one download of a given bucket at a time (a Mini App screen asks for the same bucket several times at once)
     pub inflight: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub limiter: RateLimiter,
+    /// each person's reminder settings (read back from the message pinned in their chat, see `prefs.rs`)
+    pub prefs: Mutex<HashMap<i64, PrefSlot>>,
+}
+
+#[derive(Default)]
+pub struct PrefSlot {
+    pub prefs: Prefs,
+    /// the pinned message was read (or there is none): the defaults are then the person's real settings
+    pub loaded: bool,
+    /// the settings message that is pinned in the person's chat
+    pub msg_id: Option<i64>,
+    /// when Telegram last failed to answer (epoch seconds): asked again after a pause
+    pub failed_at: i64,
 }
 
 pub fn now() -> i64 {
@@ -53,7 +67,53 @@ impl Shared {
 
     pub fn with(cfg: Config, source: Source, outbox: Outbox) -> Arc<Shared> {
         let limiter = RateLimiter::new(cfg.rate_per_minute);
-        Arc::new(Shared { cfg, source, outbox, st: RwLock::new(State::default()), cache: Mutex::new(BucketCache::default()), inflight: Mutex::new(HashMap::new()), limiter })
+        Arc::new(Shared { cfg, source, outbox, st: RwLock::new(State::default()), cache: Mutex::new(BucketCache::default()), inflight: Mutex::new(HashMap::new()), limiter, prefs: Mutex::new(HashMap::new()) })
+    }
+
+    /// A person's reminder settings: from the cache, else read back from the message pinned in their chat (once; the defaults when there is none, and
+    /// when Telegram does not answer, the defaults for now and another try after five minutes).
+    pub async fn prefs_of(&self, user: i64) -> Prefs {
+        {
+            let m = self.prefs.lock().unwrap();
+            if let Some(slot) = m.get(&user) {
+                if slot.loaded || (slot.failed_at > 0 && now() - slot.failed_at < 300) {
+                    return slot.prefs.clone();
+                }
+            }
+        }
+        let read = self.outbox.pinned_text(user).await;
+        let mut m = self.prefs.lock().unwrap();
+        let slot = m.entry(user).or_default();
+        match read {
+            Ok(Some((id, text))) => {
+                if let Some(p) = Prefs::parse(&text) {
+                    slot.prefs = p;
+                    slot.msg_id = Some(id);
+                }
+                slot.loaded = true;
+            }
+            Ok(None) => slot.loaded = true,
+            Err(e) => {
+                eprintln!("[bot] sozlamalarni oʻqib boʻlmadi ({user}): {e}");
+                slot.failed_at = now();
+            }
+        }
+        slot.prefs.clone()
+    }
+
+    /// remember a person's settings, and which message of theirs is the pinned settings screen
+    pub fn remember_prefs(&self, user: i64, prefs: Prefs, msg_id: Option<i64>) {
+        let mut m = self.prefs.lock().unwrap();
+        let slot = m.entry(user).or_default();
+        slot.prefs = prefs;
+        slot.loaded = true;
+        if msg_id.is_some() {
+            slot.msg_id = msg_id;
+        }
+    }
+
+    pub fn settings_msg(&self, user: i64) -> Option<i64> {
+        self.prefs.lock().unwrap().get(&user).and_then(|s| s.msg_id)
     }
 
     /// Read the pinned manifest and bring the locator up to date: only the index buckets whose id changed are downloaded. Cheap when nothing changed.

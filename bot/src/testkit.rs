@@ -114,12 +114,12 @@ pub fn mirrored() -> (Backup, Config) {
 }
 
 pub fn bot_with(cfg: Config, b: &Backup) -> Arc<Shared> {
-    Shared::with(cfg, Source::Memory(b.channel.clone()), Outbox::Capture(Mutex::new(Vec::new())))
+    Shared::with(cfg, Source::Memory(b.channel.clone()), Outbox::Capture(Default::default()))
 }
 
 /// a bot over an in-memory channel and a capturing outbox, not yet synced
 pub fn bot(b: &Backup) -> Arc<Shared> {
-    Shared::with(Config::for_tests(), Source::Memory(b.channel.clone()), Outbox::Capture(Mutex::new(Vec::new())))
+    Shared::with(Config::for_tests(), Source::Memory(b.channel.clone()), Outbox::Capture(Default::default()))
 }
 
 /// a bot that has already read the backup

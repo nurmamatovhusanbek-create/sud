@@ -16,6 +16,22 @@ pub fn esc(s: &str) -> String {
     out
 }
 
+/// the text of an HTML message as Telegram hands it back (`getChat` → pinned message `text`): no tags, the entities turned back into characters
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn plain(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if in_tag => {}
+            _ => out.push(c),
+        }
+    }
+    out.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+}
+
 /// a court type in words
 pub fn court_word(court: &str) -> &'static str {
     match court {

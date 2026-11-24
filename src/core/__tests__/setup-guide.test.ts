@@ -25,7 +25,7 @@ describe('the setup guide', () => {
 
   test('every «N-boʻlim» it mentions is a section that exists and is the one meant', () => {
     const md = guideMarkdown()
-    const want: Record<number, RegExp> = { 2: /bot yaratish/i, 3: /kanal/i, 5: /parol/i, 16: /almashtirish/i }
+    const want: Record<number, RegExp> = { 2: /bot yaratish/i, 3: /kanal/i, 5: /parol/i, 12: /eslatma/i, 17: /almashtirish/i }
     let seen = 0
     for (const m of md.matchAll(/(\d+)-boʻlim/g)) {
       const n = Number(m[1])

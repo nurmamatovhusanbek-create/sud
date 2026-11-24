@@ -20,6 +20,7 @@ mod state;
 mod sync;
 mod telegram;
 mod party;
+mod prefs;
 mod translit;
 mod date;
 mod digest;

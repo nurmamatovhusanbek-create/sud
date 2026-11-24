@@ -690,6 +690,176 @@ mod chat {
     }
 }
 
+mod reminders {
+    use super::*;
+    use crate::chat::handle_update;
+    use crate::date::{secs_of_day, today};
+    use crate::digest::{tick, Sent};
+    use crate::prefs::Prefs;
+    use std::sync::Arc;
+
+    fn message(user: i64, text: &str) -> Value {
+        json!({ "message": { "from": { "id": user }, "chat": { "id": user }, "text": text } })
+    }
+
+    fn press(user: i64, msg_id: i64, data: &str) -> Value {
+        json!({ "callback_query": { "id": "1", "from": { "id": user }, "message": { "message_id": msg_id, "chat": { "id": user } }, "data": data } })
+    }
+
+    /// today at the given Uzbekistan time, as epoch seconds
+    fn at(h: i64, m: i64) -> i64 {
+        let n = now();
+        n - secs_of_day(n) + h * 3600 + m * 60
+    }
+
+    fn pinned(sh: &Arc<crate::state::Shared>, user: i64) -> Option<(i64, String)> {
+        match &sh.outbox {
+            crate::telegram::Outbox::Capture(c) => c.pinned.lock().unwrap().get(&user).cloned(),
+            _ => None,
+        }
+    }
+
+    #[tokio::test]
+    async fn settings_sends_one_screen_pins_it_and_every_button_edits_it() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        let sent = sh.outbox.captured();
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].text.contains("Eslatma sozlamalari") && sent[0].text.contains("08:00") && sent[0].text.contains("18:00") && sent[0].text.contains("hamma kompaniyalar"), "{}", sent[0].text);
+        assert!(sent[0].markup.is_some());
+        // pinned in the chat, and the pinned text carries the code
+        let (id, text) = pinned(&sh, 4242).expect("pinned");
+        assert_eq!(id, sent[0].id);
+        assert_eq!(Prefs::parse(&text), Some(Prefs::default()));
+        // a button: the evening moves to 20:00; the message is edited (not a new one) and the pinned text follows
+        handle_update(sh.clone(), press(4242, id, "s:e:2000")).await;
+        assert_eq!(sh.outbox.captured().len(), 1);
+        let edited = sh.outbox.edited();
+        assert!(edited[0].text.contains("🌙 <b>Kechki eslatma:</b> 20:00") && edited[0].markup.as_ref().unwrap().to_string().contains("✓ 20:00"), "{}", edited[0].text);
+        assert_eq!(Prefs::parse(&pinned(&sh, 4242).unwrap().1).unwrap().evening, Some(20 * 60));
+        // a company, the horizon and the morning off
+        for d in [format!("s:c:{TIN}"), "s:d:14".to_string(), "s:m:off".to_string()] {
+            handle_update(sh.clone(), press(4242, id, &d)).await;
+        }
+        let p = Prefs::parse(&pinned(&sh, 4242).unwrap().1).unwrap();
+        assert_eq!((p.morning, p.evening, p.days, p.tins.clone()), (None, Some(20 * 60), 14, vec![TIN.to_string()]));
+    }
+
+    #[tokio::test]
+    async fn a_label_button_and_nonsense_change_nothing_and_strangers_cannot_press() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        let id = sh.outbox.captured()[0].id;
+        for d in ["s:noop", "s:m:0830", "s:zzz", "s:c:123"] {
+            handle_update(sh.clone(), press(4242, id, d)).await;
+        }
+        handle_update(sh.clone(), press(777, id, "s:e:off")).await; // not on the list
+        assert!(sh.outbox.edited().is_empty());
+        assert_eq!(Prefs::parse(&pinned(&sh, 4242).unwrap().1), Some(Prefs::default()));
+    }
+
+    #[tokio::test]
+    async fn a_restart_loses_nothing_the_settings_are_read_back_from_the_pinned_message() {
+        let (sh, b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        let id = sh.outbox.captured()[0].id;
+        handle_update(sh.clone(), press(4242, id, "s:e:1900")).await;
+        handle_update(sh.clone(), press(4242, id, "s:d:30")).await;
+        let (pid, ptext) = pinned(&sh, 4242).unwrap();
+        // a new process: empty memory, the same chat
+        let sh2 = bot(&b);
+        sh2.sync().await.unwrap();
+        if let crate::telegram::Outbox::Capture(c) = &sh2.outbox {
+            c.pinned.lock().unwrap().insert(4242, (pid, ptext));
+        }
+        let p = sh2.prefs_of(4242).await;
+        assert_eq!((p.evening, p.days), (Some(19 * 60), 30));
+        assert_eq!(sh2.settings_msg(4242), Some(pid));
+        // a person who never opened /settings has the defaults
+        assert_eq!(sh2.prefs_of(999).await, Prefs::default());
+    }
+
+    #[tokio::test]
+    async fn pressing_an_older_screen_also_brings_the_pinned_one_up_to_date() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        let old = sh.outbox.captured()[0].id;
+        handle_update(sh.clone(), message(4242, "/settings")).await; // a second screen: the newest, and the pinned one
+        let new = sh.outbox.captured()[1].id;
+        assert_eq!(pinned(&sh, 4242).unwrap().0, new);
+        handle_update(sh.clone(), press(4242, old, "s:d:3")).await;
+        assert_eq!(Prefs::parse(&pinned(&sh, 4242).unwrap().1).unwrap().days, 3);
+        assert_eq!(sh.outbox.edited().len(), 2); // the pressed one and the pinned one
+    }
+
+    #[tokio::test]
+    async fn the_morning_and_evening_messages_go_at_the_persons_own_times_once_a_day() {
+        let (sh, _b) = ready_bot().await;
+        let mut sent = Sent::default();
+        tick(&sh, at(7, 59), &mut sent).await;
+        assert!(sh.outbox.captured().is_empty());
+        tick(&sh, at(8, 0), &mut sent).await;
+        let m = sh.outbox.captured();
+        assert_eq!(m.len(), 1);
+        assert!(m[0].text.starts_with("📋 <b>Yaqin majlislar</b>\nKeyingi 7 kun:") && m[0].text.contains(CASE), "{}", m[0].text);
+        tick(&sh, at(8, 30), &mut sent).await; // already sent today
+        assert_eq!(sh.outbox.captured().len(), 1);
+        tick(&sh, at(18, 0), &mut sent).await;
+        let all = sh.outbox.captured();
+        assert_eq!(all.len(), 2);
+        // the fixture has one hearing tomorrow, at 09:30
+        assert!(all[1].text.starts_with("🌙 <b>Ertangi majlislar</b>\n<b>1 ta</b> · birinchisi soat <b>09:30</b>") && all[1].text.contains("2-1004-2503/8021"), "{}", all[1].text);
+        tick(&sh, at(18, 20), &mut sent).await;
+        assert_eq!(sh.outbox.captured().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_person_can_turn_a_reminder_off_move_it_or_narrow_it_to_a_company() {
+        let (sh, _b) = ready_bot().await;
+        // morning off, evening at 19:00
+        sh.remember_prefs(4242, Prefs { morning: None, evening: Some(19 * 60), ..Prefs::default() }, None);
+        let mut sent = Sent::default();
+        tick(&sh, at(8, 0), &mut sent).await;
+        tick(&sh, at(18, 0), &mut sent).await;
+        assert!(sh.outbox.captured().is_empty());
+        tick(&sh, at(19, 5), &mut sent).await;
+        assert_eq!(sh.outbox.captured().len(), 1);
+        // only the OTHER company: nothing of the first one reaches the person (silence, not an empty message)
+        let (sh2, _b2) = ready_bot().await;
+        sh2.remember_prefs(4242, Prefs { tins: vec![OTHER_TIN.to_string()], ..Prefs::default() }, None);
+        let mut sent2 = Sent::default();
+        tick(&sh2, at(8, 0), &mut sent2).await;
+        tick(&sh2, at(18, 0), &mut sent2).await;
+        assert!(sh2.outbox.captured().is_empty());
+        // the horizon: 3 days leaves the hearing in five days out of the morning message
+        let (sh3, _b3) = ready_bot().await;
+        sh3.remember_prefs(4242, Prefs { days: 3, evening: None, ..Prefs::default() }, None);
+        let mut sent3 = Sent::default();
+        tick(&sh3, at(8, 0), &mut sent3).await;
+        let m = &sh3.outbox.captured()[0].text;
+        assert!(m.contains("Keyingi 3 kun: <b>2 ta</b>") && !m.contains("2-0001-2401/5"), "{m}");
+    }
+
+    #[tokio::test]
+    async fn nothing_goes_out_before_the_backup_is_read_and_two_people_have_their_own_times() {
+        let b = backup();
+        let mut cfg = Config::for_tests();
+        cfg.allowed = vec![4242, 5151];
+        let sh = bot_with(cfg, &b);
+        let mut sent = Sent::default();
+        tick(&sh, at(8, 0), &mut sent).await; // not synced yet
+        assert!(sh.outbox.captured().is_empty());
+        sh.sync().await.unwrap();
+        sh.remember_prefs(5151, Prefs { morning: Some(9 * 60), evening: None, ..Prefs::default() }, None);
+        tick(&sh, at(8, 0), &mut sent).await;
+        let first = sh.outbox.captured();
+        assert_eq!(first.iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242]); // 5151 wants 09:00
+        tick(&sh, at(9, 0), &mut sent).await;
+        assert_eq!(sh.outbox.captured().iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242, 5151]);
+        let _ = today(now());
+    }
+}
+
 mod assets {
     use include_dir::{include_dir, Dir};
     static ASSETS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/static");

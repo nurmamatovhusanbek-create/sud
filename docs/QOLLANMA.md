@@ -90,7 +90,7 @@ Zaxira parol bilan shifrlanadi. Parolsiz hech kim, hatto Telegram ham, maʼlumot
 
 **Tekshirish:** Parol tanlandi va xavfsiz joyda yozib qoʻyilgan.
 
-> **Diqqat:** Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (16-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.
+> **Diqqat:** Parol yoʻqolsa, zaxirani hech kim qayta ocha olmaydi: uni tiklashning yoʻli yoʻq. Parolni oʻzgartirish alohida ish (17-boʻlim): faqat bitta joyda oʻzgartirib boʻlmaydi.
 
 ## 6. Birinchi zaxirani olish
 
@@ -195,18 +195,37 @@ Botga shunchaki yozing: ish raqami (2-1004-2603/8020), kvitansiya raqami, STIR y
 | /bill raqam | Kvitansiya |
 | /find matn | Qidirish (oddiy xabar yozish bilan bir xil) |
 | /app | Qidiruv oynasi (Mini App): roʻyxatlar, kompaniya kartalari, majlislar |
+| /settings | Eslatma sozlamalari: vaqt, kunlar soni, kompaniyalar (12-boʻlim) |
 | /status | Zaxira holati: qachon olingan, nechta yozuv |
 
 **Har kungi eslatma**
 
-1. Har kuni ertalab soat 08:00 dan keyin bot yaqin 7 kunlik majlislar eslatmasini oʻzi yuboradi.
-   - Majlis boʻlmasa, xabar kelmaydi.
+1. Bot ikkita eslatma yuboradi: ertalab yaqin kunlardagi majlislar va kechqurun ertangi majlislar.
+   - Standart vaqt: ertalab 08:00 (keyingi 7 kun), kechqurun 18:00 (faqat ertangi kun). Majlis boʻlmasa, xabar kelmaydi. Vaqtni 12-boʻlimda oʻzingiz oʻzgartirasiz.
 2. Xabarni shunday oʻqing: sarlavha kunni koʻrsatadi (Bugun, Ertaga, sana va hafta kuni); har bir majlis uchun: 🕙 vaqt va ish raqami (bosib nusxalash mumkin), kompaniya nomi va uning tomoni (daʼvogar yoki javobgar), «↔» belgisidan keyin qarshi tomon.
 3. Xabar oxiridagi «Majlislar Mini Appʼda» tugmasi hamma majlislarni koʻrsatadi: xabarda faqat dastlabki 12 tasi chiqadi.
 
 > **Diqqat:** Bot sud saytlariga kirmaydi: maʼlumot oxirgi zaxira vaqtidagidek. Xabar oxirida «Maʼlumot ... holatiga» yozuvi shuni koʻrsatadi.
 
-## 12. Har kungi ish tartibi va kompyuter oʻchiq boʻlsa
+## 12. Eslatmalarni sozlash: vaqt, kunlar va kompaniyalar
+
+Har bir odam eslatmalarini oʻzi uchun sozlaydi: bu boshqa odamning sozlamasiga taʼsir qilmaydi. Standart: ertalab 08:00 (keyingi 7 kun) va kechqurun 18:00 (ertangi kun), hamma kompaniyalar haqida.
+
+1. Botga /settings deb yozing.
+   - Bot sozlamalar oynasini yuboradi va uni chatda mahkamlaydi.
+2. «Ertalab» qatorida vaqtni tanlang (07:00, 08:00 yoki 09:00) yoki eslatmani butunlay oʻchirish uchun «Oʻchiq» ni bosing.
+3. «Kechqurun» qatorida vaqtni tanlang (17:00 dan 20:00 gacha) yoki «Oʻchiq» ni bosing.
+4. Ertalabki eslatma necha kunni koʻrsatishini tanlang: 3, 7, 14 yoki 30 kun.
+   - Kechki eslatma har doim faqat ertangi kunni koʻrsatadi.
+5. «Kompaniyalar» qatorida «Hammasi» ni qoldiring yoki kerakli kompaniyalarni belgilang.
+   - Bir nechtasini belgilash mumkin. Hammasini belgilasangiz, «Hammasi» boʻlib qoladi. Birortasini belgilamasangiz ham «Hammasi».
+6. Tanlovni tasdiqlash shart emas: har bir tugma darhol saqlanadi va oyna oʻzi yangilanadi.
+
+**Tekshirish:** Oynadagi matn tanlovingizni koʻrsatadi, masalan «Kechki eslatma: 20:00 · ertangi majlislar». Tanlangan tugmada ✓ belgisi turadi.
+
+> **Diqqat:** Sozlamalar sizning chatingizdagi mahkamlangan oynaning ichida saqlanadi (bot joylashgan serverda fayl saqlanmaydi, qayta ishga tushganda yoʻqoladi). Shu mahkamlangan xabarni oʻchirmang va chatda boshqa xabarni mahkamlamang: aks holda sozlamalar standartga qaytadi. Vaqt Oʻzbekiston vaqti (UTC+5) bilan.
+
+## 13. Har kungi ish tartibi va kompyuter oʻchiq boʻlsa
 
 1. Kompyuterda ilovani yoqib qoʻying: Sud.bat keep.
 2. Kompaniyani oching, kerak boʻlsa «Toʻlovlarni yangilash», keyin «Yetishmayotgan ishlarni olish» ni bosing.
@@ -219,7 +238,7 @@ Botga shunchaki yozing: ish raqami (2-1004-2603/8020), kvitansiya raqami, STIR y
 2. Ilova oʻchiq paytda hech narsa yangilanmaydi: sud roʻyxatlari oʻqilmaydi, Kuzatuv xabar bermaydi, avtomatik zaxira olinmaydi.
 3. Bot ishlayveradi: u Renderda va oxirgi zaxirani koʻrsatadi. Faqat yangiliklar kompyuter yoqilgunicha kelmaydi.
 
-## 13. Yangi zaxira kanal qoʻshish va kanallar holatini koʻrish
+## 14. Yangi zaxira kanal qoʻshish va kanallar holatini koʻrish
 
 Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtda.
 
@@ -235,7 +254,7 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 
 > **Diqqat:** Yangi kanalning zanjiri uni qoʻshgan sanadan boshlanadi, lekin ichiga bazadagi hamma maʼlumot koʻchiriladi: eski maʼlumot ham unda boʻladi.
 
-## 14. Yangi kompyuterda tiklash
+## 15. Yangi kompyuterda tiklash
 
 1. Ilovani yangi kompyuterga oʻrnating va ishga tushiring.
 2. Sozlamalar › Telegram: bot tokeni va kanal(lar)ni kiriting, «Saqlash».
@@ -246,7 +265,7 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 
 **Tekshirish:** Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada.
 
-## 15. Tez-tez uchraydigan muammolar
+## 16. Tez-tez uchraydigan muammolar
 
 | Muammo | Sababi va yechimi |
 |---|---|
@@ -258,9 +277,10 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 | Ilovada bitta son, botda boshqa | Zaxira hali olinmagan: «Zaxiralash» bosing va 5 daqiqa kuting. Bot, bundan tashqari, hali olinmagan, faqat kvitansiyada nomi bor ishlarni ham sanaydi. |
 | Statistika eski sonni koʻrsatadi | Statistika kuniga bir marta qayta quriladi. Ish topilganda yoki zaxiradan yuklanganda oʻzi yangilanadi; boshqa holatda «Yangilash» bosing. |
 | Toʻlovlar «94 dan 42» | Katta kompaniyada ish raqamisiz kvitansiyalar saqlanmaydi (20 000 tadan kichik kompaniyalarda saqlanadi). Bu xato emas. |
+| Eslatma kelmayapti | /settings da eslatma «Oʻchiq» emasligini va tanlangan kompaniyalarni tekshiring. Majlis boʻlmasa, xabar kelmaydi. ID ingiz ALLOWED_USER_IDS da bormi? Bot uygʻoqmi (/health)? Zaxira oʻqilganmi (/status)? |
 | Kuzatuv xabar yubormayapti | Kompyuter va ilova yoqilganmi (Sud.bat keep)? «Xabar oluvchilar» da ID bormi? Siz botga kamida bir marta /start yozganmisiz? «Sinash» tugmasi xato sababini koʻrsatadi. |
 
-## 16. Parolni almashtirish
+## 17. Parolni almashtirish
 
 Parol ikki joyda turadi: ilovada (zaxira olayotganda kiritasiz) va Renderda (SUD_PASSPHRASE). Ikkalasi har doim bir xil boʻlishi kerak: faqat bittasini oʻzgartirsangiz, bot «Parol notoʻgʻri» deydi. Eski kanallardagi zaxira faqat eski parol bilan ochiladi, shuning uchun parolni almashtirish yangi zanjir boshlash demak.
 
@@ -273,7 +293,7 @@ Parol ikki joyda turadi: ilovada (zaxira olayotganda kiritasiz) va Renderda (SUD
 
 **Tekshirish:** Bot yangi parol bilan javob beradi, ilovada «Kanallar holatini tekshirish» yangi kanallarni «toʻliq» deb koʻrsatadi.
 
-## 17. Xavfsizlik, qisqacha
+## 18. Xavfsizlik, qisqacha
 
 1. Token va parolni hech qachon chatga, gitga yoki skrinshotga qoʻymang. Qoʻyib yuborgan boʻlsangiz, tokenni BotFather da /revoke qiling va parolni almashtiring.
 2. Parol Renderda saqlanadi: bot uni oʻqiy olishi uchun shu kerak. Render hisobingizga kirishni himoya qiling (ikki bosqichli tasdiqlash).

@@ -6,7 +6,7 @@
  * back and deletes it, so a working setup is proven before anything depends on it.
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Info, Play, Radar, RotateCcw, Send, Trash2, XCircle } from 'lucide-react'
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
@@ -332,11 +332,12 @@ function GuideBox({ label, text, tone }: { label: string; text: string; tone: 'o
 
 /**
  * Settings › Telegram: the first-time setup, read one numbered section at a time (the text is `core/setup-guide`, the same as `docs/QOLLANMA.md`).
- * Closed until asked for; «Oldingi» / «Keyingi» or a section number moves through it in order.
+ * Closed until asked for; a section number jumps to it, and one «Keyingi boʻlim» button at the bottom continues in order.
  */
 function HelpCard() {
   const [open, setOpen] = useState(false)
   const [i, setI] = useState(0)
+  const top = useRef<HTMLHeadingElement>(null)
   const sec = GUIDE[i]!
   const last = i === GUIDE.length - 1
   return (
@@ -355,7 +356,7 @@ function HelpCard() {
             ))}
           </div>
 
-          <h3 style={{ fontSize: 15.5, fontWeight: 600, margin: '0 0 8px' }}>{i + 1}. {sec.title}</h3>
+          <h3 ref={top} style={{ fontSize: 15.5, fontWeight: 600, margin: '0 0 8px', scrollMarginTop: 80 }}>{i + 1}. {sec.title}</h3>
           {sec.intro && <p style={{ fontSize: 13.5, lineHeight: 1.65, margin: '0 0 12px' }} className="faint">{sec.intro}</p>}
           {!sec.tableAfter && <GuideTable sec={sec} />}
           {sec.steps && (
@@ -374,11 +375,14 @@ function HelpCard() {
           {sec.check && <GuideBox label="Tekshirish" text={sec.check} tone="ok" />}
           {sec.warn && <GuideBox label="Diqqat" text={sec.warn} tone="warn" />}
 
+          {/* the chips above jump to any section; this one button only saves scrolling back up after a long section */}
           <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 18, alignItems: 'center' }}>
-            <button className="btn btn-outline" onClick={() => setI((n) => Math.max(0, n - 1))} disabled={i === 0}>‹ Oldingi</button>
-            <span className="faint mono" style={{ fontSize: 12.5 }}>{i + 1} / {GUIDE.length}</span>
-            <button className="btn btn-primary" onClick={() => setI((n) => Math.min(GUIDE.length - 1, n + 1))} disabled={last}>Keyingi ›</button>
-            <span className="faint" style={{ fontSize: 12, marginLeft: 'auto' }}>Toʻliq matn: <span className="mono">docs/QOLLANMA.md</span></span>
+            {!last && <button className="btn btn-primary" onClick={() => {
+              setI((n) => Math.min(GUIDE.length - 1, n + 1))
+              // the next section starts at its heading, not wherever the long one above left the page
+              requestAnimationFrame(() => top.current?.scrollIntoView({ block: 'start' }))
+            }}>Keyingi boʻlim ›</button>}
+            <span className="faint" style={{ fontSize: 12, marginLeft: last ? 0 : 'auto' }}>Toʻliq matn: <span className="mono">docs/QOLLANMA.md</span></span>
           </div>
         </div>
       )}

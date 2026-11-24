@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    sync::{atomic::{AtomicUsize, Ordering}, Mutex},
+    sync::{atomic::{AtomicI64, AtomicUsize, Ordering}, Mutex},
     time::Duration,
 };
 
@@ -84,6 +84,50 @@ impl Tg {
         }
     }
 
+    /// like `send_as`, and gives back the message's id (to edit or pin it later)
+    pub async fn send_with_id(&self, chat_id: i64, text: &str, markup: Option<Value>) -> Option<i64> {
+        let text: String = text.chars().take(4000).collect();
+        let mut body = json!({ "chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": true });
+        if let Some(m) = markup {
+            body["reply_markup"] = m;
+        }
+        match self.call::<Value>("sendMessage", &body).await {
+            Ok(v) => v["message_id"].as_i64(),
+            Err(e) => {
+                eprintln!("[bot] sendMessage: {e}");
+                None
+            }
+        }
+    }
+
+    /// edit a message the bot sent (Telegram says «not modified» when nothing changed: that is not an error worth logging)
+    pub async fn edit_html(&self, chat_id: i64, message_id: i64, text: &str, markup: Option<Value>) {
+        let text: String = text.chars().take(4000).collect();
+        let mut body = json!({ "chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": true });
+        if let Some(m) = markup {
+            body["reply_markup"] = m;
+        }
+        if let Err(e) = self.call::<Value>("editMessageText", &body).await {
+            if !e.contains("not modified") {
+                eprintln!("[bot] editMessageText: {e}");
+            }
+        }
+    }
+
+    /// pin a message in a private chat (quietly)
+    pub async fn pin(&self, chat_id: i64, message_id: i64) {
+        if let Err(e) = self.call::<Value>("pinChatMessage", &json!({ "chat_id": chat_id, "message_id": message_id, "disable_notification": true })).await {
+            eprintln!("[bot] pinChatMessage: {e}");
+        }
+    }
+
+    /// the newest pinned message of a chat: its id and its text (as plain text: the entities are not part of `text`)
+    pub async fn pinned_text(&self, chat_id: i64) -> Result<Option<(i64, String)>, String> {
+        let r: Value = self.call("getChat", &json!({ "chat_id": chat_id })).await?;
+        let m = &r["pinned_message"];
+        Ok(m["text"].as_str().map(|t| (m["message_id"].as_i64().unwrap_or(0), t.to_string())))
+    }
+
     pub async fn answer_callback(&self, id: &str) {
         let _ = self.call::<Value>("answerCallbackQuery", &json!({ "callback_query_id": id })).await;
     }
@@ -108,6 +152,7 @@ impl Tg {
             ("case", "Ish: raqam"),
             ("bill", "Kvitansiya: raqam"),
             ("app", "Qidiruv oynasi (Mini App)"),
+            ("settings", "Eslatma sozlamalari"),
             ("status", "Zaxira holati"),
             ("help", "Yordam"),
         ]
@@ -201,27 +246,79 @@ pub struct Sent {
     pub chat: i64,
     pub text: String,
     pub markup: Option<Value>,
+    pub id: i64,
+}
+
+/// what the test outbox keeps: the messages sent, the edits made, and what is pinned in each chat (id and plain text), like Telegram would keep it
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Default)]
+pub struct CaptureBox {
+    pub sent: Mutex<Vec<Sent>>,
+    pub edited: Mutex<Vec<Sent>>,
+    pub pinned: Mutex<HashMap<i64, (i64, String)>>,
+    pub next_id: AtomicI64,
 }
 
 /// where chat replies go
 pub enum Outbox {
     Telegram(Tg),
     #[cfg_attr(not(test), allow(dead_code))]
-    Capture(Mutex<Vec<Sent>>),
+    Capture(CaptureBox),
 }
 
 impl Outbox {
     pub async fn send(&self, chat: i64, text: &str, markup: Option<Value>) {
         match self {
             Outbox::Telegram(t) => t.send(chat, text, markup).await,
-            Outbox::Capture(v) => v.lock().unwrap().push(Sent { chat, text: text.to_string(), markup }),
+            Outbox::Capture(c) => {
+                let id = c.next_id.fetch_add(1, Ordering::SeqCst) + 1;
+                c.sent.lock().unwrap().push(Sent { chat, text: text.to_string(), markup, id });
+            }
         }
     }
     /// the text is Telegram HTML
     pub async fn send_html(&self, chat: i64, text: &str, markup: Option<Value>) {
+        self.send_html_id(chat, text, markup).await;
+    }
+    /// like `send_html`, and gives back the message's id
+    pub async fn send_html_id(&self, chat: i64, text: &str, markup: Option<Value>) -> Option<i64> {
         match self {
-            Outbox::Telegram(t) => t.send_as(chat, text, markup, true).await,
-            Outbox::Capture(v) => v.lock().unwrap().push(Sent { chat, text: text.to_string(), markup }),
+            Outbox::Telegram(t) => t.send_with_id(chat, text, markup).await,
+            Outbox::Capture(c) => {
+                let id = c.next_id.fetch_add(1, Ordering::SeqCst) + 1;
+                c.sent.lock().unwrap().push(Sent { chat, text: text.to_string(), markup, id });
+                Some(id)
+            }
+        }
+    }
+    pub async fn edit_html(&self, chat: i64, id: i64, text: &str, markup: Option<Value>) {
+        match self {
+            Outbox::Telegram(t) => t.edit_html(chat, id, text, markup).await,
+            Outbox::Capture(c) => {
+                c.edited.lock().unwrap().push(Sent { chat, text: text.to_string(), markup, id });
+                // an edited pinned message keeps its place and gets the new text
+                if let Some(p) = c.pinned.lock().unwrap().get_mut(&chat) {
+                    if p.0 == id {
+                        p.1 = crate::format::plain(text);
+                    }
+                }
+            }
+        }
+    }
+    pub async fn pin(&self, chat: i64, id: i64) {
+        match self {
+            Outbox::Telegram(t) => t.pin(chat, id).await,
+            Outbox::Capture(c) => {
+                let text = c.sent.lock().unwrap().iter().rev().find(|m| m.chat == chat && m.id == id).map(|m| crate::format::plain(&m.text)).unwrap_or_default();
+                c.pinned.lock().unwrap().insert(chat, (id, text));
+            }
+        }
+    }
+    /// the newest pinned message of a chat (id, plain text)
+    pub async fn pinned_text(&self, chat: i64) -> Result<Option<(i64, String)>, String> {
+        match self {
+            Outbox::Telegram(t) => t.pinned_text(chat).await,
+            Outbox::Capture(c) => Ok(c.pinned.lock().unwrap().get(&chat).cloned()),
         }
     }
     pub async fn answer_callback(&self, id: &str) {
@@ -232,7 +329,14 @@ impl Outbox {
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn captured(&self) -> Vec<Sent> {
         match self {
-            Outbox::Capture(v) => v.lock().unwrap().clone(),
+            Outbox::Capture(c) => c.sent.lock().unwrap().clone(),
+            _ => Vec::new(),
+        }
+    }
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn edited(&self) -> Vec<Sent> {
+        match self {
+            Outbox::Capture(c) => c.edited.lock().unwrap().clone(),
             _ => Vec::new(),
         }
     }

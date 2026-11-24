@@ -21,15 +21,16 @@ Shunchaki yozing: ish raqami (<code>2-1004-2603/8020</code>), kvitansiya raqami,
 /bill raqam: kvitansiya\n\
 /find matn: qidirish\n\
 /app: qidiruv oynasi (Mini App)\n\
+/settings: eslatma sozlamalari\n\
 /status: zaxira holati\n\n\
-<b>Eslatma</b>\n\
-Har kuni soat 08:00 dan keyin yaqin 7 kunlik majlislar oʻzi yuboriladi.";
+<b>Eslatmalar</b>\n\
+Ertalab yaqin kunlardagi majlislar, kechqurun ertangi majlislar oʻzi yuboriladi (majlis boʻlmasa, xabar kelmaydi). Vaqtini, kunlar sonini va kompaniyalarni /settings da har kim oʻzi tanlaydi.";
 
 pub fn authorized(sh: &Shared, user: i64) -> bool {
     sh.cfg.allowed.contains(&user)
 }
 
-fn fmt_int(n: i64) -> String {
+pub fn fmt_int(n: i64) -> String {
     let s = n.abs().to_string();
     let mut out = String::new();
     for (i, c) in s.chars().rev().enumerate() {
@@ -344,6 +345,40 @@ async fn show(sh: &Arc<Shared>, chat: i64, what: &str, key: &str) {
     }
 }
 
+/// the companies a person can choose for the reminders: (STIR, name)
+async fn company_names(sh: &Arc<Shared>) -> Vec<(String, String)> {
+    sh.companies().await.into_iter().map(|c| (c.tin, c.name)).collect()
+}
+
+/// «/settings»: a NEW settings message (so it is the newest pinned one), pinned in the person's chat: it is both the screen and where the settings are kept
+async fn settings_reply(sh: &Arc<Shared>, chat: i64, user: i64) {
+    let p = sh.prefs_of(user).await;
+    let companies = company_names(sh).await;
+    let Some(id) = sh.outbox.send_html_id(chat, &p.text(&companies), Some(p.keyboard(&companies))).await else { return };
+    sh.outbox.pin(chat, id).await;
+    sh.remember_prefs(user, p, Some(id));
+}
+
+/// a button of the settings screen: `rest` is what follows «s:» in the callback data
+async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, rest: &str) {
+    let mut p = sh.prefs_of(user).await;
+    let companies = company_names(sh).await;
+    let all: Vec<String> = companies.iter().map(|(t, _)| t.clone()).collect();
+    if !p.apply(rest, &all) {
+        return;
+    }
+    let (text, keys) = (p.text(&companies), p.keyboard(&companies));
+    let pinned = sh.settings_msg(user);
+    sh.remember_prefs(user, p, if pinned.is_none() { Some(msg_id) } else { None });
+    sh.outbox.edit_html(chat, msg_id, &text, Some(keys.clone())).await;
+    match pinned {
+        // the screen that was pressed is an older one: the pinned screen (where the settings are read back from) is brought up to date too
+        Some(id) if id != msg_id => sh.outbox.edit_html(chat, id, &text, Some(keys)).await,
+        Some(_) => {}
+        None => sh.outbox.pin(chat, msg_id).await,
+    }
+}
+
 pub async fn handle_update(sh: Arc<Shared>, u: Value) {
     if let Some(cb) = u.get("callback_query") {
         let uid = cb["from"]["id"].as_i64().unwrap_or(0);
@@ -353,6 +388,13 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             return;
         }
         let data = cb["data"].as_str().unwrap_or("");
+        // «s:…»: a button of the settings screen
+        if let Some(rest) = data.strip_prefix("s:") {
+            if rest != "noop" {
+                settings_press(&sh, uid, chat, cb["message"]["message_id"].as_i64().unwrap_or(0), rest).await;
+            }
+            return;
+        }
         // «h:<days>:<tin>:<offset>»: the next page of the hearings list
         if let Some(rest) = data.strip_prefix("h:") {
             let p: Vec<&str> = rest.split(':').collect();
@@ -402,6 +444,7 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             let degraded = if info.failures > 0 { format!("\n⚠️ Oxirgi {} ta yangilash muvaffaqiyatsiz: eski zaxiradan javob beryapman.", info.failures) } else { String::new() };
             sh.outbox.send_html(chat, &format!("🗄 <b>Zaxira holati</b>\n<b>Oxirgi zaxira:</b> {}\n<b>Yozuvlar:</b> {}\n<b>Kompaniyalar:</b> {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
         }
+        "/settings" | "/reminders" => settings_reply(&sh, chat, uid).await,
         "/stats" => {
             let tin: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
             if tin.len() == 9 {
