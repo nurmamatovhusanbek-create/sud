@@ -506,6 +506,24 @@ export async function readRemoteCatalog(passphrase: string): Promise<{ ok: true;
   return idx.ok ? { ok: true, catalog, index: idx.value } : { ok: true, catalog, index: null, indexError: idx.error }
 }
 
+/**
+ * Is this the passphrase of the chain in the channel? The main channel first, then the mirrors; ok also when NO manifest is pinned anywhere yet (the
+ * first backup starts the chain with it). A wrong passphrase, or a channel nobody could read, is an error: an automatic backup must not start on a guess.
+ */
+export async function verifyPassphrase(passphrase: string): Promise<{ ok: true; fresh: boolean } | { ok: false; error: string }> {
+  const pre = precheck(passphrase)
+  if (!('token' in pre)) return pre.ok ? { ok: false, error: 'xato' } : pre
+  const why: string[] = []
+  for (const chat of pre.chats) {
+    const r = await pinnedManifest(pre.token, chat, passphrase, 'Parol notoʻgʻri (kanaldagi zaxira bu parol bilan ochilmadi)')
+    if (r.ok && r.value) return { ok: true, fresh: false }
+    if (!r.ok && /Parol/.test(r.error)) return { ok: false, error: r.error }
+    why.push(r.ok ? '' : `${chat}: ${r.error}`)
+  }
+  const real = why.filter(Boolean)
+  return real.length ? { ok: false, error: `Kanalni oʻqib boʻlmadi: ${real.join(' · ')}` } : { ok: true, fresh: true }
+}
+
 const TIN_RE = /^\d{9}$/
 
 export function startLoad(passphrase: string, tins: unknown): StartResult {

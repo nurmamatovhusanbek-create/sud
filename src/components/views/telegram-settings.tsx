@@ -11,11 +11,13 @@ import { CheckCircle2, DatabaseBackup, Eye, FlaskConical, Play, Radar, RotateCcw
 import { useTelegram } from '@/hooks/use-telegram'
 import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { useWatch } from '@/hooks/use-watch'
+import { useAutoBackup } from '@/hooks/use-auto-backup'
 import { STEP_LABEL } from '@/core/telegram'
 import { formatDmy } from '@/core/dates'
 
 function BackupCard({ configured }: { configured: boolean }) {
   const { snap, running, start, load, catalog, reload } = useBackup()
+  const auto = useAutoBackup()
   const [pass, setPass] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [reading, setReading] = useState(false)
@@ -123,6 +125,30 @@ function BackupCard({ configured }: { configured: boolean }) {
           </div>
         )}
       </div>
+      <div className="p-row" style={{ gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
+        {auto.status?.enabled ? (
+          <button className="btn btn-outline" onClick={() => void auto.disable()} disabled={auto.busy}>Avtomatik zaxirani oʻchirish</button>
+        ) : (
+          <button className="btn btn-outline" onClick={() => void auto.enable(pass)} disabled={!configured || !ok || auto.busy}>
+            {auto.busy ? <span className="spinner" /> : null}
+            Avtomatik zaxirani yoqish
+          </button>
+        )}
+        <span className={`badge ${auto.status?.enabled ? 'b-pos' : ''}`}>{auto.status?.enabled ? 'avtomatik zaxira yoqilgan' : 'avtomatik zaxira oʻchiq'}</span>
+      </div>
+      <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '8px 0 0' }}>
+        Yoqilsa, bazada yangi narsa paydo boʻlganda (yangi kvitansiya, topilgan ish, oʻzgargan holat) zaxira kanalga oʻzi yuboriladi va bot 5 daqiqa ichida koʻradi.
+        Buning uchun parol <b>shu kompyuterda</b> shaxsiy faylda (<span className="mono">~/.sud-tizimi/backup-pass.json</span>) saqlanadi: botning tokeni kabi, gitga tushmaydi va brauzerga qaytarilmaydi; oʻchirsangiz fayl ham oʻchadi.
+        Parol avval kanaldagi zaxira bilan solishtiriladi. Tekshiruv har 5 daqiqada, zaxira 15 daqiqadan tez-tez emas; bills jarayoni yoki Kuzatuv ishlayotganda kutadi; xato boʻlsa pauza bilan qayta uriniladi.
+      </p>
+      {auto.status?.enabled && (auto.status.lastOkAt > 0 || auto.status.lastError) && (
+        <div className="list" style={{ marginTop: 10 }}>
+          {auto.status.lastOkAt > 0 && (
+            <div className="kv"><span className="k">Soʻnggi avtomatik zaxira</span><span className="faint" style={{ fontSize: 12.5 }}>{formatDmy(new Date(auto.status.lastOkAt))} {new Date(auto.status.lastOkAt).toTimeString().slice(0, 5)}</span></div>
+          )}
+          {auto.status.lastError && <div className="kv"><span className="k" style={{ color: 'var(--neg-text)' }}>{auto.status.lastError}{auto.status.failures > 1 ? ` (${auto.status.failures} marta)` : ''}</span></div>}
+        </div>
+      )}
       {!configured && <p className="faint" style={{ fontSize: 12.5, margin: '10px 0 0' }}>Avval yuqorida botni va kanalni saqlang.</p>}
       {st && st.phase !== 'idle' && (
         <div className="kv" style={{ marginTop: 14 }}>

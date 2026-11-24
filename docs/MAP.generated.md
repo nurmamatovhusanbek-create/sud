@@ -34,6 +34,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/public-orders/orders` | GET | GET /api/public-orders/orders?caseNumber=4-1001-2619/21743 | `public-orders/orders/route.ts` |
 | `/api/public-orders/status` | GET (no-rate-limit) |  | `public-orders/status/route.ts` |
 | `/api/rating` | GET | GET /api/rating?tin=XXXXXXXXX[&force=1] | `rating/route.ts` |
+| `/api/settings/backup/auto` | GET (no-rate-limit), POST | GET → { enabled, hasPassphrase, lastOkAt, lastAttemptAt, failures, lastError, running } (never the passphrase) | `settings/backup/auto/route.ts` |
 | `/api/settings/backup/catalog` | POST | POST /api/settings/backup/catalog Body: { passphrase } | `settings/backup/catalog/route.ts` |
 | `/api/settings/backup/load` | POST | POST /api/settings/backup/load Body: { passphrase, tins: string[] } | `settings/backup/load/route.ts` |
 | `/api/settings/backup/restore` | POST | POST /api/settings/backup/restore Body: { passphrase } | `settings/backup/restore/route.ts` |
@@ -110,8 +111,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, lib/vlm-config.ts, +3 |  |
-| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +30 |  |
-| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +46 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +31 |  |
+| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +47 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `presence.ts` | api/presence/route | server/__tests__/presence.test.ts |
 | `security.ts` | proxy.ts, server/middleware.ts | server/__tests__/security.test.ts |
 
@@ -126,16 +127,17 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +27 | lib/__tests__/ui-boundary.test.ts |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +28 | lib/__tests__/ui-boundary.test.ts |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-bill-cases.ts, hooks/use-found-cases.ts, hooks/use-resource.ts, +6 |  |
-| `backup-crypto.ts` | lib/backup.ts, lib/telegram-catalog.ts, lib/telegram-index.ts | lib/__tests__/backup.test.ts |
-| `backup.ts` | api/presence/route, api/settings/backup/catalog/route, api/settings/backup/load/route, api/settings/backup/restore/route, api/settings/backup/route, hooks/use-backup.ts | lib/__tests__/backup.test.ts |
-| `bill-cases.ts` | api/bill-cases/route, api/bills/query/route, api/presence/route, lib/api-types.ts, lib/backup.ts | lib/__tests__/bill-cases.test.ts |
+| `auto-backup.ts` | api/settings/backup/auto/route, instrumentation.ts | lib/__tests__/auto-backup.test.ts |
+| `backup-crypto.ts` | api/settings/backup/auto/route, lib/auto-backup.ts, lib/backup.ts, lib/telegram-catalog.ts, lib/telegram-index.ts | lib/__tests__/backup.test.ts |
+| `backup.ts` | api/presence/route, api/settings/backup/auto/route, api/settings/backup/catalog/route, api/settings/backup/load/route, api/settings/backup/restore/route, api/settings/backup/route, hooks/use-backup.ts, +1 | lib/__tests__/backup.test.ts |
+| `bill-cases.ts` | api/bill-cases/route, api/bills/query/route, api/presence/route, lib/api-types.ts, lib/auto-backup.ts, lib/backup.ts | lib/__tests__/bill-cases.test.ts |
 | `billing.ts` | api/bills/route, lib/bill-cases.ts, lib/public-orders/source.ts | lib/__tests__/billing-search.test.ts |
 | `bills-cache.ts` | components/sections/bills.tsx, components/sections/overview.tsx |  |
 | `bills-store.ts` | api/bills/export/route, api/bills/query/route, lib/api-types.ts, lib/backup.ts, lib/bill-cases.ts | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts |
 | `cache.ts` | components/sections/overview.tsx, components/shell/app-shell.tsx, hooks/use-resource.ts, lib/hard-refresh.ts, lib/registry.ts, lib/report/generate.ts | lib/__tests__/storage-quota.test.ts |
-| `case-store.ts` | api/found-cases/route, lib/api-types.ts, lib/bill-cases.ts, lib/court-case.ts, lib/db-buckets.ts, lib/served-case.ts, lib/stats.ts | lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/stats-found.test.ts |
+| `case-store.ts` | api/found-cases/route, lib/api-types.ts, lib/auto-backup.ts, lib/bill-cases.ts, lib/court-case.ts, lib/db-buckets.ts, lib/served-case.ts, +1 | lib/__tests__/auto-backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/stats-found.test.ts |
 | `cf-worker-pool.ts` | api/settings/health/route, api/settings/workers/route, lib/health-registry.ts, lib/net/worker-fetch.ts, lib/orginfo.ts | lib/__tests__/case-instances.test.ts, lib/__tests__/case-lean.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/company-facts.test.ts, lib/__tests__/health-store.test.ts, lib/__tests__/snapshot-routes.test.ts, lib/__tests__/upcoming-appeal.test.ts |
 | `chamber.ts` | lib/rating-service.ts, lib/stats.ts, sources/index.ts | lib/__tests__/company-facts.test.ts, lib/__tests__/stats-found.test.ts |
 | `company-meta.ts` | lib/backup.ts, lib/bill-cases.ts | lib/__tests__/company-meta.test.ts |
@@ -147,7 +149,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `db-buckets.ts` | lib/backup.ts, lib/telegram-catalog.ts, lib/telegram-index.ts, lib/watch.ts | lib/__tests__/backup.test.ts, lib/__tests__/db-buckets.test.ts |
 | `db-import.ts` | lib/db.ts |  |
 | `db-schema.ts` | lib/db.ts |  |
-| `db.ts` | lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/company-meta.ts, lib/db-admin.ts, lib/db-buckets.ts, lib/db-import.ts, +3 | lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/stats-found.test.ts, lib/__tests__/watch.test.ts |
+| `db.ts` | lib/auto-backup.ts, lib/backup.ts, lib/bills-store.ts, lib/case-store.ts, lib/company-meta.ts, lib/db-admin.ts, lib/db-buckets.ts, +4 | lib/__tests__/auto-backup.test.ts, lib/__tests__/backup.test.ts, lib/__tests__/bill-cases.test.ts, lib/__tests__/bills-store.test.ts, lib/__tests__/case-store-list.test.ts, lib/__tests__/case-store.test.ts, lib/__tests__/company-meta.test.ts, lib/__tests__/db-admin.test.ts, lib/__tests__/db-buckets.test.ts, lib/__tests__/db-import.test.ts, lib/__tests__/db.test.ts, lib/__tests__/served-case.test.ts, lib/__tests__/stats-found.test.ts, lib/__tests__/watch.test.ts |
 | `documents/banner.ts` | components/proto/doc-preview.tsx, lib/documents/fill.server.ts, lib/documents/print-render.ts, lib/pretenzia/fill.server.ts | lib/documents/__tests__/banner.test.ts |
 | `documents/bulk.server.ts` | api/documents/generate-bulk/route | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/script.test.ts |
 | `documents/bulk.ts` | api/documents/generate-bulk/route, components/views/doc-bulk.tsx, lib/documents/bulk.server.ts | lib/documents/__tests__/bulk-server.test.ts, lib/documents/__tests__/bulk.test.ts |
@@ -237,7 +239,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `vlm-test-image.ts` | lib/vlm-test.ts | lib/__tests__/vlm.test.ts |
 | `vlm-test.ts` | api/settings/vlm/test/route, lib/billing.ts | lib/__tests__/vlm.test.ts |
 | `watch-store.ts` | api/settings/watch/route, lib/watch.ts | lib/__tests__/watch.test.ts |
-| `watch.ts` | api/settings/watch/route, instrumentation.ts | lib/__tests__/watch.test.ts |
+| `watch.ts` | api/settings/watch/route, instrumentation.ts, lib/auto-backup.ts | lib/__tests__/watch.test.ts |
 | `worker-defaults.ts` | lib/cf-worker-pool.ts, lib/workers-config.ts |  |
 | `workers-config.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/cf-worker-pool.ts | lib/__tests__/workers-url.test.ts, server/__tests__/security.test.ts |
 | `xlsx-grid.ts` | components/views/doc-bulk.tsx, lib/documents/bulk.ts, lib/pretenzia/parse.ts | lib/__tests__/zip-guard.test.ts |
@@ -248,6 +250,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
+| `use-auto-backup.ts` | components/views/telegram-settings.tsx |  |
 | `use-backup.ts` | components/sections/telegram-copy-card.tsx, components/views/telegram-settings.tsx |  |
 | `use-bill-cases.ts` | components/sections/bill-cases-panel.tsx, hooks/use-found-cases.ts |  |
 | `use-db-admin.ts` | components/views/db-settings.tsx |  |
@@ -382,6 +385,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SUD_AUTO_EXIT` | app/api/presence/route.ts |
 | `SUD_BACKUP_CHUNK` | lib/backup-crypto.ts |
 | `SUD_BACKUP_GAP_MS` | lib/backup.ts |
+| `SUD_BACKUP_PASS_FILE` | lib/auto-backup.ts |
 | `SUD_DB` | lib/db.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
 | `TELEGRAM_CONFIG_FILE` | lib/telegram-config.ts |
@@ -460,6 +464,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__resetRatingCacheForTests` | lib/rating-service.ts |
 | `__resetSecurityForTests` | server/audit.ts |
 | `__resetSnapshotsForTests` | lib/snapshot-store.ts |
+| `__sudAutoBackup` | lib/auto-backup.ts |
 | `__sudBackup` | lib/backup.ts |
 | `__sudBillJob` | lib/bill-cases.ts |
 | `__sudCaseStore` | lib/case-store.ts |

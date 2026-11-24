@@ -114,3 +114,7 @@ The Telegram bot (Settings › Telegram, for encrypted copies of the database) f
 ## Kuzatuv (automatic court-list watch)
 
 The only scheduler in the app. `src/instrumentation.ts` starts a 60 s timer in the Node runtime; `lib/watch` does nothing unless `meta.watch_config.enabled` is true (default false, set from Settings › Telegram, `privileged` route `/api/settings/watch`). When on, it reads the operator's own companies' court lists (only STIRs already in the database or typed in the setting) at the app's usual pace and sends messages through the saved bot token to the listed Telegram ids only. The token never leaves `lib/telegram-config`; message text holds names and STIRs, so recipients must be the operator's own accounts. Switching it off stops it at the next tick.
+
+## Automatic backup passphrase
+
+Only when the operator switches «Avtomatik zaxira» on: the backup passphrase is kept in `~/.sud-tizimi/backup-pass.json` (0600, folder 0700), outside the project and git, like `telegram.json` and `vlm.json`. It is never sent back to the browser or logged; switching the feature off deletes the file. Whoever can read that file and `telegram.json` can read the channel's backups: protect the computer's account accordingly.
