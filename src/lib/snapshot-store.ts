@@ -150,6 +150,15 @@ export function writeSnapshot(tin: string, part: SnapshotPart, data: unknown, no
   return save(file)
 }
 
+/**
+ * The company's cases changed in the database (a load from Telegram, cases found by number): the day-old copies of its stats and of its court lists
+ * would keep showing the old count, so they are forgotten and the next open builds them again from the stored lists and found cases.
+ */
+export function retireCaseSnapshots(tin: string): void {
+  dropSnapshot(tin, 'stats')
+  dropSnapshot(tin, 'court:')
+}
+
 /** Forget parts of one company: all of them, or those whose name starts with `prefix` («court:»). */
 export function dropSnapshot(tin: string, prefix?: string): void {
   if (!TIN_RE.test(tin)) return

@@ -65,6 +65,7 @@ const deps: Partial<BillCasesDeps> = {
   sleep: async (ms) => { waits.push(ms) },
 }
 
+const forgetAll = (): void => { dbm.closeDb(); fs.rmSync(DIR, { recursive: true, force: true }); fs.mkdirSync(DIR, { recursive: true }); store.forgetCaseStoreMemory(); lib.forgetJob(); n = 0; caseCalls = []; script = {} }
 const run = async (o: Parameters<typeof lib.startJob>[1] = {}) => {
   lib.startJob(TIN, { deps, paceMs: 1000, ...o })
   await lib.jobDone()
@@ -351,6 +352,25 @@ describe('fill', () => {
     const st = await run({ fill: true, deps: d })
     expect(st.found).toBe(2)
     expect(store.readFound(TIN, 'civil').length + store.readFound(TIN, 'economic').length).toBe(2)
+  })
+})
+
+describe('the day-old stats and court lists', () => {
+  test('are forgotten when a job found cases (Statistika is built from them and would keep the old count), and kept when it found nothing', async () => {
+    const snap = await import('../snapshot-store')
+    snap.writeSnapshot(TIN, 'stats', { old: true })
+    snap.writeSnapshot(TIN, 'court:economic', ['x'])
+    snap.writeSnapshot(TIN, 'info', { keep: true })
+    defaultCase = () => ({ kind: 'absent' }) as CaseLean // the court knows none of the numbers
+    await run({ fill: true })
+    expect(snap.readSnapshot(TIN, 'stats')).not.toBeNull()
+    expect(snap.readSnapshot(TIN, 'court:economic')).not.toBeNull()
+    forgetAll()
+    defaultCase = found
+    await run({ fill: true })
+    expect(snap.readSnapshot(TIN, 'stats')).toBeNull()
+    expect(snap.readSnapshot(TIN, 'court:economic')).toBeNull()
+    expect(snap.readSnapshot(TIN, 'info')).not.toBeNull() // the company's info did not change
   })
 })
 

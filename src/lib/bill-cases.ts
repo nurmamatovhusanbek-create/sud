@@ -25,6 +25,7 @@ import { getCaseLean, type CaseLean } from './court-case'
 import type { CourtCase, CourtType } from './court-case-types'
 import { addFound, feedCaseNumbers, openFoundQueue, readFoundRow, triedStats, writeDetail } from './case-store'
 import { billCaseCount, billCountOf, countMissingCases, nextMissingCases, pageOverlap, readBillsMeta, readPasses, recordPass, type PassLog, setKnownFeed, writeBillsPage } from './bills-store'
+import { retireCaseSnapshots } from './snapshot-store'
 import { ensureCompany, markRefreshed, readCompany } from './company-meta'
 import { estimateCoverage, passIndexOfSize, passSize, passVerdict } from '@/core/bill-passes'
 
@@ -228,11 +229,22 @@ export function startJob(tin: string, opts: StartOpts = {}): JobStatus {
   g.__sudBillJob = job
   const deps: BillCasesDeps = { ...REAL, ...opts.deps }
   const pace = opts.paceMs ?? (Number(process.env.CASE_FETCH_GAP_MS) >= 0 && process.env.CASE_FETCH_GAP_MS ? Number(process.env.CASE_FETCH_GAP_MS) : DEFAULT_PACE_MS)
-  job.done = run(job, tin, opts, deps, pace).catch((e) => {
-    job.status.state = 'error'
-    job.status.lastError = e instanceof Error ? e.message : String(e)
-    job.status.phase = null
-  })
+  job.done = run(job, tin, opts, deps, pace)
+    .catch((e) => {
+      job.status.state = 'error'
+      job.status.lastError = e instanceof Error ? e.message : String(e)
+      job.status.phase = null
+    })
+    .finally(() => {
+      // cases were found or changed: the day-old stats and court lists would keep the old count (Statistika is built from them)
+      if (job.status.found > 0 || job.status.changed > 0) {
+        try {
+          retireCaseSnapshots(tin)
+        } catch {
+          /* the copies simply expire after a day */
+        }
+      }
+    })
   return { ...job.status }
 }
 

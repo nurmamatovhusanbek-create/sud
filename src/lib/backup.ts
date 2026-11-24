@@ -9,6 +9,7 @@ import {
   CHUNK_PLAIN, MIN_PASSPHRASE, bucketAad, bucketId, chunkAad, chunkPlain, deriveKey, newSalt, open, openManifest, openManifestWithKey, seal, sealManifest, sha256,
   type AnyManifest, type BucketRef, type Manifest, type ManifestV2, type PartRef,
 } from './backup-crypto'
+import { retireCaseSnapshots } from './snapshot-store'
 import { companyNameOf, importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
@@ -593,7 +594,10 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
     rows += importBucket(b.name, text, db, { bills: live > theirs ? 'keep' : 'replace' })
     set({ done: n + 1, message: `Yuklab olinmoqda: ${n + 1}/${total}` })
   }
-  for (const t of tins) forgetBillsSummary(t)
+  for (const t of tins) {
+    forgetBillsSummary(t)
+    retireCaseSnapshots(t) // the day-old stats and court lists would still show the count from before the load
+  }
   const loaded = tins.filter((t) => present.has(t))
   set({
     phase: 'done',

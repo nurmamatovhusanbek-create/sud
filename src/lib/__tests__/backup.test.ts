@@ -13,6 +13,7 @@ import zlib from 'node:zlib'
 mock.module('server-only', () => ({}))
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-'))
 process.env.SUD_DB = path.join(DIR, 'sud.db')
+process.env.SNAPSHOT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-snap-'))
 process.env.CASE_STORE_DIR = path.join(DIR, 'cases')
 process.env.TELEGRAM_CONFIG_FILE = path.join(DIR, 'telegram.json')
 process.env.SUD_BACKUP_CHUNK = '4096'
@@ -348,10 +349,15 @@ describe('catalog and loading single companies from the channel', () => {
     admin.forgetCompany(TIN)
     dbm.getDb().prepare('DELETE FROM case_details').run()
     expect(billsLib.queryBills(TIN, {})).toBeNull()
+    const snap = await import('../snapshot-store')
+    snap.writeSnapshot(TIN, 'stats', { old: true })
+    snap.writeSnapshot(TIN, 'court:civil', ['old'])
     expect(backup.startLoad(PASS, [TIN]).ok).toBe(true)
     const r = await finished()
     expect(r.phase).toBe('done')
     expect(r.result!.loadedTins).toEqual([TIN])
+    expect(snap.readSnapshot(TIN, 'stats')).toBeNull() // the day-old stats and court lists would still show the count from before the load
+    expect(snap.readSnapshot(TIN, 'court:civil')).toBeNull()
     expect(allBuckets(dbm.getDb())).toEqual(before)
     expect(billsLib.queryBills(TIN, {})?.total).toBe(600) // the cached summary was dropped
     expect(dbm.getDb().prepare('SELECT first_at, refreshed_at FROM companies').get()).toMatchObject({ first_at: 100, refreshed_at: 777 })
