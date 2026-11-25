@@ -1436,3 +1436,23 @@ mod the_app_link {
         assert!(sh.link.lock().unwrap().jobs.is_empty());
     }
 }
+
+mod status_line {
+    use super::*;
+    use crate::chat::handle_update;
+
+    #[tokio::test]
+    async fn status_says_whether_the_app_is_on() {
+        let (sh, _b) = ready_bot().await;
+        let m = |t: &str| json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": t } });
+        handle_update(sh.clone(), m("/status")).await;
+        assert!(sh.outbox.captured()[0].text.contains("<b>Ilova:</b> hali koʻrinmadi"), "{}", sh.outbox.captured()[0].text);
+        sh.link.lock().unwrap().pull(crate::state::now());
+        handle_update(sh.clone(), m("/status")).await;
+        assert!(sh.outbox.captured()[1].text.contains("<b>Ilova:</b> ulangan"));
+        sh.link.lock().unwrap().last_seen = crate::state::now() - 7 * 3600;
+        handle_update(sh.clone(), m("/status")).await;
+        assert!(sh.outbox.captured()[2].text.contains("7 soat oldin javob bergan"), "{}", sh.outbox.captured()[2].text);
+    }
+}
+

@@ -18,6 +18,11 @@ pub struct Config {
     pub rate_per_minute: usize,
     /// the morning message with the week's hearings (DIGEST=0 turns it off)
     pub digest: bool,
+    /// who is told when something is wrong (`ALERT_USER_IDS`, comma separated; default: the first of `ALLOWED_USER_IDS`); `ALERTS=0` turns the watchdog off
+    pub alert_users: Vec<i64>,
+    pub alerts: bool,
+    /// the app is called silent after this many hours without asking for work (`ALERT_APP_SILENT_HOURS`, default 6)
+    pub app_silent_hours: i64,
 }
 
 fn env(k: &str) -> Option<String> {
@@ -27,11 +32,13 @@ fn env(k: &str) -> Option<String> {
 impl Config {
     pub fn from_env() -> Result<Config, String> {
         let need = |k: &str| env(k).ok_or_else(|| format!("{k} oʻrnatilmagan"));
+        let allowed: Vec<i64> = env("ALLOWED_USER_IDS").map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect()).unwrap_or_default();
+        let alert_users: Vec<i64> = env("ALERT_USER_IDS").map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect()).unwrap_or_else(|| allowed.iter().take(1).copied().collect());
         Ok(Config {
             token: need("BOT_TOKEN")?,
             channels: need("SUD_CHANNEL")?.split(',').map(|c| c.trim().to_string()).filter(|c| !c.is_empty()).collect(),
             pass: need("SUD_PASSPHRASE")?,
-            allowed: env("ALLOWED_USER_IDS").map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect()).unwrap_or_default(),
+            allowed,
             webhook_secret: need("WEBHOOK_SECRET")?,
             public_url: env("PUBLIC_URL").or_else(|| env("RENDER_EXTERNAL_URL")).map(|u| u.trim_end_matches('/').to_string()),
             port: env("PORT").and_then(|p| p.parse().ok()).unwrap_or(10000),
@@ -40,6 +47,9 @@ impl Config {
             set_webhook: env("WEBHOOK").map(|v| v != "0").unwrap_or(true),
             rate_per_minute: env("RATE_PER_MINUTE").and_then(|p| p.parse().ok()).unwrap_or(90),
             digest: env("DIGEST").map(|v| v != "0").unwrap_or(true),
+            alert_users,
+            alerts: env("ALERTS").map(|v| v != "0").unwrap_or(true),
+            app_silent_hours: env("ALERT_APP_SILENT_HOURS").and_then(|p| p.parse().ok()).filter(|h| *h >= 1).unwrap_or(6),
         })
     }
 }
@@ -61,6 +71,9 @@ impl Config {
             set_webhook: false,
             rate_per_minute: 0,
             digest: false,
+            alert_users: vec![4242],
+            alerts: false,
+            app_silent_hours: 6,
         }
     }
 }

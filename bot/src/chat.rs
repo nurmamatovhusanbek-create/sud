@@ -656,7 +656,15 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         "/status" => {
             let mirror = if info.channel > 0 { "\n⚠️ Asosiy kanal ishlamayapti: zaxira kanaldan oʻqilmoqda.".to_string() } else { String::new() };
             let degraded = if info.failures > 0 { format!("\n⚠️ Oxirgi {} ta yangilash muvaffaqiyatsiz: eski zaxiradan javob beryapman.", info.failures) } else { String::new() };
-            sh.outbox.send_html(chat, &format!("🗄 <b>Zaxira holati</b>\n<b>Oxirgi zaxira:</b> {}\n<b>Yozuvlar:</b> {}\n<b>Kompaniyalar:</b> {}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
+            // the app (the computer that scrapes): on, when it last asked for work, or not seen since the bot started
+            let seen = sh.link.lock().unwrap().last_seen;
+            let app = if seen == 0 {
+                "\n<b>Ilova:</b> hali koʻrinmadi (ulanish yoqilmagan yoki kompyuter oʻchiq)".to_string()
+            } else {
+                let ago = (crate::state::now() - seen).max(0);
+                if ago <= crate::link::ALIVE_SECS { "\n<b>Ilova:</b> ulangan".to_string() } else { format!("\n<b>Ilova:</b> {} oldin javob bergan, hozir ulanmagan", if ago >= 3600 { format!("{} soat", ago / 3600) } else { format!("{} daqiqa", ago / 60) }) }
+            };
+            sh.outbox.send_html(chat, &format!("🗄 <b>Zaxira holati</b>\n<b>Oxirgi zaxira:</b> {}\n<b>Yozuvlar:</b> {}\n<b>Kompaniyalar:</b> {}{app}{degraded}{mirror}", dmy_iso(info.backup_at.as_deref().unwrap_or("")), fmt_int(info.indexed as i64), info.companies), None).await;
         }
         "/settings" | "/reminders" => settings_reply(&sh, chat, uid).await,
         "/refresh" => refresh_reply(&sh, chat, arg).await,
