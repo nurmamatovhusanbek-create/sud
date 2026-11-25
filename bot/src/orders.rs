@@ -2,7 +2,9 @@
 //! `pdf:<id>` files. The bot never goes to public.sud.uz (its firewall refuses scripts); it only reads what the backup holds, and sends a PDF to the
 //! chat by opening its piece in memory, so nothing is written to the host's disk.
 //!
-//! A line of `orders:<yy>`: `[id, case number, instance, result, court, judge, category, pdf id, file name, size, court type, saved at (ms)]`.
+//! A line of `orders:<yy>`: `[id, case number, instance, result, court, judge, category, pdf id, file name, size, court type, saved at (ms)]`; saved at 0 =
+//! the order is known but its PDF was never downloaded (it has no `pdf:<id>` file). A line `["k", case number, checked at (ms)]` says the case was checked and
+//! nothing was published. Older backups hold downloaded orders only (saved at above 0).
 
 use crate::format::esc;
 use serde_json::{json, Value};
@@ -19,6 +21,8 @@ pub struct Order {
     pub pdf_id: String,
     pub pdf_name: String,
     pub size: u64,
+    /// the PDF is in the backup (`pdf:<id>`); false = found, not downloaded
+    pub saved: bool,
 }
 
 fn text(v: &[Value], i: usize) -> String {
@@ -31,9 +35,19 @@ pub fn parse(bytes: &[u8]) -> Vec<Order> {
         .lines()
         .filter_map(|l| serde_json::from_str::<Vec<Value>>(l).ok())
         .filter_map(|r| {
-            let o = Order { id: text(&r, 0), case: text(&r, 1), instance: text(&r, 2), result: text(&r, 3), court: text(&r, 4), judge: text(&r, 5), category: text(&r, 6), pdf_id: text(&r, 7), pdf_name: text(&r, 8), size: r.get(9).and_then(Value::as_u64).unwrap_or(0) };
+            let o = Order { id: text(&r, 0), case: text(&r, 1), instance: text(&r, 2), result: text(&r, 3), court: text(&r, 4), judge: text(&r, 5), category: text(&r, 6), pdf_id: text(&r, 7), pdf_name: text(&r, 8), size: r.get(9).and_then(Value::as_u64).unwrap_or(0), saved: r.get(11).and_then(Value::as_i64).unwrap_or(1) > 0 };
             (!o.id.is_empty() && is_pdf_id(&o.pdf_id) && !o.case.is_empty()).then_some(o)
         })
+        .collect()
+}
+
+/// the cases of an `orders:<yy>` bucket that were checked and have no order: case number → when it was checked (ms)
+pub fn parse_checks(bytes: &[u8]) -> Vec<(String, i64)> {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Vec<Value>>(l).ok())
+        .filter(|r| r.first().and_then(Value::as_str) == Some("k"))
+        .filter_map(|r| Some((r.get(1)?.as_str()?.to_string(), r.get(2)?.as_i64()?)))
         .collect()
 }
 
@@ -94,6 +108,14 @@ pub fn result_word(r: &str) -> String {
     }
 }
 
+/// the line for a case with no order: checked (when) or never checked
+pub fn none_text(title: &str, checked_ms: Option<i64>) -> String {
+    match checked_ms {
+        Some(ms) => format!("📄 {title}: <b>qaror eʼlon qilinmagan</b>\n<i>Ilova {} da tekshirgan. Sud qarorni keyinroq eʼlon qilishi mumkin.</i>", crate::chat::dmy_ms(ms)),
+        None => format!("📄 {title}: qaror maʼlumoti yoʻq.\n<i>Ish hali tekshirilmagan yoki qarorlar ilovada yuklanmagan. Ilovada ishning «Qarorlar» tugmasini bosing, soʻng zaxira oling.</i>"),
+    }
+}
+
 /// «412 KB», «1,3 MB»
 pub fn size_label(bytes: u64) -> String {
     if bytes >= 1024 * 1024 {
@@ -129,12 +151,20 @@ fn line(o: &Order, label: &str, with_case: bool) -> String {
     if !o.category.is_empty() {
         out.push_str(&format!("<i>{}</i>\n", esc(&o.category)));
     }
+    if !o.saved {
+        out.push_str("⏳ <i>PDF hali yuklanmagan</i>\n");
+    }
     out
 }
 
 /// the message for a case (`title` = the case number) or a company's list; at most `max` orders are listed
 pub fn list_text(title: &str, orders: &[Order], with_case: bool, max: usize) -> String {
-    let mut out = format!("📄 <b>Qarorlar</b> · {title}\n<b>{}</b> ta yuklangan\n", orders.len());
+    let saved = orders.iter().filter(|o| o.saved).count();
+    let mut out = if saved == orders.len() {
+        format!("📄 <b>Qarorlar</b> · {title}\n<b>{}</b> ta yuklangan\n", orders.len())
+    } else {
+        format!("📄 <b>Qarorlar</b> · {title}\n<b>{}</b> ta qaror: {} ta yuklangan, {} ta yuklanmagan\n", orders.len(), saved, orders.len() - saved)
+    };
     for (i, o) in orders.iter().enumerate().take(max) {
         out.push('\n');
         out.push_str(&line(o, &label_of(orders, i), with_case));
@@ -160,6 +190,7 @@ fn label_of(orders: &[Order], at: usize) -> String {
 /// one button per order (at most `max`): its PDF. A case has one order per instance (first, appeal, cassation, …), sometimes several in one instance.
 pub fn keyboard(orders: &[Order], max: usize) -> Value {
     let rows: Vec<Value> = (0..orders.len().min(max))
+        .filter(|&i| orders[i].saved) // an order whose PDF was never downloaded has nothing to send
         .map(|i| {
             let o = &orders[i];
             let label = if orders.iter().any(|x| x.case != o.case) { format!("📄 {} · {}", o.case, label_of(orders, i)) } else { format!("📄 {} · {}", label_of(orders, i), size_label(o.size)) };
@@ -182,7 +213,7 @@ mod tests {
     use super::*;
 
     fn o(id: &str, case: &str, inst: &str, result: &str) -> Order {
-        Order { id: id.into(), case: case.into(), instance: inst.into(), result: result.into(), court: "Andijon iqtisodiy sudi".into(), judge: "J. J.".into(), category: "Qarz".into(), pdf_id: format!("pdf-{id}"), pdf_name: "qaror.pdf".into(), size: 412 * 1024 }
+        Order { id: id.into(), case: case.into(), instance: inst.into(), result: result.into(), court: "Andijon iqtisodiy sudi".into(), judge: "J. J.".into(), category: "Qarz".into(), pdf_id: format!("pdf-{id}"), pdf_name: "qaror.pdf".into(), size: 412 * 1024, saved: true }
     }
 
     #[test]

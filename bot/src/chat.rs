@@ -425,11 +425,19 @@ async fn orders_reply(sh: &Arc<Shared>, chat: i64, arg: &str) {
     };
     match found {
         Ok(v) if v.is_empty() => {
-            sh.outbox.send_html(chat, &format!("📄 {title}: yuklangan qaror yoʻq.\n<i>Qarorlar ilovada yuklab olinganidan soʻng zaxira orqali shu yerga keladi.</i>"), None).await;
+            let text = if with_case {
+                format!("📄 {title}: qaror maʼlumoti yoʻq.\n<i>Qarorlar ilovada tekshirilib, zaxira olinganidan soʻng shu yerga keladi.</i>")
+            } else {
+                crate::orders::none_text(&title, sh.order_check_of(arg).await)
+            };
+            sh.outbox.send_html(chat, &text, None).await;
         }
         Ok(v) => {
             let max = if with_case { 8 } else { 10 };
-            sh.outbox.send_html(chat, &clip_html(&crate::orders::list_text(&title, &v, with_case, max), CHAT_MAX), Some(crate::orders::keyboard(&v, max))).await;
+            let kb = crate::orders::keyboard(&v, max);
+            // no button when no PDF is in the backup (an empty keyboard is not sent)
+            let markup = kb["inline_keyboard"].as_array().filter(|r| !r.is_empty()).map(|_| kb.clone());
+            sh.outbox.send_html(chat, &clip_html(&crate::orders::list_text(&title, &v, with_case, max), CHAT_MAX), markup).await;
         }
         Err(e) => sh.outbox.send(chat, &e.message(), None).await,
     }

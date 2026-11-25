@@ -326,13 +326,21 @@ impl Shared {
         Ok(HearingPage { today, days, total, rows, companies, ranges })
     }
 
-    /// Every downloaded order of ONE case: all its instances (first, appeal, cassation, …) and every order within an instance, first instance first.
+    /// Every found order of ONE case (downloaded or not): all its instances (first, appeal, cassation, …) and every order within an instance, first instance first.
     /// They are `orders:<yy>` records of the case's registration year; empty when the app has downloaded none.
     pub async fn orders_of_case(&self, num: &str) -> AppResult<Vec<Order>> {
         let n = orders::norm(num);
         let Some(yy) = orders::year_of(&n) else { return Ok(Vec::new()) };
         let Some(t) = self.bucket_text(&format!("orders:{yy}")).await.map_err(Self::upstream)? else { return Ok(Vec::new()) };
         Ok(orders::sorted(orders::parse(&t).into_iter().filter(|o| orders::norm(&o.case) == n).collect()))
+    }
+
+    /// When the app checked this case and found no published order (ms), if it did: the bot says «tekshirilgan, qaror eʼlon qilinmagan» instead of «unknown».
+    pub async fn order_check_of(&self, num: &str) -> Option<i64> {
+        let n = orders::norm(num);
+        let yy = orders::year_of(&n)?;
+        let t = self.bucket_text(&format!("orders:{yy}")).await.ok()??;
+        orders::parse_checks(&t).into_iter().find(|(c, _)| orders::norm(c) == n).map(|(_, at)| at)
     }
 
     /// The downloaded orders of every case the company has (by case number, so one case's several instances stay together), newest case first.

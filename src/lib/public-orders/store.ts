@@ -116,6 +116,11 @@ async function loadChecked(): Promise<Map<string, CaseCheck>> {
   return m
 }
 
+/** Every check record (the last one of each case): what the bot is told about «checked, nothing published». */
+export async function allChecked(): Promise<CaseCheck[]> {
+  return [...(await loadChecked()).values()]
+}
+
 export async function getChecked(caseNumber: string): Promise<CaseCheck | null> {
   return (await loadChecked()).get(normalizeCaseNumber(caseNumber)) ?? null
 }

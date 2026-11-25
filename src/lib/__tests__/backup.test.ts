@@ -789,13 +789,18 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     delete process.env.PUBLIC_ORDERS_BACKUP_DIR
   })
 
-  test('a downloaded order goes in as its record and its PDF, bit for bit; a found-but-not-downloaded one and a stray PDF do not; the PDF is sent once', async () => {
+  test('every found order goes in as a record, a downloaded one also as its PDF bit for bit (a stray PDF and a failed check do not); a checked case with none says so; the PDF is sent once', async () => {
     const { appendOrders } = await orders()
     const { writePdf } = await pdfs()
     const bytes = pdf('one')
     await appendOrders([order('o1', ID1, '2-1004-2603/8020'), order('o2', ID2, '2-1004-2603/8021')]) // o2 was found, never downloaded
     await writePdf(ID1, bytes, { name: 'qaror.pdf', via: 'import' })
     await writePdf(ORPHAN, pdf('orphan'), { via: 'import' }) // a file with no record: nothing to attach it to
+    const { markChecked } = await orders()
+    const at = '2026-11-20T10:00:00.000Z'
+    await markChecked({ caseNumber: '4-1001-2601/1', at, sig: '', seen: [], misses: 1 }) // checked, nothing published
+    await markChecked({ caseNumber: '4-1001-2601/2', at, sig: '', seen: [], misses: 1, error: 'timeout' }) // a failed attempt says nothing
+    await markChecked({ caseNumber: '2-1004-2603/8020', at, sig: '', seen: ['FIRST'], misses: 0 }) // has an order: no check line
     const ch = fakeChannel()
     const first = await runBackup()
     expect(first.phase).toBe('done')
@@ -804,10 +809,14 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect(m.names).toContain(`pdf:${ID1}`)
     expect(m.names).not.toContain(`pdf:${ID2}`)
     expect(m.names).not.toContain(`pdf:${ORPHAN}`)
-    // what the bot will read: one line for o1 only, the PDF identical to the file on disk
+    // what the bot will read: both found orders (o2 with saved-at 0 = not downloaded) and the one «checked, none» line; the PDF identical to the file on disk
     const lines = m.plain('orders:26').toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown[])
-    expect(lines).toHaveLength(1)
-    expect(lines[0]!.slice(0, 11)).toEqual(['o1', '2-1004-2603/8020', 'FIRST', 'FULFILLED', 'Andijon tumanlararo iqtisodiy sudi', 'J. J.', 'Qarz', ID1, 'qaror.pdf', 400, 'ECONOMIC'])
+    expect(lines).toHaveLength(3)
+    const byId = (id: string) => lines.find((l) => l[0] === id)!
+    expect(byId('o1').slice(0, 11)).toEqual(['o1', '2-1004-2603/8020', 'FIRST', 'FULFILLED', 'Andijon tumanlararo iqtisodiy sudi', 'J. J.', 'Qarz', ID1, 'qaror.pdf', 400, 'ECONOMIC'])
+    expect(Number(byId('o1')[11])).toBeGreaterThan(0)
+    expect(byId('o2')[11]).toBe(0)
+    expect(byId('k')).toEqual(['k', '4-1001-2601/1', Date.parse('2026-11-20T10:00:00.000Z')])
     expect(m.plain(`pdf:${ID1}`).equals(bytes)).toBe(true)
     // nothing readable in the channel: the file names are opaque and the PDF text does not appear
     for (const f of ch.files.values()) expect(Buffer.from(f).includes(Buffer.from('%PDF-1.4'))).toBe(false)
@@ -823,7 +832,7 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     const third = await runBackup()
     expect(third.result!.buckets - third.result!.reused).toBe(2) // orders:26 + pdf:ID3
     const m3 = await manifestOf(ch)
-    expect(m3.plain('orders:26').toString('utf8').split('\n').filter(Boolean)).toHaveLength(2)
+    expect(m3.plain('orders:26').toString('utf8').split('\n').filter(Boolean)).toHaveLength(4) // o1, o2, o3 and the check line
     expect(m3.names.filter((n) => n.startsWith('pdf:'))).toHaveLength(2)
   })
 
@@ -874,5 +883,9 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect(bk.mergeBucketText(`pdf:${ID1}`, Buffer.from('old'), Buffer.from([1, 2, 3])).equals(Buffer.from([1, 2, 3]))).toBe(true)
     const merged = bk.mergeBucketText('orders:26', Buffer.from('["o1","old"]\n["o0","x"]\n'), Buffer.from('["o1","new"]\n')).toString('utf8')
     expect(merged).toBe('["o0","x"]\n["o1","new"]\n')
+    // an order the channel knows as DOWNLOADED is not turned back into «not downloaded» by a computer that lacks the PDF; a later check replaces an earlier one
+    const row = (id: string, saved: number) => JSON.stringify([id, 'c', 'FIRST', '', '', '', '', 'pdf-' + id, '', 1, 'ECONOMIC', saved])
+    const m2 = bk.mergeBucketText('orders:26', Buffer.from(`${row('a', 1700)}\n["k","x",100]\n`), Buffer.from(`${row('a', 0)}\n["k","x",200]\n`)).toString('utf8').split('\n').filter(Boolean)
+    expect(m2).toEqual([row('a', 1700), '["k","x",200]'])
   })
 })

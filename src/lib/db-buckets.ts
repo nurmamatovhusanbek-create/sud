@@ -17,9 +17,10 @@ import { hearingDateKey, todayKeyUz } from '@/core/hearings'
  *                                 app, not in the database; read by the bot, never imported (the lists are fetched again from the courts)
  *   hearings:<tin>                the company's UPCOMING hearings (today and later), one row per case: number, court, date key, time, stage, status,
  *                                 parties, and when the row was made; read by the bot's “Yaqin majlislar” and the morning message, never imported
- *   orders:<yy>                   the records of DOWNLOADED court orders (published decisions) by the registration year of their case: id, case number,
- *                                 instance, result, court, judge, category, pdf id, file name and size, type, when saved. Not in the database (the
- *                                 orders live in `~/.sud-tizimi/public-orders`): rendered by `lib/orders-buckets`, read by the bot, never imported
+ *   orders:<yy>                   the records of FOUND court orders (published decisions) by the registration year of their case: id, case number,
+ *                                 instance, result, court, judge, category, pdf id, file name and size, type, when saved (0 = not downloaded), then
+ *                                 ["k", case, checked at] for a checked case with none. Not in the database (the orders live in
+ *                                 `~/.sud-tizimi/public-orders`): rendered by `lib/orders-buckets`, read by the bot, never imported
  *   pdf:<pdf id>                  ONE order PDF as it is (the bytes), once, forever: a published order never changes. Same source, same rules
  *   index:<tin>                   the LOCATOR of the company: every case number and bill number with the court/year of the bucket that holds it (never
  *                                 imported into a database: it is read by the search, `lib/telegram-index`)
@@ -287,7 +288,8 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
     case 'index': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'lists': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'hearings': return { key: String(r[0]), t: Number(r[8]) || 0 } // one row per case: the newer one is the case's current hearing
-    case 'orders': return { key: String(r[0]), t: null } // one row per order id: this computer's copy wins
+    // one row per order id (the copy that HAS the PDF wins: saved at 0 = not downloaded); a «checked» line is per case, the later check wins
+    case 'orders': return r[0] === 'k' ? { key: `k:${r[1]}`, t: Number(r[2]) || 0 } : { key: String(r[0]), t: Number(r[11]) || 0 }
     default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
   }
 }

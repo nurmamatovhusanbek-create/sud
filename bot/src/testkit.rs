@@ -79,6 +79,11 @@ pub const PDF_APPEAL: &str = "22222222-2222-2222-2222-222222222222";
 pub const PDF_APPEAL2: &str = "33333333-3333-3333-3333-333333333333";
 pub const PDF_OTHER_CASE: &str = "44444444-4444-4444-4444-444444444444";
 pub const PDF_OTHER_COMPANY: &str = "55555555-5555-5555-5555-555555555555";
+pub const PDF_MIXED: &str = "66666666-6666-6666-6666-666666666666";
+pub const MIXED_CASE: &str = "2-1004-2503/8022"; // a saved first instance and an appeal that was found but never downloaded
+pub const UNSAVED_CASE: &str = "2-1004-2503/8024"; // found, nothing downloaded
+pub const CHECKED_CASE: &str = "2-1004-2503/8023"; // checked: nothing published
+pub const CHECKED_AT: i64 = 1_774_000_000_000;
 pub fn pdf_text(id: &str) -> String {
     format!("%PDF-1.4\n% fake order {id}\n%%EOF")
 }
@@ -93,9 +98,14 @@ pub fn orders_buckets() -> Vec<(String, String)> {
         order("o-appeal2", CASE, "APPEAL", "FULFILLED", PDF_APPEAL2, "apellyatsiya-2.pdf"),
         order("o-other", "2-1004-2503/8021", "FIRST", "RETURNED", PDF_OTHER_CASE, "boshqa.pdf"),
         order("o-co2", "2-1503-2503/5802", "FIRST", "CASE_ENDED", PDF_OTHER_COMPANY, "ikkinchi.pdf"),
+        order("o-mixed1", MIXED_CASE, "FIRST", "FULFILLED", PDF_MIXED, "aralash.pdf"),
+        // found, never downloaded: saved at 0 (no `pdf:` bucket exists for it)
+        json!(["o-mixed2", MIXED_CASE, "APPEAL", "REFUSED", "Andijon viloyat sudi", "K. K.", "Qarz", "77777777-7777-7777-7777-777777777777", "", 5000, "ECONOMIC", 0]),
+        json!(["o-unsaved", UNSAVED_CASE, "FIRST", "FULFILLED", "Andijon tumanlararo iqtisodiy sudi", "J. J.", "Qarz", "88888888-8888-8888-8888-888888888888", "", 5000, "ECONOMIC", 0]),
+        json!(["k", CHECKED_CASE, CHECKED_AT]),
     ];
     let mut out = vec![("orders:25".to_string(), lines(&rows))];
-    for id in [PDF_FIRST, PDF_APPEAL, PDF_APPEAL2, PDF_OTHER_CASE, PDF_OTHER_COMPANY] {
+    for id in [PDF_FIRST, PDF_APPEAL, PDF_APPEAL2, PDF_OTHER_CASE, PDF_OTHER_COMPANY, PDF_MIXED] {
         out.push((format!("pdf:{id}"), pdf_text(id)));
     }
     out
