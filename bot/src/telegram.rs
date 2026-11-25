@@ -257,6 +257,8 @@ pub struct CaptureBox {
     pub sent: Mutex<Vec<Sent>>,
     pub edited: Mutex<Vec<Sent>>,
     pub pinned: Mutex<HashMap<i64, (i64, String)>>,
+    /// every pin call made (chat, message id): a test checks that pinning is not repeated
+    pub pins: Mutex<Vec<(i64, i64)>>,
     pub next_id: AtomicI64,
 }
 
@@ -312,6 +314,7 @@ impl Outbox {
             Outbox::Capture(c) => {
                 let text = c.sent.lock().unwrap().iter().rev().find(|m| m.chat == chat && m.id == id).map(|m| crate::format::plain(&m.text)).unwrap_or_default();
                 c.pinned.lock().unwrap().insert(chat, (id, text));
+                c.pins.lock().unwrap().push((chat, id));
             }
         }
     }

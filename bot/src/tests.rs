@@ -823,16 +823,26 @@ mod reminders {
     }
 
     #[tokio::test]
-    async fn pressing_an_older_screen_also_brings_the_pinned_one_up_to_date() {
+    async fn only_the_first_settings_screen_is_pinned_and_a_press_on_any_screen_updates_the_pinned_one() {
         let (sh, _b) = ready_bot().await;
         handle_update(sh.clone(), message(4242, "/settings")).await;
-        let old = sh.outbox.captured()[0].id;
-        handle_update(sh.clone(), message(4242, "/settings")).await; // a second screen: the newest, and the pinned one
-        let new = sh.outbox.captured()[1].id;
-        assert_eq!(pinned(&sh, 4242).unwrap().0, new);
-        handle_update(sh.clone(), press(4242, old, "s:d:3")).await;
+        let first = sh.outbox.captured()[0].id;
+        assert_eq!(pinned(&sh, 4242).unwrap().0, first);
+        // asking again (and again) gives a fresh screen at the bottom of the chat, but does not pin another message
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        handle_update(sh.clone(), message(4242, "/settings")).await;
+        let captured = sh.outbox.captured();
+        assert_eq!(captured.len(), 3);
+        assert_eq!(pinned(&sh, 4242).unwrap().0, first, "the pinned message stays the first one");
+        if let crate::telegram::Outbox::Capture(c) = &sh.outbox {
+            assert_eq!(c.pins.lock().unwrap().len(), 1, "one pin only");
+        }
+        // a press on the newest screen changes it AND the pinned one
+        let newest = captured[2].id;
+        handle_update(sh.clone(), press(4242, newest, "s:d:3")).await;
         assert_eq!(Prefs::parse(&pinned(&sh, 4242).unwrap().1).unwrap().days, 3);
         assert_eq!(sh.outbox.edited().len(), 2); // the pressed one and the pinned one
+        assert_eq!(sh.prefs_of(4242).await.days, 3);
     }
 
     #[tokio::test]

@@ -397,13 +397,18 @@ async fn company_names(sh: &Arc<Shared>) -> Vec<(String, String)> {
     sh.companies().await.into_iter().map(|c| (c.tin, c.name)).collect()
 }
 
-/// «/settings»: a NEW settings message (so it is the newest pinned one), pinned in the person's chat: it is both the screen and where the settings are kept
+/// «/settings»: a settings screen at the bottom of the chat. The FIRST one is pinned (it is where the settings are kept); later ones are plain messages and
+/// pinning is not repeated (every pin leaves a «pinned a message» line in the chat). A press on any screen also brings the pinned one up to date.
 async fn settings_reply(sh: &Arc<Shared>, chat: i64, user: i64) {
     let p = sh.prefs_of(user).await;
     let companies = company_names(sh).await;
     let Some(id) = sh.outbox.send_html_id(chat, &p.text(&companies), Some(p.keyboard(&companies, 0))).await else { return };
-    sh.outbox.pin(chat, id).await;
-    sh.remember_prefs(user, p, Some(id));
+    if sh.settings_msg(user).is_some() {
+        sh.remember_prefs(user, p, None);
+    } else {
+        sh.outbox.pin(chat, id).await;
+        sh.remember_prefs(user, p, Some(id));
+    }
 }
 
 /// A reminder went out: write the day into the person's pinned settings message (`sm=` / `se=`), the only place that survives the bot's restarts, so a restart
