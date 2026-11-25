@@ -12,6 +12,22 @@ use std::{
     time::Duration,
 };
 
+/// The body of a `sendDocument` call (multipart/form-data, written by hand: no extra dependency). The file name is already free of quotes, slashes and control
+/// characters (`orders::file_name`); the caption is Telegram HTML.
+pub fn multipart_document(boundary: &str, chat_id: i64, name: &str, bytes: &[u8], caption: &str) -> Vec<u8> {
+    let mut body: Vec<u8> = Vec::with_capacity(bytes.len() + 512);
+    let mut field = |k: &str, v: &str| body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").as_bytes());
+    field("chat_id", &chat_id.to_string());
+    field("parse_mode", "HTML");
+    if !caption.is_empty() {
+        field("caption", caption);
+    }
+    body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{name}\"\r\nContent-Type: application/pdf\r\n\r\n").as_bytes());
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    body
+}
+
 pub struct Tg {
     http: reqwest::Client,
     base: String,
@@ -115,6 +131,19 @@ impl Tg {
     }
 
     /// pin a message in a private chat (quietly)
+    /// Send a file to a chat (`sendDocument`, multipart written by hand: no extra dependency). The caption is Telegram HTML. Errors never contain the URL.
+    pub async fn send_document(&self, chat_id: i64, name: &str, bytes: &[u8], caption: &str) -> Result<(), String> {
+        let boundary = format!("----sudbot{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+        let body = multipart_document(&boundary, chat_id, name, bytes, caption);
+        let res = self.http.post(format!("{}/bot{}/sendDocument", self.base, self.token)).header("content-type", format!("multipart/form-data; boundary={boundary}")).body(body).send().await.map_err(reqerr)?;
+        let j: Value = res.json().await.map_err(|_| "Telegram javobi oʻqilmadi".to_string())?;
+        if j["ok"].as_bool() == Some(true) {
+            Ok(())
+        } else {
+            Err(j["description"].as_str().unwrap_or("Telegram faylni qabul qilmadi").to_string())
+        }
+    }
+
     pub async fn pin(&self, chat_id: i64, message_id: i64) {
         if let Err(e) = self.call::<Value>("pinChatMessage", &json!({ "chat_id": chat_id, "message_id": message_id, "disable_notification": true })).await {
             eprintln!("[bot] pinChatMessage: {e}");
@@ -152,6 +181,7 @@ impl Tg {
             ("case", "Ish: raqam"),
             ("bill", "Kvitansiya: raqam"),
             ("app", "Qidiruv oynasi (Mini App)"),
+            ("orders", "Sud qarorlari (PDF): ish raqami yoki STIR"),
             ("refresh", "Kompaniyani yangilash: STIR"),
             ("settings", "Eslatma sozlamalari"),
             ("status", "Zaxira holati"),
@@ -257,6 +287,8 @@ pub struct CaptureBox {
     pub sent: Mutex<Vec<Sent>>,
     pub edited: Mutex<Vec<Sent>>,
     pub pinned: Mutex<HashMap<i64, (i64, String)>>,
+    /// the files sent (`send_document`): chat, name, bytes, caption
+    pub docs: Mutex<Vec<(i64, String, Vec<u8>, String)>>,
     /// every pin call made (chat, message id): a test checks that pinning is not repeated
     pub pins: Mutex<Vec<(i64, i64)>>,
     pub next_id: AtomicI64,
@@ -291,6 +323,22 @@ impl Outbox {
                 let id = c.next_id.fetch_add(1, Ordering::SeqCst) + 1;
                 c.sent.lock().unwrap().push(Sent { chat, text: text.to_string(), markup, id });
                 Some(id)
+            }
+        }
+    }
+    /// a file to a chat; false when Telegram refused it (the reason is logged, never shown with a URL)
+    pub async fn send_document(&self, chat: i64, name: &str, bytes: &[u8], caption: &str) -> bool {
+        match self {
+            Outbox::Telegram(t) => match t.send_document(chat, name, bytes, caption).await {
+                Ok(()) => true,
+                Err(e) => {
+                    eprintln!("[bot] sendDocument: {e}");
+                    false
+                }
+            },
+            Outbox::Capture(c) => {
+                c.docs.lock().unwrap().push((chat, name.to_string(), bytes.to_vec(), caption.to_string()));
+                true
             }
         }
     }
@@ -338,10 +386,38 @@ impl Outbox {
         }
     }
     #[cfg_attr(not(test), allow(dead_code))]
+    pub fn docs(&self) -> Vec<(i64, String, Vec<u8>, String)> {
+        match self {
+            Outbox::Capture(c) => c.docs.lock().unwrap().clone(),
+            _ => Vec::new(),
+        }
+    }
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn edited(&self) -> Vec<Sent> {
         match self {
             Outbox::Capture(c) => c.edited.lock().unwrap().clone(),
             _ => Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod multipart_tests {
+    use super::multipart_document;
+
+    #[test]
+    fn the_document_body_has_its_fields_then_the_file_bytes_untouched_then_the_closing_boundary() {
+        let pdf: Vec<u8> = [b"%PDF-1.4\n".as_slice(), &[0, 255, 13, 10, 45, 45, 200], b"\n%%EOF"].concat(); // binary, with CR LF and dashes inside
+        let body = multipart_document("BND", 4242, "qaror.pdf", &pdf, "<code>2-1004-2603/8020</code>");
+        let s = String::from_utf8_lossy(&body).to_string();
+        assert!(s.starts_with("--BND\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n4242\r\n"), "{s}");
+        assert!(s.contains("name=\"parse_mode\"\r\n\r\nHTML") && s.contains("name=\"caption\"\r\n\r\n<code>2-1004-2603/8020</code>"));
+        assert!(s.contains("name=\"document\"; filename=\"qaror.pdf\"\r\nContent-Type: application/pdf\r\n\r\n"));
+        assert!(body.ends_with(b"\r\n--BND--\r\n"));
+        // the file is in the body byte for byte, between the headers and the closing boundary
+        let at = body.windows(pdf.len()).position(|w| w == pdf.as_slice()).expect("file bytes present");
+        assert_eq!(&body[at + pdf.len()..], b"\r\n--BND--\r\n");
+        // no caption: no caption field
+        assert!(!String::from_utf8_lossy(&multipart_document("B", 1, "a.pdf", b"%PDF-", "")).contains("name=\"caption\""));
     }
 }

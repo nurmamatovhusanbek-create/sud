@@ -17,6 +17,10 @@ import { hearingDateKey, todayKeyUz } from '@/core/hearings'
  *                                 app, not in the database; read by the bot, never imported (the lists are fetched again from the courts)
  *   hearings:<tin>                the company's UPCOMING hearings (today and later), one row per case: number, court, date key, time, stage, status,
  *                                 parties, and when the row was made; read by the bot's “Yaqin majlislar” and the morning message, never imported
+ *   orders:<yy>                   the records of DOWNLOADED court orders (published decisions) by the registration year of their case: id, case number,
+ *                                 instance, result, court, judge, category, pdf id, file name and size, type, when saved. Not in the database (the
+ *                                 orders live in `~/.sud-tizimi/public-orders`): rendered by `lib/orders-buckets`, read by the bot, never imported
+ *   pdf:<pdf id>                  ONE order PDF as it is (the bytes), once, forever: a published order never changes. Same source, same rules
  *   index:<tin>                   the LOCATOR of the company: every case number and bill number with the court/year of the bucket that holds it (never
  *                                 imported into a database: it is read by the search, `lib/telegram-index`)
  * Text of a bucket: one JSON array per row, rows in primary-key order, binary columns as base64. The bills' `pass` counter is left out (it moves on
@@ -38,12 +42,14 @@ const marks = (n: number) => Array.from({ length: n }, () => '?').join(', ')
 const WITH_CASE = "case_number IS NOT NULL AND case_number != ''"
 const yearOfMs = (c: string) => `CAST(strftime('%Y', ${c} / 1000, 'unixepoch') AS INTEGER)`
 
-export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists' | 'hearings'
+export type BucketKind = 'bills' | 'found' | 'details' | 'tried' | 'state' | 'index' | 'lists' | 'hearings' | 'orders' | 'pdf'
 export interface BucketName {
   kind: BucketKind
   tin: string | null
   court: string | null
   year: number | null
+  /** `pdf`: the order file's id */
+  key?: string
 }
 
 export function parseBucket(name: string): BucketName | null {
@@ -57,6 +63,8 @@ export function parseBucket(name: string): BucketName | null {
     case 'index': return p.length === 2 ? { kind: 'index', tin: p[1]!, court: null, year: null } : null
     case 'lists': return p.length === 2 ? { kind: 'lists', tin: p[1]!, court: null, year: null } : null
     case 'hearings': return p.length === 2 ? { kind: 'hearings', tin: p[1]!, court: null, year: null } : null
+    case 'orders': return p.length === 2 && /^\d{1,2}$/.test(p[1]!) ? { kind: 'orders', tin: null, court: null, year: Number(p[1]) } : null
+    case 'pdf': return p.length === 2 && /^[A-Za-z0-9_-]{4,80}$/.test(p[1]!) ? { kind: 'pdf', tin: null, court: null, year: null, key: p[1]! } : null
     default: return null
   }
 }
@@ -129,7 +137,7 @@ export interface RenderedBucket {
 /** the bytes of one bucket (deterministic), or null when it is empty or the name is not one of ours */
 export function renderBucket(name: string, db: Db = getDb()): RenderedBucket | null {
   const b = parseBucket(name)
-  if (!b) return null
+  if (!b || b.kind === 'orders' || b.kind === 'pdf') return null // those come from the orders folder (`lib/orders-buckets`), not from the database
   const lines: string[] = []
   const take = (rows: Record<string, unknown>[], cols: readonly string[], fix?: (c: string, v: unknown) => unknown) => {
     for (const r of rows) lines.push(line(cols.map((c) => (fix ? fix(c, r[c]) : r[c] ?? null))))
@@ -220,7 +228,7 @@ function importLists(tin: string, text: Uint8Array): number {
 export function importBucket(name: string, text: Uint8Array, db: Db = getDb(), opts: { bills?: 'replace' | 'keep' } = {}): number {
   const b = parseBucket(name)
   if (!b) throw new Error(`noma'lum bo'lak: ${name.slice(0, 40)}`)
-  if (b.kind === 'index' || b.kind === 'hearings') return 0 // a locator and the hearings are read by the search / the bot, never imported
+  if (b.kind === 'index' || b.kind === 'hearings' || b.kind === 'orders' || b.kind === 'pdf') return 0 // a locator, the hearings and the orders are read by the search / the bot, never imported
   if (b.kind === 'lists') return importLists(b.tin!, text) // the court lists go back into the company's stored feeds (files, not the database)
   const rows = Buffer.from(text).toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as SqlValue[])
   let n = 0
@@ -279,6 +287,7 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
     case 'index': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'lists': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'hearings': return { key: String(r[0]), t: Number(r[8]) || 0 } // one row per case: the newer one is the case's current hearing
+    case 'orders': return { key: String(r[0]), t: null } // one row per order id: this computer's copy wins
     default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
   }
 }
@@ -291,6 +300,7 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
 export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Array): Buffer {
   const b = parseBucket(name)
   if (!b) throw new Error('noma\'lum bo\'lak')
+  if (b.kind === 'pdf') return Buffer.from(local) // a published order never changes: there is nothing to merge, and the bytes are not lines
   const rows = new Map<string, { line: string; t: number | null }>()
   const take = (text: Uint8Array, isLocal: boolean) => {
     for (const line of Buffer.from(text).toString('utf8').split('\n')) {

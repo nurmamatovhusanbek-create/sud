@@ -69,6 +69,38 @@ pub fn buckets(extra_case: bool) -> Vec<(String, String)> {
     ]
 }
 
+/// the id of the file that holds a bucket's single piece in `chat`'s channel (to damage or delete it in a test)
+pub fn piece_file_id(chat: &str, pass: &str, text: &str) -> String {
+    format!("F{chat}-{}", bucket_id(&key(pass, chat), text.as_bytes()))
+}
+
+pub const PDF_FIRST: &str = "11111111-1111-1111-1111-111111111111";
+pub const PDF_APPEAL: &str = "22222222-2222-2222-2222-222222222222";
+pub const PDF_APPEAL2: &str = "33333333-3333-3333-3333-333333333333";
+pub const PDF_OTHER_CASE: &str = "44444444-4444-4444-4444-444444444444";
+pub const PDF_OTHER_COMPANY: &str = "55555555-5555-5555-5555-555555555555";
+pub fn pdf_text(id: &str) -> String {
+    format!("%PDF-1.4\n% fake order {id}\n%%EOF")
+}
+
+/// the downloaded court orders of the fixture, as the app writes them: ONE case (`CASE`) with an order in each of its instances (and two in the appeal),
+/// another case of the same company, and a case of the other company
+pub fn orders_buckets() -> Vec<(String, String)> {
+    let order = |id: &str, case: &str, inst: &str, result: &str, pdf: &str, name: &str| json!([id, case, inst, result, "Andijon tumanlararo iqtisodiy sudi", "J. J.", "Qarz", pdf, name, pdf_text(pdf).len(), "ECONOMIC", 1_774_000_000_000i64]);
+    let rows = vec![
+        order("o-first", CASE, "FIRST", "FULFILLED", PDF_FIRST, "birinchi.pdf"),
+        order("o-appeal", CASE, "APPEAL", "REFUSED", PDF_APPEAL, "apellyatsiya.pdf"),
+        order("o-appeal2", CASE, "APPEAL", "FULFILLED", PDF_APPEAL2, "apellyatsiya-2.pdf"),
+        order("o-other", "2-1004-2503/8021", "FIRST", "RETURNED", PDF_OTHER_CASE, "boshqa.pdf"),
+        order("o-co2", "2-1503-2503/5802", "FIRST", "CASE_ENDED", PDF_OTHER_COMPANY, "ikkinchi.pdf"),
+    ];
+    let mut out = vec![("orders:25".to_string(), lines(&rows))];
+    for id in [PDF_FIRST, PDF_APPEAL, PDF_APPEAL2, PDF_OTHER_CASE, PDF_OTHER_COMPANY] {
+        out.push((format!("pdf:{id}"), pdf_text(id)));
+    }
+    out
+}
+
 pub struct Backup {
     pub channel: Arc<MemoryChannel>,
     pub pass: String,

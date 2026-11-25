@@ -11,6 +11,7 @@ import {
 } from './backup-crypto'
 import { retireCaseSnapshots } from './snapshot-store'
 import { companyNameOf, importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
+import { orderBuckets, type ExtraBucket } from './orders-buckets'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
 import { billJobRunning } from './bill-cases'
@@ -290,8 +291,17 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
   let snapDb: ReturnType<typeof openDbFile> | null = null
   try {
     snapDb = openDbFile(snap.file)
-    const names = listBuckets(snapDb)
+    // the downloaded orders (records and PDFs) come from the orders folder, not from the database snapshot
+    let extras = new Map<string, ExtraBucket>()
+    try {
+      extras = await orderBuckets()
+    } catch (e) {
+      console.warn(`[backup] qarorlar roʻyxatini olib boʻlmadi: ${e instanceof Error ? e.message : String(e)}`) // the database backup goes on without them
+    }
+    const names = [...listBuckets(snapDb), ...extras.keys()]
     const total = names.length
+    /** rows of a bucket's text: a PDF is one, whatever its bytes look like as lines */
+    const countRows = (name: string, text: Buffer): number => (name.startsWith('pdf:') ? 1 : text.toString('utf8').split('\n').filter(Boolean).length)
     const id = crypto.randomBytes(8).toString('hex')
     const day = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const refs: BucketRef[] = []
@@ -325,7 +335,8 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
 
     for (let n = 0; n < total; n++) {
       const name = names[n]!
-      const r = renderBucket(name, snapDb)
+      const extra = extras.get(name)
+      const r = extra ? await extra.render().then((t) => (t ? { text: t, rows: extra.rows } : null)) : renderBucket(name, snapDb)
       if (!r) continue
       let text: Buffer = r.text
       let rows = r.rows
@@ -335,7 +346,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
         const theirs = await downloadBucket(token, key, held)
         if (theirs) {
           text = mergeBucketText(name, theirs, text)
-          rows = text.toString('utf8').split('\n').filter(Boolean).length
+          rows = countRows(name, text)
         }
       }
       // the DONOR channel (the first one that worked) holds MORE rows of this bucket than this computer and this channel's own chain: they are merged in
@@ -344,7 +355,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
         const theirs = await downloadBucket(token, donor.key, dref)
         if (theirs) {
           text = mergeBucketText(name, theirs, text)
-          rows = text.toString('utf8').split('\n').filter(Boolean).length
+          rows = countRows(name, text)
         }
       }
       const bid = bucketId(key, text)
@@ -385,7 +396,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
           const own = await downloadBucket(token, key, mine)
           if (own) text = mergeBucketText(bname, theirs, own)
         }
-        const ref = await put(bname, text, text.toString('utf8').split('\n').filter(Boolean).length)
+        const ref = await put(bname, text, countRows(bname, text))
         if (!ref) return bail(`${bname} boʻlagini yuborib boʻlmadi: ${putFailed}`)
         refs.push(ref)
         have.add(bname)
@@ -460,7 +471,7 @@ async function runRestore(passphrase: string, token: string, chat: string): Prom
   const dest = path.join(path.dirname(dbPath()), `sud.restored-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
   if (m.v === 1) return restoreV1(m, key, token, dest)
 
-  const buckets = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k !== 'index' && k !== 'lists' && k !== 'hearings' }) // locators and court lists are for the search and the bot, not for a database
+  const buckets = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k !== 'index' && k !== 'lists' && k !== 'hearings' && k !== 'orders' && k !== 'pdf' }) // locators and court lists are for the search and the bot, not for a database
   const total = buckets.length
   set({ phase: 'download', done: 0, total, message: `Yuklab olinmoqda: 0/${total}` })
   let target: ReturnType<typeof openDbFile> | null = null

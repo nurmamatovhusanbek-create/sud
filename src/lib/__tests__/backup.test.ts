@@ -750,3 +750,129 @@ describe('company names in the backup', () => {
     expect(c?.refreshedAt).toBe(777)
   })
 })
+
+describe('downloaded court orders travel with the backup (for the bot)', () => {
+  const ORD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'orders-bk-'))
+  const ID1 = '11111111-2222-3333-4444-555555555555'
+  const ID2 = '66666666-7777-8888-9999-000000000000'
+  const ORPHAN = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+  const ID3 = '12121212-3434-5656-7878-909090909090'
+  const pdf = (tag: string) => Buffer.from(`%PDF-1.4\n% ${tag}\n${crypto.randomBytes(300).toString('hex')}\n%%EOF`)
+  const order = (id: string, pdfId: string, caseNumber: string, instance = 'FIRST') => ({ id, caseNumber, instance, result: 'FULFILLED', court: 'Andijon tumanlararo iqtisodiy sudi', judge: 'J. J.', category: 'Qarz', pdfId, pdfName: 'qaror.pdf', pdfSize: 400, courtType: 'ECONOMIC' as const })
+  const orders = () => import('../public-orders/store')
+  const pdfs = () => import('../public-orders/pdf-store')
+  /** the buckets the newest manifest names, and the plain bytes of one of them (opened with the passphrase) */
+  async function manifestOf(ch: ReturnType<typeof fakeChannel>) {
+    const pinnedMsg = [...ch.msgs.entries()].filter(([, m]) => m.name.endsWith('manifest.bin')).pop()!
+    const blob = ch.files.get(pinnedMsg[1].fileId)!
+    const opened = crypt.openManifest(PASS, Buffer.from(blob))
+    if (!opened.ok) throw new Error('manifest did not open')
+    const m = opened.manifest as { buckets: Array<{ name: string; id: string; rows: number; parts: Array<{ fileId: string }> }> }
+    const plain = (name: string) => {
+      const b = m.buckets.find((x) => x.name === name)!
+      const gz = Buffer.concat(b.parts.map((p, i) => crypt.open(opened.key, Buffer.from(ch.files.get(p.fileId)!), crypt.bucketAad(b.id, i))))
+      return zlib.gunzipSync(gz)
+    }
+    return { names: m.buckets.map((b) => b.name), plain, m }
+  }
+
+  beforeEach(() => {
+    process.env.PUBLIC_ORDERS_DIR = ORD_DIR
+    process.env.PUBLIC_ORDERS_BACKUP_DIR = path.join(ORD_DIR, '..', 'orders-bk-copy')
+    fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.mkdirSync(ORD_DIR, { recursive: true })
+  })
+  afterAll(() => {
+    fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.rmSync(path.join(ORD_DIR, '..', 'orders-bk-copy'), { recursive: true, force: true })
+    delete process.env.PUBLIC_ORDERS_DIR
+    delete process.env.PUBLIC_ORDERS_BACKUP_DIR
+  })
+
+  test('a downloaded order goes in as its record and its PDF, bit for bit; a found-but-not-downloaded one and a stray PDF do not; the PDF is sent once', async () => {
+    const { appendOrders } = await orders()
+    const { writePdf } = await pdfs()
+    const bytes = pdf('one')
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020'), order('o2', ID2, '2-1004-2603/8021')]) // o2 was found, never downloaded
+    await writePdf(ID1, bytes, { name: 'qaror.pdf', via: 'import' })
+    await writePdf(ORPHAN, pdf('orphan'), { via: 'import' }) // a file with no record: nothing to attach it to
+    const ch = fakeChannel()
+    const first = await runBackup()
+    expect(first.phase).toBe('done')
+    const m = await manifestOf(ch)
+    expect(m.names).toContain('orders:26')
+    expect(m.names).toContain(`pdf:${ID1}`)
+    expect(m.names).not.toContain(`pdf:${ID2}`)
+    expect(m.names).not.toContain(`pdf:${ORPHAN}`)
+    // what the bot will read: one line for o1 only, the PDF identical to the file on disk
+    const lines = m.plain('orders:26').toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown[])
+    expect(lines).toHaveLength(1)
+    expect(lines[0]!.slice(0, 11)).toEqual(['o1', '2-1004-2603/8020', 'FIRST', 'FULFILLED', 'Andijon tumanlararo iqtisodiy sudi', 'J. J.', 'Qarz', ID1, 'qaror.pdf', 400, 'ECONOMIC'])
+    expect(m.plain(`pdf:${ID1}`).equals(bytes)).toBe(true)
+    // nothing readable in the channel: the file names are opaque and the PDF text does not appear
+    for (const f of ch.files.values()) expect(Buffer.from(f).includes(Buffer.from('%PDF-1.4'))).toBe(false)
+    // a second backup sends only a manifest
+    const files1 = ch.files.size
+    const again = await runBackup()
+    expect(again.result!.chunks).toBe(0)
+    expect(ch.files.size).toBe(files1 + 1)
+    // another order downloaded: its PDF and the changed year bucket go, the first PDF is not sent again
+    const { appendOrders: add } = await orders()
+    await add([order('o3', ID3, '2-1004-2603/8020', 'APPEAL')])
+    await writePdf(ID3, pdf('two'), { via: 'import' })
+    const third = await runBackup()
+    expect(third.result!.buckets - third.result!.reused).toBe(2) // orders:26 + pdf:ID3
+    const m3 = await manifestOf(ch)
+    expect(m3.plain('orders:26').toString('utf8').split('\n').filter(Boolean)).toHaveLength(2)
+    expect(m3.names.filter((n) => n.startsWith('pdf:'))).toHaveLength(2)
+  })
+
+  test('the restore and the company load ignore the orders (they are for the bot, not for the database); a backup with none is unchanged', async () => {
+    const { appendOrders } = await orders()
+    const { writePdf } = await pdfs()
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020')])
+    await writePdf(ID1, pdf('one'), { via: 'import' })
+    fakeChannel()
+    expect((await runBackup()).phase).toBe('done')
+    backup.startRestore(PASS)
+    const r = await finished()
+    expect(r.phase).toBe('done')
+    const copy = dbm.openDbFile(r.result!.restoredFile!)
+    expect(allBuckets(copy)).toEqual(allBuckets(dbm.getDb()))
+    copy.close()
+    // no orders on disk: no order bucket at all
+    fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.mkdirSync(ORD_DIR, { recursive: true })
+    expect((await runBackup()).phase).toBe('done')
+  })
+
+  test('the fingerprint moves when a PDF or a record arrives and stays still otherwise', async () => {
+    const ob = await import('../orders-buckets')
+    const { appendOrders } = await orders()
+    const { writePdf } = await pdfs()
+    const empty = ob.ordersFingerprint()
+    expect(ob.ordersFingerprint()).toBe(empty)
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020')])
+    const withRecord = ob.ordersFingerprint()
+    expect(withRecord).not.toBe(empty)
+    await writePdf(ID1, pdf('one'), { via: 'import' })
+    const withPdf = ob.ordersFingerprint()
+    expect(withPdf).not.toBe(withRecord)
+    expect(ob.ordersFingerprint()).toBe(withPdf)
+  })
+
+  test('bucket names: the year comes from the case number, and only well-formed names parse', async () => {
+    const ob = await import('../orders-buckets')
+    expect(ob.orderYear('2-1004-2603/8020')).toBe(26)
+    expect(ob.orderYear('nonsense')).toBe(0)
+    expect(bk.parseBucket('orders:26')).toMatchObject({ kind: 'orders', year: 26 })
+    expect(bk.parseBucket('orders:x')).toBeNull()
+    expect(bk.parseBucket(`pdf:${ID1}`)).toMatchObject({ kind: 'pdf', key: ID1 })
+    expect(bk.parseBucket('pdf:../etc/passwd')).toBeNull()
+    expect(bk.parseBucket('pdf:a:b')).toBeNull()
+    // a PDF has nothing to merge, and an old record is replaced by this computer's
+    expect(bk.mergeBucketText(`pdf:${ID1}`, Buffer.from('old'), Buffer.from([1, 2, 3])).equals(Buffer.from([1, 2, 3]))).toBe(true)
+    const merged = bk.mergeBucketText('orders:26', Buffer.from('["o1","old"]\n["o0","x"]\n'), Buffer.from('["o1","new"]\n')).toString('utf8')
+    expect(merged).toBe('["o0","x"]\n["o1","new"]\n')
+  })
+})

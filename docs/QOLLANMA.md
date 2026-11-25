@@ -196,6 +196,7 @@ Botga shunchaki yozing: ish raqami (2-1004-2603/8020), kvitansiya raqami, STIR y
 | /find matn | Qidirish (oddiy xabar yozish bilan bir xil) |
 | /app | Qidiruv oynasi (Mini App): roʻyxatlar, kompaniya kartalari, majlislar |
 | /settings | Eslatma sozlamalari: vaqt, kunlar soni, kompaniyalar (12-boʻlim) |
+| /orders ish raqami yoki STIR | Ilovada yuklab olingan sud qarorlari: har instansiya alohida tugma, bosilsa PDF keladi. Ish kartasida «Qarorlar» tugmasi ham bor |
 | /refresh STIR | Kompaniyani sud saytlaridan qayta yigʻdirish (ilova bilan ulanish yoqilgan boʻlsa, 13-boʻlim) |
 | /status | Zaxira holati: qachon olingan, nechta yozuv |
 

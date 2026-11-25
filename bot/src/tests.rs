@@ -1097,6 +1097,133 @@ mod assets {
     }
 }
 
+mod orders {
+    use super::*;
+    use crate::chat::handle_update;
+
+    fn message(user: i64, text: &str) -> Value {
+        json!({ "message": { "from": { "id": user }, "chat": { "id": user }, "text": text } })
+    }
+    fn press(user: i64, data: &str) -> Value {
+        json!({ "callback_query": { "id": "1", "from": { "id": user }, "message": { "message_id": 9, "chat": { "id": user } }, "data": data } })
+    }
+    async fn with_orders() -> (std::sync::Arc<crate::state::Shared>, Backup) {
+        let b = backup();
+        let mut all = buckets(false);
+        all.extend(orders_buckets());
+        publish(&b.channel, MAIN, &b.pass, 2, &all);
+        let sh = bot(&b);
+        sh.sync().await.unwrap();
+        (sh, b)
+    }
+    fn texts(sh: &std::sync::Arc<crate::state::Shared>) -> Vec<String> {
+        sh.outbox.captured().into_iter().map(|m| m.text).collect()
+    }
+
+    #[tokio::test]
+    async fn one_case_lists_every_instance_and_each_button_sends_its_own_pdf() {
+        let (sh, _b) = with_orders().await;
+        // however the number is written: spaces, lower case
+        handle_update(sh.clone(), message(4242, &format!("/orders {}", CASE.replace('/', " / ").to_lowercase()))).await;
+        let sent = sh.outbox.captured();
+        assert_eq!(sent.len(), 1);
+        let t = &sent[0].text;
+        assert!(t.contains("<b>3</b> ta yuklangan") && t.contains("<b>Birinchi instansiya</b> · qanoatlantirildi") && t.contains("<b>Apellyatsiya 1</b> · rad etildi") && t.contains("<b>Apellyatsiya 2</b> · qanoatlantirildi"), "{t}");
+        let kb = sent[0].markup.clone().unwrap();
+        let ids: Vec<String> = kb["inline_keyboard"].as_array().unwrap().iter().map(|r| r[0]["callback_data"].as_str().unwrap().to_string()).collect();
+        assert_eq!(ids, vec![format!("o:{PDF_FIRST}"), format!("o:{PDF_APPEAL}"), format!("o:{PDF_APPEAL2}")]);
+        // each press sends its own file, byte for byte, with the court's file name and a caption
+        for (n, id) in [PDF_APPEAL2, PDF_FIRST].iter().enumerate() {
+            handle_update(sh.clone(), press(4242, &format!("o:{id}"))).await;
+            let docs = sh.outbox.docs();
+            assert_eq!(docs.len(), n + 1);
+            let d = docs.last().unwrap();
+            assert_eq!(d.0, 4242);
+            assert_eq!(d.2, pdf_text(id).into_bytes());
+            assert!(d.1.ends_with(".pdf") && !d.1.contains('/'), "{}", d.1);
+            assert!(d.3.contains(CASE) && (d.3.contains("Apellyatsiya") || d.3.contains("Birinchi")), "{}", d.3);
+        }
+        assert_eq!(sh.outbox.docs()[0].1, "apellyatsiya-2.pdf");
+    }
+
+    #[tokio::test]
+    async fn a_company_lists_the_orders_of_its_own_cases_newest_case_first() {
+        let (sh, _b) = with_orders().await;
+        handle_update(sh.clone(), message(4242, &format!("/orders {TIN}"))).await;
+        let sent = sh.outbox.captured();
+        let t = &sent[0].text;
+        assert!(t.contains("<b>4</b> ta yuklangan"), "{t}");
+        assert!(t.find("2-1004-2503/8021").unwrap() < t.find(&format!("<code>{CASE}</code>")).unwrap(), "newest case number first: {t}");
+        assert!(!t.contains("2-1503-2503/5802"), "another company's order does not show: {t}");
+        let kb = sent[0].markup.clone().unwrap().to_string();
+        assert!(kb.contains(PDF_OTHER_CASE) && kb.contains(PDF_FIRST) && !kb.contains(PDF_OTHER_COMPANY));
+        // the other company has its own
+        handle_update(sh.clone(), message(4242, &format!("/orders {OTHER_TIN}"))).await;
+        assert!(sh.outbox.captured()[1].markup.clone().unwrap().to_string().contains(PDF_OTHER_COMPANY));
+    }
+
+    #[tokio::test]
+    async fn the_case_card_offers_its_orders_only_when_it_has_some() {
+        let (sh, _b) = with_orders().await;
+        handle_update(sh.clone(), message(4242, &format!("/case {CASE}"))).await;
+        let m = sh.outbox.captured()[0].markup.clone().unwrap().to_string();
+        assert!(m.contains("Qarorlar (3)") && m.contains(&format!("r:{CASE}")), "{m}");
+        // the button opens the list
+        handle_update(sh.clone(), press(4242, &format!("r:{CASE}"))).await;
+        assert!(sh.outbox.captured()[1].text.contains("<b>3</b> ta yuklangan"));
+        // a case with none: no button
+        handle_update(sh.clone(), message(4242, "/case 2-0001-2401/5")).await;
+        let last = sh.outbox.captured().last().unwrap().markup.clone().map(|m| m.to_string()).unwrap_or_default();
+        assert!(!last.contains("Qarorlar"), "{last}");
+    }
+
+    #[tokio::test]
+    async fn nothing_to_show_says_so_and_a_bad_id_or_a_stranger_gets_nothing() {
+        let (sh, _b) = with_orders().await;
+        handle_update(sh.clone(), message(4242, "/orders 2-1004-2503/9999")).await;
+        handle_update(sh.clone(), message(4242, "/orders")).await;
+        handle_update(sh.clone(), message(4242, "/orders 2-1004-2699/1")).await; // a year the backup has no orders for
+        let t = texts(&sh);
+        assert!(t[0].contains("yuklangan qaror yoʻq") && t[1].contains("<code>/orders 2-1004-2603/8020</code>") && t[2].contains("yuklangan qaror yoʻq"), "{t:?}");
+        let before = sh.outbox.captured().len();
+        for bad in ["o:../etc/passwd", "o:", "o:a b", "o:x", "o:99999999-9999-9999-9999-999999999999"] {
+            handle_update(sh.clone(), press(4242, bad)).await;
+        }
+        assert!(sh.outbox.docs().is_empty());
+        assert_eq!(sh.outbox.captured().len(), before + 1, "only the unknown (well-formed) id is answered"); // «bu qaror fayli zaxirada yoʻq»
+        assert!(texts(&sh).last().unwrap().contains("zaxirada yoʻq"));
+        // a person who is not on the list gets nothing, for a command or a button
+        handle_update(sh.clone(), message(999, &format!("/orders {CASE}"))).await;
+        handle_update(sh.clone(), press(999, &format!("o:{PDF_FIRST}"))).await;
+        assert!(sh.outbox.docs().is_empty());
+        // (a stranger's command is answered with a refusal, never with the orders; a stranger's button with nothing)
+        let to_stranger: Vec<String> = sh.outbox.captured().into_iter().filter(|m| m.chat == 999).map(|m| m.text).collect();
+        assert!(to_stranger.iter().all(|t| !t.contains("ta yuklangan") && !t.contains(CASE)), "{to_stranger:?}");
+        assert!(sh.outbox.captured().len() <= before + 2);
+    }
+
+    #[tokio::test]
+    async fn a_damaged_pdf_piece_is_never_sent() {
+        let (sh, b) = with_orders().await;
+        let id = piece_file_id(MAIN, &b.pass, &pdf_text(PDF_FIRST));
+        b.channel.put(MAIN, &id, vec![1, 2, 3, 4, 5, 6, 7, 8]); // the channel's file changed
+        handle_update(sh.clone(), press(4242, &format!("o:{PDF_FIRST}"))).await;
+        assert!(sh.outbox.docs().is_empty());
+        assert!(texts(&sh).last().unwrap().contains("shikastlangan"), "{:?}", texts(&sh));
+    }
+
+    #[tokio::test]
+    async fn the_orders_are_in_the_help_and_a_backup_without_them_still_works() {
+        let (sh, _b) = ready_bot().await; // the plain fixture: no order buckets at all
+        handle_update(sh.clone(), message(4242, "/help")).await;
+        assert!(texts(&sh)[0].contains("/orders"));
+        handle_update(sh.clone(), message(4242, &format!("/orders {CASE}"))).await;
+        assert!(texts(&sh)[1].contains("yuklangan qaror yoʻq"));
+        handle_update(sh.clone(), message(4242, &format!("/case {CASE}"))).await;
+        assert!(!sh.outbox.captured()[2].markup.clone().map(|m| m.to_string()).unwrap_or_default().contains("Qarorlar"));
+    }
+}
+
 mod the_app_link {
     use super::*;
     use crate::chat::handle_update;

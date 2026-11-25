@@ -4,6 +4,7 @@
 use crate::domain::{Bill, BillPage, CaseRef, CasePage, CaseView, Company, CompanyHit, Hearing, HearingCompany, HearingPage, Overview, YearBills, YearCount};
 use crate::error::{AppError, AppResult};
 use crate::index::is_case_like;
+use crate::orders::{self, Order};
 use crate::date::add_days;
 use crate::party::{learn_name, side_by_aliases, side_by_tin, Side};
 use crate::state::Shared;
@@ -323,6 +324,50 @@ impl Shared {
         let total = rows_all.len();
         let rows = rows_all.into_iter().skip(offset).take(limit).cloned().collect();
         Ok(HearingPage { today, days, total, rows, companies, ranges })
+    }
+
+    /// Every downloaded order of ONE case: all its instances (first, appeal, cassation, …) and every order within an instance, first instance first.
+    /// They are `orders:<yy>` records of the case's registration year; empty when the app has downloaded none.
+    pub async fn orders_of_case(&self, num: &str) -> AppResult<Vec<Order>> {
+        let n = orders::norm(num);
+        let Some(yy) = orders::year_of(&n) else { return Ok(Vec::new()) };
+        let Some(t) = self.bucket_text(&format!("orders:{yy}")).await.map_err(Self::upstream)? else { return Ok(Vec::new()) };
+        Ok(orders::sorted(orders::parse(&t).into_iter().filter(|o| orders::norm(&o.case) == n).collect()))
+    }
+
+    /// The downloaded orders of every case the company has (by case number, so one case's several instances stay together), newest case first.
+    pub async fn orders_of_company(&self, tin: &str) -> AppResult<Vec<Order>> {
+        let cases: Vec<(String, String, u32)> = { self.st.read().await.index.shard_cases(tin) };
+        let wanted: std::collections::HashSet<String> = cases.iter().map(|(n, _, _)| orders::norm(n)).collect();
+        let years: std::collections::BTreeSet<u32> = wanted.iter().filter_map(|n| orders::year_of(n)).collect();
+        let mut out = Vec::new();
+        for yy in years {
+            if let Some(t) = self.bucket_text(&format!("orders:{yy}")).await.map_err(Self::upstream)? {
+                out.extend(orders::parse(&t).into_iter().filter(|o| wanted.contains(&orders::norm(&o.case))));
+            }
+        }
+        Ok(orders::newest_case_first(out))
+    }
+
+    /// The record of an order by its file id (the buckets `orders:*` the backup names are small), for a caption.
+    pub async fn order_meta(&self, pdf_id: &str) -> Option<Order> {
+        let names: Vec<String> = { self.st.read().await.manifest.as_ref().map(|m| m.buckets.iter().filter(|b| b.name.starts_with("orders:")).map(|b| b.name.clone()).collect()).unwrap_or_default() };
+        for n in names {
+            if let Ok(Some(t)) = self.bucket_text(&n).await {
+                if let Some(o) = orders::parse(&t).into_iter().find(|o| o.pdf_id == pdf_id) {
+                    return Some(o);
+                }
+            }
+        }
+        None
+    }
+
+    /// The bytes of an order's PDF, opened in memory (hash, authentication tag and keyed id are checked). None = the backup has no such file.
+    pub async fn order_pdf(&self, pdf_id: &str) -> AppResult<Option<Vec<u8>>> {
+        if !orders::is_pdf_id(pdf_id) {
+            return Ok(None);
+        }
+        Ok(self.bucket_text(&format!("pdf:{pdf_id}")).await.map_err(Self::upstream)?.map(|t| t.as_ref().clone()))
     }
 
     pub async fn bill_view(&self, number: &str) -> AppResult<Bill> {

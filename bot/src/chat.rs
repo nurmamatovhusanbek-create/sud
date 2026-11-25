@@ -18,6 +18,7 @@ Shunchaki yozing: ish raqami (<code>2-1004-2603/8020</code>), kvitansiya raqami,
 /stats [STIR]: sonlar, kompaniyalar va ishlar\n\
 /company STIR: kompaniya\n\
 /refresh STIR: kompaniyani sud saytlaridan qayta yigʻdirish (ilova yoqilgan boʻlsa)\n\
+/orders ish raqami yoki STIR: yuklangan sud qarorlari (PDF)\n\
 /case raqam: ish maʼlumoti\n\
 /bill raqam: kvitansiya\n\
 /find matn: qidirish\n\
@@ -387,7 +388,72 @@ async fn show(sh: &Arc<Shared>, chat: i64, what: &str, key: &str) {
         _ => (sh.company(key).await.map(|c| company_text(&c)).ok_or_else(|| crate::error::AppError::NotFound("Bunday kompaniya zaxirada yoʻq".into())), "company"),
     };
     match reply {
-        Ok(t) => sh.outbox.send_html(chat, &clip_html(&t, CHAT_MAX), app_button(sh, param, key)).await,
+        Ok(t) => {
+            let mut markup = app_button(sh, param, key);
+            // a case with downloaded court orders gets a button for them (all its instances)
+            if what == "c" {
+                let n = sh.orders_of_case(key).await.map(|o| o.len()).unwrap_or(0);
+                if n > 0 {
+                    let row = json!([{ "text": format!("📄 Qarorlar ({n})"), "callback_data": format!("r:{}", crate::orders::norm(key)) }]);
+                    let mut rows = markup.as_ref().and_then(|m| m["inline_keyboard"].as_array().cloned()).unwrap_or_default();
+                    rows.push(row);
+                    markup = Some(json!({ "inline_keyboard": rows }));
+                }
+            }
+            sh.outbox.send_html(chat, &clip_html(&t, CHAT_MAX), markup).await
+        }
+        Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+    }
+}
+
+/// «/orders <case number or STIR>»: the downloaded orders, one button per PDF
+async fn orders_reply(sh: &Arc<Shared>, chat: i64, arg: &str) {
+    let arg = arg.trim();
+    if arg.is_empty() {
+        sh.outbox.send_html(chat, "Ish raqamini yoki STIRni yozing: <code>/orders 2-1004-2603/8020</code> yoki <code>/orders 207275139</code>.\nFaqat ilovada yuklab olingan qarorlar koʻrinadi.", None).await;
+        return;
+    }
+    let digits: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
+    let by_company = digits.len() == 9 && !arg.contains('-') && !arg.contains('/');
+    let (title, found, with_case) = if by_company {
+        let name = sh.name_of(&digits).await;
+        let title = if name.is_empty() { format!("<code>STIR {digits}</code>") } else { format!("<b>{}</b>", esc(&lat(&name))) };
+        (title, sh.orders_of_company(&digits).await, true)
+    } else {
+        let case = crate::orders::norm(arg);
+        (format!("<code>{}</code>", esc(&case)), sh.orders_of_case(&case).await, false)
+    };
+    match found {
+        Ok(v) if v.is_empty() => {
+            sh.outbox.send_html(chat, &format!("📄 {title}: yuklangan qaror yoʻq.\n<i>Qarorlar ilovada yuklab olinganidan soʻng zaxira orqali shu yerga keladi.</i>"), None).await;
+        }
+        Ok(v) => {
+            let max = if with_case { 8 } else { 10 };
+            sh.outbox.send_html(chat, &clip_html(&crate::orders::list_text(&title, &v, with_case, max), CHAT_MAX), Some(crate::orders::keyboard(&v, max))).await;
+        }
+        Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+    }
+}
+
+/// a press on an order button: the PDF is opened from the backup in memory and sent
+async fn order_file(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
+    if !crate::orders::is_pdf_id(pdf_id) {
+        return;
+    }
+    let meta = sh.order_meta(pdf_id).await;
+    match sh.order_pdf(pdf_id).await {
+        Ok(Some(bytes)) => {
+            let (name, caption) = match &meta {
+                Some(o) => (crate::orders::file_name(o), format!("<code>{}</code> · {}", esc(&o.case), esc(crate::orders::instance_word(&o.instance)))),
+                None => ("qaror.pdf".to_string(), String::new()),
+            };
+            if !sh.outbox.send_document(chat, &name, &bytes, &caption).await {
+                sh.outbox.send(chat, "Faylni yuborib boʻlmadi: Telegram qabul qilmadi. Birozdan soʻng qayta urining.", None).await;
+            }
+        }
+        Ok(None) => {
+            sh.outbox.send(chat, "Bu qaror fayli zaxirada yoʻq. Ilovada qarorni qayta yuklab, zaxira oling.", None).await;
+        }
         Err(e) => sh.outbox.send(chat, &e.message(), None).await,
     }
 }
@@ -499,6 +565,15 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             }
             return;
         }
+        // «o:<pdf id>»: send that order's PDF; «r:<case number>»: the orders of a case (from the case card's button)
+        if let Some(id) = data.strip_prefix("o:") {
+            order_file(&sh, chat, id).await;
+            return;
+        }
+        if let Some(case) = data.strip_prefix("r:") {
+            orders_reply(&sh, chat, case).await;
+            return;
+        }
         // «h:<days>:<tin>:<offset>»: the next page of the hearings list
         if let Some(rest) = data.strip_prefix("h:") {
             let p: Vec<&str> = rest.split(':').collect();
@@ -582,6 +657,7 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         "/bill" => show(&sh, chat, "b", arg).await,
         "/company" => show(&sh, chat, "k", arg).await,
         "/find" => search_reply(&sh, chat, arg).await,
+        "/orders" | "/qarorlar" => orders_reply(&sh, chat, arg).await,
         _ if body.starts_with('/') => sh.outbox.send_html(chat, HELP, None).await,
         _ => search_reply(&sh, chat, body).await,
     }

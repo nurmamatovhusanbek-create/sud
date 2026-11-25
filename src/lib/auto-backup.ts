@@ -9,6 +9,7 @@ import { billJobRunning } from './bill-cases'
 import { feedRows, feedTins } from './case-store'
 import { watchRunning } from './watch'
 import { MIN_PASSPHRASE } from './backup-crypto'
+import { ordersFingerprint } from './orders-buckets'
 
 /**
  * Automatic backup («Avtomatik zaxira»): when something NEW is in the database, the encrypted backup goes to the Telegram channel by itself, so the
@@ -101,6 +102,7 @@ export function fingerprint(): string {
     for (const r of feedRows(tin)) h.update(`|${r.court}|${r.num}|${r.row.caseStatus}|${r.row.result}|${r.row.hearingDate}|${r.row.hearingTime}`)
     h.update('\n')
   }
+  h.update(`orders:${ordersFingerprint()}`) // downloaded order PDFs and their records (names and sizes only)
   return h.digest('hex')
 }
 
