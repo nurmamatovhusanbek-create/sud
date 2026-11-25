@@ -219,7 +219,7 @@ export const GUIDE: GuideSection[] = [
         ['/find matn', 'Qidirish (oddiy xabar yozish bilan bir xil)'],
         ['/app', 'Qidiruv oynasi (Mini App): roʻyxatlar, kompaniya kartalari, majlislar'],
         ['/settings', 'Eslatma sozlamalari: vaqt, kunlar soni, kompaniyalar (12-boʻlim)'],
-        ['/orders ish raqami yoki STIR', 'Ilovada yuklab olingan sud qarorlari: har instansiya alohida tugma, bosilsa PDF keladi. Ish kartasida «Qarorlar» tugmasi ham bor'],
+        ['/orders ish raqami yoki STIR', 'Sud qarorlari: har instansiya alohida tugma, bosilsa PDF keladi. Hali yuklanmagan qarorda «yuklash» tugmasi bor: ilova (yoqilgan boʻlsa) uni yuklaydi va bot faylni yuboradi; sayt odam tasdiqlashini talab qilsa, bot sababini yozadi. Ish kartasida «Qarorlar» tugmasi ham bor'],
         ['/refresh STIR', 'Kompaniyani sud saytlaridan qayta yigʻdirish (ilova bilan ulanish yoqilgan boʻlsa, 13-boʻlim)'],
         ['/status', 'Zaxira holati: qachon olingan, nechta yozuv'],
       ],

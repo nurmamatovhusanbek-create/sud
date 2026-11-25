@@ -529,24 +529,47 @@ async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, res
     }
 }
 
+/// what to tell a person whose request went to the app's queue (or could not): the same words for a company and for an order
+fn queued_text(asked: crate::link::Queued, what: &str, done: &str) -> String {
+    use crate::link::Queued;
+    match asked {
+        Queued::New => format!("⏳ {what} navbatga qoʻyildi. Ilova uni bajaradi, zaxiraga yozadi va men sizga xabar beraman (odatda bir necha daqiqa)."),
+        Queued::Joined => format!("⏳ {what} allaqachon navbatda: tugagach sizga ham xabar beraman."),
+        Queued::NotLinked => "Ilova ulanmagan: kompyuter oʻchiq yoki Sozlamalar › Telegram da «Bot bilan ulanish» yoqilmagan. Bu ish ilova ochiq paytida bajariladi.".to_string(),
+        Queued::Full => "Navbat toʻla: bir necha daqiqadan soʻng qayta urining.".to_string(),
+        Queued::TooMany => "Bir vaqtning oʻzida uchtagacha soʻrov berish mumkin: avvalgilari tugashini kuting.".to_string(),
+        Queued::Recent(secs) => format!("{what} {} daqiqa oldin {done}: bir oz keyin qayta urining.", secs / 60),
+    }
+}
+
 /// «/refresh STIR»: ask the app (the computer that scrapes) to update one company; it tells the person when the backup and the bot have it
 async fn refresh_reply(sh: &Arc<Shared>, chat: i64, arg: &str) {
-    use crate::link::Queued;
     let tin: String = arg.chars().filter(|c| c.is_ascii_digit()).collect();
     if tin.len() != 9 {
         sh.outbox.send_html(chat, "Kompaniya STIRini yozing: <code>/refresh 207275139</code>", None).await;
         return;
     }
-    let asked = sh.link.lock().unwrap().ask(&tin, chat, crate::state::now());
-    let text = match asked {
-        Queued::New => format!("⏳ <code>{tin}</code> navbatga qoʻyildi. Ilova uni sud saytlaridan yigʻadi, zaxiraga yozadi va men sizga xabar beraman (odatda bir necha daqiqa)."),
-        Queued::Joined => format!("⏳ <code>{tin}</code> allaqachon navbatda: tugagach sizga ham xabar beraman."),
-        Queued::NotLinked => "Ilova ulanmagan: kompyuter oʻchiq yoki Sozlamalar › Telegram da «Bot bilan ulanish» yoqilmagan. Yangilash ilova ochiq paytida ishlaydi.".to_string(),
-        Queued::Full => "Navbat toʻla: bir necha daqiqadan soʻng qayta urining.".to_string(),
-        Queued::TooMany => "Bir vaqtning oʻzida uchtagacha kompaniya soʻrash mumkin: avvalgilari tugashini kuting.".to_string(),
-        Queued::Recent(secs) => format!("<code>{tin}</code> {} daqiqa oldin yangilangan: bir oz keyin qayta urining.", secs / 60),
+    let asked = sh.link.lock().unwrap().ask(crate::link::What::Company(tin.clone()), chat, crate::state::now());
+    sh.outbox.send_html(chat, &queued_text(asked, &format!("<code>{tin}</code>"), "yangilangan"), None).await;
+}
+
+/// a press on «Yuklash» under an order whose PDF was never downloaded: the app is asked to download it (it needs the computer; the site may ask for a person)
+async fn order_download(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
+    if !crate::orders::is_pdf_id(pdf_id) {
+        return;
+    }
+    let Some(o) = sh.order_meta(pdf_id).await else {
+        sh.outbox.send(chat, "Bu qaror zaxirada yoʻq: ilovada ishni tekshirib, zaxira oling.", None).await;
+        return;
     };
-    sh.outbox.send_html(chat, &text, None).await;
+    if o.saved {
+        order_file(sh, chat, pdf_id).await; // it has been downloaded since the list was shown: just send it
+        return;
+    }
+    let what = crate::link::What::Order { pdf_id: pdf_id.to_string(), case: o.case.clone(), instance: o.instance.clone() };
+    let asked = sh.link.lock().unwrap().ask(what, chat, crate::state::now());
+    let label = format!("Qaror <code>{}</code> · {}", esc(&o.case), esc(crate::orders::instance_word(&o.instance)));
+    sh.outbox.send_html(chat, &queued_text(asked, &label, "yuklangan"), None).await;
 }
 
 pub async fn handle_update(sh: Arc<Shared>, u: Value) {
@@ -576,6 +599,10 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         // «o:<pdf id>»: send that order's PDF; «r:<case number>»: the orders of a case (from the case card's button)
         if let Some(id) = data.strip_prefix("o:") {
             order_file(&sh, chat, id).await;
+            return;
+        }
+        if let Some(id) = data.strip_prefix("d:") {
+            order_download(&sh, chat, id).await;
             return;
         }
         if let Some(case) = data.strip_prefix("r:") {

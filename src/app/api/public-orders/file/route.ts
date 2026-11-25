@@ -1,22 +1,15 @@
 import { guard } from '@/server/middleware'
 import { jsonFail } from '@/server/envelope'
-import { fetchOrderFile } from '@/lib/public-orders/source'
 import { isOrderFileId, pdfFileName } from '@/core/public-orders'
-import { createOrderPdfLoader, ManualDownloadRequired, NotPdfError } from '@/lib/public-orders/order-pdf'
-import { readPdf, writePdf } from '@/lib/public-orders/pdf-store'
+import { ManualDownloadRequired, NotPdfError } from '@/lib/public-orders/order-pdf'
+import { loadOrderPdf } from '@/lib/public-orders/pdf-load'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// one loader for the whole server: disk cache, one captcha at a time, same order joins the running request
-const loadPdf = createOrderPdfLoader({
-  read: readPdf,
-  write: writePdf,
-  fetch: fetchOrderFile,
-  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-  now: Date.now,
-})
+// one loader for the whole server (`lib/public-orders/pdf-load`): disk cache, one captcha at a time, same order joins the running request
+const loadPdf = loadOrderPdf
 
 /**
  * GET /api/public-orders/file?id=<pdf id>[&name=…]  → the order as a PDF.

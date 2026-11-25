@@ -57,10 +57,28 @@ pub fn verify(token: &str, ts: &str, sig: &str, path: &str, body: &[u8], now: i6
     m.verify_slice(&sig).is_ok()
 }
 
+/// what the app is asked to do: refresh a company, or download one order's PDF
+#[derive(Debug, Clone, PartialEq)]
+pub enum What {
+    Company(String),
+    /// an order that was found but whose PDF was never downloaded (`pdf_id` = the file id in the backup's record)
+    Order { pdf_id: String, case: String, instance: String },
+}
+
+impl What {
+    /// the identity for «already queued» and «done a moment ago»
+    pub fn key(&self) -> String {
+        match self {
+            What::Company(t) => t.clone(),
+            What::Order { pdf_id, .. } => format!("o:{pdf_id}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Job {
     pub id: u64,
-    pub tin: String,
+    pub what: What,
     /// everyone who asked for this company (one run answers them all)
     pub chats: Vec<i64>,
     pub at: i64,
@@ -95,17 +113,18 @@ impl Link {
         self.last_seen > 0 && now - self.last_seen <= ALIVE_SECS
     }
 
-    pub fn ask(&mut self, tin: &str, chat: i64, now: i64) -> Queued {
+    pub fn ask(&mut self, what: What, chat: i64, now: i64) -> Queued {
         if !self.alive(now) {
             return Queued::NotLinked;
         }
-        if let Some(j) = self.jobs.iter_mut().find(|j| j.tin == tin && j.result.is_none()) {
+        let key = what.key();
+        if let Some(j) = self.jobs.iter_mut().find(|j| j.what.key() == key && j.result.is_none()) {
             if !j.chats.contains(&chat) {
                 j.chats.push(chat);
             }
             return Queued::Joined;
         }
-        if let Some(t) = self.done_at.get(tin) {
+        if let Some(t) = self.done_at.get(&key) {
             if now - t < COOLDOWN_SECS {
                 return Queued::Recent(now - t);
             }
@@ -117,17 +136,17 @@ impl Link {
             return Queued::Full;
         }
         self.next_id += 1;
-        self.jobs.push(Job { id: self.next_id, tin: tin.to_string(), chats: vec![chat], at: now, taken_at: None, result: None });
+        self.jobs.push(Job { id: self.next_id, what, chats: vec![chat], at: now, taken_at: None, result: None });
         Queued::New
     }
 
     /// the app asks for work: what nobody has taken yet, now marked taken
-    pub fn pull(&mut self, now: i64) -> Vec<(u64, String)> {
+    pub fn pull(&mut self, now: i64) -> Vec<(u64, What)> {
         self.last_seen = now;
         let mut out = Vec::new();
         for j in self.jobs.iter_mut().filter(|j| j.taken_at.is_none() && j.result.is_none()) {
             j.taken_at = Some(now);
-            out.push((j.id, j.tin.clone()));
+            out.push((j.id, j.what.clone()));
         }
         out
     }
@@ -136,7 +155,7 @@ impl Link {
         if let Some(j) = self.jobs.iter_mut().find(|j| j.id == id && j.result.is_none()) {
             j.result = Some((ok, note.chars().take(300).collect()));
             if ok {
-                self.done_at.insert(j.tin.clone(), now);
+                self.done_at.insert(j.what.key(), now);
             }
         }
     }
@@ -184,28 +203,65 @@ pub async fn deliver(sh: &Arc<Shared>) {
     };
     for job in ready {
         let (ok, note) = job.result.clone().unwrap_or((false, String::new()));
-        let text = if ok {
-            match sh.overview(&job.tin).await {
-                Ok(o) => format!("✅ <b>{}</b> yangilandi\n<code>{}</code> · ishlar <b>{}</b> · toʻlovlar {}", crate::format::esc(&crate::translit::to_latin(&o.company.name)), job.tin, crate::chat::fmt_int(o.cases as i64), crate::chat::fmt_int(o.company.bills as i64)),
-                // the app finished but the bot has not read the backup yet: the next look will bring it
-                Err(_) => format!("✅ <code>{}</code> yangilandi. Bot yangi zaxirani bir necha daqiqada oʻqiydi.", job.tin),
+        match &job.what {
+            What::Company(tin) => {
+                let text = if ok {
+                    match sh.overview(tin).await {
+                        Ok(o) => format!("✅ <b>{}</b> yangilandi\n<code>{}</code> · ishlar <b>{}</b> · toʻlovlar {}", crate::format::esc(&crate::translit::to_latin(&o.company.name)), tin, crate::chat::fmt_int(o.cases as i64), crate::chat::fmt_int(o.company.bills as i64)),
+                        // the app finished but the bot has not read the backup yet: the next look will bring it
+                        Err(_) => format!("✅ <code>{tin}</code> yangilandi. Bot yangi zaxirani bir necha daqiqada oʻqiydi."),
+                    }
+                } else {
+                    format!("⚠️ <code>{tin}</code> yangilanmadi: {}", crate::format::esc(&note))
+                };
+                for chat in job.chats {
+                    sh.outbox.send_html(chat, &text, None).await;
+                }
             }
-        } else {
-            format!("⚠️ <code>{}</code> yangilanmadi: {}", job.tin, crate::format::esc(&note))
-        };
-        for chat in job.chats {
-            sh.outbox.send_html(chat, &text, None).await;
+            What::Order { pdf_id, case, instance } => {
+                let label = format!("<code>{}</code> · {}", crate::format::esc(case), crate::format::esc(crate::orders::instance_word(instance)));
+                if !ok {
+                    let text = format!("⚠️ Qarorni yuklab boʻlmadi ({label}): {}", crate::format::esc(&note));
+                    for chat in job.chats {
+                        sh.outbox.send_html(chat, &text, None).await;
+                    }
+                    continue;
+                }
+                // downloaded and backed up: the bot has just read that backup, so the file is here: send it
+                let file = sh.order_pdf(pdf_id).await.ok().flatten();
+                let meta = sh.order_meta(pdf_id).await;
+                for chat in job.chats {
+                    match (&file, &meta) {
+                        (Some(bytes), Some(o)) => {
+                            if !sh.outbox.send_document(chat, &crate::orders::file_name(o), bytes, &label).await {
+                                sh.outbox.send_html(chat, &format!("✅ Qaror yuklandi ({label}), lekin faylni yuborib boʻlmadi. /orders bilan qayta urining."), None).await;
+                            }
+                        }
+                        _ => {
+                            sh.outbox.send_html(chat, &format!("✅ Qaror yuklandi ({label}). Bot zaxirani bir necha daqiqada oʻqiydi: keyin /orders bilan oling."), None).await;
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-pub fn pull_json(jobs: &[(u64, String)]) -> Value {
-    json!({ "ok": true, "jobs": jobs.iter().map(|(id, tin)| json!({ "id": id, "tin": tin })).collect::<Vec<_>>() })
+/// the answer to «anything for me?»: a company job is `{id, tin}` (as before), an order job is `{id, kind: "order", pdfId}`
+pub fn pull_json(jobs: &[(u64, What)]) -> Value {
+    json!({ "ok": true, "jobs": jobs.iter().map(|(id, w)| match w {
+        What::Company(tin) => json!({ "id": id, "tin": tin }),
+        What::Order { pdf_id, .. } => json!({ "id": id, "kind": "order", "pdfId": pdf_id }),
+    }).collect::<Vec<_>>() })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn co(tin: &str) -> What {
+        What::Company(tin.to_string())
+    }
 
     #[test]
     fn the_signature_is_checked_against_time_path_and_body() {
@@ -231,20 +287,20 @@ mod tests {
     #[test]
     fn requests_queue_dedupe_cap_and_expire() {
         let mut l = Link::default();
-        assert!(matches!(l.ask("207275139", 1, 100), Queued::NotLinked), "the app has not been seen");
+        assert!(matches!(l.ask(co("207275139"), 1, 100), Queued::NotLinked), "the app has not been seen");
         assert!(l.pull(100).is_empty());
-        assert!(matches!(l.ask("207275139", 1, 110), Queued::New));
-        assert!(matches!(l.ask("207275139", 2, 111), Queued::Joined) && matches!(l.ask("207275139", 2, 112), Queued::Joined));
+        assert!(matches!(l.ask(co("207275139"), 1, 110), Queued::New));
+        assert!(matches!(l.ask(co("207275139"), 2, 111), Queued::Joined) && matches!(l.ask(co("207275139"), 2, 112), Queued::Joined));
         assert_eq!(l.jobs.len(), 1);
         assert_eq!(l.jobs[0].chats, vec![1, 2]);
-        assert!(matches!(l.ask("302678824", 1, 113), Queued::New) && matches!(l.ask("200248856", 1, 114), Queued::New));
-        assert!(matches!(l.ask("111111111", 1, 115), Queued::TooMany), "three at a time per person");
+        assert!(matches!(l.ask(co("302678824"), 1, 113), Queued::New) && matches!(l.ask(co("200248856"), 1, 114), Queued::New));
+        assert!(matches!(l.ask(co("111111111"), 1, 115), Queued::TooMany), "three at a time per person");
         // a pull hands out each job once
         assert_eq!(l.pull(120).len(), 3);
         assert!(l.pull(121).is_empty());
         // the result is kept until it is told; a finished company is not asked again at once
         l.finish(1, true, "", 130);
-        assert!(matches!(l.ask("207275139", 3, 140), Queued::Recent(10)));
+        assert!(matches!(l.ask(co("207275139"), 3, 140), Queued::Recent(10)));
         let told = l.take_results();
         assert_eq!(told.len(), 1);
         assert_eq!(l.jobs.len(), 2);
@@ -252,7 +308,7 @@ mod tests {
         assert!(l.alive(121 + ALIVE_SECS) && !l.alive(121 + ALIVE_SECS + 1));
         let mut l = Link::default();
         l.pull(1000);
-        assert!(matches!(l.ask("207275139", 1, 1001), Queued::New));
+        assert!(matches!(l.ask(co("207275139"), 1, 1001), Queued::New));
         l.expire(1001 + UNTAKEN_SECS + 1);
         let told = l.take_results();
         assert!(told.len() == 1 && !told[0].result.as_ref().unwrap().0);
@@ -263,8 +319,28 @@ mod tests {
         let mut l = Link::default();
         l.pull(10);
         for i in 0..QUEUE_MAX as i64 {
-            assert!(matches!(l.ask(&format!("{}", 200_000_000 + i), 100 + i, 11), Queued::New));
+            assert!(matches!(l.ask(co(&format!("{}", 200_000_000 + i)), 100 + i, 11), Queued::New));
         }
-        assert!(matches!(l.ask("999999999", 1, 12), Queued::Full));
+        assert!(matches!(l.ask(co("999999999"), 1, 12), Queued::Full));
+    }
+
+    #[test]
+    fn an_order_download_queues_dedupes_and_is_handed_out_as_an_order_job() {
+        let ord = |pdf: &str| What::Order { pdf_id: pdf.into(), case: "2-1004-2603/8020".into(), instance: "APPEAL".into() };
+        let mut l = Link::default();
+        l.pull(10);
+        assert!(matches!(l.ask(ord("p1"), 1, 11), Queued::New));
+        assert!(matches!(l.ask(ord("p1"), 2, 12), Queued::Joined), "the same order asked twice is one job");
+        assert!(matches!(l.ask(co("207275139"), 1, 13), Queued::New), "a company with the same text is another thing");
+        assert_eq!(l.jobs.len(), 2);
+        let got = l.pull(20);
+        assert_eq!(got.len(), 2);
+        let j = pull_json(&got);
+        assert_eq!(j["jobs"][0], json!({ "id": got[0].0, "kind": "order", "pdfId": "p1" }));
+        assert_eq!(j["jobs"][1], json!({ "id": got[1].0, "tin": "207275139" }));
+        // a finished order is not asked again at once; its key is not the company's
+        l.finish(got[0].0, true, "", 30);
+        assert!(matches!(l.ask(ord("p1"), 3, 40), Queued::Recent(10)));
+        assert!(matches!(l.ask(ord("p2"), 3, 40), Queued::New));
     }
 }

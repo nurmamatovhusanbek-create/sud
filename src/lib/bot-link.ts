@@ -5,6 +5,11 @@ import { backupBusy, backupState } from './backup'
 import { backupNow, type BackupNow } from './auto-backup'
 import { billJobRunning, jobDone, startJob } from './bill-cases'
 import { clearCourtCaseCache, searchCourtCasesDetailed } from './court-case'
+import { ManualDownloadRequired } from './public-orders/order-pdf'
+import { loadOrderPdf } from './public-orders/pdf-load'
+import { readPdf } from './public-orders/pdf-store'
+import { allOrders } from './public-orders/store'
+import { isOrderFileId } from '@/core/public-orders'
 import type { CourtType } from './court-case-types'
 import { retireCaseSnapshots } from './snapshot-store'
 import { readTelegram } from './telegram-config'
@@ -18,7 +23,9 @@ import { logger } from '@/infra/logger'
  *  1. After every successful backup the app tells the bot («/link/synced»), so the bot reads the new manifest at once instead of at its next look.
  *  2. Every minute the app asks the bot «anything for me?» («/link/pull»). A person's `/refresh STIR` in Telegram waits there; the app reads that
  *     company's court lists again (and re-asks its open cases), takes a backup right away (`backupNow`, no 15-minute gap) and reports back, and the bot
- *     tells the person once it has read the backup.
+ *     tells the person once it has read the backup. A «Yuklash» pressed under an order that was found but never downloaded is the same kind of job: the app
+ *     downloads that one PDF (through the same loader as the Qarorlar page: one captcha at a time, and the pause after a refusal), backs up, and the bot
+ *     sends the file. When the site wants a person, the job fails with the way to hand the file over (HAR) and nothing is retried.
  *
  * Opt-in: nothing is sent and nothing is asked until the setting is on (and a bot address is given). Each call is signed with a key derived from the bot
  * token (`HMAC-SHA256(token, "sud-link-v1")`, over time + path + body), so there is no new secret to keep. The bot's answer is never trusted beyond a
@@ -108,6 +115,8 @@ export interface LinkDeps {
   post: (path: '/link/pull' | '/link/synced', body: unknown) => Promise<Reply>
   /** read one company's court lists again and re-ask its open cases */
   refresh: (tin: string) => Promise<{ ok: boolean; note: string }>
+  /** download one order's PDF (a found order that was never downloaded) */
+  downloadOrder: (pdfId: string) => Promise<{ ok: boolean; note: string }>
   /** the bills job or Kuzatuv is running: wait for them */
   working: () => boolean
   backup: () => BackupView
@@ -127,7 +136,7 @@ export interface LinkStatus {
 }
 
 interface Slot {
-  todo: Array<{ id: number; tin: string }>
+  todo: LinkJob[]
   running: string | null
   awaiting: Finished[]
   ticking: boolean
@@ -148,14 +157,19 @@ export const forgetLink = (): void => {
 
 const TIN = /^\d{9}$/
 
-/** the jobs in the bot's answer, checked: a STIR of nine digits and a whole number id; anything else is dropped */
-export function parseJobs(v: unknown): Array<{ id: number; tin: string }> {
+/** a job the bot asks for: refresh a company (`tin`) or download one order's PDF (`pdfId`) */
+export type LinkJob = { id: number; tin: string } | { id: number; pdfId: string }
+
+/** the jobs in the bot's answer, checked: a whole number id and a STIR of nine digits, or an order file id of the shapes the app writes; anything else is dropped */
+export function parseJobs(v: unknown): LinkJob[] {
   if (!Array.isArray(v)) return []
-  const out: Array<{ id: number; tin: string }> = []
+  const out: LinkJob[] = []
   for (const j of v.slice(0, 50)) {
-    const id = (j as { id?: unknown })?.id
-    const tin = (j as { tin?: unknown })?.tin
-    if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && typeof tin === 'string' && TIN.test(tin)) out.push({ id, tin })
+    const o = j as { id?: unknown; tin?: unknown; kind?: unknown; pdfId?: unknown }
+    if (typeof o?.id !== 'number' || !Number.isSafeInteger(o.id) || o.id <= 0) continue
+    if (o.kind === 'order') {
+      if (typeof o.pdfId === 'string' && isOrderFileId(o.pdfId)) out.push({ id: o.id, pdfId: o.pdfId.toLowerCase() })
+    } else if (typeof o.tin === 'string' && TIN.test(o.tin)) out.push({ id: o.id, tin: o.tin })
   }
   return out
 }
@@ -185,7 +199,7 @@ export async function linkTick(d: LinkDeps): Promise<void> {
     if (r.ok) {
       s.lastPullAt = d.now()
       s.lastError = null
-      for (const j of parseJobs(r.jobs)) if (!s.todo.some((t) => t.id === j.id) && s.running !== j.tin) s.todo.push(j)
+      for (const j of parseJobs(r.jobs)) if (!s.todo.some((t) => t.id === j.id) && s.running !== ('tin' in j ? j.tin : j.pdfId)) s.todo.push(j)
     } else {
       s.lastError = r.error ?? 'Bot javob bermadi'
     }
@@ -193,9 +207,9 @@ export async function linkTick(d: LinkDeps): Promise<void> {
     // 2. one company at a time, and not while the bills job or Kuzatuv is using the sites
     if (!s.running && s.todo.length && !d.working()) {
       const job = s.todo.shift()!
-      s.running = job.tin
-      void d
-        .refresh(job.tin)
+      const label = 'tin' in job ? job.tin : job.pdfId
+      s.running = label
+      void ('tin' in job ? d.refresh(job.tin) : d.downloadOrder(job.pdfId))
         .catch((e) => ({ ok: false, note: e instanceof Error ? e.message.slice(0, 200) : 'xato' }))
         .then((res) => {
           s.awaiting.push({ id: job.id, ok: res.ok, note: res.note, at: d.now() })
@@ -272,6 +286,22 @@ async function refreshCompany(tin: string): Promise<{ ok: boolean; note: string 
   return { ok: true, note: read < COURTS.length ? `${read}/${COURTS.length} sud oʻqildi` : '' }
 }
 
+const MANUAL_NOTE = 'Sayt qarorni faqat odam tasdiqlagandan keyin beradi. Kompyuterda: brauzerda qarorni oching, HAR faylni Qarorlar › «HAR fayldan yuklash» orqali yuklang: bot faylni oʻzi yuboradi.'
+
+/** One order's PDF for the phone: only an order the app KNOWS (its record is in the store), once, through the shared loader; a refusal is reported with the way out, never retried. */
+export async function downloadOrder(pdfId: string, load: (id: string) => Promise<{ saved: boolean; saveError?: string }> = loadOrderPdf): Promise<{ ok: boolean; note: string }> {
+  const id = pdfId.toLowerCase()
+  if (!(await allOrders()).some((o) => (o.pdfId ?? '').toLowerCase() === id)) return { ok: false, note: 'Bu qaror ilovada topilmadi: avval ishni ilovada tekshiring.' }
+  if (await readPdf(id)) return { ok: true, note: '' } // already on disk: only the backup is left
+  try {
+    const r = await load(id)
+    return r.saved ? { ok: true, note: '' } : { ok: false, note: `PDF diskka saqlanmadi: ${r.saveError ?? ''}`.slice(0, 200) }
+  } catch (e) {
+    if (e instanceof ManualDownloadRequired) return { ok: false, note: MANUAL_NOTE }
+    return { ok: false, note: e instanceof Error ? e.message.slice(0, 200) : 'Qarorni yuklab boʻlmadi' }
+  }
+}
+
 async function realPost(path: '/link/pull' | '/link/synced', body: unknown): Promise<Reply> {
   const cfg = readLink()
   const tg = readTelegram()
@@ -301,6 +331,7 @@ const REAL: LinkDeps = {
   hasToken: () => readTelegram() !== null,
   post: realPost,
   refresh: refreshCompany,
+  downloadOrder,
   working: () => billJobRunning() || watchRunning(),
   backup: () => {
     const b = backupState()

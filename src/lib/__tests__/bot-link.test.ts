@@ -9,10 +9,16 @@ import os from 'node:os'
 import path from 'node:path'
 
 mock.module('server-only', () => ({}))
+// the shared PDF loader is replaced by a fake one passed in (the real one goes to public.sud.uz): what it does is set by each test
+let loaderCalls: string[] = []
+let loaderBehaviour: (id: string) => Promise<{ saved: boolean; saveError?: string }> = async () => ({ saved: true })
+const fakeLoader = async (id: string) => { loaderCalls.push(id); return loaderBehaviour(id) }
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bot-link-'))
 process.env.SUD_DB = path.join(DIR, 'sud.db')
 process.env.CASE_STORE_DIR = path.join(DIR, 'cases')
 process.env.SUD_BACKUP_PASS_FILE = path.join(DIR, 'pass.json')
+process.env.PUBLIC_ORDERS_DIR = path.join(DIR, 'orders')
+process.env.PUBLIC_ORDERS_BACKUP_DIR = path.join(DIR, 'orders-copy')
 const dbm = await import('../db')
 const store = await import('../case-store')
 const ab = await import('../auto-backup')
@@ -57,6 +63,9 @@ describe('the bot address and its answer', () => {
   test('only a STIR of nine digits and a whole number id are taken from the jobs', () => {
     expect(bl.parseJobs([{ id: 3, tin: '207275139' }, { id: '4', tin: '207275139' }, { id: 5, tin: '2072751390' }, { id: 6, tin: '../etc' }, { id: 1.5, tin: '207275139' }, null, 'x'])).toEqual([{ id: 3, tin: '207275139' }])
     expect(bl.parseJobs('nope')).toEqual([])
+    // an order job: an order file id of the shapes the app writes, never a path
+    const U = '11111111-2222-3333-4444-555555555555'
+    expect(bl.parseJobs([{ id: 1, kind: 'order', pdfId: U }, { id: 2, kind: 'order', pdfId: '../x' }, { id: 3, kind: 'order', pdfId: 5 }, { id: 4, kind: 'order' }, { id: 5, kind: 'order', pdfId: 'old-civil-123' }, { id: 6, kind: 'weird', tin: '207275139' }])).toEqual([{ id: 1, pdfId: U }, { id: 5, pdfId: 'old-civil-123' }, { id: 6, tin: '207275139' }])
   })
   test('the setting is kept, and off keeps the address', () => {
     expect(bl.readLink()).toEqual({ enabled: false, url: '' })
@@ -77,6 +86,8 @@ describe('the poll loop', () => {
   let working = false
   let refreshed: string[] = []
   let refreshResult = { ok: true, note: '' }
+  let downloaded: string[] = []
+  let downloadResult = { ok: true, note: '' }
   let backup: BackupView = { busy: false, doneStartedAt: 0, doneId: '' }
   let nowAnswer: 'started' | 'unchanged' | 'busy' | 'unavailable' = 'started'
   let nowCalls = 0
@@ -96,6 +107,7 @@ describe('the poll loop', () => {
       return { ok: true }
     },
     refresh: async (tin) => { refreshed.push(tin); return refreshResult },
+    downloadOrder: async (id) => { downloaded.push(id); return downloadResult },
     working: () => working,
     backup: () => backup,
     backupNow: () => { nowCalls++; return nowAnswer },
@@ -104,7 +116,7 @@ describe('the poll loop', () => {
   const synced = () => posts.filter((p) => p.path === '/link/synced')
 
   beforeEach(() => {
-    t = 1_700_000_000_000; enabled = true; jobs = []; posts = []; postOk = true; working = false; refreshed = []; refreshResult = { ok: true, note: '' }
+    t = 1_700_000_000_000; enabled = true; jobs = []; posts = []; postOk = true; working = false; refreshed = []; refreshResult = { ok: true, note: '' }; downloaded = []; downloadResult = { ok: true, note: '' }
     backup = { busy: false, doneStartedAt: 0, doneId: '' }; nowAnswer = 'started'; nowCalls = 0
   })
 
@@ -187,6 +199,29 @@ describe('the poll loop', () => {
     expect(refreshed).toEqual(['207275139', '302678824'])
   })
 
+  test('an order download from the phone: downloaded, a backup that started after it, then the bot is told (it sends the file)', async () => {
+    const U = '11111111-2222-3333-4444-555555555555'
+    jobs = [{ id: 31, kind: 'order', pdfId: U } as unknown as { id: number; tin: string }]
+    await tick()
+    await tick()
+    expect(downloaded).toEqual([U])
+    expect(refreshed).toEqual([])
+    expect(synced()).toEqual([])
+    backup = { busy: false, doneStartedAt: t + 1, doneId: 'o1' }
+    await tick()
+    expect(synced().at(-1)!.body).toEqual({ done: [{ id: 31, ok: true, note: '' }] })
+  })
+
+  test('a download the site refused is told at once with the reason and needs no backup', async () => {
+    const U = '11111111-2222-3333-4444-555555555555'
+    downloadResult = { ok: false, note: 'Sayt qarorni faqat odam tasdiqlagandan keyin beradi.' }
+    jobs = [{ id: 32, kind: 'order', pdfId: U } as unknown as { id: number; tin: string }]
+    await tick()
+    await tick()
+    expect(synced()[0]!.body).toEqual({ done: [{ id: 32, ok: false, note: 'Sayt qarorni faqat odam tasdiqlagandan keyin beradi.' }] })
+    expect(nowCalls).toBe(0)
+  })
+
   test('an unreachable bot is remembered and tried again, nothing is lost', async () => {
     postOk = false
     await tick()
@@ -214,5 +249,44 @@ describe('a backup right now', () => {
     ab.autoBackupTick(mk({ now: () => 1_700_000_100_000 })) // the usual tick records how it ended
     expect(ab.backupNow(mk())).toBe('unchanged')
     expect(ab.backupNow(mk({ fingerprint: () => 'two' }))).toBe('started')
+  })
+})
+
+describe('downloading one order for the phone', () => {
+  const ORD = process.env.PUBLIC_ORDERS_DIR!
+  const KNOWN = '66666666-7777-8888-9999-000000000000'
+  const order = (pdfId: string) => ({ id: 'o-' + pdfId.slice(0, 4), caseNumber: '2-1004-2603/8020', instance: 'APPEAL', result: 'REFUSED', court: 'S', judge: 'J', category: 'C', pdfId, pdfName: 'q.pdf', pdfSize: 100, courtType: 'ECONOMIC' as const })
+  beforeEach(() => {
+    fs.rmSync(ORD, { recursive: true, force: true })
+    fs.mkdirSync(ORD, { recursive: true })
+    loaderCalls = []
+    loaderBehaviour = async () => ({ saved: true })
+  })
+
+  test('only an order the app knows is asked for; one on disk is not asked again; a refusal says how to hand the file over; nothing is retried', async () => {
+    const { appendOrders } = await import('../public-orders/store')
+    const { writePdf } = await import('../public-orders/pdf-store')
+    const { ManualDownloadRequired } = await import('../public-orders/order-pdf')
+    // unknown: the site is not touched
+    expect(await bl.downloadOrder(KNOWN, fakeLoader)).toMatchObject({ ok: false })
+    expect(loaderCalls).toEqual([])
+    await appendOrders([order(KNOWN)])
+    // known: one attempt through the shared loader
+    expect(await bl.downloadOrder(KNOWN, fakeLoader)).toEqual({ ok: true, note: '' })
+    expect(loaderCalls).toEqual([KNOWN])
+    // refused by the site: the reason and the way out, once
+    loaderBehaviour = async () => { throw new ManualDownloadRequired('token rad etildi') }
+    const refused = await bl.downloadOrder(KNOWN, fakeLoader)
+    expect(refused.ok).toBe(false)
+    expect(refused.note).toContain('HAR')
+    expect(loaderCalls).toHaveLength(2)
+    // a file that could not be kept on disk is not a success
+    loaderBehaviour = async () => ({ saved: false, saveError: 'disk toʻla' })
+    expect(await bl.downloadOrder(KNOWN, fakeLoader)).toMatchObject({ ok: false, note: expect.stringContaining('disk toʻla') })
+    // already on disk: the loader is not asked at all
+    await writePdf(KNOWN, Buffer.from('%PDF-1.4\nx\n%%EOF'), { via: 'import' })
+    loaderCalls = []
+    expect(await bl.downloadOrder(KNOWN, fakeLoader)).toEqual({ ok: true, note: '' })
+    expect(loaderCalls).toEqual([])
   })
 })

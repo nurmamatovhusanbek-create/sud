@@ -1172,13 +1172,84 @@ mod orders {
         assert!(t.contains("<b>2</b> ta qaror: 1 ta yuklangan, 1 ta yuklanmagan"), "{t}");
         assert!(t.contains("<b>Birinchi instansiya</b> · qanoatlantirildi") && t.contains("<b>Apellyatsiya</b> · rad etildi") && t.contains("⏳ <i>PDF hali yuklanmagan</i>"), "{t}");
         assert_eq!(t.matches("yuklanmagan").count(), 2, "the header and the one order: {t}");
+        // the saved one opens its PDF; the other asks the app to download it
         let kb = sent[0].markup.clone().unwrap().to_string();
-        assert!(kb.contains(PDF_MIXED) && !kb.contains("77777777") && kb.matches("callback_data").count() == 1, "{kb}");
-        // found, nothing downloaded at all: the list, no keyboard
+        assert!(kb.contains(&format!("o:{PDF_MIXED}")) && kb.contains("d:77777777-7777-7777-7777-777777777777") && !kb.contains("o:77777777") && kb.matches("callback_data").count() == 2, "{kb}");
+        assert!(kb.contains("⬇️ Apellyatsiya · yuklash") && kb.contains("📄 Birinchi instansiya · "), "{kb}");
+        // found, nothing downloaded at all: the list and only a «yuklash» button
         handle_update(sh.clone(), message(4242, &format!("/orders {UNSAVED_CASE}"))).await;
         let s2 = &sh.outbox.captured()[1];
         assert!(s2.text.contains("<b>1</b> ta qaror: 0 ta yuklangan, 1 ta yuklanmagan") && s2.text.contains("⏳"), "{}", s2.text);
-        assert!(s2.markup.is_none(), "{:?}", s2.markup);
+        let k2 = s2.markup.clone().unwrap().to_string();
+        assert!(k2.contains("d:88888888") && !k2.contains("o:"), "{k2}");
+    }
+
+    const UNSAVED_PDF: &str = "88888888-8888-8888-8888-888888888888";
+
+    #[tokio::test]
+    async fn yuklash_asks_the_app_and_the_pdf_comes_to_the_person_once_the_backup_has_it() {
+        let (sh, b) = with_orders().await;
+        let press_d = |id: &str| press(4242, &format!("d:{id}"));
+        // the app is not on: said plainly, nothing queued
+        handle_update(sh.clone(), press_d(UNSAVED_PDF)).await;
+        assert!(texts(&sh)[0].contains("Ilova ulanmagan"), "{:?}", texts(&sh));
+        assert!(sh.link.lock().unwrap().jobs.is_empty());
+        // the app is on (it asked for work a moment ago): the order is queued, a second press joins it
+        sh.link.lock().unwrap().pull(crate::state::now());
+        handle_update(sh.clone(), press_d(UNSAVED_PDF)).await;
+        handle_update(sh.clone(), press_d(UNSAVED_PDF)).await;
+        let t = texts(&sh);
+        assert!(t[1].contains("navbatga qoʻyildi") && t[1].contains(UNSAVED_CASE) && t[1].contains("Birinchi instansiya"), "{}", t[1]);
+        assert!(t[2].contains("allaqachon navbatda"), "{}", t[2]);
+        // the next pull hands it out as an order job
+        let got = sh.link.lock().unwrap().pull(crate::state::now());
+        assert_eq!(got.len(), 1);
+        assert_eq!(crate::link::pull_json(&got)["jobs"][0]["kind"], "order");
+        assert_eq!(crate::link::pull_json(&got)["jobs"][0]["pdfId"], UNSAVED_PDF);
+        // the app downloaded it and made a backup: the record now says saved, the PDF bucket exists. The person is told only after the bot has read it
+        let mut all = buckets(false);
+        let mut ob = orders_buckets();
+        for (name, text) in ob.iter_mut() {
+            if name == "orders:25" {
+                *text = text.replace(&format!("\"{UNSAVED_PDF}\",\"\",5000,\"ECONOMIC\",0"), &format!("\"{UNSAVED_PDF}\",\"q.pdf\",{},\"ECONOMIC\",1774000000000", pdf_text(UNSAVED_PDF).len()));
+            }
+        }
+        ob.push((format!("pdf:{UNSAVED_PDF}"), pdf_text(UNSAVED_PDF)));
+        all.extend(ob);
+        publish(&b.channel, MAIN, &b.pass, 3, &all);
+        sh.link.lock().unwrap().finish(got[0].0, true, "", crate::state::now());
+        assert!(sh.outbox.docs().is_empty());
+        sh.sync().await.unwrap();
+        crate::link::deliver(&sh).await;
+        let docs = sh.outbox.docs();
+        assert_eq!(docs.len(), 1, "one person pressed twice: one file");
+        assert!(docs.iter().all(|d| d.0 == 4242 && d.2 == pdf_text(UNSAVED_PDF).into_bytes() && d.3.contains(UNSAVED_CASE)));
+        // and the order is now a normal one: a press on the old button just sends the file
+        handle_update(sh.clone(), press_d(UNSAVED_PDF)).await;
+        assert_eq!(sh.outbox.docs().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_download_the_site_refused_is_told_with_the_reason_and_a_bad_or_unknown_id_is_not_queued() {
+        let (sh, _b) = with_orders().await;
+        sh.link.lock().unwrap().pull(crate::state::now());
+        handle_update(sh.clone(), press(4242, &format!("d:{UNSAVED_PDF}"))).await;
+        let got = sh.link.lock().unwrap().pull(crate::state::now());
+        sh.link.lock().unwrap().finish(got[0].0, false, "Sayt qarorni faqat odam tasdiqlagandan keyin beradi: <b>qoʻlda</b>", crate::state::now());
+        crate::link::deliver(&sh).await;
+        let last = texts(&sh).last().unwrap().clone();
+        assert!(last.contains("Qarorni yuklab boʻlmadi") && last.contains(UNSAVED_CASE) && last.contains("&lt;b&gt;qoʻlda&lt;/b&gt;"), "{last}");
+        assert!(sh.outbox.docs().is_empty());
+        // an id the backup does not know is never queued (the app would be asked to fetch anything), nor are malformed ones
+        let before = sh.link.lock().unwrap().jobs.len();
+        for bad in ["d:99999999-9999-9999-9999-999999999999", "d:../x", "d:", "d:a b"] {
+            handle_update(sh.clone(), press(4242, bad)).await;
+        }
+        assert_eq!(sh.link.lock().unwrap().jobs.len(), before);
+        assert!(texts(&sh).last().unwrap().contains("zaxirada yoʻq"));
+        // a stranger cannot queue anything
+        handle_update(sh.clone(), press(999, &format!("d:{UNSAVED_PDF}"))).await;
+        assert_eq!(sh.link.lock().unwrap().jobs.len(), before);
     }
 
     #[tokio::test]

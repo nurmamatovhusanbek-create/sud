@@ -94,7 +94,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `party-text.ts` | core/classify.ts, lib/case-store.ts, lib/court-case.ts, lib/stats.ts | core/__tests__/party-text.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
-| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +12 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +13 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/classic.tsx, components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render-ink.ts, +1 | core/__tests__/rates.test.ts |
 | `schemas/index.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/rating/route, +5 |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
@@ -202,11 +202,12 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
 | `public-orders/meta-backup.ts` | lib/public-orders/data-dir.ts, lib/public-orders/meta-backup-runner.ts | lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
-| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route, lib/public-orders/har-import.ts | lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route, lib/bot-link.ts, lib/public-orders/har-import.ts, lib/public-orders/pdf-load.ts | lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
 | `public-orders/pace.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/pace.test.ts |
-| `public-orders/pdf-store.ts` | api/public-orders/file/route, api/public-orders/import-har/route, api/public-orders/import/route, api/public-orders/library/route, lib/orders-buckets.ts, lib/public-orders/hidden-store.ts | lib/__tests__/backup.test.ts, lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
-| `public-orders/source.ts` | api/public-orders/file/route, lib/public-orders/company-job.ts |  |
-| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/import-har/route, api/public-orders/library/route, api/public-orders/orders/route, lib/orders-buckets.ts, lib/public-orders/company-job.ts | lib/__tests__/backup.test.ts, lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders/pdf-load.ts` | api/public-orders/file/route, lib/bot-link.ts |  |
+| `public-orders/pdf-store.ts` | api/public-orders/import-har/route, api/public-orders/import/route, api/public-orders/library/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/public-orders/hidden-store.ts, lib/public-orders/pdf-load.ts | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/source.ts` | lib/public-orders/company-job.ts, lib/public-orders/pdf-load.ts |  |
+| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/import-har/route, api/public-orders/library/route, api/public-orders/orders/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/public-orders/company-job.ts | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts |  |
 | `public-orders/waf.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/waf.test.ts |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
@@ -484,6 +485,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__sudHealthPools` | lib/health-registry.ts |
 | `__sudHealthStore` | lib/health-store.ts |
 | `__sudHidden` | lib/public-orders/hidden-store.ts |
+| `__sudOrderPdfLoader` | lib/public-orders/pdf-load.ts |
 | `__sudOrdersPacer` | lib/public-orders/pace.ts |
 | `__sudPresence` | server/presence.ts |
 | `__sudSecurity` | server/audit.ts |

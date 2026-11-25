@@ -187,12 +187,16 @@ fn label_of(orders: &[Order], at: usize) -> String {
     format!("{} {n}", instance_word(&o.instance))
 }
 
-/// one button per order (at most `max`): its PDF. A case has one order per instance (first, appeal, cassation, …), sometimes several in one instance.
+/// one button per order (at most `max`): its PDF, or «Yuklash» (ask the app to download it) when the PDF was never downloaded. A case has one order per
+/// instance (first, appeal, cassation, …), sometimes several in one instance.
 pub fn keyboard(orders: &[Order], max: usize) -> Value {
     let rows: Vec<Value> = (0..orders.len().min(max))
-        .filter(|&i| orders[i].saved) // an order whose PDF was never downloaded has nothing to send
         .map(|i| {
             let o = &orders[i];
+            if !o.saved {
+                let label = if orders.iter().any(|x| x.case != o.case) { format!("⬇️ {} · {} · yuklash", o.case, label_of(orders, i)) } else { format!("⬇️ {} · yuklash", label_of(orders, i)) };
+                return json!([{ "text": label, "callback_data": format!("d:{}", o.pdf_id) }]);
+            }
             let label = if orders.iter().any(|x| x.case != o.case) { format!("📄 {} · {}", o.case, label_of(orders, i)) } else { format!("📄 {} · {}", label_of(orders, i), size_label(o.size)) };
             json!([{ "text": label, "callback_data": format!("o:{}", o.pdf_id) }])
         })

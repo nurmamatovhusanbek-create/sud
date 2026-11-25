@@ -125,3 +125,5 @@ Opt-in (Settings › Telegram › «Bot bilan ulanish»). The app only makes OUT
 ## Order PDFs through the bot
 The bot sends a court order PDF only to a person on `ALLOWED_USER_IDS`, and only a file the backup names (`pdf:<id>`, the id checked to `[A-Za-z0-9_-]{4,80}`: it can never become a path or another bucket). The file is opened in memory after its hash, tag and keyed id check out and is not written to disk. The orders are the public, anonymised publications of public.sud.uz (no parties, no STIR); the records say which case they belong to, nothing else.
 
+**Downloading an order from the phone.** The same link can ask the app to download ONE order PDF: the bot sends only an id it found in its own backup records, and the app downloads only an id whose record is in its own order store (`bot-link.downloadOrder`: unknown ids are refused without touching the site), through the one shared loader (one captcha session at a time, the pause after a refusal), once, never retried. It does not widen what the app asks of public.sud.uz: the same request a click on «Yuklab olish» makes.
+
