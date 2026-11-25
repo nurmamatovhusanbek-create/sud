@@ -79,19 +79,20 @@ pub async fn tick(sh: &Arc<Shared>, n: i64, sent: &mut Sent) {
     let button = sh.cfg.public_url.as_ref().map(|u| serde_json::json!({ "inline_keyboard": [[{ "text": "Majlislar Mini Appʼda", "web_app": { "url": format!("{u}/app?tab=hearings") } }]] }));
     for user in &sh.cfg.allowed {
         let p = sh.prefs_of(*user).await;
-        if let Some(d) = p.morning.and_then(|m| due_at(n, sent.morning.get(user).copied().unwrap_or(0), i64::from(m) * 60)) {
+        if let Some(d) = p.morning.and_then(|m| due_at(n, sent.morning.get(user).copied().unwrap_or(0).max(p.sent_m), i64::from(m) * 60)) {
             sent.morning.insert(*user, d);
             match sh.hearings(d, add_days(d, i64::from(p.days) - 1)).await {
                 Ok(l) => {
                     let l: Vec<_> = l.into_iter().filter(|h| p.wants(&h.tin)).collect();
                     if let Some(body) = text_for(&l, d, info.backup_at.as_deref(), p.days) {
                         sh.outbox.send_html(*user, &body, button.clone()).await;
+                        crate::chat::persist_sent(sh, *user, false, d).await;
                     }
                 }
                 Err(e) => eprintln!("[bot] ertalabki xabar: {}", e.message()),
             }
         }
-        if let Some(d) = p.evening.and_then(|m| due_at(n, sent.evening.get(user).copied().unwrap_or(0), i64::from(m) * 60)) {
+        if let Some(d) = p.evening.and_then(|m| due_at(n, sent.evening.get(user).copied().unwrap_or(0).max(p.sent_e), i64::from(m) * 60)) {
             sent.evening.insert(*user, d);
             let tomorrow = add_days(d, 1);
             match sh.hearings(tomorrow, tomorrow).await {
@@ -99,6 +100,7 @@ pub async fn tick(sh: &Arc<Shared>, n: i64, sent: &mut Sent) {
                     let l: Vec<_> = l.into_iter().filter(|h| p.wants(&h.tin)).collect();
                     if let Some(body) = evening_text(&l, d, info.backup_at.as_deref()) {
                         sh.outbox.send_html(*user, &body, button.clone()).await;
+                        crate::chat::persist_sent(sh, *user, true, d).await;
                     }
                 }
                 Err(e) => eprintln!("[bot] kechki xabar: {}", e.message()),

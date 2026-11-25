@@ -406,6 +406,32 @@ async fn settings_reply(sh: &Arc<Shared>, chat: i64, user: i64) {
     sh.remember_prefs(user, p, Some(id));
 }
 
+/// A reminder went out: write the day into the person's pinned settings message (`sm=` / `se=`), the only place that survives the bot's restarts, so a restart
+/// or a wake-up inside the hour after the chosen time does not send it again. A person who never opened `/settings` gets the settings screen pinned now (once).
+pub async fn persist_sent(sh: &Arc<Shared>, user: i64, evening: bool, day: u32) {
+    let mut p = sh.prefs_of(user).await;
+    if evening {
+        p.sent_e = day;
+    } else {
+        p.sent_m = day;
+    }
+    let companies = company_names(sh).await;
+    let (text, keys) = (p.text(&companies), p.keyboard(&companies, 0));
+    match sh.settings_msg(user) {
+        Some(id) => {
+            sh.remember_prefs(user, p, None);
+            sh.outbox.edit_html(user, id, &text, Some(keys)).await;
+        }
+        None => match sh.outbox.send_html_id(user, &text, Some(keys)).await {
+            Some(id) => {
+                sh.outbox.pin(user, id).await;
+                sh.remember_prefs(user, p, Some(id));
+            }
+            None => sh.remember_prefs(user, p, None),
+        },
+    }
+}
+
 /// a button of the settings screen: `rest` is what follows «s:» in the callback data
 async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, rest: &str) {
     let mut p = sh.prefs_of(user).await;

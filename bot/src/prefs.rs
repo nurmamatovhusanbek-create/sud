@@ -32,11 +32,15 @@ pub struct Prefs {
     pub days: u32,
     /// the companies the reminders are about; empty = all
     pub tins: Vec<String>,
+    /// the day (yyyymmdd) the morning / evening message was last SENT for, 0 = never. It lives in the pinned code too: the bot's memory is lost whenever
+    /// the host restarts or wakes from sleep, and without this a restart inside the hour after the chosen time sent the same reminder again.
+    pub sent_m: u32,
+    pub sent_e: u32,
 }
 
 impl Default for Prefs {
     fn default() -> Prefs {
-        Prefs { morning: Some(8 * 60), evening: Some(18 * 60), days: 7, tins: Vec::new() }
+        Prefs { morning: Some(8 * 60), evening: Some(18 * 60), days: 7, tins: Vec::new(), sent_m: 0, sent_e: 0 }
     }
 }
 
@@ -67,7 +71,8 @@ impl Prefs {
     /// the values as the short code on the last line of the settings message: `m=0800 e=1800 d=7 c=*`
     pub fn code(&self) -> String {
         let c = if self.tins.is_empty() { "*".to_string() } else { self.tins.join(",") };
-        format!("m={} e={} d={} c={c}", code_time(self.morning), code_time(self.evening), self.days)
+        let sent = [("sm", self.sent_m), ("se", self.sent_e)].iter().filter(|(_, d)| *d > 0).map(|(k, d)| format!(" {k}={d}")).collect::<String>();
+        format!("m={} e={} d={} c={c}{sent}", code_time(self.morning), code_time(self.evening), self.days)
     }
 
     /// the settings out of the plain text of a pinned message; None when it is not a settings message (the defaults then apply)
@@ -81,6 +86,8 @@ impl Prefs {
                 "e" => p.evening = parse_time(v)?,
                 "d" => p.days = v.parse::<u32>().ok().filter(|d| (1..=crate::service::MAX_HEARING_DAYS).contains(d))?,
                 "c" => p.tins = if v == "*" { Vec::new() } else { v.split(',').filter(|t| is_tin(t)).map(str::to_string).collect() },
+                "sm" => p.sent_m = v.parse().ok()?,
+                "se" => p.sent_e = v.parse().ok()?,
                 _ => {}
             }
         }
@@ -223,8 +230,8 @@ mod tests {
     fn the_code_reads_back_exactly() {
         for p in [
             Prefs::default(),
-            Prefs { morning: None, evening: Some(19 * 60), days: 30, tins: vec!["207275139".into(), "302678824".into()] },
-            Prefs { morning: Some(7 * 60), evening: None, days: 3, tins: vec![] },
+            Prefs { morning: None, evening: Some(19 * 60), days: 30, tins: vec!["207275139".into(), "302678824".into()], sent_m: 0, sent_e: 20_261_125 },
+            Prefs { morning: Some(7 * 60), evening: None, days: 3, tins: vec![], sent_m: 20_261_124, sent_e: 0 },
         ] {
             assert_eq!(Prefs::parse(&crate::format::plain(&p.text(&[]))), Some(p.clone()), "{}", p.code());
         }

@@ -750,6 +750,11 @@ mod reminders {
         n - secs_of_day(n) + h * 3600 + m * 60
     }
 
+    /// the reminder messages only (the first one also pins the settings screen, which carries the «sent today» marker)
+    fn reminders(sh: &Arc<crate::state::Shared>) -> Vec<crate::telegram::Sent> {
+        sh.outbox.captured().into_iter().filter(|s| s.text.starts_with("📋") || s.text.starts_with("🌙")).collect()
+    }
+
     fn pinned(sh: &Arc<crate::state::Shared>, user: i64) -> Option<(i64, String)> {
         match &sh.outbox {
             crate::telegram::Outbox::Capture(c) => c.pinned.lock().unwrap().get(&user).cloned(),
@@ -837,18 +842,48 @@ mod reminders {
         tick(&sh, at(7, 59), &mut sent).await;
         assert!(sh.outbox.captured().is_empty());
         tick(&sh, at(8, 0), &mut sent).await;
-        let m = sh.outbox.captured();
+        let m = reminders(&sh);
         assert_eq!(m.len(), 1);
         assert!(m[0].text.starts_with("📋 <b>Yaqin majlislar</b>\nKeyingi 7 kun:") && m[0].text.contains(CASE), "{}", m[0].text);
         tick(&sh, at(8, 30), &mut sent).await; // already sent today
-        assert_eq!(sh.outbox.captured().len(), 1);
+        assert_eq!(reminders(&sh).len(), 1);
         tick(&sh, at(18, 0), &mut sent).await;
-        let all = sh.outbox.captured();
+        let all = reminders(&sh);
         assert_eq!(all.len(), 2);
         // the fixture has one hearing tomorrow, at 09:30
         assert!(all[1].text.starts_with("🌙 <b>Ertangi majlislar</b>\n<b>1 ta</b> · birinchisi soat <b>09:30</b>") && all[1].text.contains("2-1004-2503/8021"), "{}", all[1].text);
         tick(&sh, at(18, 20), &mut sent).await;
-        assert_eq!(sh.outbox.captured().len(), 2);
+        assert_eq!(reminders(&sh).len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_restart_or_wake_up_inside_the_hour_does_not_send_the_same_reminder_again() {
+        let (sh, b) = ready_bot().await;
+        let mut sent = Sent::default();
+        tick(&sh, at(18, 0), &mut sent).await;
+        assert_eq!(reminders(&sh).len(), 1);
+        // the marker is in the pinned settings message, with the person's settings kept intact
+        let (pid, ptext) = pinned(&sh, 4242).expect("the settings screen was pinned with the reminder");
+        let p = Prefs::parse(&ptext).unwrap();
+        assert_eq!((p.sent_e, p.sent_m), (crate::date::today(at(18, 0)), 0));
+        assert_eq!((p.morning, p.evening, p.days), (Some(8 * 60), Some(18 * 60), 7));
+        // the host restarts (memory gone) and wakes at 18:40: the same chat, a fresh `Sent`
+        let sh2 = bot(&b);
+        sh2.sync().await.unwrap();
+        if let crate::telegram::Outbox::Capture(c) = &sh2.outbox {
+            c.pinned.lock().unwrap().insert(4242, (pid, ptext));
+        }
+        let mut sent2 = Sent::default();
+        tick(&sh2, at(18, 40), &mut sent2).await;
+        assert_eq!(reminders(&sh2).len(), 0, "{:?}", sh2.outbox.captured());
+        // the next day it goes again
+        tick(&sh2, at(18, 0) + 86_400, &mut sent2).await;
+        assert_eq!(reminders(&sh2).len(), 0); // (no hearing the day after tomorrow in the fixture: nothing to say, nothing sent)
+        // pressing a settings button keeps the marker
+        let mut sh3p = sh2.prefs_of(4242).await;
+        assert_eq!(sh3p.sent_e, crate::date::today(at(18, 0)));
+        sh3p.apply("d:14", &["207275139".to_string()]);
+        assert_eq!(sh3p.sent_e, crate::date::today(at(18, 0)));
     }
 
     #[tokio::test]
@@ -861,7 +896,7 @@ mod reminders {
         tick(&sh, at(18, 0), &mut sent).await;
         assert!(sh.outbox.captured().is_empty());
         tick(&sh, at(19, 5), &mut sent).await;
-        assert_eq!(sh.outbox.captured().len(), 1);
+        assert_eq!(reminders(&sh).len(), 1);
         // only the OTHER company: nothing of the first one reaches the person (silence, not an empty message)
         let (sh2, _b2) = ready_bot().await;
         sh2.remember_prefs(4242, Prefs { tins: vec![OTHER_TIN.to_string()], ..Prefs::default() }, None);
@@ -890,10 +925,9 @@ mod reminders {
         sh.sync().await.unwrap();
         sh.remember_prefs(5151, Prefs { morning: Some(9 * 60), evening: None, ..Prefs::default() }, None);
         tick(&sh, at(8, 0), &mut sent).await;
-        let first = sh.outbox.captured();
-        assert_eq!(first.iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242]); // 5151 wants 09:00
+        assert_eq!(reminders(&sh).iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242]); // 5151 wants 09:00
         tick(&sh, at(9, 0), &mut sent).await;
-        assert_eq!(sh.outbox.captured().iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242, 5151]);
+        assert_eq!(reminders(&sh).iter().map(|m| m.chat).collect::<Vec<_>>(), vec![4242, 5151]);
         let _ = today(now());
     }
 }
