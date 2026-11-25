@@ -89,7 +89,37 @@ describe('the first read and what is new after it', () => {
     const r = await run()
     expect(r.events).toBe(2)
     expect(sent.map((s) => s.text.split('\n')[0]).sort()).toEqual(['📅 <b>Majlis sanasi yangilandi</b>', '🔔 <b>Ish holati oʻzgardi</b>'])
-    expect(sent.find((s) => s.text.includes('Majlis sanasi'))!.text).toContain('<b>Majlis:</b> 15.12.2030 10:00')
+    expect(sent.find((s) => s.text.includes('Majlis sanasi'))!.text).toContain('<b>Majlis:</b> <b>15.12.2030 10:00</b> (yangi)')
+    // and the status message says WHAT changed, from what to what
+    expect(sent.find((s) => s.text.includes('holati'))!.text).toContain('<b>Holati:</b> Tayinlash → <b>Koʻrib chiqish jarayonida</b>')
+  })
+
+  test('the same case twice in one list is one case: announced once, not every run', async () => {
+    lists[`economic:${TIN}`] = [row(1)]
+    await run()
+    // two rows of case 1: the court answers with both; only the second matches nothing remembered
+    lists[`economic:${TIN}`] = [row(1, { caseStatus: 'Кўриб чиқиш жараёнида' }), row(1)]
+    expect((await run()).events).toBe(0) // one of the rows IS what is remembered: nothing new
+    expect(sent).toEqual([])
+    lists[`economic:${TIN}`] = [row(1, { caseStatus: 'Қаноатлантирилди' }), row(1, { caseStatus: 'Кўриб чиқиш жараёнида' })]
+    expect((await run()).events).toBe(1)
+    expect(sent).toHaveLength(1)
+    for (let i = 0; i < 3; i++) await run()
+    expect(sent).toHaveLength(1)
+  })
+
+  test('a list that flaps between two answers is announced twice, then never again; the script of the answer is not news', async () => {
+    lists[`economic:${TIN}`] = [row(1, { caseStatus: 'Кўриб чиқиш жараёнида' })]
+    await run()
+    // the same status written in Latin, other spaces and apostrophes: not a change
+    lists[`economic:${TIN}`] = [row(1, { caseStatus: "Ko'rib  chiqish jarayonida" })]
+    expect((await run()).events).toBe(0)
+    const flip = ['Архивга топширилган', 'Кўриб чиқиш жараёнида']
+    for (let i = 0; i < 8; i++) {
+      lists[`economic:${TIN}`] = [row(1, { caseStatus: flip[i % 2]! })]
+      await run()
+    }
+    expect(sent).toHaveLength(2) // there and back, then the repeats are remembered but silent
   })
 
   test('a case that reached the appeal court is announced as such (the detail shows it), and an instance that was already there is not news', async () => {

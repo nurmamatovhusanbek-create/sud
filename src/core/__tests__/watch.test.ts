@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildMessage, escapeHtml, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
+import { buildMessage, changeLines, normSig, escapeHtml, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
 import type { CourtCase, FullCaseData } from '@/lib/court-case-types'
 
 const row = (o: Partial<CourtCase> = {}): CourtCase => ({ caseNumber: '2-1004-2611/1', caseType: '', caseStatus: 'Тайинлаш', result: '', courtName: '', dateFiled: '', plaintiff: 'Универсал Савдо МЧЖ', defendant: '«ANOR» МЧЖ', claimAmount: '', hearingDate: '', hearingTime: '', judge: '', ...o })
@@ -112,5 +112,54 @@ describe('the message is Telegram HTML: a name cannot break it', () => {
 
   test('escapeHtml touches only & < >', () => {
     expect(escapeHtml('«A» & <B> oʻ')).toBe('«A» &amp; &lt;B&gt; oʻ')
+  })
+})
+
+describe('what changed, said in the message', () => {
+  const sigOf = (o: Partial<CourtCase>) => rowSig(row(o))
+  test('the script, case, spaces and apostrophes of a word are not a change', () => {
+    expect(normSig(sigOf({ caseStatus: 'Кўриб чиқиш жараёнида' }))).toBe(normSig(sigOf({ caseStatus: "KO'RIB  CHIQISH jarayonida" })))
+    expect(diffRow({ sig: sigOf({ caseStatus: 'Кўриб чиқиш жараёнида' }), ins: '' }, row({ caseStatus: 'Koʻrib chiqish jarayonida' })).kind).toBeNull()
+    expect(diffRow({ sig: sigOf({ caseStatus: 'Кўриб чиқиш жараёнида' }), ins: '' }, row({ caseStatus: 'Қаноатлантирилди' })).kind).toBe('status')
+  })
+  test('the status, the result and the hearing each say «before → now»', () => {
+    const prev = sigOf({ caseStatus: 'Кўриб чиқиш жараёнида', hearingDate: '12.03.2030', hearingTime: '10:00' })
+    const lines = changeLines(prev, row({ caseStatus: 'Қаноатлантирилди', result: 'Талаб қаноатлантирилди', hearingDate: '20.03.2030', hearingTime: '11:00' }))
+    expect(lines).toEqual([
+      '<b>Holati:</b> Koʻrib chiqish jarayonida → <b>Qanoatlantirildi</b>',
+      '<b>Natija:</b> yoʻq → <b>Talab qanoatlantirildi</b>',
+      '<b>Majlis:</b> 12.03.2030 10:00 → <b>20.03.2030 11:00</b>',
+    ])
+    expect(changeLines(prev, row({ caseStatus: 'Кўриб чиқиш жараёнида', hearingDate: '12.03.2030', hearingTime: '10:00' }))).toEqual([])
+    expect(changeLines(undefined, row())).toEqual([])
+    // a hearing taken off the calendar
+    expect(changeLines(prev, row({ caseStatus: 'Кўриб чиқиш жараёнида' }))).toEqual(['<b>Majlis:</b> 12.03.2030 10:00 → <b>belgilanmagan</b>'])
+  })
+  test('a status message shows the change instead of a bare status, and escapes it', () => {
+    const r = row({ caseStatus: 'Архивга топширилган <x>' })
+    const d = detail({ caseStatus: 'Архивга топширилган <x>' })
+    const m = buildMessage({ kind: 'status', tin: '207275139', companyName: '', courtType: 'economic', row: r, detail: d, sides: sidesOf('207275139', '', r, d), prevSig: sigOf({ caseStatus: 'Қаноатлантирилди' }) })
+    expect(m).toContain('<b>Holati:</b> Qanoatlantirildi → <b>Arxivga topshirilgan &lt;x&gt;</b>')
+    expect(m.match(/Holati:/g)).toHaveLength(1)
+    // without a memory of the old value the plain status stays
+    expect(buildMessage({ kind: 'status', tin: '207275139', companyName: '', courtType: 'economic', row: r, detail: d, sides: sidesOf('207275139', '', r, d) })).toContain('<b>Holati:</b> Arxivga topshirilgan')
+  })
+  test('a new case says when it was filed, and one filed long ago is not called a fresh filing', () => {
+    const now = Date.UTC(2026, 10, 25)
+    const mk = (dateFiled: string) => {
+      const r = row({ dateFiled })
+      const d = detail()
+      return buildMessage({ kind: 'new', tin: '207275139', companyName: '', courtType: 'economic', row: r, detail: d, sides: sidesOf('207275139', '', r, d) }, now)
+    }
+    const fresh = mk('20.11.2026')
+    expect(fresh).toContain('Sudga yangi ariza topshirildi')
+    expect(fresh).toContain('<b>Ariza sanasi:</b> 20.11.2026')
+    expect(mk('2026-11-01')).toContain('Sudga yangi ariza topshirildi')
+    const old = mk('03.05.2019')
+    expect(old).toContain('Roʻyxatda ish paydo boʻldi')
+    expect(old).not.toContain('Sudga yangi ariza')
+    expect(old).toContain('<b>Ariza sanasi:</b> 03.05.2019')
+    expect(mk('')).toContain('Sudga yangi ariza topshirildi') // no date known: said as before
+    expect(mk('')).not.toContain('Ariza sanasi')
   })
 })

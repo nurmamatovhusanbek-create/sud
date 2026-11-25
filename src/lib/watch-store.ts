@@ -75,3 +75,28 @@ export function knownTins(): string[] {
   for (const t of ['companies', 'bill_loads']) for (const r of db.prepare(`SELECT tin FROM ${t}`).all()) s.add(String(r.tin))
   return [...s].sort()
 }
+
+// ---- announced transitions: a list that flaps between two answers is announced twice, not every run ---------------------------------------------
+
+const TRANSITION_KEEP_MS = 3 * 86_400_000
+const TRANSITION_MAX = 8
+
+const trKey = (tin: string, num: string): string => `watch_tr:${tin}:${num}`
+
+function readTransitions(tin: string, num: string, now: number): Array<[string, number]> {
+  try {
+    const r = getDb().prepare('SELECT v FROM meta WHERE k = ?').get(trKey(tin, num))
+    const list = r ? (JSON.parse(String(r.v)) as unknown) : []
+    return Array.isArray(list) ? (list as Array<[string, number]>).filter((e) => Array.isArray(e) && typeof e[0] === 'string' && now - Number(e[1]) < TRANSITION_KEEP_MS) : []
+  } catch {
+    return []
+  }
+}
+
+/** was this exact change («old signature>new signature») of this case already announced in the last three days */
+export const transitionAnnounced = (tin: string, num: string, key: string, now: number): boolean => readTransitions(tin, num, now).some((e) => e[0] === key)
+
+export function rememberTransition(tin: string, num: string, key: string, now: number): void {
+  const list = [...readTransitions(tin, num, now).filter((e) => e[0] !== key), [key, now] as [string, number]].slice(-TRANSITION_MAX)
+  getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run(trKey(tin, num), JSON.stringify(list))
+}

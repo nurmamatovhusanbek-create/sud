@@ -29,6 +29,14 @@ export function rowSig(r: Pick<CourtCase, 'caseStatus' | 'result' | 'hearingDate
   return [r.caseStatus, r.result, r.hearingDate, r.hearingTime, r.hearingStage ?? ''].map((x) => (x ?? '').trim()).join('|')
 }
 
+/** a signature compared as the court MEANS it: Cyrillic or Latin, any case, any apostrophe, any run of spaces is the same word (a list read from another source says it differently, and that is not news) */
+export function normSig(sig: string): string {
+  return sig
+    .split('|')
+    .map((x) => uzCyrToLat(x).toLowerCase().replace(/[ʻʼ`´‘’']/g, "'").replace(/\s+/g, ' ').trim())
+    .join('|')
+}
+
 /** `A` appeal, `C` cassation, `I` supervision: the higher instances a case detail shows (the first instance is every case's) */
 export function instancesOf(d: FullCaseData | null | undefined): string {
   if (!d) return ''
@@ -44,9 +52,9 @@ export const INSTANCE_WORD: Record<string, string> = { A: 'Apellyatsiya', C: 'Ka
 export function diffRow(prev: SeenRow | undefined, row: CourtCase): { kind: WatchKind | null; recheck: boolean } {
   if (!prev) return { kind: 'new', recheck: true }
   const sig = rowSig(row)
-  if (sig === prev.sig) return { kind: null, recheck: false }
-  const old = prev.sig.split('|')
-  const now = sig.split('|')
+  if (sig === prev.sig || normSig(sig) === normSig(prev.sig)) return { kind: null, recheck: false }
+  const old = normSig(prev.sig).split('|')
+  const now = normSig(sig).split('|')
   // status (0) / result (1) changed → status; the hearing (2, 3, 4) moved → hearing; either way the detail is read again (an appeal shows there)
   const kind: WatchKind = old[0] !== now[0] || old[1] !== now[1] ? 'status' : 'hearing'
   return { kind, recheck: true }
@@ -101,6 +109,8 @@ export interface WatchEvent {
   row: CourtCase
   detail: FullCaseData | null
   sides: Sides
+  /** the signature remembered before this read (a `status` / `hearing` event says what it changed from) */
+  prevSig?: string
 }
 
 const lat = (s: string): string => uzCyrToLat(s)
@@ -120,16 +130,52 @@ export function statusLine(row: CourtCase, detail: FullCaseData | null): string 
   return `<b>Holati:</b> ${escapeHtml(status || 'nomaʼlum')}${deadline ? ` · <b>Muddat:</b> ${escapeHtml(deadline)}` : ''}`
 }
 
+/** `old → new`; an empty side is said in words, so «» → «Qanoatlantirildi» still reads */
+const arrow = (from: string, to: string): string => `${escapeHtml(from || 'yoʻq')} → <b>${escapeHtml(to || 'yoʻq')}</b>`
+
+/** WHAT changed since the remembered signature: the status, the result and the hearing, each as «oldin → endi». Telegram HTML lines. */
+export function changeLines(prevSig: string | undefined, row: CourtCase): string[] {
+  if (!prevSig) return []
+  const [pStatus = '', pResult = '', pDate = '', pTime = ''] = prevSig.split('|').map((x) => lat(x.trim()))
+  const [nStatus, nResult] = [lat(clean(row.caseStatus)), lat(clean(row.result))]
+  const same = (a: string, b: string): boolean => normSig(a) === normSig(b)
+  const out: string[] = []
+  if (!same(pStatus, nStatus)) out.push(`<b>Holati:</b> ${arrow(pStatus, nStatus)}`)
+  if (!same(pResult, nResult)) out.push(`<b>Natija:</b> ${arrow(pResult, nResult)}`)
+  const pHear = [pDate, pTime].filter(Boolean).join(' ')
+  const nHear = [clean(row.hearingDate), clean(row.hearingTime)].filter(Boolean).join(' ')
+  if (!same(pHear, nHear)) out.push(`<b>Majlis:</b> ${pHear ? arrow(pHear, nHear || 'belgilanmagan') : `<b>${escapeHtml(nHear)}</b> (yangi)`}`)
+  return out
+}
+
+const DAY_MS = 86_400_000
+/** a «dd.mm.yyyy» or «yyyy-mm-dd» filing date as epoch ms (null = not a date) */
+function filedAt(s: string): number | null {
+  const t = clean(s)
+  const m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(t) ?? /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t)
+  if (!m) return null
+  const [y, mo, d] = m[1]!.length === 4 ? [Number(m[1]), Number(m[2]), Number(m[3])] : [Number(m[3]), Number(m[2]), Number(m[1])]
+  const ms = Date.UTC(y, mo - 1, d)
+  return Number.isFinite(ms) ? ms : null
+}
+
+/** a «new» case filed longer ago than this is not a fresh filing: it only appeared in the list now */
+export const FRESH_DAYS = 45
+
 /**
  * The message the operator reads, as Telegram HTML (the same look as the bot's reminders): a bold headline, then who you are in the case, the case
- * number (tap to copy), both parties, the status and deadline, the hearing, and a dim line saying which company it came from. Latin Uzbek; every
- * piece of data is escaped.
+ * number (tap to copy), both parties, WHAT CHANGED («Holati: Koʻrib chiqish jarayonida → Qanoatlantirildi», «Majlis: 12.03 → 20.03») or, for a new
+ * case, its status and filing date, the deadline, and a dim line saying which company it came from. Latin Uzbek; every piece of data is escaped.
  */
-export function buildMessage(ev: WatchEvent): string {
+export function buildMessage(ev: WatchEvent, now: number = Date.now()): string {
   const { row, sides } = ev
+  const filed = filedAt(row.dateFiled)
+  const old = ev.kind === 'new' && filed !== null && now - filed > FRESH_DAYS * DAY_MS
   const head =
     ev.kind === 'new'
-      ? '⚖️ <b>Sudga yangi ariza topshirildi</b>'
+      ? old
+        ? '🗂 <b>Roʻyxatda ish paydo boʻldi</b> <i>(ariza ancha oldin topshirilgan)</i>'
+        : '⚖️ <b>Sudga yangi ariza topshirildi</b>'
       : ev.kind === 'instance'
         ? `⚖️ <b>${INSTANCE_WORD[ev.instance ?? ''] ?? 'Yuqori instansiya'}ga shikoyat topshirildi</b>`
         : ev.kind === 'hearing'
@@ -138,7 +184,12 @@ export function buildMessage(ev: WatchEvent): string {
   const side = sides.role ? `<b>Siz: ${ROLE_WORD[sides.role]}</b>` : ''
   const hearing = [clean(row.hearingDate), clean(row.hearingTime)].filter(Boolean).join(' ')
   const case_ = `<b>Ish:</b> <code>${escapeHtml(row.caseNumber)}</code>${COURT_WORD[ev.courtType] ? ` · ${COURT_WORD[ev.courtType]}` : ''}`
-  const body = [side, case_, party('Daʼvogar', sides.plaintiff), party('Javobgar', sides.defendant), statusLine(row, ev.detail), hearing && ev.kind !== 'status' ? `<b>Majlis:</b> ${escapeHtml(hearing)}` : '']
+  const changes = ev.kind === 'status' || ev.kind === 'hearing' ? changeLines(ev.prevSig, row) : []
+  const deadline = clean(ev.detail?.general?.deadlineDate)
+  // a change replaces the plain status line (it says the same and more); without one (no memory of the old value) the plain lines stay
+  const state = changes.length ? [...changes, deadline ? `<b>Muddat:</b> ${escapeHtml(deadline)}` : ''] : [statusLine(row, ev.detail), hearing && ev.kind !== 'status' ? `<b>Majlis:</b> ${escapeHtml(hearing)}` : '']
+  const filedLine = ev.kind === 'new' && clean(row.dateFiled) ? `<b>Ariza sanasi:</b> ${escapeHtml(clean(row.dateFiled))}` : ''
+  const body = [side, case_, party('Daʼvogar', sides.plaintiff), party('Javobgar', sides.defendant), ...state, filedLine]
     .filter(Boolean)
     .join('\n')
   const from = ev.companyName ? `Kuzatuv: ${escapeHtml(lat(ev.companyName))} (STIR ${escapeHtml(ev.tin)})` : `Kuzatuv: STIR ${escapeHtml(ev.tin)}`

@@ -1,12 +1,12 @@
 import 'server-only'
 import { isConcludedStatus } from '@/core/case-status'
-import { buildMessage, diffRow, instanceEvent, instancesOf, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
+import { buildMessage, diffRow, instanceEvent, instancesOf, normSig, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 import { clearCourtCaseCache, getCaseLean, searchCourtCasesDetailed, type CaseLean, type CourtListResult } from './court-case'
 import { companyNameOf } from './db-buckets'
 import { readTelegram } from './telegram-config'
 import { sendMessage } from './telegram-client'
-import { hasBaseline, knownTins, markBaseline, readLastRun, readSeen, readWatchConfig, saveLastRun, writeSeen, type WatchRunSummary } from './watch-store'
+import { hasBaseline, knownTins, markBaseline, readLastRun, readSeen, readWatchConfig, rememberTransition, saveLastRun, transitionAnnounced, writeSeen, type WatchRunSummary } from './watch-store'
 import { logger } from '@/infra/logger'
 
 /**
@@ -44,6 +44,8 @@ interface Pending {
   ev: WatchEvent
   sig: string
   ins: string | undefined
+  /** the remembered signature this change is from (undefined for a new case) */
+  from?: string
 }
 
 const PRIORITY: Record<string, number> = { new: 0, instance: 1, hearing: 2, status: 3 }
@@ -72,8 +74,13 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
       continue
     }
     const baseline = !hasBaseline(tin, court)
-    for (const row of res.cases) {
-      if (!row.caseNumber) continue
+    // the same number twice in one list (two rows of one case) is ONE case: it is news only when NO row of it matches what is remembered, and then
+    // the first row speaks; judged row by row the two would each differ from the memory, be announced and remembered in turn, every run
+    const byNumber = new Map<string, CourtCase[]>()
+    for (const r of res.cases) if (r.caseNumber) byNumber.set(r.caseNumber, [...(byNumber.get(r.caseNumber) ?? []), r])
+    for (const [num, rows] of byNumber) {
+      const kept = seen.get(num)
+      const row = (kept && rows.find((r) => normSig(rowSig(r)) === normSig(kept.sig))) || rows[0]!
       run.rows++
       const sig = rowSig(row)
       const prev = seen.get(row.caseNumber)
@@ -99,7 +106,7 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
         }
       }
       changed.add(row.caseNumber)
-      pending.push({ ev: { kind, ...(instance ? { instance } : {}), tin, companyName: name, courtType: court, row, detail: det, sides: sidesOf(tin, name, row, det) }, sig, ins: det ? instancesOf(det) : undefined })
+      pending.push({ ev: { kind, ...(instance ? { instance } : {}), tin, companyName: name, courtType: court, row, detail: det, sides: sidesOf(tin, name, row, det), ...(prev ? { prevSig: prev.sig } : {}) }, sig, ins: det ? instancesOf(det) : undefined, ...(prev ? { from: prev.sig } : {}) })
     }
     if (baseline) markBaseline(tin, court)
   }
@@ -130,7 +137,15 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
   }
   pending.sort((a, b) => PRIORITY[a.ev.kind]! - PRIORITY[b.ev.kind]! || (a.ev.row.caseNumber < b.ev.row.caseNumber ? -1 : 1))
   const now = d.now()
-  for (const p of pending.slice(0, MAX_MESSAGES)) {
+  // a status or hearing change that went out in the last three days (a list that flaps between two answers) is remembered but not announced again
+  const fresh = pending.filter((p) => {
+    if (!p.from || (p.ev.kind !== 'status' && p.ev.kind !== 'hearing')) return true
+    if (!transitionAnnounced(tin, p.ev.row.caseNumber, `${normSig(p.from)}>${normSig(p.sig)}`, now)) return true
+    writeSeen(tin, p.ev.row.caseNumber, p.ev.courtType, p.sig, { ...(p.ins !== undefined ? { ins: p.ins } : {}), checkedAt: p.ins !== undefined ? now : undefined, now })
+    run.events--
+    return false
+  })
+  for (const p of fresh.slice(0, MAX_MESSAGES)) {
     let ok = false
     for (const chat of cfg.recipients) {
       if (await d.send(chat, buildMessage(p.ev))) ok = true
@@ -138,12 +153,13 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
     }
     if (ok) {
       run.sent++
+      if (p.from) rememberTransition(tin, p.ev.row.caseNumber, `${normSig(p.from)}>${normSig(p.sig)}`, now)
       writeSeen(tin, p.ev.row.caseNumber, p.ev.courtType, p.sig, { ...(p.ins !== undefined ? { ins: p.ins } : {}), checkedAt: p.ins !== undefined ? now : undefined, now })
     } else run.errors.push(`${tin} ${p.ev.row.caseNumber}: xabar yuborilmadi`)
   }
-  if (pending.length > MAX_MESSAGES) {
+  if (fresh.length > MAX_MESSAGES) {
     for (const chat of cfg.recipients) {
-      await d.send(chat, overflowMessage(pending.length - MAX_MESSAGES, tin))
+      await d.send(chat, overflowMessage(fresh.length - MAX_MESSAGES, tin))
       await d.sleep(SEND_GAP_MS)
     }
   }
