@@ -780,7 +780,9 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     process.env.PUBLIC_ORDERS_DIR = ORD_DIR
     process.env.PUBLIC_ORDERS_BACKUP_DIR = path.join(ORD_DIR, '..', 'orders-bk-copy')
     fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.rmSync(path.join(ORD_DIR, '..', 'orders-bk-copy'), { recursive: true, force: true }) // the protected copy would bring the records back into an empty folder
     fs.mkdirSync(ORD_DIR, { recursive: true })
+    void orders().then((o) => o.resetCheckedCache())
   })
   afterAll(() => {
     fs.rmSync(ORD_DIR, { recursive: true, force: true })
@@ -836,23 +838,70 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect(m3.names.filter((n) => n.startsWith('pdf:'))).toHaveLength(2)
   })
 
-  test('the restore and the company load ignore the orders (they are for the bot, not for the database); a backup with none is unchanged', async () => {
-    const { appendOrders } = await orders()
-    const { writePdf } = await pdfs()
+  test('the restore brings the orders back into an empty orders folder; a second restore adds nothing and nothing local is overwritten', async () => {
+    const { appendOrders, allOrders, getChecked, markChecked, resetCheckedCache } = await orders()
+    const { writePdf, readPdf } = await pdfs()
+    const bytes = pdf('one')
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020'), order('o2', ID2, '2-1004-2603/8021', 'APPEAL')]) // o2 never downloaded
+    await writePdf(ID1, bytes, { via: 'import' })
+    await markChecked({ caseNumber: '4-1001-2601/1', at: '2026-11-20T10:00:00.000Z', sig: '', seen: [], misses: 1 })
+    fakeChannel()
+    expect((await runBackup()).phase).toBe('done')
+
+    // a new computer: nothing in the orders folder
+    fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.mkdirSync(ORD_DIR, { recursive: true })
+    resetCheckedCache()
+    expect(await allOrders()).toEqual([])
+    backup.startRestore(PASS)
+    const r = await finished()
+    expect(r.phase).toBe('done')
+    expect(r.result!.orders).toEqual({ records: 2, pdfs: 1, checks: 3, failed: 0 }) // two cases that have orders + the one checked with none
+    expect(r.message).toContain('qarorlar: 2 yozuv, 1 PDF tiklandi')
+    expect((await allOrders()).map((o) => o.id).sort()).toEqual(['o1', 'o2'])
+    expect(Buffer.from((await readPdf(ID1))!).equals(bytes)).toBe(true)
+    expect(await readPdf(ID2)).toBeNull() // never downloaded: nothing to restore
+    expect((await getChecked('2-1004-2603/8020'))?.seen).toEqual(['FIRST'])
+    expect((await getChecked('2-1004-2603/8021'))?.seen).toEqual(['APPEAL'])
+    expect((await getChecked('4-1001-2601/1'))?.seen).toEqual([])
+
+    // again: nothing is added twice
+    const lines = () => fs.readdirSync(path.join(ORD_DIR, 'shards')).map((n) => fs.readFileSync(path.join(ORD_DIR, 'shards', n), 'utf8')).join('').split('\n').filter(Boolean).length
+    const before = lines()
+    backup.startRestore(PASS)
+    const again = await finished()
+    expect(again.result!.orders).toEqual({ records: 0, pdfs: 0, checks: 0, failed: 0 })
+    expect(lines()).toBe(before)
+  })
+
+  test('a restore never overwrites what this computer has: its own PDF and its own check stay', async () => {
+    const { appendOrders, getChecked, markChecked, resetCheckedCache } = await orders()
+    const { writePdf, readPdf } = await pdfs()
     await appendOrders([order('o1', ID1, '2-1004-2603/8020')])
-    await writePdf(ID1, pdf('one'), { via: 'import' })
+    await writePdf(ID1, pdf('backed up'), { via: 'import' })
+    fakeChannel()
+    expect((await runBackup()).phase).toBe('done')
+    // this computer later holds its OWN copy of the file and a newer check of the case
+    fs.rmSync(path.join(ORD_DIR, 'files'), { recursive: true, force: true })
+    const mine = pdf('local copy')
+    await writePdf(ID1, mine, { via: 'import' })
+    resetCheckedCache()
+    await markChecked({ caseNumber: '2-1004-2603/8020', at: '2026-11-24T10:00:00.000Z', sig: 'local', seen: ['FIRST'], misses: 0 })
+    backup.startRestore(PASS)
+    const r = await finished()
+    expect(r.result!.orders).toMatchObject({ pdfs: 0, failed: 0 })
+    expect(Buffer.from((await readPdf(ID1))!).equals(mine)).toBe(true)
+    expect((await getChecked('2-1004-2603/8020'))?.sig).toBe('local')
+  })
+
+  test('no orders on disk: no order bucket at all, and the restore says nothing about orders', async () => {
     fakeChannel()
     expect((await runBackup()).phase).toBe('done')
     backup.startRestore(PASS)
     const r = await finished()
     expect(r.phase).toBe('done')
-    const copy = dbm.openDbFile(r.result!.restoredFile!)
-    expect(allBuckets(copy)).toEqual(allBuckets(dbm.getDb()))
-    copy.close()
-    // no orders on disk: no order bucket at all
-    fs.rmSync(ORD_DIR, { recursive: true, force: true })
-    fs.mkdirSync(ORD_DIR, { recursive: true })
-    expect((await runBackup()).phase).toBe('done')
+    expect(r.result!.orders).toBeUndefined()
+    expect(r.message).not.toContain('qarorlar')
   })
 
   test('the fingerprint moves when a PDF or a record arrives and stays still otherwise', async () => {

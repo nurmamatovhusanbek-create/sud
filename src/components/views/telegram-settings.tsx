@@ -31,7 +31,7 @@ function BackupCard({ configured }: { configured: boolean }) {
   const last = snap?.last
   const ok = pass.length >= 10
   const go = async (kind: 'backup' | 'restore') => {
-    if (kind === 'restore' && !window.confirm('Kanaldagi eng soʻnggi zaxira yuklab olinadi va sud.restored-….db nomi bilan joriy bazaning yoniga yoziladi. Joriy baza oʻzgarmaydi. Davom etasizmi?')) return
+    if (kind === 'restore' && !window.confirm('Kanaldagi eng soʻnggi zaxira yuklab olinadi va sud.restored-….db nomi bilan joriy bazaning yoniga yoziladi. Joriy baza oʻzgarmaydi. Sud qarorlari (yozuvlar va PDF fayllar) esa qarorlar papkasiga qoʻshiladi: mavjud narsa oʻchirilmaydi va ustiga yozilmaydi. Davom etasizmi?')) return
     if (await start(kind, pass)) setPass('')
     else void reload()
   }

@@ -12,6 +12,7 @@ import {
 import { retireCaseSnapshots } from './snapshot-store'
 import { companyNameOf, importBucket, listBuckets, mergeBucketText, parseBucket, renderBucket } from './db-buckets'
 import { orderBuckets, type ExtraBucket } from './orders-buckets'
+import { importOrdersBucket, NONE as NO_ORDERS, sum as sumOrders, type OrdersRestored } from './orders-restore'
 import { dbPath, getDb, openDbFile } from './db'
 import { snapshotFile } from './db-admin'
 import { billJobRunning } from './bill-cases'
@@ -67,6 +68,8 @@ export interface BackupResult {
   reused: number
   /** restore only: the file written next to the live database */
   restoredFile?: string
+  /** restore only: the court orders brought back into the orders folder (records, PDFs, check records, buckets that failed) */
+  orders?: OrdersRestored
   /** load only: the companies brought into the live database */
   loadedTins?: string[]
 }
@@ -471,6 +474,7 @@ async function runRestore(passphrase: string, token: string, chat: string): Prom
   const dest = path.join(path.dirname(dbPath()), `sud.restored-${new Date().toISOString().replace(/[:.]/g, '-')}.db`)
   if (m.v === 1) return restoreV1(m, key, token, dest)
 
+  const orderRefs = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k === 'orders' || k === 'pdf' }).sort((a, b) => Number(a.name.startsWith('pdf:')) - Number(b.name.startsWith('pdf:')))
   const buckets = m.buckets.filter((b) => { const k = parseBucket(b.name)?.kind; return k !== 'index' && k !== 'lists' && k !== 'hearings' && k !== 'orders' && k !== 'pdf' }) // locators and court lists are for the search and the bot, not for a database
   const total = buckets.length
   set({ phase: 'download', done: 0, total, message: `Yuklab olinmoqda: 0/${total}` })
@@ -508,11 +512,23 @@ async function runRestore(passphrase: string, token: string, chat: string): Prom
     sealRestored(target)
     target.close()
     target = null
+    // the court orders do not live in the database: they go straight into this computer's orders folder (nothing there is overwritten or deleted)
+    let orders: OrdersRestored | undefined
+    if (orderRefs.length) {
+      orders = NO_ORDERS
+      set({ phase: 'unpack', done: 0, total: orderRefs.length, message: `Qarorlar tiklanmoqda: 0/${orderRefs.length}` })
+      for (let n = 0; n < orderRefs.length; n++) {
+        const text = await downloadBucket(token, key, orderRefs[n]!).catch(() => null)
+        orders = sumOrders(orders, text ? await importOrdersBucket(orderRefs[n]!.name, text).catch(() => ({ failed: 1 })) : { failed: 1 })
+        set({ done: n + 1, message: `Qarorlar tiklanmoqda: ${n + 1}/${orderRefs.length}` })
+      }
+    }
+    const ordersNote = orders ? `; qarorlar: ${orders.records} yozuv, ${orders.pdfs} PDF tiklandi${orders.failed ? `, ${orders.failed} ta boʻlak oʻqilmadi` : ''}` : ''
     set({
       phase: 'done',
       finishedAt: Date.now(),
-      result: { id: m.id, created: m.created, dbBytes: plainBytes, uploadedBytes: 0, chunks: 0, buckets: total, reused: 0, restoredFile: dest },
-      message: 'Tayyor: baza tiklandi va tekshirildi. Almashtirish uchun ilovani yoping va faylni sud.db oʻrniga qoʻying',
+      result: { id: m.id, created: m.created, dbBytes: plainBytes, uploadedBytes: 0, chunks: 0, buckets: total, reused: 0, restoredFile: dest, ...(orders ? { orders } : {}) },
+      message: `Tayyor: baza tiklandi va tekshirildi. Almashtirish uchun ilovani yoping va faylni sud.db oʻrniga qoʻying${ordersNote}`,
     })
   } finally {
     try {

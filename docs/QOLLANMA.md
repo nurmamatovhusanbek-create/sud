@@ -282,8 +282,10 @@ Asosiy kanaldan tashqari 3 tagacha zaxira kanal qoʻshish mumkin, istalgan vaqtd
 4. Kerakli kompaniyalarni tanlab «Tanlanganlarni yuklash» ni bosing.
 5. Har bir kompaniyada «Toʻlovlarni yangilash» ni bosing.
    - Ish raqamisiz kvitansiyalar zaxiraga kirmaydi: ular shu yerda sud saytidan qayta oʻqiladi.
+6. Sud qarorlari (yuklab olingan PDF fayllar va yozuvlar) kerak boʻlsa, parolni kiritib «Tiklash» ni bosing.
+   - Baza yangi faylga yoziladi (almashtirish yuqorida), qarorlar esa qarorlar papkasiga qoʻshiladi: mavjud narsa oʻchirilmaydi. Har bir PDF uchun captcha qayta kerak boʻlmaydi.
 
-**Tekshirish:** Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada.
+**Tekshirish:** Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada; Qarorlar sahifasida yuklangan qarorlar koʻrinadi.
 
 ## 17. Tez-tez uchraydigan muammolar
 

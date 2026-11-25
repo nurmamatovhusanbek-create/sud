@@ -303,8 +303,9 @@ export const GUIDE: GuideSection[] = [
       { text: '«Shifrlangan zaxira» kartasida parolni kiriting va «Kanaldagi kompaniyalar» tugmasini bosing.' },
       { text: 'Kerakli kompaniyalarni tanlab «Tanlanganlarni yuklash» ni bosing.' },
       { text: 'Har bir kompaniyada «Toʻlovlarni yangilash» ni bosing.', note: 'Ish raqamisiz kvitansiyalar zaxiraga kirmaydi: ular shu yerda sud saytidan qayta oʻqiladi.' },
+      { text: 'Sud qarorlari (yuklab olingan PDF fayllar va yozuvlar) kerak boʻlsa, parolni kiritib «Tiklash» ni bosing.', note: 'Baza yangi faylga yoziladi (almashtirish yuqorida), qarorlar esa qarorlar papkasiga qoʻshiladi: mavjud narsa oʻchirilmaydi. Har bir PDF uchun captcha qayta kerak boʻlmaydi.' },
     ],
-    check: 'Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada.',
+    check: 'Kompaniyalar roʻyxatda, kvitansiyalar va ishlar bazada; Qarorlar sahifasida yuklangan qarorlar koʻrinadi.',
   },
   {
     id: 'muammo',
