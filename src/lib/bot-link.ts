@@ -1,6 +1,6 @@
 import 'server-only'
 import crypto from 'node:crypto'
-import { getDb } from './db'
+import { readLink, saveLink, normalizeBotUrl, type LinkConfig } from './bot-link-config'
 import { backupBusy, backupState } from './backup'
 import { backupNow, type BackupNow } from './auto-backup'
 import { billJobRunning, jobDone, startJob } from './bill-cases'
@@ -34,48 +34,11 @@ import { logger } from '@/infra/logger'
 
 const log = logger('bot-link')
 
-const META = 'bot_link'
 export const POLL_MS = 60_000
 const LIST_GAP_MS = 2_500
 const COURTS: readonly CourtType[] = ['economic', 'civil', 'administrative']
 
-export interface LinkConfig {
-  enabled: boolean
-  /** the bot's public address, e.g. https://sud-bot.onrender.com (no path) */
-  url: string
-}
-const OFF: LinkConfig = { enabled: false, url: '' }
-
-/** `https://host` only (plain http only for localhost, for a bot run on this computer); no path, no credentials. null = not an address */
-export function normalizeBotUrl(input: unknown): string | null {
-  if (typeof input !== 'string') return null
-  let u: URL
-  try {
-    u = new URL(input.trim())
-  } catch {
-    return null
-  }
-  const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1'
-  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) return null
-  if (u.username || u.password || !u.hostname) return null
-  return u.origin
-}
-
-export function readLink(): LinkConfig {
-  try {
-    const r = getDb().prepare('SELECT v FROM meta WHERE k = ?').get(META)
-    if (!r) return OFF
-    const c = JSON.parse(String(r.v)) as Partial<LinkConfig>
-    const url = normalizeBotUrl(c.url)
-    return { enabled: c.enabled === true && !!url, url: url ?? '' }
-  } catch {
-    return OFF
-  }
-}
-
-export function saveLink(cfg: LinkConfig): void {
-  getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run(META, JSON.stringify(cfg))
-}
+export { normalizeBotUrl, readLink, saveLink, type LinkConfig } from './bot-link-config'
 
 // ---- the signature (the bot checks the same) ------------------------------------------------------------------------------------------------
 

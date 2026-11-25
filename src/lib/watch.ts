@@ -1,9 +1,10 @@
 import 'server-only'
 import { isConcludedStatus } from '@/core/case-status'
-import { buildMessage, diffRow, instanceEvent, instancesOf, normSig, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
+import { buildMessage, watchKeyboard, diffRow, instanceEvent, instancesOf, normSig, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 import { clearCourtCaseCache, getCaseLean, searchCourtCasesDetailed, type CaseLean, type CourtListResult } from './court-case'
 import { companyNameOf } from './db-buckets'
+import { readLink } from './bot-link-config'
 import { readTelegram } from './telegram-config'
 import { sendMessage } from './telegram-client'
 import { hasBaseline, knownTins, markBaseline, readLastRun, readSeen, readWatchConfig, rememberTransition, saveLastRun, transitionAnnounced, writeSeen, type WatchRunSummary } from './watch-store'
@@ -34,7 +35,9 @@ export interface WatchDeps {
   list: (courtType: CourtType, tin: string) => Promise<CourtListResult>
   detail: (courtType: CourtType, caseNumber: string) => Promise<CaseLean>
   /** one message to one person; true = it went out */
-  send: (chat: number, text: string) => Promise<boolean>
+  send: (chat: number, text: string, markup?: object) => Promise<boolean>
+  /** the bot's public address (the link setting), for the «Mini Appʼda ochish» button; null = none */
+  botUrl?: () => string | null
   name: (tin: string) => string
   now: () => number
   sleep: (ms: number) => Promise<void>
@@ -148,7 +151,8 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
   for (const p of fresh.slice(0, MAX_MESSAGES)) {
     let ok = false
     for (const chat of cfg.recipients) {
-      if (await d.send(chat, buildMessage(p.ev))) ok = true
+      const kb = watchKeyboard(p.ev.row.caseNumber, d.botUrl?.() ?? null)
+      if (await d.send(chat, buildMessage(p.ev), kb.inline_keyboard.length ? kb : undefined)) ok = true
       await d.sleep(SEND_GAP_MS)
     }
     if (ok) {
@@ -196,7 +200,14 @@ function realDeps(token: string): WatchDeps {
       return searchCourtCasesDetailed(court, 'tin', tin)
     },
     detail: (court, num) => getCaseLean(court, num),
-    send: async (chat, text) => (await sendMessage(token, chat, text)).ok,
+    send: async (chat, text, markup) => (await sendMessage(token, chat, text, markup)).ok,
+    botUrl: () => {
+      try {
+        return readLink().url || null
+      } catch {
+        return null
+      }
+    },
     name: (tin) => {
       try {
         return companyNameOf(tin) ?? ''

@@ -33,9 +33,10 @@ let lists: Record<string, CourtCase[]>   // `${court}:${tin}` → rows
 let listFail: Set<string>
 let incomplete: Set<string>
 let details: Record<string, CaseLean>    // case number → answer
-let sent: Array<{ chat: number; text: string }>
+let sent: Array<{ chat: number; text: string; markup?: object }>
 let sendOk: boolean
 let t = 0
+let botUrl: string | null = null
 
 const deps: WatchDeps = {
   list: async (court: CourtType, tin: string): Promise<CourtListResult> => {
@@ -44,7 +45,8 @@ const deps: WatchDeps = {
     return { cases: lists[k] ?? [], incomplete: incomplete.has(k) }
   },
   detail: async (_c, num) => details[num] ?? { kind: 'found', via: 'new', data: detail(Number(num.split('/')[1])), row: null },
-  send: async (chat, text) => { if (!sendOk) return false; sent.push({ chat, text }); return true },
+  send: async (chat, text, markup) => { if (!sendOk) return false; sent.push({ chat, text, markup }); return true },
+  botUrl: () => botUrl,
   name: (tin) => (tin === TIN ? '«SAMARQAND KABEL» МЧЖ' : ''),
   now: () => (t += 1000),
   sleep: async () => {},
@@ -55,7 +57,7 @@ beforeEach(() => {
   dbm.closeDb()
   fs.rmSync(DIR, { recursive: true, force: true })
   fs.mkdirSync(DIR, { recursive: true })
-  lists = {}; listFail = new Set(); incomplete = new Set(); details = {}; sent = []; sendOk = true; t = 1_700_000_000_000
+  botUrl = null; lists = {}; listFail = new Set(); incomplete = new Set(); details = {}; sent = []; sendOk = true; t = 1_700_000_000_000
 })
 afterAll(() => {
   dbm.closeDb()
@@ -80,6 +82,19 @@ describe('the first read and what is new after it', () => {
     // and never again
     expect((await run()).events).toBe(0)
     expect(sent).toHaveLength(1)
+  })
+
+  test('every message carries its buttons: the case\'s orders, and the Mini App when the bot\'s address is known', async () => {
+    lists[`civil:${TIN}`] = [row(1)]
+    await run()
+    lists[`civil:${TIN}`] = [row(1), row(2)]
+    await run()
+    expect(sent[0]!.markup).toEqual({ inline_keyboard: [[{ text: '📄 Qarorlar', callback_data: 'r:2-1004-2611/2' }]] })
+    botUrl = 'https://sud-bot.onrender.com'
+    lists[`civil:${TIN}`] = [row(1), row(2), row(3)]
+    await run()
+    const kb = sent[1]!.markup as { inline_keyboard: Array<Array<{ text: string; web_app?: { url: string } }>> }
+    expect(kb.inline_keyboard[1]![0]!.web_app!.url).toBe('https://sud-bot.onrender.com/app?case=2-1004-2611%2F3')
   })
 
   test('a changed status and a moved hearing are news; an unchanged row is not', async () => {

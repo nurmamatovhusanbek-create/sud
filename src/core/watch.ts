@@ -196,6 +196,18 @@ export function buildMessage(ev: WatchEvent, now: number = Date.now()): string {
   return `${head}\n\n${body}\n\n<i>${from}</i>`
 }
 
+/**
+ * The buttons under a Kuzatuv message: «Qarorlar» (the bot lists the case's court orders: callback `r:<case number>`, handled by the same bot) and, when the
+ * bot's address is known (the link setting), «Mini Appʼda ochish» straight on the case. Both are for the person reading the alert on a phone.
+ */
+export function watchKeyboard(caseNumber: string, botUrl: string | null): { inline_keyboard: Array<Array<Record<string, unknown>>> } {
+  const rows: Array<Array<Record<string, unknown>>> = []
+  // Telegram refuses callback data over 64 bytes: a case number is about 20, so «r:» + it is far below
+  if (caseNumber && Buffer.byteLength(`r:${caseNumber}`) <= 64) rows.push([{ text: '📄 Qarorlar', callback_data: `r:${caseNumber}` }])
+  if (botUrl && caseNumber) rows.push([{ text: 'Mini Appʼda ochish', web_app: { url: `${botUrl.replace(/\/+$/, '')}/app?case=${encodeURIComponent(caseNumber)}` } }])
+  return { inline_keyboard: rows }
+}
+
 /** a long run is cut: at most `max` messages, then one that says how many more there are */
 export function overflowMessage(n: number, tin: string): string {
   return `…yana <b>${n}</b> ta yangi xabar bor <i>(STIR ${escapeHtml(tin)})</i>. Ilovada «Sud ishlari» ni oching.`

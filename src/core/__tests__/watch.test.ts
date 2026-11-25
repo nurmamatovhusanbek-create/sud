@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildMessage, changeLines, normSig, escapeHtml, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
+import { buildMessage, watchKeyboard, changeLines, normSig, escapeHtml, diffRow, instanceEvent, parseWatchConfig, WATCH_DEFAULT, instancesOf, rowSig, sidesOf, statusLine, type WatchEvent } from '../watch'
 import type { CourtCase, FullCaseData } from '@/lib/court-case-types'
 
 const row = (o: Partial<CourtCase> = {}): CourtCase => ({ caseNumber: '2-1004-2611/1', caseType: '', caseStatus: 'Тайинлаш', result: '', courtName: '', dateFiled: '', plaintiff: 'Универсал Савдо МЧЖ', defendant: '«ANOR» МЧЖ', claimAmount: '', hearingDate: '', hearingTime: '', judge: '', ...o })
@@ -163,3 +163,18 @@ describe('what changed, said in the message', () => {
     expect(mk('')).not.toContain('Ariza sanasi')
   })
 })
+
+describe('the buttons under a Kuzatuv message', () => {
+  test('«Qarorlar» always (the bot answers the callback), «Mini Appʼda ochish» only when the bot\'s address is known', () => {
+    expect(watchKeyboard('2-1004-2603/8020', null)).toEqual({ inline_keyboard: [[{ text: '📄 Qarorlar', callback_data: 'r:2-1004-2603/8020' }]] })
+    const k = watchKeyboard('2-1004-2603/8020', 'https://sud-bot.onrender.com/')
+    expect(k.inline_keyboard).toHaveLength(2)
+    expect(k.inline_keyboard[1]![0]).toEqual({ text: 'Mini Appʼda ochish', web_app: { url: 'https://sud-bot.onrender.com/app?case=2-1004-2603%2F8020' } })
+  })
+  test('callback data stays within Telegram\'s 64 bytes, and no case number means no buttons', () => {
+    expect(watchKeyboard('x'.repeat(80), null).inline_keyboard).toEqual([])
+    expect(watchKeyboard('', 'https://b.example').inline_keyboard).toEqual([])
+    for (const row of watchKeyboard('4-1001-2629/43571', null).inline_keyboard) for (const b of row) expect(Buffer.byteLength(String(b.callback_data))).toBeLessThanOrEqual(64)
+  })
+})
+
