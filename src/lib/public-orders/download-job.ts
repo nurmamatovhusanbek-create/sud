@@ -21,7 +21,8 @@ import { ManualDownloadRequired, NotPdfError } from './order-pdf'
 export type { DownloadJobState as JobState, DownloadProblem as Problem, DownloadProblemKind as ProblemKind } from '@/core/public-orders'
 
 export interface JobDeps {
-  load: (pdfId: string) => Promise<OrderPdf>
+  /** `retryAuto`: reopen the loader's rest after a refusal (the job probes the next order instead of giving up on the whole list) */
+  load: (pdfId: string, retryAuto: boolean) => Promise<OrderPdf>
   /** the order's case number and instance (for the report); unknown ids give empty strings */
   describe: (pdfId: string) => Promise<{ caseNumber: string; instance: string }>
   purge: (pdfId: string, caseNumber: string) => Promise<void>
@@ -33,6 +34,8 @@ export interface JobDeps {
 const fresh = (): JobState => ({ phase: 'idle', total: 0, done: 0, ok: 0, removed: 0, deferred: 0, problems: [], current: '', note: '', startedAt: 0, finishedAt: 0 })
 
 export const MAX_JOB = 5000
+/** the site refused this many orders in a row: it is not about one order, so the rest is left for later (every probe costs up to three captcha sessions) */
+export const MAX_REFUSED_IN_A_ROW = 3
 
 export function createDownloadJob(deps: JobDeps) {
   const now = deps.now ?? Date.now
@@ -41,6 +44,7 @@ export function createDownloadJob(deps: JobDeps) {
   let running: Promise<void> | null = null
 
   async function run(ids: string[]): Promise<void> {
+    let refusedInARow = 0
     for (let i = 0; i < ids.length; i++) {
       if (stopFlag) {
         st.phase = 'stopped'
@@ -56,12 +60,15 @@ export function createDownloadJob(deps: JobDeps) {
           continue
         }
         let r: OrderPdf
+        // after a refusal the next order is a PROBE (the loader's rest is reopened): one order may be refused while the next is fine
+        const probe = refusedInARow > 0
         try {
-          r = await deps.load(id)
+          r = await deps.load(id, probe)
         } catch (e) {
           if (!(e instanceof NotPdfError)) throw e
-          r = await deps.load(id) // «Fayl PDF emas» once more: a half answer is not a verdict
+          r = await deps.load(id, probe) // «Fayl PDF emas» once more: a half answer is not a verdict
         }
+        refusedInARow = 0
         if (!r.saved) {
           st.note = `PDF olindi, lekin kompyuterga saqlanmadi: ${r.saveError || 'sababi nomaʼlum'}. Yuklash toʻxtatildi.`
           break
@@ -70,9 +77,15 @@ export function createDownloadJob(deps: JobDeps) {
       } catch (e) {
         if (e instanceof ManualDownloadRequired) {
           bad('manual', 'public.sud.uz bu qarorni qoʻlda yuklashni talab qildi: brauzerda oching va HAR faylini «HAR fayldan yuklash» orqali bering')
-          st.deferred = ids.length - i - 1 // the loader now rests for 30 minutes: the rest is for a later press
+          refusedInARow++
+          if (refusedInARow >= MAX_REFUSED_IN_A_ROW) {
+            st.deferred = ids.length - i - 1 // refused again and again: the site is closed for now, the rest is for a later press
+            st.done++
+            break
+          }
+          // otherwise skip it and go on: the next order is a probe
           st.done++
-          break
+          continue
         }
         if (e instanceof NotPdfError) {
           await deps.purge(id, d.caseNumber).catch(() => {})

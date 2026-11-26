@@ -12,7 +12,7 @@ const g = globalThis as unknown as { __sudOrderDownloadJob?: Job }
 /** The one job of this server (on `globalThis`: a route bundle and the presence route must see the same one). */
 export const downloadJob = (): Job =>
   (g.__sudOrderDownloadJob ??= createDownloadJob({
-    load: (id) => loadOrderPdf(id),
+    load: (id, retryAuto) => loadOrderPdf(id, { retryAuto }),
     has: async (id) => !!(await readPdf(id)),
     describe: async (id) => {
       const o = (await allOrders()).find((x) => (x.pdfId ?? '').toLowerCase() === id)

@@ -65,18 +65,47 @@ describe('the download job', () => {
     expect(r.job.state()).toMatchObject({ ok: 1, removed: 0, problems: [] })
     expect(r.purged).toEqual([])
   })
-  test('the site wants a person: that order is listed with the way out, the rest is deferred (not tried: the loader now rests), the job ends', async () => {
-    const r = rig((id) => {
-      if (id === ID(2)) throw new ManualDownloadRequired('captcha')
-      return ok
+  test('one order refused: it is listed with the way out and skipped, the NEXT one is a probe (the loader\'s rest is reopened) and the job goes on', async () => {
+    const probes: boolean[] = []
+    const job = createDownloadJob({
+      load: async (id, probe) => {
+        probes.push(probe)
+        if (id === ID(2)) throw new ManualDownloadRequired('captcha')
+        return ok
+      },
+      has: async () => false,
+      describe: async (id) => ({ caseNumber: `2-1-25/${id.slice(7, 8)}`, instance: '' }),
+      purge: async () => {},
     })
-    r.job.start([ID(1), ID(2), ID(3), ID(4)])
-    await r.job.settled()
-    const s = r.job.state()
-    expect(r.calls).toEqual([ID(1), ID(2)]) // 3 and 4 never asked: no captcha burnt on a shut door
-    expect(s).toMatchObject({ phase: 'done', ok: 1, deferred: 2 })
+    job.start([ID(1), ID(2), ID(3), ID(4)])
+    await job.settled()
+    const s = job.state()
+    expect(probes).toEqual([false, false, true, false]) // only the order right after a refusal is a probe
+    expect(s).toMatchObject({ phase: 'done', ok: 3, deferred: 0, done: 4 })
     expect(s.problems).toEqual([expect.objectContaining({ pdfId: ID(2), kind: 'manual' })])
     expect(s.problems[0]!.message).toContain('HAR')
+  })
+  test('refused three times in a row: the site is closed for now, the rest is deferred (no more captchas burnt) and the job ends', async () => {
+    const r = rig((id) => {
+      if (id !== ID(1)) throw new ManualDownloadRequired('captcha')
+      return ok
+    })
+    r.job.start([ID(1), ID(2), ID(3), ID(4), ID(5), ID(6)])
+    await r.job.settled()
+    const s = r.job.state()
+    expect(r.calls).toEqual([ID(1), ID(2), ID(3), ID(4)]) // 5 and 6 never asked
+    expect(s).toMatchObject({ phase: 'done', ok: 1, deferred: 2 })
+    expect(s.problems.map((p) => p.kind)).toEqual(['manual', 'manual', 'manual'])
+  })
+  test('a success in between resets the count: refused, fine, refused, fine never gives up', async () => {
+    const r = rig((id) => {
+      if (Number(id.slice(7, 8)) % 2 === 0) throw new ManualDownloadRequired('captcha')
+      return ok
+    })
+    r.job.start([ID(1), ID(2), ID(3), ID(4), ID(5), ID(6), ID(7)])
+    await r.job.settled()
+    expect(r.job.state()).toMatchObject({ ok: 4, deferred: 0, done: 7 })
+    expect(r.job.state().problems).toHaveLength(3)
   })
   test('any other failure is listed and skipped; the job goes on', async () => {
     const r = rig((id) => {

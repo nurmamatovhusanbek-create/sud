@@ -382,7 +382,7 @@ export function OrdersView() {
                   </button>
                 </div>
                 {dl.job.note && <div style={{ color: 'var(--neg-text)' }}>{dl.job.note}</div>}
-                {dl.job.deferred > 0 && <div>{dl.job.deferred} ta qaror urinib koʻrilmadi: sayt avtomatik yuklashni vaqtincha rad etdi (taxminan 30 daqiqa). Keyinroq «Barchasini yuklash» ni qayta bosing: yuklanmaganlari davom ettiriladi.</div>}
+                {dl.job.deferred > 0 && <div>{dl.job.deferred} ta qaror urinib koʻrilmadi: sayt ketma-ket 3 ta qarorni rad etdi, hozir avtomatik yuklashni bermayapti. Birozdan keyin (taxminan 30 daqiqa) «Barchasini yuklash» ni qayta bosing: yuklanmaganlari davom ettiriladi.</div>}
                 {dl.job.problems.slice(0, 50).map((p) => (
                   <div key={p.pdfId} style={{ fontSize: 12.5, lineHeight: 1.45 }}>
                     <span className="mono">{p.caseNumber || p.pdfId}</span>{p.instance ? ` · ${p.instance}` : ''} <span className="faint">—</span> {p.message}
