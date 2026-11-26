@@ -42,6 +42,7 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { diagnoseGit, getLocalGitSha, getLocalGitBranch, isWorkingTreeClean } from '@/lib/version-server'
 import { guard } from '@/server/middleware'
+import { classifyGitFailure } from '@/lib/git-failure'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -147,11 +148,17 @@ async function runUpdate() {
   // Run git pull — FAST-FORWARD ONLY: a pull that would need a merge (local commits on main, a rewritten remote) must stop
   // here, not leave conflict markers in files the server is about to rebuild from.
   try {
-    const { stdout, stderr } = await execFileAsync('git', ['pull', '--ff-only', 'origin', 'main'], {
-      timeout: 60000,
-      maxBuffer: 1024 * 1024,
-      env: GIT_ENV,
-    })
+    const pull = (extra: string[], timeout: number) => execFileAsync('git', ['pull', ...extra, '--ff-only', 'origin', 'main'], { timeout, maxBuffer: 1024 * 1024, env: GIT_ENV })
+    let out
+    try {
+      out = await pull([], 30000)
+    } catch (e) {
+      // the remote could not be reached (a hung connect, DNS, a reset): one more try over IPv4, like the check does (lib/update-check › fetchWithRetry)
+      const kind = classifyGitFailure(e).kind
+      if (kind !== 'network' && kind !== 'timeout') throw e
+      out = await pull(['-4'], 60000)
+    }
+    const { stdout, stderr } = out
 
     const restored = await restoreStash()
     const newSha = getLocalGitSha()
@@ -176,7 +183,7 @@ async function runUpdate() {
       {
         ok: false,
         error: 'pull_failed',
-        detail: e.message || 'git pull failed',
+        detail: classifyGitFailure(e).kind === 'network' ? classifyGitFailure(e).detail : e.message || 'git pull failed',
         stderr: e.stderr || '',
         stdout: e.stdout || '',
         stashed,

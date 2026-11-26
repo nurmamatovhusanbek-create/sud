@@ -138,6 +138,30 @@ describe('runUpdateCheck', () => {
 })
 
 describe('runUpdateCheckShared', () => {
+  test('a connect that hangs once is retried over IPv4 and the check succeeds (no second click needed)', async () => {
+    const field = Object.assign(new Error('Command failed'), { stderr: "fatal: unable to access 'https://github.com/x/sud.git/': Failed to connect to github.com port 443 after 21112 ms: Could not connect to server", code: 128 })
+    const calls: string[][] = []
+    const limits: (number | undefined)[] = []
+    const run: GitRun = async (args, limit) => {
+      calls.push(args)
+      if (args[0] === 'fetch') {
+        limits.push(limit)
+        if (!args.includes('-4')) throw field
+        return ''
+      }
+      if (args[0] === 'log') return HEAD_LINE
+      return '0\t2'
+    }
+    const r = await runUpdateCheck({ run, fetchGithub: gh({ head: null, rateLimited: false }), localSha: FULL })
+    expect(r).toMatchObject({ source: 'git', updateAvailable: true, behind: 2, error: null })
+    expect(calls.filter((c) => c[0] === 'fetch')).toEqual([['fetch', '--quiet', 'origin', 'main'], ['fetch', '--quiet', '-4', 'origin', 'main']])
+    expect(limits[0]).toBeLessThanOrEqual(15_000) // the first try is short: a hung connect is not waited for 21 s
+  })
+  test('a failure that is not about the network is NOT retried (git missing is the answer, not a flake)', async () => {
+    const g = fakeGit({ fetchFails: Object.assign(new Error('boom'), { code: 'ENOENT' }) })
+    await runUpdateCheck({ run: g.run, fetchGithub: gh({ head: null, rateLimited: false }), localSha: FULL })
+    expect(g.calls.filter((c) => c[0] === 'fetch')).toHaveLength(1)
+  })
   test('two simultaneous checks share one git run; the next one runs again (nothing is cached)', async () => {
     let fetches = 0
     const run: GitRun = async (args) => {

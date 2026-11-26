@@ -20,6 +20,13 @@ describe('classifyGitFailure', () => {
     expect(classifyGitFailure({ stderr: "'git' is not recognized as an internal or external command" }).kind).toBe('missing')
     expect(classifyGitFailure({ stderr: '/bin/sh: git: command not found' }).kind).toBe('missing')
   })
+  test('the remote cannot be reached: the field message, DNS, reset', () => {
+    const field = "fatal: unable to access 'https://github.com/nurmamatovhusanbek-create/sud.git/': Failed to connect to github.com port 443 after 21112 ms: Could not connect to server"
+    expect(classifyGitFailure({ stderr: field, code: 128 }).kind).toBe('network')
+    expect(classifyGitFailure({ stderr: 'fatal: unable to access: Could not resolve host: github.com' }).kind).toBe('network')
+    expect(classifyGitFailure({ message: 'Connection reset by peer' }).kind).toBe('network')
+    expect(classifyGitFailure({ killed: true, signal: 'SIGTERM' }).kind).toBe('timeout') // our own kill is still «slow», not «unreachable»
+  })
   test('not a repository', () => {
     expect(classifyGitFailure({ stderr: 'fatal: not a git repository (or any of the parent directories): .git' }).kind).toBe('not_repo')
   })
@@ -29,7 +36,7 @@ describe('classifyGitFailure', () => {
     expect(classifyGitFailure(undefined).kind).toBe('other')
   })
   test('every message is native Uzbek: no straight apostrophes in words, no em dash', () => {
-    const all = [classifyGitFailure({ code: 'ENOENT' }), classifyGitFailure({ code: 'ETIMEDOUT' }), classifyGitFailure({ stderr: 'not a git repository' }), classifyGitFailure({ stderr: 'dubious ownership' }, 'x')]
+    const all = [classifyGitFailure({ code: 'ENOENT' }), classifyGitFailure({ code: 'ETIMEDOUT' }), classifyGitFailure({ stderr: 'not a git repository' }), classifyGitFailure({ stderr: 'dubious ownership' }, 'x'), classifyGitFailure({ stderr: 'Could not resolve host' })]
     for (const m of all) expect(m.detail).not.toMatch(/[a-z]'[a-z]|—/i)
   })
 })

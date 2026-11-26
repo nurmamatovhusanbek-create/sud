@@ -6,7 +6,7 @@
  * the call time out. Three different fixes, one useless message.
  */
 
-export type GitFailureKind = 'missing' | 'dubious_ownership' | 'timeout' | 'not_repo' | 'other'
+export type GitFailureKind = 'missing' | 'dubious_ownership' | 'network' | 'timeout' | 'not_repo' | 'other'
 
 export interface GitFailure {
   kind: GitFailureKind
@@ -39,6 +39,10 @@ export function classifyGitFailure(err: unknown, cwd?: string): GitFailure {
 
   if (all.includes('dubious ownership')) {
     return { kind: 'dubious_ownership', detail: `Git bu papkani begona egasiniki deb hisoblab rad etdi. Terminalda bir marta bajaring: ${safeDirectoryCommand(stderr, cwd)}` }
+  }
+  // the remote could not be reached (DNS, a connect that hung, a reset, a firewall): NOT a slow disk, and usually gone on the next try
+  if (/could not resolve host|failed to connect|could not connect to server|unable to access|connection (timed out|reset|refused)|network is unreachable|schannel|ssl_connect|tls connection|remote end hung up/.test(all)) {
+    return { kind: 'network', detail: 'GitHubʼga ulanib boʻlmadi: internet, VPN, DNS yoki antivirus/xavfsizlik devorini tekshiring. Odatda bir necha soniyadan keyin oʻtadi: qayta urinib koʻring.' }
   }
   if (e.code === 'ETIMEDOUT' || (e.killed === true && e.signal === 'SIGTERM') || all.includes('etimedout')) {
     return { kind: 'timeout', detail: 'Git juda sekin javob berdi (disk sekin yoki antivirus/OneDrive tekshiryapti). Loyihani C:\\dev kabi oddiy papkaga koʻchiring yoki qayta urinib koʻring.' }

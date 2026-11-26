@@ -52,7 +52,8 @@ export interface UpdateCheck {
   checkedAt: string
 }
 
-export type GitRun = (args: string[]) => Promise<string>
+/** `timeoutMs` overrides the runner's own limit for this one call (the first, optimistic try of a fetch is short) */
+export type GitRun = (args: string[], timeoutMs?: number) => Promise<string>
 
 /** What the GitHub fallback returns: a head, or why there is none. */
 export type GithubResult = { head: RemoteHead } | { head: null; rateLimited: boolean; retryAfterSec?: number; status?: number }
@@ -64,7 +65,7 @@ const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_EDITOR: 'true' }
 
 /** The real runner: async, in the project folder, never waiting for a credential prompt. */
 export function gitRunner(cwd: string = process.cwd(), timeoutMs = 25_000): GitRun {
-  return async (args) => (await execFileAsync('git', args, { cwd, timeout: timeoutMs, env: GIT_ENV, maxBuffer: 1024 * 1024 })).stdout.trim()
+  return async (args, limit) => (await execFileAsync('git', args, { cwd, timeout: limit ?? timeoutMs, env: GIT_ENV, maxBuffer: 1024 * 1024 })).stdout.trim()
 }
 
 export function relationOf(ahead: number, behind: number): Relation {
@@ -87,9 +88,27 @@ export function parseHead(out: string, repo: string = GITHUB_REPO): RemoteHead |
   return { sha: full.slice(0, 7), message, author, date, commitUrl: `https://github.com/${repo}/commit/${full}` }
 }
 
+/** First-try limit of a fetch: a working connection answers in a second or two; a hung one (a dead IPv6 route, a cold DNS) is not worth waiting 21 s for. */
+export const FIRST_TRY_MS = 10_000
+
+/**
+ * `git fetch`, and when it could not REACH the remote (a connect that hung, DNS, a reset, a kill by our own short limit) one more try, forced over IPv4
+ * (`-4`: on Windows a broken IPv6 route makes the first connect hang ~21 s, and the second click «worked» only because the OS had given up on it).
+ * Any other failure (git missing, dubious ownership, not a repository) is the real answer and is thrown at once.
+ */
+export async function fetchWithRetry(run: GitRun, branch: string = BRANCH): Promise<void> {
+  try {
+    await run(['fetch', '--quiet', 'origin', branch], FIRST_TRY_MS)
+  } catch (e) {
+    const kind = classifyGitFailure(e).kind
+    if (kind !== 'network' && kind !== 'timeout') throw e
+    await run(['fetch', '--quiet', '-4', 'origin', branch])
+  }
+}
+
 /** Ask git. Throws whatever git threw (the caller classifies it). */
 export async function checkViaGit(run: GitRun, branch: string = BRANCH): Promise<{ remote: RemoteHead; ahead: number; behind: number }> {
-  await run(['fetch', '--quiet', 'origin', branch])
+  await fetchWithRetry(run, branch)
   const remote = parseHead(await run(['log', '-1', '--format=%H%x1f%s%x1f%an%x1f%aI', 'FETCH_HEAD']))
   if (!remote) throw new Error('git javobini oʻqib boʻlmadi (log)')
   const counts = parseCounts(await run(['rev-list', '--left-right', '--count', 'HEAD...FETCH_HEAD']))
