@@ -55,6 +55,9 @@ function BackupCard({ configured }: { configured: boolean }) {
         <h2>Shifrlangan zaxira</h2>
         {last && <span className="badge" style={{ marginLeft: 'auto' }}>{last.created.slice(0, 10)} · {last.buckets ?? last.chunks} boʻlak{last.reused ? ` (${last.reused} ta oʻzgarmagan)` : ''}{last.pinned ? '' : ' · mahkamlanmagan'}{last.channels && last.channels.length > 1 ? ` · ${last.channels.filter((c) => c.ok).length}/${last.channels.length} kanal` : ''}</span>}
       </div>
+      {last?.channels?.filter((c) => !c.ok).map((c) => (
+        <div className="kv" key={c.chat}><span className="k" style={{ color: 'var(--neg-text)' }}>Kanalga joylanmadi: <span className="mono">{c.chat}</span>{c.error ? ` · ${c.error}` : ''}</span></div>
+      ))}
       <p className="faint" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '2px 0 12px' }}>
         Baza kompaniya va yil boʻyicha boʻlaklarga ajratiladi; har bir boʻlak siqiladi, parolingiz bilan AES-256 yordamida shifrlanadi va kanalga joylanadi.
         Keyingi zaxirada faqat oʻzgargan boʻlaklar yuboriladi (hech narsa oʻchirilmaydi, eski manifestlar tarix boʻlib qoladi); soʻnggi manifest mahkamlanadi. Telegram faqat tasodifiy baytlarni va maʼnosiz fayl nomlarini koʻradi. Har safar <b>bir xil parol</b> kiriting. <b>Parol hech qayerda saqlanmaydi: yoʻqotsangiz zaxirani ochib boʻlmaydi.</b> Yangi kompyuterda botni, kanalni va parolni kiritib «Tiklash» ni bosing.
@@ -186,7 +189,7 @@ function BackupCard({ configured }: { configured: boolean }) {
       {st && st.phase !== 'idle' && (
         <div className="kv" style={{ marginTop: 14 }}>
           <span className="k" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {st.phase === 'done' ? <CheckCircle2 size={16} /> : st.phase === 'error' ? <XCircle size={16} /> : <span className="spinner" />}
+            {st.phase === 'done' && !st.partial ? <CheckCircle2 size={16} /> : st.phase === 'done' ? <XCircle size={16} /> : st.phase === 'error' ? <XCircle size={16} /> : <span className="spinner" />}
             {st.message}
           </span>
           {st.total > 1 && running && <span className="badge">{st.done}/{st.total}</span>}

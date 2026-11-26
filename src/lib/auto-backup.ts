@@ -126,7 +126,8 @@ const REAL: AutoDeps = {
   busy: backupBusy,
   outcome: () => {
     const s = backupState()
-    return { ok: s.phase === 'done', message: s.message }
+    // a backup that reached the main channel but not a mirror is NOT a success: it is retried (with the usual back-off) and the reason stays on the screen
+    return { ok: s.phase === 'done' && !s.partial, message: s.message }
   },
   working: () => billJobRunning() || watchRunning(),
 }

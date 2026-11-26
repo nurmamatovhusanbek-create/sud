@@ -52,6 +52,8 @@ export interface BackupState {
   startedAt: number
   finishedAt: number
   result: BackupResult | null
+  /** a backup that reached some channels but not all (the phase is still `done`: what worked is safe): the screens and the automatic backup must NOT call it a clean success */
+  partial?: boolean
 }
 
 export interface BackupResult {
@@ -75,7 +77,7 @@ export interface BackupResult {
 }
 
 const g = globalThis as unknown as { __sudBackup?: BackupState }
-const fresh = (): BackupState => ({ kind: null, phase: 'idle', done: 0, total: 0, message: '', startedAt: 0, finishedAt: 0, result: null })
+const fresh = (): BackupState => ({ kind: null, phase: 'idle', done: 0, total: 0, message: '', startedAt: 0, finishedAt: 0, result: null, partial: false })
 const state = (): BackupState => (g.__sudBackup ??= fresh())
 
 export const backupState = (): BackupState => ({ ...state() })
@@ -237,12 +239,13 @@ async function runBackupAll(passphrase: string, token: string, chats: string[]):
   const line = outcomes.map((o, i) => `${i === 0 ? 'asosiy' : 'zaxira'} ${o.chat}: ${o.ok ? `tayyor${copied(o)}` : `xato (${o.message})`}`).join(' · ')
   try {
     const last = getDb().prepare('SELECT v FROM meta WHERE k = ?').get('last_backup')
-    if (last) getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...(JSON.parse(String(last.v)) as object), channels: outcomes.map((o) => ({ chat: o.chat, ok: o.ok })) }))
+    if (last) getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...(JSON.parse(String(last.v)) as object), channels: outcomes.map((o) => ({ chat: o.chat, ok: o.ok, ...(o.ok ? {} : { error: o.message.slice(0, 240) }) })) }))
   } catch {
     /* the summary is a convenience */
   }
   set({
     phase: okN > 0 ? 'done' : 'error',
+    partial: okN > 0 && okN < chats.length,
     result: outcomes.find((o) => o.ok)?.result ?? null,
     finishedAt: Date.now(),
     message: okN === chats.length ? `Tayyor: ${chats.length} ta kanalga zaxira olindi (${line})` : okN > 0 ? `Qisman: ${okN}/${chats.length} kanalga olindi: ${line}` : line,
@@ -786,7 +789,7 @@ async function runLoad(passphrase: string, token: string, chat: string, tins: st
   })
 }
 
-export function lastBackup(): { channels?: Array<{ chat: string; ok: boolean }>; created: string; chunks: number; buckets?: number; reused?: number; dbBytes: number; uploadedBytes: number; pinned: boolean } | null {
+export function lastBackup(): { channels?: Array<{ chat: string; ok: boolean; error?: string }>; created: string; chunks: number; buckets?: number; reused?: number; dbBytes: number; uploadedBytes: number; pinned: boolean } | null {
   try {
     const r = getDb().prepare("SELECT v FROM meta WHERE k = 'last_backup'").get()
     return r ? JSON.parse(String(r.v)) : null

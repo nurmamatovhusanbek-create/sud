@@ -15,7 +15,7 @@ export interface BackupLast {
   dbBytes: number
   uploadedBytes: number
   pinned: boolean
-  channels?: Array<{ chat: string; ok: boolean }>
+  channels?: Array<{ chat: string; ok: boolean; error?: string }>
 }
 export interface LocatorHit {
   kind: 'company' | 'case' | 'bill'

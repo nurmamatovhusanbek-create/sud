@@ -610,6 +610,18 @@ describe('mirror channels: a banned channel or a deleted manifest message does n
     const done = await runBackup()
     expect(done.message).toContain('Qisman: 1/2')
     expect(done.message).not.toContain('koʻchirildi')
+    // a partial backup is not a clean success: the flag is set (the automatic backup retries it), and the failed channel's reason is kept for the screen
+    expect(done.phase).toBe('done')
+    expect(backup.backupState().partial).toBe(true)
+    const failed = backup.lastBackup()?.channels?.find((c) => !c.ok)
+    expect(failed?.chat).toBe(MAIN)
+    expect(failed?.error?.length).toBeGreaterThan(0)
+  })
+  test('a backup that reached every channel is clean: partial is false', async () => {
+    fakeChannels()
+    const done = await runBackup()
+    expect(done.message).toContain('Tayyor: 2 ta kanalga')
+    expect(backup.backupState().partial).toBe(false)
   })
 
   test('inspectChannels: what each channel really holds, since when its chain exists, missing pieces, and what it lacks', async () => {
@@ -692,7 +704,7 @@ describe('mirror channels: a banned channel or a deleted manifest message does n
     const done = await runBackup()
     expect(done.phase).toBe('done')
     expect(done.message).toContain('Qisman: 1/2')
-    expect(backup.lastBackup()?.channels).toEqual([{ chat: MAIN, ok: false }, { chat: MIRROR, ok: true }])
+    expect(backup.lastBackup()?.channels).toEqual([{ chat: MAIN, ok: false, error: expect.stringContaining('Bot kanaldan chiqarilgan') }, { chat: MIRROR, ok: true }])
     backup.startRestore(PASS)
     const r = await finished()
     const copy = dbm.openDbFile(r.result!.restoredFile!)
