@@ -124,10 +124,29 @@ describe('POST /api/public-orders/import-har', () => {
   test('with the search answer in the HAR the order gets a record, and the answer says it matched', async () => {
     const r = await call(har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF))]))
     const j = await r.json()
-    expect(j.data.matched).toEqual([ID])
+    expect(j.data.saved).toEqual([]) // the previous test already stored this file: not written again
+    expect(j.data.skipped).toBe(1)
     expect(j.data.orders).toBe(2)
     const { allOrders } = await import('@/lib/public-orders/store')
     expect((await allOrders()).some((o) => o.pdfId === ID && o.caseNumber === '2-1003-2113/20027')).toBe(true)
+  })
+  test('an overlapping export adds only what is new: the same HAR twice changes nothing, a bigger one adds the difference', async () => {
+    const { allOrders } = await import('@/lib/public-orders/store')
+    const shardBytes = () => fs.readdirSync(path.join(dir, 'shards')).reduce((a, n) => a + fs.statSync(path.join(dir, 'shards', n)).size, 0)
+    const log = () => fs.readFileSync(path.join(dir, 'downloads.jsonl'), 'utf8').split('\n').filter(Boolean).length
+    const first = har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF))])
+    const before = { shards: shardBytes(), log: log(), orders: (await allOrders()).length }
+    const again = (await (await call(first)).json()).data
+    expect([again.saved.length, again.skipped, again.orders]).toEqual([0, 1, 0])
+    expect({ shards: shardBytes(), log: log(), orders: (await allOrders()).length }).toEqual(before) // not a byte, a log line or a record more
+    // the next 5 pages of the same session: the first file again, plus a second one
+    const ID2 = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'
+    const PDF2 = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(500, 0x42), Buffer.from('\n%%EOF')])
+    const bigger = har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF)), entry(`https://adolatapi1.sud.uz/public/onStream/${ID2}?recaptcha_token=x`, envelope(PDF2))])
+    const more = (await (await call(bigger)).json()).data
+    expect(more.saved).toEqual([{ id: ID2, size: PDF2.length }])
+    expect([more.skipped, more.orders]).toEqual([1, 0])
+    expect(fs.existsSync(path.join(dir, 'files', `${ID2}.pdf`))).toBe(true)
   })
   test('says what is wrong: not a HAR, no order inside, no content saved', async () => {
     expect((await (await call(Buffer.from('nope'))).json()).code).toBe('not_har')

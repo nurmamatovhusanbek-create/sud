@@ -141,11 +141,18 @@ export function OrdersView() {
       return
     }
     const n = r.data.saved.length
+    const had = r.data.skipped
     const lost = n - r.data.matched.length
+    if (n === 0) {
+      // every file in it was already here (an overlapping export): nothing was written
+      toast.success(`Yangi qaror yoʻq: ${had} ta fayl allaqachon bor`, { description: r.data.orders ? `${r.data.orders} ta yangi yozuv roʻyxatga qoʻshildi.` : 'Hech narsa oʻzgarmadi.', duration: 6000 })
+      setTick((t) => t + 1)
+      return
+    }
     toast.success(n === 1 ? 'Qaror saqlandi' : `${n} ta qaror saqlandi`, {
       description: lost
         ? `${lost} tasi roʻyxatda koʻrinmaydi: HAR faylda uning ish raqami yoʻq. Network ochiq turib sahifani yangilang (F5), qarorni qidirib oching va HAR ni qayta saqlang.`
-        : `${r.data.orders} ta yozuv roʻyxatga qoʻshildi.`,
+        : `${r.data.orders} ta yozuv roʻyxatga qoʻshildi${had ? `, ${had} ta fayl allaqachon bor edi` : ''}.`,
       duration: lost ? 20000 : 6000,
     })
     if (manual && r.data.saved.some((x) => x.id === manual.pdfId)) setManual(null)
