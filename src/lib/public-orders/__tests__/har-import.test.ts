@@ -154,6 +154,19 @@ describe('POST /api/public-orders/import-har', () => {
     expect([more.skipped, more.orders]).toEqual([1, 0])
     expect(fs.existsSync(path.join(dir, 'files', `${ID2}.pdf`))).toBe(true)
   })
+  test('a log of search pages only (nothing opened) stores the records; a cleared order handed over again comes back to the lists', async () => {
+    const { readHidden, setHidden } = await import('@/lib/public-orders/hidden-store')
+    const { allOrders } = await import('@/lib/public-orders/store')
+    const pdfId = '11111111-2222-3333-4444-555555555555'
+    await setHidden('hide', [pdfId])
+    expect((await readHidden()).has(pdfId)).toBe(true)
+    const r = await call(har([entry(LIST_URL, LIST, null)]))
+    expect(r.status).toBe(200)
+    const j = (await r.json()).data
+    expect([j.saved.length, j.restored]).toEqual([0, 1])
+    expect((await readHidden()).has(pdfId)).toBe(false)
+    expect((await allOrders()).some((o) => o.pdfId === pdfId)).toBe(true)
+  })
   test('says what is wrong: not a HAR, no order inside, no content saved', async () => {
     expect((await (await call(Buffer.from('nope'))).json()).code).toBe('not_har')
     expect((await (await call(har([entry('https://public.sud.uz/a.json', 'x', null)]))).json()).code).toBe('no_order_file')

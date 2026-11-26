@@ -553,7 +553,7 @@ export async function importPublicOrderPdf(pdfId: string, file: File): Promise<A
 }
 
 /** Hand over a HAR file the person saved from their own browser; every order PDF in it is stored (lib/public-orders/har-import). */
-export async function importPublicOrdersHar(file: File): Promise<ApiResult<{ saved: { id: string; size: number }[]; skipped: number; matched: string[]; orders: number; seen: number }>> {
+export async function importPublicOrdersHar(file: File): Promise<ApiResult<{ saved: { id: string; size: number }[]; skipped: number; matched: string[]; orders: number; restored: number; seen: number }>> {
   try {
     const res = await fetch('/api/public-orders/import-har', {
       method: 'POST',

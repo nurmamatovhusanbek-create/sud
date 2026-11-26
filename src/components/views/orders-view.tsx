@@ -143,16 +143,18 @@ export function OrdersView() {
     const n = r.data.saved.length
     const had = r.data.skipped
     const lost = n - r.data.matched.length
+    const back = r.data.restored
     if (n === 0) {
-      // every file in it was already here (an overlapping export): nothing was written
-      toast.success(`Yangi qaror yoʻq: ${had} ta fayl allaqachon bor`, { description: r.data.orders ? `${r.data.orders} ta yangi yozuv roʻyxatga qoʻshildi.` : 'Hech narsa oʻzgarmadi.', duration: 6000 })
+      // no new file: a log of search pages only, or an overlapping export where every file was already here
+      const parts = [r.data.orders ? `${r.data.orders} ta yangi yozuv roʻyxatga qoʻshildi` : '', back ? `${back} ta qaror «Tozalangan» dan qaytdi` : '', had ? `${had} ta fayl allaqachon bor` : ''].filter(Boolean)
+      toast.success(r.data.orders || back ? 'Qarorlar roʻyxatga qoʻshildi' : 'Yangi qaror yoʻq', { description: parts.length ? `${parts.join(', ')}.` : 'Hech narsa oʻzgarmadi.', duration: 8000 })
       setTick((t) => t + 1)
       return
     }
     toast.success(n === 1 ? 'Qaror saqlandi' : `${n} ta qaror saqlandi`, {
       description: lost
         ? `${lost} tasi roʻyxatda koʻrinmaydi: HAR faylda uning ish raqami yoʻq. Network ochiq turib sahifani yangilang (F5), qarorni qidirib oching va HAR ni qayta saqlang.`
-        : `${r.data.orders} ta yozuv roʻyxatga qoʻshildi${had ? `, ${had} ta fayl allaqachon bor edi` : ''}.`,
+        : `${r.data.orders} ta yozuv roʻyxatga qoʻshildi${had ? `, ${had} ta fayl allaqachon bor edi` : ''}${back ? `, ${back} ta qaror «Tozalangan» dan qaytdi` : ''}.`,
       duration: lost ? 20000 : 6000,
     })
     if (manual && r.data.saved.some((x) => x.id === manual.pdfId)) setManual(null)

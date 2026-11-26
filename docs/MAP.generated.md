@@ -200,7 +200,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `public-orders/data-dir.ts` | lib/orders-buckets.ts, lib/public-orders/hidden-store.ts, lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
 | `public-orders/har-import.ts` | api/public-orders/import-har/route | lib/public-orders/__tests__/har-import.test.ts |
-| `public-orders/hidden-store.ts` | api/public-orders/hidden/route, api/public-orders/library/route | lib/public-orders/__tests__/hidden-store.test.ts |
+| `public-orders/hidden-store.ts` | api/public-orders/hidden/route, api/public-orders/import-har/route, api/public-orders/library/route | lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/hidden-store.test.ts |
 | `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
 | `public-orders/meta-backup.ts` | lib/public-orders/data-dir.ts, lib/public-orders/meta-backup-runner.ts | lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
