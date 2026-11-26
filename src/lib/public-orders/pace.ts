@@ -6,7 +6,8 @@
  */
 
 import { createPacer, type Priority } from '@/lib/net/pacer'
-import { ORDERS_GAP_SECONDS_DEFAULT } from '@/core/public-orders'
+import { createSerialGate } from '@/lib/net/serial-gate'
+import { ORDERS_FILE_GAP_SECONDS_DEFAULT, ORDERS_GAP_SECONDS_DEFAULT } from '@/core/public-orders'
 
 export function ordersGapMs(env: Record<string, string | undefined> = process.env): number {
   const raw = env.PUBLIC_ORDERS_MIN_GAP_MS
@@ -23,4 +24,24 @@ export function ordersPace(priority: Priority = 'background', signal?: AbortSign
   return pacer().pace(priority, signal)
 }
 
-export const ordersWaiting = (): number => pacer().waiting()
+export const ordersWaiting = (): number => pacer().waiting() + fileGate().waiting()
+
+/**
+ * PDF downloads are NOT paced start-to-start like the searches: one download at a time, and the next may start `PUBLIC_ORDERS_FILE_GAP_MS` (default 4 s) after the
+ * previous one FINISHED. A file that took 6 s used to be followed by 4 s of waiting anyway; now a slow one is simply followed by the short rest, and a quick one
+ * is never held back for the rest of a fixed 10 s. `0` = no rest (still one at a time). The firewall's circuit breaker (lib/public-orders/waf) is unchanged.
+ */
+export function ordersFileGapMs(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.PUBLIC_ORDERS_FILE_GAP_MS
+  if (raw === undefined || raw.trim() === '') return ORDERS_FILE_GAP_SECONDS_DEFAULT * 1000
+  const n = Number(raw)
+  return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 0), 120_000) : ORDERS_FILE_GAP_SECONDS_DEFAULT * 1000
+}
+
+const GF = globalThis as typeof globalThis & { __sudOrdersFileGate?: ReturnType<typeof createSerialGate> }
+const fileGate = () => (GF.__sudOrdersFileGate ??= createSerialGate({ gapMs: () => ordersFileGapMs() }))
+
+/** Resolves when it is this download's turn; call the returned function when the download is DONE (success or failure). */
+export function ordersFileSlot(signal?: AbortSignal): Promise<() => void> {
+  return fileGate().acquire(signal)
+}

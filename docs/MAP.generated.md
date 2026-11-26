@@ -187,6 +187,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `net/direct-route.ts` | lib/billing.ts, lib/public-orders/source.ts |  |
 | `net/pacer.ts` | lib/public-orders/pace.ts | lib/net/__tests__/pacer.test.ts |
 | `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/net/chain-fetch.ts, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
+| `net/serial-gate.ts` | lib/public-orders/pace.ts | lib/net/__tests__/serial-gate.test.ts |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/read-body-idle.test.ts, lib/net/__tests__/worker-fetch-pin.test.ts |
 | `orders-buckets.ts` | lib/auto-backup.ts, lib/backup.ts | lib/__tests__/backup.test.ts |
 | `orders-restore.ts` | lib/backup.ts |  |
@@ -488,6 +489,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__sudHealthStore` | lib/health-store.ts |
 | `__sudHidden` | lib/public-orders/hidden-store.ts |
 | `__sudOrderPdfLoader` | lib/public-orders/pdf-load.ts |
+| `__sudOrdersFileGate` | lib/public-orders/pace.ts |
 | `__sudOrdersPacer` | lib/public-orders/pace.ts |
 | `__sudPresence` | server/presence.ts |
 | `__sudSecurity` | server/audit.ts |

@@ -22,7 +22,7 @@ import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { downloadPublicOrderPdf, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
-import { ORDERS_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
+import { ORDERS_FILE_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: '', label: 'Barchasi' },
@@ -287,7 +287,7 @@ export function OrdersView() {
       return
     }
     // each one costs a captcha and a few seconds: a long list is a decision, not a click
-    if (list.length > 20 && !window.confirm(`${list.length} ta qaror birin-ketin yuklanadi (har biri bir necha soniya, jami taxminan ${Math.ceil((list.length * ORDERS_GAP_SECONDS_DEFAULT) / 60)} daqiqa: sayt bloklamasligi uchun har ${ORDERS_GAP_SECONDS_DEFAULT} soniyada bitta soʻrov). Davom etamizmi?`)) return
+    if (list.length > 20 && !window.confirm(`${list.length} ta qaror birin-ketin yuklanadi (har biri bir necha soniya, jami taxminan ${Math.ceil((list.length * (ORDERS_FILE_GAP_SECONDS_DEFAULT + 4)) / 60)} daqiqa: sayt bloklamasligi uchun bittasi tugagach ${ORDERS_FILE_GAP_SECONDS_DEFAULT} soniya dam olinib keyingisi boshlanadi). Davom etamizmi?`)) return
     await runBulk(list)
   }
 

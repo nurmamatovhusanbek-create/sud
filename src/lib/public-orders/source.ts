@@ -1,6 +1,6 @@
 import 'server-only'
 import { chainFetch } from '@/lib/net/chain-fetch'
-import { ordersPace } from '@/lib/public-orders/pace'
+import { ordersFileSlot, ordersPace } from '@/lib/public-orders/pace'
 import { assertNotWafBlocked, noteWafBlock, parseWafBlock, throwUpstreamFailure, wafMessage } from '@/lib/public-orders/waf'
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
@@ -47,24 +47,29 @@ const realDeps: OrderFileDeps = {
     const path = orderFilePath(pdfId) // uuid → the library file, `old-…` → the pre-2024 file; nothing else is ever built
     if (!path) throw new Error('Fayl identifikatori notoʻgʻri')
     if (route === DIRECT) assertNotWafBlocked()
-    await ordersPace('interactive') // a person asked for this file: ahead of any crawl, but never closer than the gap to the last request
-    if (route === DIRECT) assertNotWafBlocked()
-    const url = `${BASE}${path}?recaptcha_token=${encodeURIComponent(token)}`
-    // never race a duplicate: the first request spends the token
-    const res =
-      route === DIRECT
-        ? await chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
-        : await fetchViaWorkers(url, { originKey: 'adolatapi1.sud.uz', headers: HEADERS, timeoutMs: 45_000, maxAttempts: 1, hedgeMs: 45_000, priority: 'interactive', worker: route })
-    const body = new Uint8Array(await res.arrayBuffer())
-    if (!res.ok && route === DIRECT) {
-      const waf = parseWafBlock(Buffer.from(body.subarray(0, 2000)).toString('utf8'))
-      if (waf) {
-        noteWafBlock(waf)
-        throw new Error(wafMessage(waf))
+    // one download at a time, the next one a short rest after this one is DONE (not a fixed 10 s from its start): lib/public-orders/pace › ordersFileSlot
+    const release = await ordersFileSlot()
+    try {
+      if (route === DIRECT) assertNotWafBlocked()
+      const url = `${BASE}${path}?recaptcha_token=${encodeURIComponent(token)}`
+      // never race a duplicate: the first request spends the token
+      const res =
+        route === DIRECT
+          ? await chainFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(45_000), redirect: 'manual' })
+          : await fetchViaWorkers(url, { originKey: 'adolatapi1.sud.uz', headers: HEADERS, timeoutMs: 45_000, maxAttempts: 1, hedgeMs: 45_000, priority: 'interactive', worker: route })
+      const body = new Uint8Array(await res.arrayBuffer())
+      if (!res.ok && route === DIRECT) {
+        const waf = parseWafBlock(Buffer.from(body.subarray(0, 2000)).toString('utf8'))
+        if (waf) {
+          noteWafBlock(waf)
+          throw new Error(wafMessage(waf))
+        }
       }
+      if (!res.ok) console.error(`[orders-file] ${route === DIRECT ? 'direct' : 'worker'} HTTP ${res.status}: ${Buffer.from(body.subarray(0, 200)).toString('utf8').replace(/\s+/g, ' ')}`)
+      return { status: res.status, body }
+    } finally {
+      release()
     }
-    if (!res.ok) console.error(`[orders-file] ${route === DIRECT ? 'direct' : 'worker'} HTTP ${res.status}: ${Buffer.from(body.subarray(0, 200)).toString('utf8').replace(/\s+/g, ' ')}`)
-    return { status: res.status, body }
   },
   pick: pickWorker,
 }

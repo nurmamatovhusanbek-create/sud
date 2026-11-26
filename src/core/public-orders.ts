@@ -14,6 +14,8 @@ import { uzCyrToLat } from './translit'
 
 /** one request to the orders API every this many seconds (lib/public-orders/pace; PUBLIC_ORDERS_MIN_GAP_MS overrides) */
 export const ORDERS_GAP_SECONDS_DEFAULT = 10
+/** the rest between two PDF DOWNLOADS, counted from the end of the previous one (searches keep the start-to-start gap above) */
+export const ORDERS_FILE_GAP_SECONDS_DEFAULT = 4
 
 export type PublicCourtType = 'ECONOMIC' | 'CIVIL' | 'ADMINISTRATIVE' | 'CRIMINAL'
 export const PUBLIC_COURT_TYPES: PublicCourtType[] = ['ECONOMIC', 'CIVIL', 'ADMINISTRATIVE', 'CRIMINAL']
