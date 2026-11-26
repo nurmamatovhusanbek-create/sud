@@ -37,7 +37,7 @@ import { Dial, HEALTH_ZONES, WORKER_ZONES, BarChart, Spark, SkRows, EmptyBlock }
 import { openProtoDrawer, DwSection } from '@/components/proto/drawer'
 import { APP_VERSION } from '@/lib/version'
 import { authHeaders, getTorStatus, privilegedHeaders } from '@/lib/api-client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { waitForUpdate, type VersionSnap } from '@/lib/update-wait'
 import { OrdersTab } from '@/components/views/orders-settings'
 import { SecurityTab } from '@/components/views/security-settings'

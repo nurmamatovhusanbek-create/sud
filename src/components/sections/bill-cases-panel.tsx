@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { useBillJob } from '@/hooks/use-bill-cases'
 import { formatDmy } from '@/core/dates'
 

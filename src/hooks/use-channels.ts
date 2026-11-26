@@ -3,7 +3,7 @@
 /** Settings › Telegram › Kanallar holati: what each backup channel really holds (read from Telegram, nothing changes). Needs the passphrase. */
 
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { privilegedHeaders } from '@/lib/api-client'
 
 export interface ChannelReport {

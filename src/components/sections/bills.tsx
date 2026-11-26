@@ -38,7 +38,7 @@ import {
   type CheckStatusResponse,
 } from '@/core/billing-format'
 import { familyBadgeClass } from '@/components/proto/primitives'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 
 /** Deterministic pseudo-barcode from the invoice number (prototype barcode()). */
 function Barcode({ seed }: { seed: string }) {

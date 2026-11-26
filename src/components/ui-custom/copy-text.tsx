@@ -1,6 +1,6 @@
 'use client'
 
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 
 /**
  * A case number (or any identifier) that copies itself when clicked. It sits inside list rows that open a detail on click, so the

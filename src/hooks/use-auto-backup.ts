@@ -3,7 +3,7 @@
 /** Settings › Telegram › Avtomatik zaxira: the status of the automatic backup and its switch. The passphrase goes to this server once, to be kept in a private file. */
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 
 export interface AutoBackupStatus {

@@ -3,7 +3,7 @@
 /** Settings › Telegram › encrypted copy: start a backup or a restore, watch its progress. Polls only while a job runs; nothing starts by itself. */
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 import type { BackupState } from '@/lib/backup'
 

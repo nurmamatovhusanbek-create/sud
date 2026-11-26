@@ -18,7 +18,7 @@ import { detectSearchMode } from '@/core/search-mode'
 import { allRecords, setWatched } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { searchCompanies } from '@/lib/api-client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { familyBadgeClass, grp, initials } from '@/components/proto/primitives'
 
 const isKnownActive = (s?: string) => !!s && /фаол|faol|active|мавжуд|mavjud/i.test(s)

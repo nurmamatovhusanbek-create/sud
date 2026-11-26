@@ -17,7 +17,7 @@ import { recents, removeRecent, removeRecord, allRecords, upcomingOf, daysUntilI
 import { useRegistryVersion } from '@/lib/use-registry'
 import { dropCompanySnapshot, searchCompanies } from '@/lib/api-client'
 import { enrichCompany } from '@/lib/enrich'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { CountUp, Kpi, Seg, CardStats, grp, initials } from '@/components/proto/primitives'
 import type { CompanyRecord } from '@/lib/registry'
 

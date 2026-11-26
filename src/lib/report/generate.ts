@@ -14,7 +14,7 @@
  * and the report says so, in place, instead of printing a misleading zero.
  */
 
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { getCompanyInfo, getStats, getUpcomingHearings, searchCases } from '@/lib/api-client'
 import type { ApiResult, CompanyInfoData, CompanyStats, CourtCase, UpcomingHearingsData } from '@/lib/api-types'
 import { getCached, setCached } from '@/lib/cache'

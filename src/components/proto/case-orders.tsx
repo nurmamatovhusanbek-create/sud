@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import { FileText, Loader2, RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { fetchPublicOrders, getPublicOrders, importPublicOrderPdf, ManualOrderError, openPublicOrderPdf, type PublicOrdersData } from '@/lib/api-client'
 import { PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, splitDecisions, type KnownDecision } from '@/core/public-orders'
 import { DwSection } from '@/components/proto/drawer'

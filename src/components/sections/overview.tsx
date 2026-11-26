@@ -56,7 +56,7 @@ import { categoryLabel, courtTypeLabel, statusLabel as billStatusLabel, formatSu
 import type { EnrichedBill } from '@/lib/api-types'
 import { openReceipt } from '@/components/sections/bills'
 import type { ResourceState } from '@/hooks/use-resource'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { reportAge } from '@/lib/data-age'
 import { COMPANY_REFRESHED } from '@/lib/hard-refresh'
 

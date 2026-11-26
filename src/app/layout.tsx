@@ -41,7 +41,7 @@ export default function RootLayout({
       <body className="antialiased bg-background text-foreground">
         {children}
         <PresenceBeat />
-        <Toaster position="bottom-right" closeButton />
+        <Toaster position="bottom-right" closeButton expand visibleToasts={4} gap={8} offset={20} mobileOffset={12} />
       </body>
     </html>
   );

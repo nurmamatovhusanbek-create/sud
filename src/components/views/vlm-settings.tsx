@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, FlaskConical, Trash2, XCircle, ScanEye } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 import { VLM_PRESETS, presetOf, vlmId, type VlmFailure, type VlmProvider } from '@/core/vlm'
 

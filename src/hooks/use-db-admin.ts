@@ -3,7 +3,7 @@
 /** Settings › Maʼlumotlar bazasi: the database's status and its three actions (download, compact, forget one company). */
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, downloadDatabase, privilegedHeaders } from '@/lib/api-client'
 import { fmtInt } from '@/lib/report/model'
 import type { DbStatus } from '@/lib/db-admin'

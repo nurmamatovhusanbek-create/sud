@@ -47,7 +47,7 @@ import { useAppStore } from '@/lib/store/app-store'
 import type { CourtType, CourtCase, FullCaseData, Hearing, InstanceData, CaseDetail as FullCaseGeneral } from '@/lib/court-case-types'
 import type { ResourceState } from '@/hooks/use-resource'
 import { CASE_STATUSES, HEARING_STATUSES } from '@/lib/court-case-types'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 
 const COURT_SEG: { key: string; label: string }[] = [
   { key: 'all', label: 'Barchasi' },

@@ -3,7 +3,7 @@
 /** Settings › Telegram: the saved bot's status and its actions (find the channel, test, save, forget). The token is typed here and sent to this server only. */
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 import type { TelegramStepResult } from '@/core/telegram'
 

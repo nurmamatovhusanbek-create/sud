@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { Bookmark, Check, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { applyProfile, deleteProfile, listProfiles, profileNs, profileValues, saveProfile, suggestName, type Profile } from '@/lib/documents/profiles'
 
 const store = (): Storage | null => {

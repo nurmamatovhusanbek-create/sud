@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, FileDown, FileSpreadsheet, FileText, Files, Loader2, RotateCcw } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import {
   FIELDS,
   categoryDefaults,

@@ -9,7 +9,7 @@
  */
 
 import { useSyncExternalStore } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { clearCached } from './cache'
 import { clearAge } from './data-age'
 import { enrichCompanyDetailed, type EnrichResult } from './enrich'

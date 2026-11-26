@@ -9,7 +9,7 @@
 
 import { useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, FilePlus, FileText, Loader2, Trash2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { DOCS, FIELDS, docsByTab } from '@/lib/documents/registry'
 import { isCustomId } from '@/lib/documents/custom'
 import { deleteCustomDoc, uploadCustomDoc } from '@/lib/api-client'

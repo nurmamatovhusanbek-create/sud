@@ -29,7 +29,7 @@ import { HearingsSection } from '@/components/sections/hearings'
 import { ProfileSection } from '@/components/sections/profile'
 import { useAppStore, WORKSPACE_NAV, type SectionKey } from '@/lib/store/app-store'
 import { exportStatsXlsx, getStats } from '@/lib/api-client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { keepIdentityWarm } from '@/lib/identity'
 import { hardRefreshWithToast } from '@/lib/hard-refresh'
 

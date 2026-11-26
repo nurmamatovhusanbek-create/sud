@@ -18,7 +18,7 @@ import { refreshRating } from '@/lib/enrich'
 import { companyFactsPatch, daysUntilIso, futureUpcoming, hearingMetaPatch, orderCasesPatch, patchMeta, patchRecord, setWatched, watched, type CompanyRecord, type UpcomingHearing } from '@/lib/registry'
 import { useRegistryVersion } from '@/lib/use-registry'
 import { getStats, getUpcomingHearings } from '@/lib/api-client'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 
 const MONTHS = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 

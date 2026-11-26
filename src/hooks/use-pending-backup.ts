@@ -3,7 +3,7 @@
 /** Settings › Telegram › «Nima yuklanmagan?»: what this computer holds that each channel does not hold yet (local comparison: no passphrase, nothing is asked of Telegram). */
 
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders } from '@/lib/api-client'
 
 export interface PendingItem {

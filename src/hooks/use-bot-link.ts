@@ -3,7 +3,7 @@
 /** Settings › Telegram › Bot bilan ulanish: the link with the bot (lib/bot-link): its status and switch. */
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 
 export interface BotLinkStatus {

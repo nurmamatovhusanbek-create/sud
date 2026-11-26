@@ -15,7 +15,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { FileUp, FileDown, Loader2, X, AlertTriangle, ArrowLeft, ShieldCheck, CalendarDays } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { useDocScript } from '@/lib/documents/script-pref'
 import { SCRIPT_LABEL, UZ_SCRIPTS } from '@/core/uz-alphabet'
 import { parseSverka, type SverkaParseResult } from '@/lib/pretenzia/parse'

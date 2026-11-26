@@ -3,7 +3,7 @@
 /** Settings › Telegram › Kuzatuv: the automatic read of court lists with Telegram messages. Setting, last run, and the two buttons (read now, test message). */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { authHeaders, privilegedHeaders } from '@/lib/api-client'
 import type { WatchConfig } from '@/core/watch'
 

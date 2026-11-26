@@ -17,7 +17,7 @@
 import { CopyText } from '@/components/ui-custom/copy-text'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Download, FileText, Loader2, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'

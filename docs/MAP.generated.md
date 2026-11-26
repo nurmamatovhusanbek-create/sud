@@ -193,6 +193,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `net/public-host.ts` | api/settings/workers/route, api/settings/workers/test/route, lib/net/chain-fetch.ts, lib/vlm-request.ts | lib/__tests__/public-host.test.ts |
 | `net/serial-gate.ts` | lib/public-orders/pace.ts | lib/net/__tests__/serial-gate.test.ts |
 | `net/worker-fetch.ts` | lib/billing.ts, lib/chamber.ts, lib/court-case.ts, lib/public-orders/source.ts | lib/net/__tests__/read-body-idle.test.ts, lib/net/__tests__/worker-fetch-pin.test.ts |
+| `notify.ts` | app/page.tsx, components/company/context-bar.tsx, components/proto/case-orders.tsx, components/proto/letterhead.tsx, components/sections/bill-cases-panel.tsx, components/sections/bills.tsx, components/sections/cases.tsx, +25 | lib/__tests__/notify.test.ts |
 | `orders-buckets.ts` | lib/auto-backup.ts, lib/backup-pending.ts, lib/backup.ts | lib/__tests__/backup.test.ts |
 | `orders-restore.ts` | lib/backup.ts |  |
 | `orginfo.ts` | api/company/route, lib/stats.ts, sources/index.ts | lib/__tests__/orginfo-fetch.test.ts, lib/__tests__/stats-found.test.ts |

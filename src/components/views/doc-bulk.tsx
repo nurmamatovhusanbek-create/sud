@@ -9,7 +9,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FileDown, FileSpreadsheet, Loader2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 import { FIELDS, type DocDef } from '@/lib/documents/registry'
 import { MAX_BULK_ROWS, gridToRows, matchColumns, parseCsv, rowsToValues, templateCsv } from '@/lib/documents/bulk'
 import { withDerived } from '@/lib/documents/derive'

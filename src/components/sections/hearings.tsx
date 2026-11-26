@@ -22,7 +22,7 @@ import { useAppStore } from '@/lib/store/app-store'
 import { useTabCounts } from '@/lib/tab-counts'
 import type { UpcomingHearingsData } from '@/lib/api-types'
 import type { ResourceState } from '@/hooks/use-resource'
-import { toast } from 'sonner'
+import { toast } from '@/lib/notify'
 
 const MONTHS_UZ = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
 const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba']

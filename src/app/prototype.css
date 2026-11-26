@@ -585,6 +585,14 @@ html, body { height: 100%; }
 [data-sonner-toast][data-type='error'] { background: var(--status-negative-solid) !important; color: #fff !important; }
 [data-sonner-toast][data-type='warning'] { background: var(--status-warning-solid) !important; color: var(--status-warning-on) !important; }
 
+/* pop-ups stay short and never stack over each other (lib/notify cuts a long message; this is the last resort): a bounded width, a title of at most two lines
+   and a description of at most four, in every look. `expand` on the <Toaster> spaces them instead of stacking them into one another. */
+[data-sonner-toaster] { --width: min(380px, calc(100vw - 24px)); }
+[data-sonner-toast] { max-width: min(380px, calc(100vw - 24px)); }
+[data-sonner-toast] [data-title], [data-sonner-toast] [data-description] { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+[data-sonner-toast] [data-title] { -webkit-line-clamp: 2; line-clamp: 2; }
+[data-sonner-toast] [data-description] { -webkit-line-clamp: 4; line-clamp: 4; font-size: 12.5px; }
+
 /* ---------- dial gauge (proto/dial-geometry.ts) ---------- */
 
 @media (prefers-reduced-motion: reduce) {
