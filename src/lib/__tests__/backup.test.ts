@@ -886,6 +886,34 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect(lines()).toBe(before)
   })
 
+  test('an order removed because its file can never be downloaded: gone from every reader, a tombstone travels in the bucket, the channel\'s older copy cannot bring it back, a restore learns it', async () => {
+    const { appendOrders, allOrders, lookupOrders, resetCheckedCache } = await orders()
+    const { purgeOrders, readPurged } = await import('../public-orders/purged-store')
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020'), order('o2', ID2, '2-1004-2603/8021')])
+    const ch = fakeChannel()
+    expect((await runBackup()).phase).toBe('done') // the channel now holds BOTH records (o2 not downloaded)
+    expect(await purgeOrders([{ pdfId: ID2, caseNumber: '2-1004-2603/8021' }])).toBe(1)
+    expect(await purgeOrders([{ pdfId: ID2.toUpperCase(), caseNumber: '2-1004-2603/8021' }])).toBe(0) // once
+    expect((await allOrders()).map((o) => o.id)).toEqual(['o1'])
+    expect(await lookupOrders('2-1004-2603/8021')).toEqual([])
+    expect([...(await readPurged()).keys()]).toEqual([ID2])
+    // the next backup merges with the channel's older copy (which has o2): the tombstone wins, o2 is not in the new bucket
+    expect((await runBackup()).phase).toBe('done')
+    const m = await manifestOf(ch)
+    const rows = m.plain('orders:26').toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown[])
+    expect(rows.find((r) => r[0] === 'o2')).toBeUndefined()
+    expect(rows.find((r) => r[0] === 'o1')).toBeDefined()
+    expect(rows.find((r) => r[0] === 'x')).toEqual(['x', ID2, expect.any(Number), '2-1004-2603/8021'])
+    // a new computer: the restore brings o1 back, NOT o2, and learns that o2 was removed
+    fs.rmSync(ORD_DIR, { recursive: true, force: true })
+    fs.mkdirSync(ORD_DIR, { recursive: true })
+    resetCheckedCache()
+    backup.startRestore(PASS)
+    expect((await finished()).phase).toBe('done')
+    expect((await allOrders()).map((o) => o.id)).toEqual(['o1'])
+    expect([...(await readPurged()).keys()]).toEqual([ID2])
+  })
+
   test('a restore never overwrites what this computer has: its own PDF and its own check stay', async () => {
     const { appendOrders, getChecked, markChecked, resetCheckedCache } = await orders()
     const { writePdf, readPdf } = await pdfs()

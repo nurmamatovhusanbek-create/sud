@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { billJobRunning } from '@/lib/bill-cases'
 import { backupBusy } from '@/lib/backup'
 import { caseJobStatus } from '@/lib/public-orders/company-job'
+import { downloadJobRunning } from '@/lib/public-orders/download-job-real'
 import { guard } from '@/server/middleware'
 import { jsonFail, jsonOk } from '@/server/envelope'
 import { presenceSnapshot, recordBeat, recordBye } from '@/server/presence'
@@ -35,5 +36,5 @@ export const POST = guard(
 )
 
 export const GET = guard(async () => {
-  return jsonOk({ ...presenceSnapshot(), busy: caseJobStatus().state === 'running' || billJobRunning() || backupBusy(), autoExit: autoExit() })
+  return jsonOk({ ...presenceSnapshot(), busy: caseJobStatus().state === 'running' || billJobRunning() || backupBusy() || downloadJobRunning(), autoExit: autoExit() })
 })

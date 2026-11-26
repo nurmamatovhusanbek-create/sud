@@ -289,7 +289,8 @@ function rowKey(kind: BucketKind, r: unknown[]): { key: string; t: number | null
     case 'lists': return { key: `${r[0]}:${r[1]}`, t: null }
     case 'hearings': return { key: String(r[0]), t: Number(r[8]) || 0 } // one row per case: the newer one is the case's current hearing
     // one row per order id (the copy that HAS the PDF wins: saved at 0 = not downloaded); a «checked» line is per case, the later check wins
-    case 'orders': return r[0] === 'k' ? { key: `k:${r[1]}`, t: Number(r[2]) || 0 } : { key: String(r[0]), t: Number(r[11]) || 0 }
+    // a tombstone ("x", pdf id, when) is an order the app removed because its file can never be downloaded: it is per file id and outlives the record
+    case 'orders': return r[0] === 'k' ? { key: `k:${r[1]}`, t: Number(r[2]) || 0 } : r[0] === 'x' ? { key: `x:${String(r[1]).toLowerCase()}`, t: Number(r[2]) || 0 } : { key: String(r[0]), t: Number(r[11]) || 0 }
     default: return { key: String(r[0]), t: null } // state: «load» / «company» lines
   }
 }
@@ -303,7 +304,7 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
   const b = parseBucket(name)
   if (!b) throw new Error('noma\'lum bo\'lak')
   if (b.kind === 'pdf') return Buffer.from(local) // a published order never changes: there is nothing to merge, and the bytes are not lines
-  const rows = new Map<string, { line: string; t: number | null }>()
+  const rows = new Map<string, { line: string; t: number | null; pid?: string }>()
   const take = (text: Uint8Array, isLocal: boolean) => {
     for (const line of Buffer.from(text).toString('utf8').split('\n')) {
       if (!line) continue
@@ -315,11 +316,17 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
       if (b.kind === 'hearings' && Number(r[2]) < todayKeyUz()) continue // a hearing that has passed is not kept
       const { key, t } = rowKey(b.kind, r)
       const have = rows.get(key)
-      if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t })
+      const pid = b.kind === 'orders' && r[0] !== 'k' && r[0] !== 'x' ? String(r[7] ?? '').toLowerCase() : undefined
+      if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t, pid })
     }
   }
   take(base, false)
   take(local, true)
+  // an order with a tombstone is gone from the union (in either copy): the app removed it on purpose
+  if (b.kind === 'orders') {
+    const gone = new Set([...rows.keys()].filter((k) => k.startsWith('x:')).map((k) => k.slice(2)))
+    if (gone.size) for (const [k, v] of rows) if (v.pid && gone.has(v.pid)) rows.delete(k)
+  }
   // the order `renderBucket` writes: by key (case numbers, bill numbers: plain ASCII, so code-unit order is the database's order)
   const order = (e: [string, { line: string }]) => (b.kind === 'index' ? (e[0].startsWith('c:') ? `0${e[0]}` : `1${e[0]}`) : e[0])
   const lines = [...rows.entries()].sort((x, y) => (order(x) < order(y) ? -1 : order(x) > order(y) ? 1 : 0)).map((e) => e[1].line)

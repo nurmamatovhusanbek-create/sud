@@ -7,7 +7,7 @@
 
 import { beginActivity } from './net-activity'
 import { normalizeCourtType } from '@/core/billing-format'
-import type { LibraryItem, LibraryStatus, StoredOrder } from '@/core/public-orders'
+import type { DownloadJobState, LibraryItem, LibraryStatus, StoredOrder } from '@/core/public-orders'
 import type { SecuritySnapshot } from '@/core/security-events'
 import type { UzScript } from '@/core/uz-alphabet'
 import type { OrdersCacheStats, PublicOrdersStatus } from '@/lib/public-orders/types'
@@ -603,6 +603,23 @@ export async function setOrdersHidden(action: 'hide' | 'restore', ids: string[])
     return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
   }
 }
+
+/** «Barchasini yuklash» runs on the SERVER (lib/public-orders/download-job): these only start / stop / read / dismiss it, so leaving the page does not stop it. */
+async function downloadJobCall(init?: RequestInit): Promise<ApiResult<DownloadJobState>> {
+  try {
+    const res = await fetch('/api/public-orders/download-job', { cache: 'no-store', ...init, headers: { 'Content-Type': 'application/json', ...authHeaders() } })
+    const json = await res.json().catch(() => null)
+    // an error body (401, 429, 500) is JSON without the fields we read: never stored as the job
+    if (json?.ok === true && json.data && typeof json.data.phase === 'string' && Array.isArray(json.data.problems)) return { ok: true, data: json.data as DownloadJobState }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+export const getDownloadJob = () => downloadJobCall()
+export const startDownloadJob = (ids: string[]) => downloadJobCall({ method: 'POST', body: JSON.stringify({ action: 'start', ids }) })
+export const stopDownloadJob = () => downloadJobCall({ method: 'POST', body: JSON.stringify({ action: 'stop' }) })
+export const clearDownloadJob = () => downloadJobCall({ method: 'POST', body: JSON.stringify({ action: 'clear' }) })
 
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
 export async function fetchPublicOrders(

@@ -32,7 +32,7 @@ export function defaultBackupDir(env: Record<string, string | undefined>, home: 
 /** The metadata files under `dir`, as paths relative to it. */
 export function metaFiles(dir: string): string[] {
   const out: string[] = []
-  for (const f of ['checked.jsonl', 'downloads.jsonl']) if (fs.existsSync(path.join(dir, f))) out.push(f)
+  for (const f of ['checked.jsonl', 'downloads.jsonl', 'purged.jsonl']) if (fs.existsSync(path.join(dir, f))) out.push(f)
   try {
     for (const n of fs.readdirSync(path.join(dir, 'shards'))) if (n.endsWith('.jsonl')) out.push(path.join('shards', n))
   } catch { /* no shards yet */ }

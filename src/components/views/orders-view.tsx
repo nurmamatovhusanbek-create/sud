@@ -21,7 +21,8 @@ import { toast } from 'sonner'
 import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
-import { downloadPublicOrderPdf, getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { useDownloadJob } from '@/hooks/use-download-job'
+import { getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { ORDERS_FILE_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -63,8 +64,18 @@ export function OrdersView() {
   const [sel, setSel] = useState<Map<string, LibraryItem>>(new Map()) // orders ticked in «Yuklanmagan» / «Mavjud emas» (by file id)
   const first = useRef(true)
 
-  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null)
-  const stopRef = useRef(false) // «Toʻxtatish»: the running bulk download stops after the order in flight
+  // «Barchasini yuklash» is a SERVER job: this page starts it and watches it, so leaving the page (another tab, a company card) does not stop it
+  const dl = useDownloadJob((s) => {
+    setTick((n) => n + 1)
+    if (s.ok) toast.success(`${s.ok} ta qaror yuklab olindi${s.phase === 'stopped' ? ' (toʻxtatildi)' : ''}`)
+    if (s.problems.length || s.deferred || s.note) toast.error(`Yuklash tugadi: ${s.problems.length} ta qarorda muammo bor, pastdagi hisobotga qarang`, { duration: 12000 })
+  })
+  const bulk = dl.job?.phase === 'running' ? { done: dl.job.done, total: dl.job.total } : null
+  // the lists and counts move while the job works: every finished order leaves «Yuklanmagan» now, not at the end
+  const jobDone = dl.job?.phase === 'running' ? dl.job.done : -1
+  useEffect(() => {
+    if (jobDone > 0) setTick((n) => n + 1)
+  }, [jobDone])
 
   // local read; typing is debounced and a newer request cancels the older one
   useEffect(() => {
@@ -216,49 +227,12 @@ export function OrdersView() {
   const todo = items.filter((o) => o.state !== 'saved' && o.pdfId)
 
   /**
-   * Save a list of orders one after another (the server spaces the captchas). The list and the counts are re-read after EACH order,
-   * so they move while it works. Stops at the first order that needs a person, at the first file the server could not keep (that
-   * is systematic: say why instead of failing 80 times), or when «Toʻxtatish» is pressed; any other failure is counted and skipped.
+   * Hand a list of orders to the server job (it saves them one after another, the gates space the requests). The list and the counts are re-read while it works.
+   * Orders that cannot be saved are skipped and reported at the end (see the report under the toolbar), never a reason to stop the rest.
    */
   const runBulk = async (list: LibraryItem[]) => {
-    stopRef.current = false
-    setBulk({ done: 0, total: list.length })
-    let ok = 0
-    let failed = 0
-    let lastErr = ''
-    let notSaved = ''
-    let needsPerson: LibraryItem | null = null
-    for (const o of list) {
-      if (stopRef.current) break
-      try {
-        const r = await downloadPublicOrderPdf(o.pdfId, o.pdfName)
-        if (r.saved) ok++
-        else {
-          notSaved = r.saveError || 'sababi nomaʼlum'
-          break
-        }
-      } catch (e) {
-        if (e instanceof ManualOrderError) {
-          needsPerson = o
-          break
-        }
-        failed++
-        lastErr = `${o.caseNumber}: ${e instanceof Error ? e.message : 'yuklab boʻlmadi'}`
-      } finally {
-        setBulk((b) => (b ? { ...b, done: b.done + 1 } : b))
-        setTick((n) => n + 1) // the order that just landed leaves «Yuklanmagan» now, not at the end
-      }
-    }
-    setBulk(null)
-    setTick((n) => n + 1)
-    if (needsPerson) {
-      setManual(needsPerson)
-      toast.error('public.sud.uz bu qarorni qoʻlda yuklashni talab qildi — pastdagi yoʻriqnomaga qarang')
-    }
-    if (notSaved) toast.error(`PDF olindi, lekin kompyuterga saqlanmadi: ${notSaved}. Yuklash toʻxtatildi.`, { duration: 20000 })
-    else if (failed) toast.error(`${failed} ta qaror yuklanmadi (${lastErr})`, { duration: 12000 })
-    if (ok) toast.success(`${ok} ta qaror yuklab olindi${stopRef.current ? ' (toʻxtatildi)' : ''}`)
-    else if (stopRef.current) toast.info('Yuklash toʻxtatildi')
+    const err = await dl.start(list.map((o) => o.pdfId))
+    if (err) toast.error(err)
   }
 
   /** Every order in `state` that matches the current filters, across ALL pages (not only the one on screen). */
@@ -394,6 +368,29 @@ export function OrdersView() {
                 </span>
               </div>
             )}
+            {dl.job && (dl.job.phase === 'done' || dl.job.phase === 'stopped') && (dl.job.problems.length > 0 || dl.job.deferred > 0 || !!dl.job.note || dl.job.removed > 0) && (
+              <div className="dw-orders-empty" style={{ margin: '0 0 10px', display: 'grid', gap: 6, textAlign: 'left' }} role="status">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                  <b>
+                    Yuklash {dl.job.phase === 'stopped' ? 'toʻxtatildi' : 'tugadi'}: {dl.job.ok} ta yuklandi
+                    {dl.job.removed ? `, ${dl.job.removed} ta maʼlumotlardan olib tashlandi` : ''}
+                    {dl.job.problems.length - dl.job.removed > 0 ? `, ${dl.job.problems.length - dl.job.removed} tasida muammo` : ''}
+                  </b>
+                  <button className="btn btn-outline btn-sm" onClick={() => void dl.clear()}>
+                    <X />
+                    <span>Yopish</span>
+                  </button>
+                </div>
+                {dl.job.note && <div style={{ color: 'var(--neg-text)' }}>{dl.job.note}</div>}
+                {dl.job.deferred > 0 && <div>{dl.job.deferred} ta qaror urinib koʻrilmadi: sayt avtomatik yuklashni vaqtincha rad etdi (taxminan 30 daqiqa). Keyinroq «Barchasini yuklash» ni qayta bosing: yuklanmaganlari davom ettiriladi.</div>}
+                {dl.job.problems.slice(0, 50).map((p) => (
+                  <div key={p.pdfId} style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                    <span className="mono">{p.caseNumber || p.pdfId}</span>{p.instance ? ` · ${p.instance}` : ''} <span className="faint">—</span> {p.message}
+                  </div>
+                ))}
+                {dl.job.problems.length > 50 && <div className="faint" style={{ fontSize: 12.5 }}>…yana {dl.job.problems.length - 50} ta</div>}
+              </div>
+            )}
             {(status === 'never' || status === 'gone') && counts && (status === 'never' ? counts.never : counts.gone) > 0 && (
               <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
                 <span>
@@ -403,7 +400,7 @@ export function OrdersView() {
                 </span>
                 <span style={{ display: 'flex', gap: 8 }}>
                   {bulk && (
-                    <button className="btn btn-outline btn-sm" onClick={() => { stopRef.current = true }} title="Hozirgi qarordan keyin toʻxtaydi">
+                    <button className="btn btn-outline btn-sm" onClick={() => void dl.stop()} title="Hozirgi qarordan keyin toʻxtaydi">
                       <X />
                       <span>Toʻxtatish</span>
                     </button>

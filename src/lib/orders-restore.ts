@@ -3,6 +3,7 @@ import type { StoredOrder } from '@/core/public-orders'
 import { parseBucket } from './db-buckets'
 import { allChecked, allOrders, appendOrders, markChecked } from './public-orders/store'
 import { readPdf, writePdf } from './public-orders/pdf-store'
+import { purgeOrders, readPurged } from './public-orders/purged-store'
 
 /**
  * The way back for the court orders in a backup (`orders:<yy>` records, `pdf:<id>` files): they go into THIS computer's orders folder
@@ -51,6 +52,20 @@ export async function importOrdersBucket(name: string, text: Uint8Array): Promis
   const instancesByCase = new Map<string, Set<string>>()
   const savedAtByCase = new Map<string, number>()
   const noneAt = new Map<string, number>()
+  // the orders the app removed on purpose (tombstones) come first: this computer learns them, and their records are not brought back
+  const gone = new Set<string>()
+  const tombs: Array<{ pdfId: string; caseNumber: string }> = []
+  for (const l of Buffer.from(text).toString('utf8').split('\n')) {
+    try {
+      const r = JSON.parse(l) as unknown[]
+      if (r[0] === 'x' && typeof r[1] === 'string') {
+        gone.add(r[1].toLowerCase())
+        tombs.push({ pdfId: r[1], caseNumber: typeof r[3] === 'string' ? r[3] : '' })
+      }
+    } catch { /* not a line */ }
+  }
+  if (tombs.length) await purgeOrders(tombs)
+  const already = await readPurged()
   for (const l of Buffer.from(text).toString('utf8').split('\n')) {
     if (!l) continue
     let r: unknown[]
@@ -59,6 +74,7 @@ export async function importOrdersBucket(name: string, text: Uint8Array): Promis
     } catch {
       continue // a damaged line costs that order only
     }
+    if (r[0] === 'x') continue
     if (r[0] === 'k') {
       if (typeof r[1] === 'string' && Number.isFinite(Number(r[2]))) noneAt.set(r[1], Number(r[2]))
       continue
@@ -68,7 +84,7 @@ export async function importOrdersBucket(name: string, text: Uint8Array): Promis
     const set = instancesByCase.get(caseNumber) ?? instancesByCase.set(caseNumber, new Set()).get(caseNumber)!
     if (instance) set.add(instance)
     savedAtByCase.set(caseNumber, Math.max(savedAtByCase.get(caseNumber) ?? 0, Number(savedAt) || 0))
-    if (have.has(id)) continue
+    if (have.has(id) || gone.has(pdfId.toLowerCase()) || already.has(pdfId.toLowerCase())) continue
     have.add(id)
     fresh.push({ id, caseNumber, instance: instance ?? '', result: result ?? '', court: court ?? '', judge: judge ?? '', category: category ?? '', pdfId, pdfName: pdfName ?? '', pdfSize: Number(pdfSize) || 0, courtType: (courtType || 'ECONOMIC') as StoredOrder['courtType'] })
   }

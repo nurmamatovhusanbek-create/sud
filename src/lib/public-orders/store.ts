@@ -4,6 +4,7 @@ import path from 'node:path'
 import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
 import { dataDir, lastRestore } from './data-dir'
 import { currentBackup, scheduleMetaBackup } from './meta-backup-runner'
+import { readPurged, withoutPurged } from './purged-store'
 import type { OrdersCacheStats } from './types'
 
 export { dataDir }
@@ -74,7 +75,7 @@ export async function lookupOrders(caseNumber: string): Promise<StoredOrder[]> {
       /* a half-written last line — ignore */
     }
   }
-  return sortOrders([...byId.values()])
+  return sortOrders(await withoutPurged([...byId.values()]))
 }
 
 // ---- per-case check records (core/public-orders → CaseCheck) ------------------------------------
@@ -156,7 +157,8 @@ export async function allOrders(): Promise<StoredOrder[]> {
     return []
   }
   const stats = await Promise.all(names.map((n) => fs.stat(path.join(shards, n)).catch(() => null)))
-  const sig = names.map((n, i) => `${n}:${stats[i]?.size}:${stats[i]?.mtimeMs}`).join('|')
+  const purged = await readPurged()
+  const sig = names.map((n, i) => `${n}:${stats[i]?.size}:${stats[i]?.mtimeMs}`).join('|') + `|purged:${purged.size}`
   if (allMemo?.sig === sig) return allMemo.orders
   const byId = new Map<string, StoredOrder>()
   for (const n of names) {
@@ -172,7 +174,7 @@ export async function allOrders(): Promise<StoredOrder[]> {
       } catch { /* torn last line */ }
     }
   }
-  const orders = [...byId.values()]
+  const orders = purged.size ? [...byId.values()].filter((o) => !o.pdfId || !purged.has(o.pdfId.toLowerCase())) : [...byId.values()]
   allMemo = { sig, orders }
   return orders
 }

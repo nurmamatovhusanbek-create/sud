@@ -25,6 +25,7 @@ Every route is `guard()`-wrapped (tested in `src/server/__tests__/routes.test.ts
 | `/api/presence` | POST, GET | POST { id, bye? } a page's heartbeat (every 30 s) or its goodbye. Answers `{ autoExit }`: the page stops pingi | `presence/route.ts` |
 | `/api/pretenzia/generate` | POST | POST /api/pretenzia/generate | `pretenzia/generate/route.ts` |
 | `/api/public-orders/cache` | GET (no-rate-limit) |  | `public-orders/cache/route.ts` |
+| `/api/public-orders/download-job` | GET (no-rate-limit), POST | GET → the job's state (phase, progress, the orders that could not be saved and why) | `public-orders/download-job/route.ts` |
 | `/api/public-orders/fetch` | POST | POST /api/public-orders/fetch | `public-orders/fetch/route.ts` |
 | `/api/public-orders/file` | GET | GET /api/public-orders/file?id=<pdf id>[&name=…] → the order as a PDF. | `public-orders/file/route.ts` |
 | `/api/public-orders/hidden` | POST | POST /api/public-orders/hidden { action: 'hide' / 'restore', ids: string[] } | `public-orders/hidden/route.ts` |
@@ -94,7 +95,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `legal-forms.ts` | lib/pretenzia/parse.ts, lib/pretenzia/render.ts | lib/pretenzia/__tests__/parties.test.ts |
 | `party-text.ts` | core/classify.ts, lib/case-store.ts, lib/court-case.ts, lib/stats.ts | core/__tests__/party-text.test.ts |
 | `pretenzia.ts` | components/views/pretenzia-view.tsx, lib/pretenzia/parse.ts, lib/pretenzia/render.ts | core/__tests__/pretenzia.test.ts |
-| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +14 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders.ts` | api/public-orders/fetch/route, api/public-orders/file/route, api/public-orders/import/route, api/public-orders/library/route, api/public-orders/orders/route, components/proto/case-orders.tsx, components/sections/cases.tsx, +18 | core/__tests__/case-status.test.ts, core/__tests__/public-orders-legacy.test.ts, core/__tests__/public-orders.test.ts, lib/public-orders/__tests__/engine.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `rates.ts` | components/proto/classic.tsx, components/proto/primitives.tsx, components/sections/overview.tsx, components/views/watchlist.tsx, lib/enrich.ts, lib/report/model.ts, lib/report/render-ink.ts, +1 | core/__tests__/rates.test.ts |
 | `schemas/index.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/rating/route, +5 |  |
 | `search-mode.ts` | components/shell/command-palette.tsx, components/views/launcher.tsx | core/__tests__/status.test.ts |
@@ -115,8 +116,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 |---|---|---|
 | `audit.ts` | api/settings/security/route, server/middleware.ts | server/__tests__/guard.test.ts |
 | `config.ts` | api/settings/health/route, api/settings/security/route, api/stats/route, infra/logger.ts, lib/billing.ts, lib/snapshot-store.ts, lib/vlm-config.ts, +3 |  |
-| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +33 |  |
-| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +49 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
+| `envelope.ts` | api/bill-cases/route, api/bills/query/route, api/bills/route, api/company-info/route, api/court-cases/route, api/found-cases/route, api/presence/route, +34 |  |
+| `middleware.ts` | api/bill-cases/route, api/bills/export/route, api/bills/query/route, api/bills/route, api/company-info/route, api/company/route, api/court-cases/export/route, +50 | server/__tests__/guard.test.ts, server/__tests__/update-route.test.ts |
 | `presence.ts` | api/presence/route | server/__tests__/presence.test.ts |
 | `security.ts` | proxy.ts, server/middleware.ts | server/__tests__/security.test.ts |
 
@@ -131,7 +132,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 
 | File | Imported by | Tests |
 |---|---|---|
-| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +30 | lib/__tests__/ui-boundary.test.ts |
+| `api-client.ts` | app/page.tsx, components/proto/case-orders.tsx, components/proto/doc-preview.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, +31 | lib/__tests__/ui-boundary.test.ts |
 | `api-types.ts` | components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, components/shell/app-shell.tsx, hooks/use-bill-cases.ts, hooks/use-found-cases.ts, hooks/use-resource.ts, +6 |  |
 | `auto-backup.ts` | api/settings/backup/auto/route, instrumentation.ts, lib/bot-link.ts | lib/__tests__/auto-backup.test.ts, lib/__tests__/bot-link.test.ts |
 | `backup-crypto.ts` | api/settings/backup/auto/route, lib/auto-backup.ts, lib/backup.ts, lib/telegram-catalog.ts, lib/telegram-index.ts | lib/__tests__/backup.test.ts |
@@ -198,19 +199,22 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `pretenzia/render.ts` | api/pretenzia/generate/route, lib/pretenzia/fill.server.ts | lib/pretenzia/__tests__/script.test.ts |
 | `print.ts` | components/sections/bills.tsx, components/sections/cases.tsx, components/views/doc-editor.tsx, lib/report/doc.ts, lib/report/generate.ts, lib/report/render-ink.ts, lib/report/render.ts | lib/__tests__/print-look.test.ts, lib/report/__tests__/xss.test.ts |
 | `public-orders/company-job.ts` | api/presence/route, api/public-orders/fetch/route, api/public-orders/orders/route, api/public-orders/status/route | lib/public-orders/__tests__/company-job.test.ts |
-| `public-orders/data-dir.ts` | lib/orders-buckets.ts, lib/public-orders/hidden-store.ts, lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
+| `public-orders/data-dir.ts` | lib/orders-buckets.ts, lib/public-orders/hidden-store.ts, lib/public-orders/meta-backup-runner.ts, lib/public-orders/pdf-store.ts, lib/public-orders/purged-store.ts, lib/public-orders/store.ts | lib/public-orders/__tests__/data-dir.test.ts, lib/public-orders/__tests__/meta-backup.test.ts |
+| `public-orders/download-job-real.ts` | api/presence/route, api/public-orders/download-job/route |  |
+| `public-orders/download-job.ts` | api/public-orders/download-job/route, lib/public-orders/download-job-real.ts | lib/public-orders/__tests__/download-job.test.ts |
 | `public-orders/engine.ts` | api/public-orders/fetch/route, lib/public-orders/company-job.ts | lib/public-orders/__tests__/engine.test.ts |
 | `public-orders/har-import.ts` | api/public-orders/import-har/route | lib/public-orders/__tests__/har-import.test.ts |
 | `public-orders/hidden-store.ts` | api/public-orders/hidden/route, api/public-orders/import-har/route, api/public-orders/library/route | lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/hidden-store.test.ts |
 | `public-orders/meta-backup-runner.ts` | lib/public-orders/pdf-store.ts, lib/public-orders/store.ts |  |
 | `public-orders/meta-backup.ts` | lib/public-orders/data-dir.ts, lib/public-orders/meta-backup-runner.ts | lib/public-orders/__tests__/meta-backup.test.ts |
 | `public-orders/order-file.ts` | lib/public-orders/order-pdf.ts, lib/public-orders/source.ts | lib/public-orders/__tests__/order-file.test.ts, lib/public-orders/__tests__/order-pdf.test.ts |
-| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route, lib/bot-link.ts, lib/public-orders/har-import.ts, lib/public-orders/pdf-load.ts | lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/order-pdf.ts` | api/public-orders/file/route, api/public-orders/import/route, lib/bot-link.ts, lib/public-orders/download-job.ts, lib/public-orders/har-import.ts, lib/public-orders/pdf-load.ts | lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/download-job.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
 | `public-orders/pace.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/pace.test.ts |
-| `public-orders/pdf-load.ts` | api/public-orders/file/route, lib/bot-link.ts |  |
-| `public-orders/pdf-store.ts` | api/public-orders/import-har/route, api/public-orders/import/route, api/public-orders/library/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/orders-restore.ts, lib/public-orders/hidden-store.ts, +1 | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/pdf-load.ts` | api/public-orders/file/route, lib/bot-link.ts, lib/public-orders/download-job-real.ts |  |
+| `public-orders/pdf-store.ts` | api/public-orders/import-har/route, api/public-orders/import/route, api/public-orders/library/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/orders-restore.ts, lib/public-orders/download-job-real.ts, +2 | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/import-route.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/order-pdf.test.ts, lib/public-orders/__tests__/save-and-cache.test.ts |
+| `public-orders/purged-store.ts` | lib/orders-buckets.ts, lib/orders-restore.ts, lib/public-orders/download-job-real.ts, lib/public-orders/store.ts | lib/__tests__/backup.test.ts |
 | `public-orders/source.ts` | lib/public-orders/company-job.ts, lib/public-orders/pdf-load.ts |  |
-| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/import-har/route, api/public-orders/library/route, api/public-orders/orders/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/orders-restore.ts, +1 | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
+| `public-orders/store.ts` | api/public-orders/cache/route, api/public-orders/import-har/route, api/public-orders/library/route, api/public-orders/orders/route, lib/bot-link.ts, lib/orders-buckets.ts, lib/orders-restore.ts, +2 | lib/__tests__/backup.test.ts, lib/__tests__/bot-link.test.ts, lib/public-orders/__tests__/company-job.test.ts, lib/public-orders/__tests__/har-import.test.ts, lib/public-orders/__tests__/library.test.ts, lib/public-orders/__tests__/meta-backup.test.ts, lib/public-orders/__tests__/store.test.ts |
 | `public-orders/types.ts` | components/views/orders-settings.tsx, lib/api-client.ts, lib/public-orders/company-job.ts, lib/public-orders/store.ts |  |
 | `public-orders/waf.ts` | lib/public-orders/source.ts | lib/public-orders/__tests__/waf.test.ts |
 | `rating-service.ts` | api/rating/route | lib/__tests__/company-facts.test.ts |
@@ -267,6 +271,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `use-bot-link.ts` | components/views/telegram-settings.tsx |  |
 | `use-channels.ts` | components/views/telegram-settings.tsx |  |
 | `use-db-admin.ts` | components/views/db-settings.tsx |  |
+| `use-download-job.ts` | components/views/orders-view.tsx |  |
 | `use-found-cases.ts` | components/sections/found-cases.tsx |  |
 | `use-resource.ts` | components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx |  |
 | `use-stored-bills.ts` | components/sections/bills.tsx |  |
@@ -488,6 +493,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__sudHealthPools` | lib/health-registry.ts |
 | `__sudHealthStore` | lib/health-store.ts |
 | `__sudHidden` | lib/public-orders/hidden-store.ts |
+| `__sudOrderDownloadJob` | lib/public-orders/download-job-real.ts |
 | `__sudOrderPdfLoader` | lib/public-orders/pdf-load.ts |
 | `__sudOrdersFileGate` | lib/public-orders/pace.ts |
 | `__sudOrdersPacer` | lib/public-orders/pace.ts |

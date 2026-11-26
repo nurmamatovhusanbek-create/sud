@@ -1133,6 +1133,16 @@ mod orders {
     fn press(user: i64, data: &str) -> Value {
         json!({ "callback_query": { "id": "1", "from": { "id": user }, "message": { "message_id": 9, "chat": { "id": user } }, "data": data } })
     }
+    #[test]
+    fn a_tombstone_removes_the_order_from_every_list() {
+        let p1 = "11111111-2222-3333-4444-555555555555";
+        let p2 = "66666666-7777-8888-9999-000000000000";
+        let line = |id: &str, pdf: &str| json!([id, "2-1004-2603/8020", "FIRST", "FULFILLED", "Sud", "J", "Qarz", pdf, "q.pdf", 10, "ECONOMIC", 0]).to_string();
+        let text = format!("{}\n{}\n{}\n", line("o1", p1), line("o2", p2), json!(["x", p2.to_uppercase(), 1, "2-1004-2603/8020"]));
+        let got = crate::orders::parse(text.as_bytes());
+        assert_eq!(got.iter().map(|o| o.id.as_str()).collect::<Vec<_>>(), vec!["o1"], "o2 was removed by the app: no list shows it, whatever the case of its id");
+        assert!(crate::orders::parse_checks(text.as_bytes()).is_empty(), "a tombstone is not a check line");
+    }
     async fn with_orders() -> (std::sync::Arc<crate::state::Shared>, Backup) {
         let b = backup();
         let mut all = buckets(false);

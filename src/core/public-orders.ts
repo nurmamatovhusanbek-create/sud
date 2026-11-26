@@ -499,3 +499,38 @@ export function courtTypeOfCase(caseNumber: string): PublicCourtType | null {
   const d = normalizeCaseNumber(caseNumber).charAt(0)
   return d === '1' ? 'CRIMINAL' : d === '2' ? 'CIVIL' : d === '3' || d === '5' ? 'ADMINISTRATIVE' : d === '4' ? 'ECONOMIC' : null
 }
+
+// ---- the «Barchasini yuklash» job (lib/public-orders/download-job) -------------------------------------------------
+export type DownloadProblemKind = 'manual' | 'removed' | 'other'
+
+export interface DownloadProblem {
+  pdfId: string
+  caseNumber: string
+  instance: string
+  kind: DownloadProblemKind
+  /** what is wrong, in words for the person */
+  message: string
+}
+
+export type DownloadJobPhase = 'idle' | 'running' | 'done' | 'stopped'
+
+export interface DownloadJobState {
+  phase: DownloadJobPhase
+  total: number
+  /** orders handled so far (saved, skipped or failed) */
+  done: number
+  /** saved by this job (a file already on disk is not counted) */
+  ok: number
+  /** orders removed from the metadata (the file can never be downloaded) */
+  removed: number
+  /** not tried because the site refused automatic downloads: press again later */
+  deferred: number
+  problems: DownloadProblem[]
+  /** the order being downloaded now */
+  current: string
+  /** a job-level reason it ended early (the disk refused the file) */
+  note: string
+  startedAt: number
+  finishedAt: number
+}
+

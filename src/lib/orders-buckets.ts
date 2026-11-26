@@ -6,6 +6,7 @@ import { registeredKey } from '@/core/bill-cases'
 import type { StoredOrder } from '@/core/public-orders'
 import { dataDir } from './public-orders/data-dir'
 import { readPdf, listPdfs } from './public-orders/pdf-store'
+import { readPurged } from './public-orders/purged-store'
 import { allChecked, allOrders } from './public-orders/store'
 
 /**
@@ -41,6 +42,9 @@ export function orderLine(o: StoredOrder, savedAt: number): string {
   return JSON.stringify([o.id, o.caseNumber, o.instance, o.result, o.court, o.judge, o.category, o.pdfId.toLowerCase(), o.pdfName, o.pdfSize, o.courtType, Math.round(savedAt)])
 }
 
+/** a tombstone: an order the app removed because its file can never be downloaded ("x", file id, when): the merge drops the order from every copy, the bot forgets it */
+export const purgeLine = (pdfId: string, atMs: number, caseNumber = ''): string => JSON.stringify(['x', pdfId.toLowerCase(), Math.round(atMs), caseNumber])
+
 /** a «checked, nothing published» line */
 export const checkLine = (caseNumber: string, atMs: number): string => JSON.stringify(['k', caseNumber, Math.round(atMs)])
 
@@ -49,8 +53,8 @@ export async function orderBuckets(): Promise<Map<string, ExtraBucket>> {
   const out = new Map<string, ExtraBucket>()
   const pdfs = await listPdfs()
   const orders = await allOrders()
-  const byYear = new Map<number, { orders: Array<{ id: string; line: string }>; checks: Array<{ n: string; line: string }> }>()
-  const slot = (y: number) => byYear.get(y) ?? byYear.set(y, { orders: [], checks: [] }).get(y)!
+  const byYear = new Map<number, { orders: Array<{ id: string; line: string }>; checks: Array<{ n: string; line: string }>; gone: Array<{ p: string; line: string }> }>()
+  const slot = (y: number) => byYear.get(y) ?? byYear.set(y, { orders: [], checks: [], gone: [] }).get(y)!
   const linked = new Set<string>()
   const withOrders = new Set<string>()
   for (const o of orders) {
@@ -67,11 +71,13 @@ export async function orderBuckets(): Promise<Map<string, ExtraBucket>> {
     const at = Date.parse(c.at)
     if (Number.isFinite(at)) slot(orderYear(c.caseNumber)).checks.push({ n: c.caseNumber, line: checkLine(c.caseNumber, at) })
   }
+  // the tombstones of removed orders, in the year of their case
+  for (const p of (await readPurged()).values()) if (p.caseNumber) slot(orderYear(p.caseNumber)).gone.push({ p: p.pdfId, line: purgeLine(p.pdfId, p.at, p.caseNumber) })
   const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
   for (const y of [...byYear.keys()].sort((a, b) => a - b)) {
     const s = byYear.get(y)!
     // one order of keys, the one `mergeBucketText` sorts by (an order's id, a check's «k:<case>»), so a merged copy and a rendered one are the same bytes
-    const lines = [...s.orders.map((r) => ({ k: r.id, line: r.line })), ...s.checks.map((r) => ({ k: `k:${r.n}`, line: r.line }))].sort((a, b) => cmp(a.k, b.k)).map((r) => r.line)
+    const lines = [...s.orders.map((r) => ({ k: r.id, line: r.line })), ...s.checks.map((r) => ({ k: `k:${r.n}`, line: r.line })), ...s.gone.map((r) => ({ k: `x:${r.p}`, line: r.line }))].sort((a, b) => cmp(a.k, b.k)).map((r) => r.line)
     const text = Buffer.from(lines.join('\n') + '\n')
     out.set(ordersBucketName(y), { rows: lines.length, render: async () => text })
   }
@@ -110,6 +116,11 @@ export function ordersFingerprint(): string {
   }
   walk('files', '.pdf')
   walk('shards', '.jsonl')
+  try {
+    h.update(`purged:${fs.statSync(path.join(dir, 'purged.jsonl')).size}\n`)
+  } catch {
+    /* none removed */
+  }
   try {
     h.update(`checked:${fs.statSync(path.join(dir, 'checked.jsonl')).size}\n`)
   } catch {
