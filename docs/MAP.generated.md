@@ -233,7 +233,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `stats.ts` | api/stats/export/route, components/proto/pizza-geometry.ts, lib/api-types.ts, lib/stats-snapshot.ts, sources/index.ts | core/__tests__/pizza.test.ts, lib/__tests__/stats-found.test.ts, lib/__tests__/stats-snapshot.test.ts |
 | `store/app-store.ts` | app/page.tsx, components/company/context-bar.tsx, components/sections/bills.tsx, components/sections/cases.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/sections/profile.tsx, +6 | lib/__tests__/ui-boundary.test.ts |
 | `tab-counts.ts` | components/sections/bills.tsx, components/sections/hearings.tsx, components/sections/overview.tsx, components/shell/app-shell.tsx |  |
-| `telegram-catalog.ts` | api/bills/query/route, api/settings/backup/route, lib/backup.ts, lib/telegram-index.ts | lib/__tests__/backup.test.ts |
+| `telegram-catalog.ts` | api/bills/query/route, api/settings/backup/route, lib/backup.ts, lib/telegram-index.ts | lib/__tests__/backup.test.ts, lib/__tests__/telegram-catalog.test.ts |
 | `telegram-client.ts` | api/settings/telegram/find/route, api/settings/telegram/test/route, lib/backup.ts, lib/telegram-index.ts, lib/watch.ts | lib/__tests__/telegram.test.ts |
 | `telegram-config.ts` | api/settings/telegram/route, lib/backup.ts, lib/bot-link.ts, lib/telegram-request.ts, lib/watch.ts | lib/__tests__/backup.test.ts, lib/__tests__/telegram.test.ts |
 | `telegram-index.ts` | api/settings/backup/search/route, lib/backup.ts | lib/__tests__/backup.test.ts |
