@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { DIRECT, fetchOrderFileWith, isCaptchaRefusal, type OrderFileDeps } from '../order-file'
+import { createRouteHealth, DIRECT, fetchOrderFileWith, isCaptchaRefusal, RoutesFailedError, type OrderFileDeps } from '../order-file'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const PDF = enc('%PDF-1.4 ok')
@@ -63,6 +63,43 @@ describe('fetchOrderFileWith (captcha-gated download)', () => {
     const { d, calls } = deps([{ status: 500, body: enc('boom') }])
     await expect(fetchOrderFileWith('id', d)).rejects.toThrow('HTTP 500 (bu kompyuter) boom')
     expect(calls.downloads.length).toBe(1)
+  })
+  test('a worker that does not allow the host (an old deployment) rests for an hour; the order is served by the next route, and later orders skip it without a captcha', async () => {
+    let t = 1_000
+    const health = createRouteHealth(() => t)
+    const NOT_ALLOWED = enc('{"error":"Host adolatapi1.sud.uz not allowed. Permitted: billing.sud.uz"}')
+    const { d, calls } = deps([{ status: 403, body: NOT_ALLOWED }, { status: 200, body: PDF }, { status: 200, body: PDF }], [])
+    d.health = health
+    d.rotate = () => 1 // start on the first worker
+    expect(await fetchOrderFileWith('id', d)).toBe(PDF)
+    expect(calls.tokens).toEqual(['https://w1.example', 'https://w2.example'])
+    expect(health.resting('https://w1.example')).toContain('Cloudflare')
+    // the next order: w1 rests, so it is not even asked for a token
+    d.rotate = () => 1
+    expect(await fetchOrderFileWith('id2', d)).toBe(PDF)
+    expect(calls.tokens.slice(2)).toEqual(['https://w2.example'])
+    t += 61 * 60_000
+    expect(health.resting('https://w1.example')).toBeNull() // an hour later it is tried again
+  })
+  test('this machine cannot mint a token: it rests, so the next orders do not wait 30 s for it again', async () => {
+    const health = createRouteHealth(() => 5)
+    const { d, calls } = deps([{ status: 200, body: PDF }, { status: 200, body: PDF }], [DIRECT])
+    d.health = health
+    await fetchOrderFileWith('a', d)
+    await fetchOrderFileWith('b', d)
+    expect(calls.tokens).toEqual([DIRECT, 'https://w1.example', 'https://w1.example']) // DIRECT asked once, then rested
+    expect(health.resting(DIRECT)).toContain('token olinmadi')
+  })
+  test('round robin: each download starts one route later; a refusal is still the site\'s, a broken setup is said as it is', async () => {
+    const { d, calls } = deps([{ status: 200, body: PDF }, { status: 200, body: PDF }, { status: 200, body: PDF }, { status: 200, body: PDF }])
+    let n = 0
+    d.rotate = () => n++
+    for (const id of ['a', 'b', 'c', 'd']) await fetchOrderFileWith(id, d)
+    expect(calls.downloads.map((x) => x.route)).toEqual([DIRECT, 'https://w1.example', 'https://w2.example', DIRECT])
+    const broken = deps([], [DIRECT, 'https://w1.example', 'https://w2.example'])
+    const e = await fetchOrderFileWith('x', broken.d).catch((x: Error) => x)
+    expect(e).toBeInstanceOf(RoutesFailedError)
+    expect((e as Error).message).toContain('hech bir yoʻl ishlamadi')
   })
   test('isCaptchaRefusal', () => {
     expect(isCaptchaRefusal(403, '{"message":"Каптча тасдиқланмади"}')).toBe(true)

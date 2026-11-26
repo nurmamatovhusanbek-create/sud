@@ -395,6 +395,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `PUBLIC_ORDERS_API` | lib/public-orders/source.ts |
 | `PUBLIC_ORDERS_BACKUP_DIR` | lib/public-orders/data-dir.ts |
 | `PUBLIC_ORDERS_DIR` | lib/public-orders/data-dir.ts |
+| `PUBLIC_ORDERS_ROUTES` | lib/public-orders/source.ts |
 | `PUBLIC_ORDERS_VIA_WORKERS` | lib/public-orders/source.ts |
 | `RATE_LIMIT_MAX` | server/config.ts |
 | `RATE_LIMIT_WINDOW_MS` | server/config.ts |
@@ -495,6 +496,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `__sudHidden` | lib/public-orders/hidden-store.ts |
 | `__sudOrderDownloadJob` | lib/public-orders/download-job-real.ts |
 | `__sudOrderPdfLoader` | lib/public-orders/pdf-load.ts |
+| `__sudOrderRoutes` | lib/public-orders/source.ts |
 | `__sudOrdersFileGate` | lib/public-orders/pace.ts |
 | `__sudOrdersPacer` | lib/public-orders/pace.ts |
 | `__sudPresence` | server/presence.ts |

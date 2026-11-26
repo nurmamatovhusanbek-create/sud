@@ -118,6 +118,24 @@ describe('the download job', () => {
     expect(r.job.state().problems).toEqual([expect.objectContaining({ kind: 'other', message: 'HTTP 502' })])
     expect(r.purged).toEqual([])
   })
+  test('the SAME failure three orders in a row is not about the orders: the rest is left, the reason is said once; a different one in between resets', async () => {
+    const r = rig(() => {
+      throw new Error('hech bir yoʻl ishlamadi · bu worker eski')
+    })
+    r.job.start([ID(1), ID(2), ID(3), ID(4), ID(5)])
+    await r.job.settled()
+    const s = r.job.state()
+    expect(r.calls).toEqual([ID(1), ID(2), ID(3)])
+    expect(s).toMatchObject({ phase: 'done', ok: 0, deferred: 2 })
+    expect(s.note).toContain('bu worker eski')
+    expect(s.problems).toHaveLength(3)
+    const mixed = rig((id) => {
+      throw new Error(Number(id.slice(7, 8)) % 2 ? 'A' : 'B')
+    })
+    mixed.job.start([ID(1), ID(2), ID(3), ID(4), ID(5)])
+    await mixed.job.settled()
+    expect(mixed.job.state()).toMatchObject({ deferred: 0, done: 5, note: '' })
+  })
   test('a file that arrived but could not be kept stops the job and says why', async () => {
     const r = rig((id) => (id === ID(1) ? { ...ok, saved: false, saveError: 'disk toʻla' } : ok))
     r.job.start([ID(1), ID(2)])

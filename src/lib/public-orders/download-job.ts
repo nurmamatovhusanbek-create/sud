@@ -36,6 +36,8 @@ const fresh = (): JobState => ({ phase: 'idle', total: 0, done: 0, ok: 0, remove
 export const MAX_JOB = 5000
 /** the site refused this many orders in a row: it is not about one order, so the rest is left for later (every probe costs up to three captcha sessions) */
 export const MAX_REFUSED_IN_A_ROW = 3
+/** the same failure for this many orders in a row is not about the orders (a worker that is out of date, a captcha host that is down): the rest is left and the reason is said once */
+export const MAX_SAME_FAILURE_IN_A_ROW = 3
 
 export function createDownloadJob(deps: JobDeps) {
   const now = deps.now ?? Date.now
@@ -45,6 +47,7 @@ export function createDownloadJob(deps: JobDeps) {
 
   async function run(ids: string[]): Promise<void> {
     let refusedInARow = 0
+    let sameFailure = { message: '', n: 0 }
     for (let i = 0; i < ids.length; i++) {
       if (stopFlag) {
         st.phase = 'stopped'
@@ -69,6 +72,7 @@ export function createDownloadJob(deps: JobDeps) {
           r = await deps.load(id, probe) // «Fayl PDF emas» once more: a half answer is not a verdict
         }
         refusedInARow = 0
+        sameFailure = { message: '', n: 0 }
         if (!r.saved) {
           st.note = `PDF olindi, lekin kompyuterga saqlanmadi: ${r.saveError || 'sababi nomaʼlum'}. Yuklash toʻxtatildi.`
           break
@@ -92,7 +96,15 @@ export function createDownloadJob(deps: JobDeps) {
           st.removed++
           bad('removed', 'Sayt PDF emas, boshqa narsa qaytardi (ikki urinishda ham): qaror maʼlumotlardan olib tashlandi')
         } else {
-          bad('other', e instanceof Error ? e.message : 'yuklab boʻlmadi')
+          const message = e instanceof Error ? e.message : 'yuklab boʻlmadi'
+          bad('other', message)
+          sameFailure = sameFailure.message === message ? { message, n: sameFailure.n + 1 } : { message, n: 1 }
+          if (sameFailure.n >= MAX_SAME_FAILURE_IN_A_ROW) {
+            st.deferred = ids.length - i - 1
+            st.note = `Ketma-ket ${sameFailure.n} ta qaror bir xil sabab bilan yuklanmadi, shuning uchun qolganlari urinib koʻrilmadi. Sabab: ${message}`
+            st.done++
+            break
+          }
         }
       }
       st.done++

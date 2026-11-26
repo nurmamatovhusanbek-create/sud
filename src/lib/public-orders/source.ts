@@ -5,7 +5,7 @@ import { assertNotWafBlocked, noteWafBlock, parseWafBlock, throwUpstreamFailure,
 import { fetchViaWorkers, pickWorker } from '@/lib/net/worker-fetch'
 import { directRoute } from '@/lib/net/direct-route'
 import { getCaptchaToken, PUBLIC_DOWNLOAD_CAPTCHA } from '@/lib/billing'
-import { DIRECT, fetchOrderFileWith, type OrderFileDeps } from './order-file'
+import { createRouteHealth, DIRECT, fetchOrderFileWith, type OrderFileDeps } from './order-file'
 import { compactLegacy, legacyRows, legacySearchPath, orderFilePath, type PublicCourtType, type RawPublication, type StoredOrder } from '@/core/public-orders'
 
 /**
@@ -41,7 +41,14 @@ async function fetchUpstream(path: string, opts: { timeoutMs: number; background
   })
 }
 
+// which routes rest after a failure that repeats, and the round robin over them: on globalThis (the routes and the job bundle apart see ONE memory)
+const GR = globalThis as typeof globalThis & { __sudOrderRoutes?: { health: ReturnType<typeof createRouteHealth>; n: number } }
+const routes = () => (GR.__sudOrderRoutes ??= { health: createRouteHealth(), n: 0 })
+
 const realDeps: OrderFileDeps = {
+  get health() { return routes().health },
+  // PUBLIC_ORDERS_ROUTES=direct keeps «this machine first, always»; the default spreads the downloads over this machine and the workers
+  rotate: process.env.PUBLIC_ORDERS_ROUTES === 'direct' ? undefined : () => routes().n++,
   getToken: (route) => getCaptchaToken(3, undefined, route === DIRECT ? directRoute(PUBLIC_ORIGIN) : route, PUBLIC_DOWNLOAD_CAPTCHA),
   download: async (pdfId, token, route) => {
     const path = orderFilePath(pdfId) // uuid → the library file, `old-…` → the pre-2024 file; nothing else is ever built
