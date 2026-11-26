@@ -1298,11 +1298,29 @@ mod orders {
         // the list: everything, newest case first, with the counts behind the chips
         let (_, all) = get(&sh, "/api/orders", Some(&me)).await;
         assert_eq!((all["orders"]["total"].as_i64(), all["orders"]["saved"].as_i64(), all["orders"]["unsaved"].as_i64()), (Some(8), Some(6), Some(2)));
-        assert_eq!(all["orders"]["years"], json!([25]));
+        assert_eq!(all["orders"]["years"], json!([{ "value": 25, "count": 8 }]));
         assert_eq!(all["orders"]["courts"], json!({ "economic": 8 }));
         let chips = all["orders"]["results"].as_array().unwrap();
         assert!(chips.iter().all(|c| c["value"].as_str().unwrap().chars().all(|ch| ch.is_ascii_uppercase() || ch == '_') && !c["word"].as_str().unwrap().is_empty()));
         assert_eq!(chips.iter().map(|c| c["count"].as_i64().unwrap()).sum::<i64>(), 8 - all["orders"]["rows"].as_array().unwrap().iter().filter(|r| r["result"] == "").count() as i64 - 0, "every order with a result is counted once");
+        // the facets of the filter selects: instances (stored enum, the word in Uzbek) and companies (each with how many orders its cases have)
+        let inst = all["orders"]["instances"].as_array().unwrap();
+        assert!(inst.iter().all(|i| i["value"].as_str().unwrap().chars().all(|c| c.is_ascii_lowercase() || c == '_') && !i["word"].as_str().unwrap().is_empty()));
+        assert_eq!(inst.iter().map(|i| i["count"].as_i64().unwrap()).sum::<i64>(), 8);
+        let comp = all["orders"]["companies"].as_array().unwrap();
+        assert!(comp.iter().any(|c| c["tin"] == TIN && c["count"].as_i64().unwrap() == 4), "{comp:?}");
+        // counts ignore their own filter: the saved/unsaved counts stay whole while one of them is chosen
+        let (_, only_unsaved) = get(&sh, "/api/orders?saved=0", Some(&me)).await;
+        assert_eq!((only_unsaved["orders"]["total"].as_i64(), only_unsaved["orders"]["saved"].as_i64(), only_unsaved["orders"]["unsaved"].as_i64()), (Some(2), Some(6), Some(2)));
+        // one company: only its cases, filters still apply on top of it
+        let (_, mine) = get(&sh, &format!("/api/orders?tin={TIN}&saved=0"), Some(&me)).await;
+        assert!(mine["orders"]["rows"].as_array().unwrap().iter().all(|r| r["saved"] == false));
+        let (_, none) = get(&sh, &format!("/api/orders?tin={OTHER_TIN}"), Some(&me)).await;
+        assert!(none["orders"]["total"].as_i64().unwrap() < 4, "another company: only its own cases");
+        assert_eq!(get(&sh, "/api/orders?tin=12", Some(&me)).await.0, StatusCode::BAD_REQUEST);
+        let first_inst = inst[0]["value"].as_str().unwrap().to_string();
+        let (_, by_inst) = get(&sh, &format!("/api/orders?instance={first_inst}"), Some(&me)).await;
+        assert_eq!(by_inst["orders"]["total"].as_i64(), inst[0]["count"].as_i64());
         let cases: Vec<&str> = all["orders"]["rows"].as_array().unwrap().iter().map(|r| r["caseNumber"].as_str().unwrap()).collect();
         let mut sorted = cases.clone();
         sorted.sort_by(|a, b| b.cmp(a));

@@ -34,3 +34,15 @@ export function CardRow(items, value, onPick) {
       h('span', { class: 'mcard__big mono' }, i.big),
       i.sub && h('span', { class: 'mcard__sub' }, i.sub))))
 }
+
+/**
+ * a labelled drop-down: `options` = [{ value, label }], `value` the chosen one ('' = «all»); it is marked when something other than «all» is chosen.
+ * Returns the element; `el.select` is the <select> (so a screen can set it back).
+ */
+export function Select({ label, options, value, onPick }) {
+  const sel = h('select', { 'aria-label': label, on: { change: () => { box.classList.toggle('select--active', sel.value !== ''); onPick(sel.value) } } },
+    ...options.map((o) => h('option', { value: o.value, selected: o.value === value }, o.label)))
+  const box = h('label', { class: `select${value !== '' && value != null ? ' select--active' : ''}` }, h('span', { class: 'select__label' }, label), h('span', { class: 'select__box' }, sel, icon('chevron', 16)))
+  box.select = sel
+  return box
+}

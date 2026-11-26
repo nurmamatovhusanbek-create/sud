@@ -7,7 +7,7 @@
 .screen__top { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-1) 0 var(--space-3); }
 .screen__lead { font-size: var(--text-sm); color: var(--text-2); margin: var(--space-1) 0 0; }
 .screen__status { margin-top: var(--space-3); }
-.screen__filters { display: grid; gap: var(--space-3); margin: var(--space-3) 0; }
+.screen__filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); margin: var(--space-3) 0; } /* minmax(0, …): a grid track never grows to the width of a scrolling row inside it (that made the whole page scroll sideways) */
 .screen__more { margin-top: var(--space-3); }
 
 /* the home tile: the logo on the navy brand tile */

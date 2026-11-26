@@ -28,3 +28,14 @@
 .chips--scroll .chip { flex: none; }
 
 .tag { flex: none; padding: 2px var(--space-2); border: var(--border-width) solid var(--brand-line); border-radius: var(--radius-pill); background: var(--brand-soft); color: var(--brand-ink); font-size: var(--text-xs); }
+
+/* a labelled drop-down (native <select>: the phone's own picker). The chevron is an inline svg, not an image. */
+.filters-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+@media (min-width: 640px) { .filters-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.select { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.select__label { padding-left: var(--space-1); font-size: var(--text-xs); color: var(--text-2); }
+.select__box { position: relative; min-width: 0; }
+.select__box select { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; min-height: var(--size-control); padding: 0 var(--space-6) 0 var(--space-3); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); text-overflow: ellipsis; }
+.select__box select:focus-visible { border-color: var(--border-focus); }
+.select--active .select__box select { border-color: var(--accent); }
+.select__box svg { position: absolute; right: var(--space-3); top: 50%; margin-top: -8px; width: 16px; height: 16px; color: var(--text-3); pointer-events: none; transform: rotate(90deg); }

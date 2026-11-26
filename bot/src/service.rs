@@ -371,26 +371,69 @@ impl Shared {
     }
 
     /// One page of the filtered orders, with the counts behind the filter chips (of everything that matches the other filters).
-    pub async fn orders_page(&self, q: &orders::Query, offset: usize, limit: usize) -> AppResult<Value> {
+    pub async fn orders_page(&self, q: &orders::Query, tin: &str, offset: usize, limit: usize) -> AppResult<Value> {
         let all = self.orders_all().await?;
-        // years come out as the registration year of the case, newest first, for the year chips
-        let mut years: Vec<u32> = all.iter().filter_map(|o| orders::year_of(&o.case)).collect();
-        years.sort_unstable_by(|a, b| b.cmp(a));
-        years.dedup();
+        // each company's cases (normalised): for the company filter and for the per-company counts
+        let companies = self.companies().await;
+        let mut sets: Vec<(String, String, std::collections::HashSet<String>)> = Vec::new();
+        for c in &companies {
+            let cs: std::collections::HashSet<String> = { self.st.read().await.index.shard_cases(&c.tin) }.into_iter().map(|(n, _, _)| orders::norm(&n)).collect();
+            sets.push((c.tin.clone(), c.name.clone(), cs));
+        }
+        let mut q = q.clone();
+        if !tin.is_empty() {
+            q.cases = Some(sets.iter().find(|(t, _, _)| t == tin).map(|(_, _, cs)| cs.clone()).unwrap_or_default());
+        }
+        // a facet counts what the OTHER filters leave, so a choice never promises an empty list
+        let without = |f: &dyn Fn(&mut orders::Query)| { let mut c = q.clone(); f(&mut c); c };
+        let q_court = without(&|c| c.court.clear());
+        let q_result = without(&|c| c.result.clear());
+        let q_inst = without(&|c| c.instance.clear());
+        let q_year = without(&|c| c.year = None);
+        let q_saved = without(&|c| c.saved = None);
+        let q_company = without(&|c| c.cases = None);
         let mut courts: BTreeMap<String, usize> = BTreeMap::new();
-        for o in all.iter().filter(|o| orders::Query { court: String::new(), ..q.clone() }.matches(o)) {
-            *courts.entry(o.court_type.to_lowercase()).or_default() += 1;
-        }
-        // the result chips count what the other filters leave, like the court chips; «result» → how many (the word is added by the screen from `resultWord` of a row)
         let mut results: BTreeMap<String, usize> = BTreeMap::new();
-        for o in all.iter().filter(|o| orders::Query { result: String::new(), ..q.clone() }.matches(o)).filter(|o| !o.result.is_empty()) {
-            *results.entry(o.result.to_uppercase()).or_default() += 1;
+        let mut instances: BTreeMap<String, usize> = BTreeMap::new();
+        let mut years: BTreeMap<u32, usize> = BTreeMap::new();
+        let (mut saved, mut unsaved) = (0usize, 0usize);
+        for o in &all {
+            if q_court.matches(o) {
+                *courts.entry(o.court_type.to_lowercase()).or_default() += 1;
+            }
+            if q_result.matches(o) && !o.result.is_empty() {
+                *results.entry(o.result.to_uppercase()).or_default() += 1;
+            }
+            if q_inst.matches(o) && !o.instance.is_empty() {
+                *instances.entry(o.instance.to_lowercase()).or_default() += 1;
+            }
+            if q_year.matches(o) {
+                if let Some(y) = orders::year_of(&o.case) {
+                    *years.entry(y).or_default() += 1;
+                }
+            }
+            if q_saved.matches(o) {
+                if o.saved { saved += 1 } else { unsaved += 1 }
+            }
         }
-        let results: Vec<Value> = results.into_iter().map(|(k, n)| serde_json::json!({ "value": k, "word": orders::result_word(&k), "count": n })).collect();
+        let by_company: Vec<Value> = sets
+            .iter()
+            .filter_map(|(t, name, cs)| {
+                let n = all.iter().filter(|o| q_company.matches(o) && cs.contains(&orders::norm(&o.case))).count();
+                (n > 0 || t == tin).then(|| serde_json::json!({ "tin": t, "name": name, "count": n }))
+            })
+            .collect();
+        let all_companies = all.iter().filter(|o| q_company.matches(o)).count();
         let rows: Vec<&Order> = all.iter().filter(|o| q.matches(o)).collect();
-        let saved = rows.iter().filter(|o| o.saved).count();
+        let mut years: Vec<(u32, usize)> = years.into_iter().collect();
+        years.sort_unstable_by(|a, b| b.0.cmp(&a.0));
         Ok(serde_json::json!({
-            "total": rows.len(), "saved": saved, "unsaved": rows.len() - saved, "years": years, "courts": courts, "results": results,
+            "total": rows.len(), "saved": saved, "unsaved": unsaved, "allCompanies": all_companies,
+            "years": years.into_iter().map(|(y, n)| serde_json::json!({ "value": y, "count": n })).collect::<Vec<_>>(),
+            "courts": courts,
+            "results": results.into_iter().map(|(k, n)| serde_json::json!({ "value": k, "word": orders::result_word(&k), "count": n })).collect::<Vec<_>>(),
+            "instances": instances.into_iter().map(|(k, n)| serde_json::json!({ "value": k, "word": orders::instance_word(&k), "count": n })).collect::<Vec<_>>(),
+            "companies": by_company,
             "rows": rows.iter().skip(offset).take(limit).map(|o| orders::to_json(o)).collect::<Vec<_>>(),
         }))
     }

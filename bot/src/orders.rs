@@ -99,7 +99,7 @@ pub fn instance_rank(i: &str) -> u8 {
     }
 }
 
-/// the court's decision, in words; an unknown value is shown as it came
+/// the court's decision, in words; an unknown value is put together word by word (never shown in English)
 pub fn result_word(r: &str) -> String {
     match r.to_uppercase().as_str() {
         "FULFILLED" => "qanoatlantirildi".into(),
@@ -108,8 +108,36 @@ pub fn result_word(r: &str) -> String {
         "RETURNED" => "qaytarildi".into(),
         "UNCONSIDERED" => "koʻrmasdan qoldirildi".into(),
         "CASE_ENDED" => "tugatildi".into(),
+        "CASSATION_UNCHANGED" => "kassatsiya: oʻzgarishsiz qoldirildi".into(),
+        "APPEAL_UNCHANGED" => "apellyatsiya: oʻzgarishsiz qoldirildi".into(),
+        "JOINED_TO_OTHER_CASE" => "boshqa ish bilan birlashtirildi".into(),
         "" => String::new(),
-        other => other.to_lowercase().replace('_', " "),
+        other => {
+            let words: Vec<String> = other
+                .to_lowercase()
+                .split('_')
+                .filter(|w| !w.is_empty())
+                .map(|w| match w {
+                    "cassation" => "kassatsiya",
+                    "appeal" => "apellyatsiya",
+                    "unchanged" => "oʻzgarishsiz",
+                    "changed" => "oʻzgartirildi",
+                    "cancelled" | "canceled" => "bekor qilindi",
+                    "joined" => "birlashtirildi",
+                    "other" => "boshqa",
+                    "case" => "ish",
+                    "partially" => "qisman",
+                    "ended" => "tugatildi",
+                    "returned" => "qaytarildi",
+                    "refused" => "rad etildi",
+                    "fulfilled" => "qanoatlantirildi",
+                    "to" | "of" | "the" => "",
+                    x => x,
+                }.to_string())
+                .filter(|w| !w.is_empty())
+                .collect();
+            words.join(" ")
+        }
     }
 }
 
@@ -135,6 +163,10 @@ pub struct Query {
     pub saved: Option<bool>,
     /// the case's registration year, two digits
     pub year: Option<u32>,
+    /// first | appeal | cassation | …: the instance enum as stored, case-insensitive
+    pub instance: String,
+    /// only orders of these cases (normalised numbers): one company's cases
+    pub cases: Option<std::collections::HashSet<String>>,
 }
 
 impl Query {
@@ -143,6 +175,12 @@ impl Query {
             return false;
         }
         if !self.result.is_empty() && !o.result.eq_ignore_ascii_case(&self.result) {
+            return false;
+        }
+        if !self.instance.is_empty() && !o.instance.eq_ignore_ascii_case(&self.instance) {
+            return false;
+        }
+        if self.cases.as_ref().is_some_and(|c| !c.contains(&norm(&o.case))) {
             return false;
         }
         if self.saved.is_some_and(|s| s != o.saved) || self.year.is_some_and(|y| year_of(&o.case) != Some(y)) {
@@ -292,7 +330,10 @@ mod tests {
         assert_eq!(instance_word("inspection"), "Taftish");
         assert_eq!(instance_word("???"), "Qaror");
         assert_eq!(result_word("PARTIALLY_FULFILLED"), "qisman qanoatlantirildi");
-        assert_eq!(result_word("CASSATION_REJECTED"), "cassation rejected");
+        assert_eq!(result_word("CASSATION_REJECTED"), "kassatsiya rejected", "known words are Uzbek, an unknown one is left as it is");
+        assert_eq!(result_word("CASSATION_UNCHANGED"), "kassatsiya: oʻzgarishsiz qoldirildi");
+        assert_eq!(result_word("JOINED_TO_OTHER_CASE"), "boshqa ish bilan birlashtirildi");
+        assert_eq!(result_word("CASSATION_CANCELLED"), "kassatsiya bekor qilindi");
         assert_eq!(result_word(""), "");
         assert_eq!(size_label(412 * 1024), "412 KB");
         assert_eq!(size_label(10), "1 KB");

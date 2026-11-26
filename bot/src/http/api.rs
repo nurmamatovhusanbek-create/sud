@@ -85,6 +85,8 @@ fn order_query(q: &HashMap<String, String>) -> crate::orders::Query {
             _ => None,
         },
         year: q.get("year").and_then(|y| y.parse::<u32>().ok()).filter(|y| *y < 100),
+        instance: get(q, "instance").to_lowercase(),
+        cases: None,
     }
 }
 
@@ -98,14 +100,9 @@ pub async fn orders(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<Value>>
         let check = if rows.is_empty() { sh.order_check_of(&n).await } else { None };
         return Ok(Json(json!({ "ok": true, "orders": { "total": rows.len(), "rows": rows.iter().map(crate::orders::to_json).collect::<Vec<_>>(), "check": check } })));
     }
-    let t = get(&q, "tin");
-    if !t.is_empty() {
-        let rows = sh.orders_of_company(&tin(&q)?).await?;
-        let saved = rows.iter().filter(|o| o.saved).count();
-        let (offset, limit) = (num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100));
-        return Ok(Json(json!({ "ok": true, "orders": { "total": rows.len(), "saved": saved, "unsaved": rows.len() - saved, "rows": rows.iter().skip(offset).take(limit).map(crate::orders::to_json).collect::<Vec<_>>() } })));
-    }
-    let page = sh.orders_page(&order_query(&q), num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100)).await?;
+    // `tin=<STIR>` narrows the filtered page to that company's cases (every other filter, the counts and the company cards still apply)
+    let t = if get(&q, "tin").is_empty() { String::new() } else { tin(&q)? };
+    let page = sh.orders_page(&order_query(&q), &t, num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100)).await?;
     Ok(Json(json!({ "ok": true, "orders": page })))
 }
 
