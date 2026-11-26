@@ -95,6 +95,12 @@ describe('the browser\'s own search answers in the HAR', () => {
     expect(o).toMatchObject({ caseNumber: '2-1003-2113/20027', courtType: 'CIVIL', instance: 'FIRST', pdfId: ID })
     expect(r.files[0].id).toBe(o.pdfId) // the file's id IS the record's pdfId: that is what attaches them
   })
+  test('the same search page or the same order seen several times (refreshes, overlapping pages) is one record and one file', () => {
+    const r = extractOrdersFromHar(har([entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF)), entry(LIST_URL, LIST, null), entry(FILE_URL, envelope(PDF)), entry(LIST_URL, LIST, null)]))
+    expect(r.orders.map((o) => o.id).sort()).toEqual(['row-1', 'row-2'])
+    expect(r.files).toHaveLength(1)
+    expect(r.seen).toBe(2) // two requests for the file were in the log, one file comes out
+  })
   test('a search answer that is not ours (other host, no court_type, garbage) adds nothing', () => {
     const r = extractOrdersFromHar(
       har([
