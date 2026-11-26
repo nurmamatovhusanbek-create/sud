@@ -22,6 +22,7 @@ import { buildCatalog, saveCatalog, type Catalog } from './telegram-catalog'
 import { syncIndex, type SyncResult } from './telegram-index'
 import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile, setFloodListener } from './telegram-client'
 import { readTelegram } from './telegram-config'
+import { localHash, saveBackupSnapshot } from './backup-pending'
 
 /**
  * Encrypted copy of the database in the operator's Telegram channel, and the way back.
@@ -334,6 +335,8 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
     const id = crypto.randomBytes(8).toString('hex')
     const day = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const refs: BucketRef[] = []
+    // what THIS computer held for each bucket at this backup (a keyless hash of the local text, never sent): «Yuklanmaganini koʻrsatish» compares it with what is held now
+    const snapshot: Record<string, [string, number]> = {}
     let sentBytes = 0
     let sentParts = 0
     let reused = 0
@@ -367,6 +370,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
       const extra = extras.get(name)
       const r = extra ? await extra.render().then((t) => (t ? { text: t, rows: extra.rows } : null)) : renderBucket(name, snapDb)
       if (!r) continue
+      snapshot[name] = [name.startsWith('pdf:') ? '' : localHash(r.text), r.rows] // a PDF never changes: its name alone says it was sent
       let text: Buffer = r.text
       let rows = r.rows
       // the channel already holds a DIFFERENT version of this bucket (another computer, an older scrape): the backup is their union
@@ -469,6 +473,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
 
     const result: BackupResult = { id, created, dbBytes: plainBytes, uploadedBytes: sentBytes + sealedManifest.length, chunks: sentParts, buckets: refs.length, reused }
     saveCatalog(buildCatalog(manifest))
+    saveBackupSnapshot(chat, created, snapshot)
     getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...result, pinned: pin.ok, manifestMessageId: m.value.messageId }))
     set({
       phase: 'done',

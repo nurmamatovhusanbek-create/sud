@@ -961,6 +961,39 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect(rows.find((r) => r[0] === 'x')).toEqual(['x', ID2, expect.any(Number), '2-1004-2603/8021', 1]) // the later «restored» mark replaced the tombstone
   })
 
+  test('«Nima yuklanmagan?»: nothing pending right after a backup; a new record and a new PDF show up in words; a channel never backed up says so; the next backup clears it', async () => {
+    const { appendOrders } = await orders()
+    const { writePdf } = await pdfs()
+    const { pendingBackup } = await import('../backup-pending')
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020')])
+    await writePdf(ID1, pdf('one'), { via: 'import' })
+    fakeChannel()
+    expect((await runBackup()).phase).toBe('done')
+    const clean = await pendingBackup()
+    if (!clean.configured) throw new Error('configured')
+    expect(clean.channels).toHaveLength(1)
+    expect(clean.channels[0]).toMatchObject({ role: 'asosiy', known: true, freshCount: 0, changedCount: 0 })
+    // a second record in the same year (the bucket changes) and a second PDF (a new file bucket)
+    await appendOrders([order('o2', ID2, '2-1004-2603/8021')])
+    await writePdf(ID2, pdf('two'), { via: 'import' })
+    const after = await pendingBackup()
+    if (!after.configured) throw new Error('configured')
+    const c = after.channels[0]!
+    expect(c.changed.map((x) => [x.label, x.rows, x.was])).toEqual([['qarorlar yozuvlari 2026', 2, 1]])
+    expect([c.freshCount, c.freshPdfs]).toEqual([1, 1]) // the new PDF is counted, not listed
+    // a mirror added later has never been backed up: nothing to compare, and it says so
+    cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: ['@mirror_chan'] })
+    const withMirror = await pendingBackup()
+    if (!withMirror.configured) throw new Error('configured')
+    expect(withMirror.channels.map((x) => [x.role, x.known])).toEqual([['asosiy', true], ['zaxira', false]])
+    // the next backup brings the main channel up to date
+    cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
+    expect((await runBackup()).phase).toBe('done')
+    const done = await pendingBackup()
+    if (!done.configured) throw new Error('configured')
+    expect(done.channels[0]).toMatchObject({ known: true, freshCount: 0, changedCount: 0 })
+  })
+
   test('a restore never overwrites what this computer has: its own PDF and its own check stay', async () => {
     const { appendOrders, getChecked, markChecked, resetCheckedCache } = await orders()
     const { writePdf, readPdf } = await pdfs()

@@ -13,6 +13,7 @@ import { useBackup, useTelegramSearch } from '@/hooks/use-backup'
 import { useWatch } from '@/hooks/use-watch'
 import { useAutoBackup } from '@/hooks/use-auto-backup'
 import { useChannels } from '@/hooks/use-channels'
+import { usePendingBackup } from '@/hooks/use-pending-backup'
 import { useBotLink } from '@/hooks/use-bot-link'
 import { GUIDE, GUIDE_LEAD, type GuideSection, type GuideStep } from '@/core/setup-guide'
 import { STEP_LABEL } from '@/core/telegram'
@@ -20,6 +21,7 @@ import { formatDmy } from '@/core/dates'
 
 function BackupCard({ configured }: { configured: boolean }) {
   const { snap, running, start, load, catalog, reload } = useBackup()
+  const pending = usePendingBackup()
   const auto = useAutoBackup()
   const chk = useChannels()
   const [pass, setPass] = useState('')
@@ -91,7 +93,41 @@ function BackupCard({ configured }: { configured: boolean }) {
           {chk.busy ? <span className="spinner" /> : null}
           Kanallar holatini tekshirish
         </button>
+        <button className="btn btn-outline" onClick={() => void pending.check()} disabled={!configured || pending.busy} title="Parol kerak emas: shu kompyuterdagi maʼlumot kanalga yuborilganiga solishtiriladi">
+          {pending.busy ? <span className="spinner" /> : null}
+          Nima yuklanmagan?
+        </button>
       </div>
+      {pending.report?.channels && (
+        <div className="list" style={{ marginTop: 10 }}>
+          {pending.report.channels.map((c) => {
+            const day = c.lastAt ? `${formatDmy(new Date(c.lastAt))} ${new Date(c.lastAt).toTimeString().slice(0, 5)}` : ''
+            const nothing = c.known && c.freshCount === 0 && c.changedCount === 0
+            return (
+              <div className="kv" key={c.chat} style={{ alignItems: 'flex-start' }}>
+                <span className="k" style={{ display: 'grid', gap: 3 }}>
+                  <span><b>{c.role === 'asosiy' ? 'Asosiy kanal' : 'Zaxira kanal'}</b> <span className="faint mono" style={{ fontSize: 12 }}>{c.chat}</span></span>
+                  {!c.known && <span className="faint" style={{ fontSize: 12.5 }}>Bu kanalga yuborilganini solishtirib boʻlmaydi (kanalga hali zaxira olinmagan yoki u bu ekrandan oldin olingan): bitta «Zaxiralash» dan keyin koʻrinadi. Zaxiralash hammasini yuboradi.</span>}
+                  {nothing && <span style={{ fontSize: 12.5 }}>✓ Hammasi yuklangan · soʻnggi zaxira {day} · {c.unchanged} ta boʻlak oʻzgarmagan</span>}
+                  {c.known && !nothing && (
+                    <>
+                      <span style={{ fontSize: 12.5, color: 'var(--neg-text)' }}>
+                        Yuklanmagan: {c.freshCount} ta yangi{c.freshPdfs ? ` (shundan ${c.freshPdfs} tasi qaror fayli)` : ''}, {c.changedCount} ta oʻzgargan boʻlak · soʻnggi zaxira {day}
+                      </span>
+                      {[...c.changed.map((x) => ({ ...x, tag: 'oʻzgargan' })), ...c.fresh.map((x) => ({ ...x, tag: 'yangi' }))].map((x) => (
+                        <span key={x.name} className="faint" style={{ fontSize: 12.5 }}>
+                          {x.tag} · {x.label} · {x.rows} qator{x.was !== undefined ? ` (oldin ${x.was})` : ''}
+                        </span>
+                      ))}
+                      {c.freshCount + c.changedCount > c.fresh.length + c.changed.length + c.freshPdfs && <span className="faint" style={{ fontSize: 12.5 }}>…va boshqalar</span>}
+                    </>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {chk.channels && (
         <div className="list" style={{ marginTop: 10 }}>
           {chk.channels.map((c) => {
