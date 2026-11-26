@@ -40,6 +40,8 @@ export interface CatalogEntry {
   refreshedAt: number
   bills: number
   found: number
+  listed?: number
+  hearings?: number
 }
 export interface Catalog {
   backupAt: string

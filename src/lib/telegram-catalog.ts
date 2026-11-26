@@ -14,7 +14,12 @@ export interface CatalogEntry {
   firstAt: number
   refreshedAt: number
   bills: number
+  /** cases FOUND BY NUMBER from the bills (the `found:` buckets); the court lists are counted apart (`listed`) because the two overlap */
   found: number
+  /** rows of the company's court lists (what the courts' list endpoints showed), as in the backup; absent in a catalog written before it was counted */
+  listed?: number
+  /** the company's upcoming hearings in the backup */
+  hearings?: number
   /** the company's name as its bills spell it, when the backup knows it */
   name?: string
 }
@@ -33,6 +38,8 @@ export function buildCatalog(m: ManifestV2): Catalog {
     if (!p?.tin) continue
     if (p.kind === 'bills') co(p.tin).bills += b.rows
     else if (p.kind === 'found') co(p.tin).found += b.rows
+    else if (p.kind === 'lists') co(p.tin).listed = (co(p.tin).listed ?? 0) + b.rows
+    else if (p.kind === 'hearings') co(p.tin).hearings = (co(p.tin).hearings ?? 0) + b.rows
     else co(p.tin)
   }
   return { backupAt: m.created, companies: [...by.values()].sort((a, b) => b.bills - a.bills) }

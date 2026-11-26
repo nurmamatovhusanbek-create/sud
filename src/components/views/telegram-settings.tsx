@@ -124,7 +124,7 @@ function BackupCard({ configured }: { configured: boolean }) {
                 <span className="mono">{c.tin}</span>
               </span>
               <span className="faint mono" style={{ fontSize: 12 }}>
-                {c.bills} toʻlov · {c.found} ish{c.refreshedAt > 0 ? ` · ${formatDmy(new Date(c.refreshedAt))} holatiga` : ''}
+                {c.bills} toʻlov · {c.found} ish (raqam boʻyicha){c.listed ? ` · ${c.listed} ish sud roʻyxatida` : ''}{c.hearings ? ` · ${c.hearings} majlis` : ''}{c.refreshedAt > 0 ? ` · toʻlovlar ${formatDmy(new Date(c.refreshedAt))} holatiga` : ''}
               </span>
             </label>
           ))}
