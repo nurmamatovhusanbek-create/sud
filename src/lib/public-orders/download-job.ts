@@ -91,10 +91,14 @@ export function createDownloadJob(deps: JobDeps) {
           st.done++
           continue
         }
-        if (e instanceof NotPdfError) {
+        if (e instanceof NotPdfError && e.what.document) {
+          // the order EXISTS, the site just gives it as another kind of file (Word, an image): never removed, listed with what it is so the person can open it by hand
+          bad('other', `${e.message}. Qaror mavjud, lekin PDF emas: public.sud.uz da oching`)
+        } else if (e instanceof NotPdfError) {
+          // an error page, JSON or empty answer on both tries: nothing to keep. Removed, and the report says WHAT the site sent
           await deps.purge(id, d.caseNumber).catch(() => {})
           st.removed++
-          bad('removed', 'Sayt PDF emas, boshqa narsa qaytardi (ikki urinishda ham): qaror maʼlumotlardan olib tashlandi')
+          bad('removed', `Sayt ikki urinishda ham PDF bermadi (${e.what.label}${e.what.preview ? `: «${e.what.preview}»` : ''}, ${e.size} bayt): qaror maʼlumotlardan olib tashlandi`)
         } else {
           const message = e instanceof Error ? e.message : 'yuklab boʻlmadi'
           bad('other', message)

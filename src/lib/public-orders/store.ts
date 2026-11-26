@@ -4,7 +4,7 @@ import path from 'node:path'
 import { normalizeCaseNumber, sortOrders, type CaseCheck, type StoredOrder } from '@/core/public-orders'
 import { dataDir, lastRestore } from './data-dir'
 import { currentBackup, scheduleMetaBackup } from './meta-backup-runner'
-import { readPurged, withoutPurged } from './purged-store'
+import { activePurged, readPurged, withoutPurged } from './purged-store'
 import type { OrdersCacheStats } from './types'
 
 export { dataDir }
@@ -157,8 +157,9 @@ export async function allOrders(): Promise<StoredOrder[]> {
     return []
   }
   const stats = await Promise.all(names.map((n) => fs.stat(path.join(shards, n)).catch(() => null)))
-  const purged = await readPurged()
-  const sig = names.map((n, i) => `${n}:${stats[i]?.size}:${stats[i]?.mtimeMs}`).join('|') + `|purged:${purged.size}`
+  const purgedAll = await readPurged()
+  const purged = await activePurged()
+  const sig = names.map((n, i) => `${n}:${stats[i]?.size}:${stats[i]?.mtimeMs}`).join('|') + `|purged:${purged.size}:${purgedAll.size}`
   if (allMemo?.sig === sig) return allMemo.orders
   const byId = new Map<string, StoredOrder>()
   for (const n of names) {

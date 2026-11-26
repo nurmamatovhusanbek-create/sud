@@ -22,7 +22,7 @@ import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useDownloadJob } from '@/hooks/use-download-job'
-import { getPublicOrdersLibrary, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { getPublicOrdersLibrary, getPurgedOrders, restorePurgedOrders, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { ORDERS_FILE_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -70,6 +70,20 @@ export function OrdersView() {
     if (s.ok) toast.success(`${s.ok} ta qaror yuklab olindi${s.phase === 'stopped' ? ' (toʻxtatildi)' : ''}`)
     if (s.problems.length || s.deferred || s.note) toast.error(`Yuklash tugadi: ${s.problems.length} ta qarorda muammo bor, pastdagi hisobotga qarang`, { duration: 12000 })
   })
+  // orders the download job removed from the metadata (their file could not be downloaded): a way back, so a wrong removal is never final
+  const [purged, setPurged] = useState(0)
+  useEffect(() => {
+    void getPurgedOrders().then((r) => r.ok && setPurged(r.data.total))
+  }, [tick])
+  const restoreRemoved = async () => {
+    const r = await restorePurgedOrders()
+    if (!r.ok) {
+      toast.error(r.error)
+      return
+    }
+    toast.success(`${r.data.restored} ta qaror roʻyxatga qaytarildi`)
+    setTick((n) => n + 1)
+  }
   const bulk = dl.job?.phase === 'running' ? { done: dl.job.done, total: dl.job.total } : null
   // the lists and counts move while the job works: every finished order leaves «Yuklanmagan» now, not at the end
   const jobDone = dl.job?.phase === 'running' ? dl.job.done : -1
@@ -366,6 +380,15 @@ export function OrdersView() {
                     <span>Qolganlarini oʻchirish</span>
                   </button>
                 </span>
+              </div>
+            )}
+            {purged > 0 && (
+              <div className="dw-orders-empty" style={{ margin: '0 0 10px', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <span>{purged} ta qaror fayli yuklanmagani uchun maʼlumotlardan olib tashlangan. Yozuvlari saqlangan: qaytarish mumkin.</span>
+                <button className="btn btn-outline btn-sm" onClick={() => void restoreRemoved()}>
+                  <RefreshCw />
+                  <span>Hammasini qaytarish</span>
+                </button>
               </div>
             )}
             {dl.job && (dl.job.phase === 'done' || dl.job.phase === 'stopped') && (dl.job.problems.length > 0 || dl.job.deferred > 0 || !!dl.job.note || dl.job.removed > 0) && (

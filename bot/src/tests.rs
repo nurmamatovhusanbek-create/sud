@@ -1181,10 +1181,13 @@ mod orders {
         let p1 = "11111111-2222-3333-4444-555555555555";
         let p2 = "66666666-7777-8888-9999-000000000000";
         let line = |id: &str, pdf: &str| json!([id, "2-1004-2603/8020", "FIRST", "FULFILLED", "Sud", "J", "Qarz", pdf, "q.pdf", 10, "ECONOMIC", 0]).to_string();
-        let text = format!("{}\n{}\n{}\n", line("o1", p1), line("o2", p2), json!(["x", p2.to_uppercase(), 1, "2-1004-2603/8020"]));
+        let text = format!("{}\n{}\n{}\n", line("o1", p1), line("o2", p2), json!(["x", p2.to_uppercase(), 1, "2-1004-2603/8020", 0]));
         let got = crate::orders::parse(text.as_bytes());
         assert_eq!(got.iter().map(|o| o.id.as_str()).collect::<Vec<_>>(), vec!["o1"], "o2 was removed by the app: no list shows it, whatever the case of its id");
         assert!(crate::orders::parse_checks(text.as_bytes()).is_empty(), "a tombstone is not a check line");
+        // a later «restored» mark (5th field 1) brings it back
+        let back = format!("{}\n{}\n{}\n", line("o1", p1), line("o2", p2), json!(["x", p2, 2, "2-1004-2603/8020", 1]));
+        assert_eq!(crate::orders::parse(back.as_bytes()).len(), 2);
     }
     async fn with_orders() -> (std::sync::Arc<crate::state::Shared>, Backup) {
         let b = backup();

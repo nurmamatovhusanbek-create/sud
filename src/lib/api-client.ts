@@ -621,6 +621,28 @@ export const startDownloadJob = (ids: string[]) => downloadJobCall({ method: 'PO
 export const stopDownloadJob = () => downloadJobCall({ method: 'POST', body: JSON.stringify({ action: 'stop' }) })
 export const clearDownloadJob = () => downloadJobCall({ method: 'POST', body: JSON.stringify({ action: 'clear' }) })
 
+/** Orders the app removed from its metadata (their file could not be downloaded), and «Qaytarish» (all, or the given file ids). Local state only. */
+export async function getPurgedOrders(): Promise<ApiResult<{ total: number; items: { pdfId: string; caseNumber: string; at: number }[] }>> {
+  try {
+    const res = await fetch('/api/public-orders/purged', { cache: 'no-store', headers: authHeaders() })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data && Array.isArray(json.data.items)) return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+export async function restorePurgedOrders(ids?: string[]): Promise<ApiResult<{ restored: number }>> {
+  try {
+    const res = await fetch('/api/public-orders/purged', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action: 'restore', ...(ids ? { ids } : {}) }) })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data && typeof json.data.restored === 'number') return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+
 /** Queue cases for the BACKGROUND download of their published orders; returns at once. */
 export async function fetchPublicOrders(
   cases: { caseNumber: string; courtType: string; sig?: string; result?: string; caseStatus?: string }[],

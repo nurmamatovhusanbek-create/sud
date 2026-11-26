@@ -45,7 +45,7 @@ export const GET = guard(async (req) => {
     })
   } catch (e) {
     if (e instanceof ManualDownloadRequired) return jsonFail(e.message, 'manual_required', 409)
-    if (e instanceof NotPdfError) return jsonFail('Fayl PDF emas', 'upstream_error', 502)
+    if (e instanceof NotPdfError) return jsonFail(e.message, 'upstream_error', 502)
     return jsonFail(e instanceof Error ? e.message : 'Faylni olib boʻlmadi', 'upstream_error', 502)
   }
 })

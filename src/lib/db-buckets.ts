@@ -304,7 +304,7 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
   const b = parseBucket(name)
   if (!b) throw new Error('noma\'lum bo\'lak')
   if (b.kind === 'pdf') return Buffer.from(local) // a published order never changes: there is nothing to merge, and the bytes are not lines
-  const rows = new Map<string, { line: string; t: number | null; pid?: string }>()
+  const rows = new Map<string, { line: string; t: number | null; pid?: string; restored?: boolean }>()
   const take = (text: Uint8Array, isLocal: boolean) => {
     for (const line of Buffer.from(text).toString('utf8').split('\n')) {
       if (!line) continue
@@ -317,14 +317,14 @@ export function mergeBucketText(name: string, base: Uint8Array, local: Uint8Arra
       const { key, t } = rowKey(b.kind, r)
       const have = rows.get(key)
       const pid = b.kind === 'orders' && r[0] !== 'k' && r[0] !== 'x' ? String(r[7] ?? '').toLowerCase() : undefined
-      if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t, pid })
+      if (!have || (t !== null && have.t !== null ? t >= have.t : isLocal)) rows.set(key, { line, t, pid, restored: r[0] === 'x' && Number(r[4]) === 1 })
     }
   }
   take(base, false)
   take(local, true)
   // an order with a tombstone is gone from the union (in either copy): the app removed it on purpose
   if (b.kind === 'orders') {
-    const gone = new Set([...rows.keys()].filter((k) => k.startsWith('x:')).map((k) => k.slice(2)))
+    const gone = new Set([...rows.entries()].filter(([k, v]) => k.startsWith('x:') && !v.restored).map(([k]) => k.slice(2)))
     if (gone.size) for (const [k, v] of rows) if (v.pid && gone.has(v.pid)) rows.delete(k)
   }
   // the order `renderBucket` writes: by key (case numbers, bill numbers: plain ASCII, so code-unit order is the database's order)

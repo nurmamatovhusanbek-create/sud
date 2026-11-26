@@ -17,6 +17,8 @@ export interface Purged {
   pdfId: string
   caseNumber: string
   at: number
+  /** the person brought it back: the record is in the lists again; the entry stays so the backup can carry the later «restored» mark over an older tombstone */
+  restored?: boolean
 }
 
 const file = () => path.join(dataDir(), 'purged.jsonl')
@@ -47,7 +49,11 @@ export async function readPurged(): Promise<Map<string, Purged>> {
       if (!line) continue
       try {
         const p = JSON.parse(line) as Partial<Purged>
-        if (typeof p.pdfId === 'string' && isOrderFileId(p.pdfId)) map.set(p.pdfId.toLowerCase(), { pdfId: p.pdfId.toLowerCase(), caseNumber: String(p.caseNumber ?? ''), at: Number(p.at) || 0 })
+        if (typeof p.pdfId === 'string' && isOrderFileId(p.pdfId)) {
+          const id = p.pdfId.toLowerCase()
+          const old = map.get(id)
+          map.set(id, { pdfId: id, caseNumber: String(p.caseNumber ?? '') || old?.caseNumber || '', at: Number(p.at) || 0, ...(p.restored ? { restored: true } : {}) }) // the last line of an id wins
+        }
       } catch { /* torn last line */ }
     }
   }
@@ -59,7 +65,7 @@ export async function readPurged(): Promise<Map<string, Purged>> {
 export function purgeOrders(items: Array<{ pdfId: string; caseNumber: string }>, at: number = Date.now()): Promise<number> {
   const run = async () => {
     const have = await readPurged()
-    const fresh = items.filter((i) => isOrderFileId(i.pdfId) && !have.has(i.pdfId.toLowerCase()))
+    const fresh = items.filter((i) => isOrderFileId(i.pdfId) && !(have.has(i.pdfId.toLowerCase()) && !have.get(i.pdfId.toLowerCase())!.restored))
     if (!fresh.length) return 0
     await fs.mkdir(dataDir(), { recursive: true, mode: 0o700 })
     await fs.appendFile(file(), fresh.map((i) => JSON.stringify({ pdfId: i.pdfId.toLowerCase(), caseNumber: i.caseNumber, at })).join('\n') + '\n', { encoding: 'utf8', mode: 0o600 })
@@ -71,8 +77,31 @@ export function purgeOrders(items: Array<{ pdfId: string; caseNumber: string }>,
   return next
 }
 
+/** the file ids that are removed NOW (a restored one is not) */
+export async function activePurged(): Promise<Map<string, Purged>> {
+  return new Map([...(await readPurged())].filter(([, v]) => !v.restored))
+}
+
 /** Records of the store minus the purged ones. */
 export async function withoutPurged<T extends { pdfId?: string }>(orders: T[]): Promise<T[]> {
-  const p = await readPurged()
+  const p = await activePurged()
   return p.size ? orders.filter((o) => !o.pdfId || !p.has(o.pdfId.toLowerCase())) : orders
+}
+
+/**
+ * Bring removed orders back (`ids` = those, or every removed one). Appends a `restored` line (the file stays append-only); the next backup carries the mark,
+ * which beats an older tombstone in the channel because it is later. Returns how many came back.
+ */
+export function restorePurged(ids?: string[], at: number = Date.now()): Promise<number> {
+  const run = async () => {
+    const now = await activePurged()
+    const want = (ids ? ids.map((i) => i.toLowerCase()) : [...now.keys()]).filter((i) => now.has(i))
+    if (!want.length) return 0
+    await fs.appendFile(file(), want.map((id) => JSON.stringify({ pdfId: id, caseNumber: now.get(id)!.caseNumber, at, restored: true })).join('\n') + '\n', { encoding: 'utf8', mode: 0o600 })
+    memo = null
+    return want.length
+  }
+  const next = chain.then(run, run)
+  chain = next.catch(() => undefined)
+  return next
 }

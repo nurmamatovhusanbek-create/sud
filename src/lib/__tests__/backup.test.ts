@@ -903,7 +903,7 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     const rows = m.plain('orders:26').toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown[])
     expect(rows.find((r) => r[0] === 'o2')).toBeUndefined()
     expect(rows.find((r) => r[0] === 'o1')).toBeDefined()
-    expect(rows.find((r) => r[0] === 'x')).toEqual(['x', ID2, expect.any(Number), '2-1004-2603/8021'])
+    expect(rows.find((r) => r[0] === 'x')).toEqual(['x', ID2, expect.any(Number), '2-1004-2603/8021', 0])
     // a new computer: the restore brings o1 back, NOT o2, and learns that o2 was removed
     fs.rmSync(ORD_DIR, { recursive: true, force: true })
     fs.mkdirSync(ORD_DIR, { recursive: true })
@@ -912,6 +912,26 @@ describe('downloaded court orders travel with the backup (for the bot)', () => {
     expect((await finished()).phase).toBe('done')
     expect((await allOrders()).map((o) => o.id)).toEqual(['o1'])
     expect([...(await readPurged()).keys()]).toEqual([ID2])
+  })
+
+  test('a removed order can be brought back: the mark travels, beats the older tombstone in the channel, and the order is in the bot\'s bucket again', async () => {
+    const { appendOrders, allOrders, lookupOrders } = await orders()
+    const { purgeOrders, restorePurged, activePurged } = await import('../public-orders/purged-store')
+    await appendOrders([order('o1', ID1, '2-1004-2603/8020'), order('o2', ID2, '2-1004-2603/8021')])
+    const ch = fakeChannel()
+    await runBackup()
+    await purgeOrders([{ pdfId: ID2, caseNumber: '2-1004-2603/8021' }], Date.now() - 5000)
+    await runBackup() // the channel now holds the tombstone
+    expect(await restorePurged([ID2.toUpperCase()])).toBe(1)
+    expect(await restorePurged()).toBe(0) // nothing is removed any more
+    expect([...(await activePurged()).keys()]).toEqual([])
+    expect((await allOrders()).map((o) => o.id).sort()).toEqual(['o1', 'o2'])
+    expect((await lookupOrders('2-1004-2603/8021')).map((o) => o.id)).toEqual(['o2'])
+    expect((await runBackup()).phase).toBe('done')
+    const m = await manifestOf(ch)
+    const rows = m.plain('orders:26').toString('utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as unknown[])
+    expect(rows.find((r) => r[0] === 'o2')).toBeDefined() // back in the bucket the bot reads
+    expect(rows.find((r) => r[0] === 'x')).toEqual(['x', ID2, expect.any(Number), '2-1004-2603/8021', 1]) // the later «restored» mark replaced the tombstone
   })
 
   test('a restore never overwrites what this computer has: its own PDF and its own check stay', async () => {

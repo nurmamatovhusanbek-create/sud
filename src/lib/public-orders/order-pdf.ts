@@ -11,9 +11,44 @@ import { CaptchaRefusedError } from './order-file'
  *  3. Only a real PDF is stored (an error page or a half answer never lands on disk).
  */
 
+/**
+ * What the bytes ARE, from their first bytes (the site answered something that is not a PDF: which thing it is decides what the person should do).
+ * `document` = a real file of another type (Word, an image, an archive: the order exists, it is just not a PDF); `page` = an error page / JSON (a refusal, not an order).
+ */
+export interface Sniffed {
+  kind: 'docx' | 'doc' | 'rtf' | 'image' | 'zip' | 'html' | 'json' | 'empty' | 'text' | 'unknown'
+  document: boolean
+  /** words for the person, Uzbek */
+  label: string
+  /** the first printable characters (an error page says what it is) */
+  preview: string
+}
+
+export function sniffBytes(b: Uint8Array): Sniffed {
+  const buf = Buffer.from(b.subarray(0, 4096))
+  const head = buf.toString('latin1')
+  const preview = buf.subarray(0, 160).toString('utf8').replace(/[^\p{L}\p{N}\p{P}\p{S} ]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100)
+  const mk = (kind: Sniffed['kind'], document: boolean, label: string): Sniffed => ({ kind, document, label, preview })
+  if (!b.length) return mk('empty', false, 'boʻsh javob')
+  if (head.startsWith('PK\x03\x04')) return head.includes('word/') ? mk('docx', true, 'Word hujjati (.docx)') : mk('zip', true, 'arxiv (.zip)')
+  if (head.startsWith('\xd0\xcf\x11\xe0')) return mk('doc', true, 'Word hujjati (.doc)')
+  if (head.startsWith('{\\rtf')) return mk('rtf', true, 'RTF hujjati')
+  if (head.startsWith('\x89PNG') || head.startsWith('\xff\xd8\xff') || head.startsWith('GIF8')) return mk('image', true, 'rasm')
+  if (/^\s*<(!doctype|html|\?xml|head|body)/i.test(head)) return mk('html', false, 'veb-sahifa (HTML)')
+  if (/^\s*[{[]/.test(head)) return mk('json', false, 'JSON javob')
+  if (/^[\x09\x0a\x0d\x20-\x7e]+$/.test(head) || preview.length > 20) return mk('text', false, 'matn')
+  return mk('unknown', false, 'nomaʼlum fayl')
+}
+
 export class NotPdfError extends Error {
-  constructor() {
-    super('Fayl PDF emas')
+  readonly what: Sniffed
+  readonly size: number
+  constructor(bytes: Uint8Array = new Uint8Array()) {
+    const what = sniffBytes(bytes)
+    super(`Fayl PDF emas: ${what.label}, ${bytes.length} bayt${what.preview && !what.document ? ` («${what.preview}»)` : ''}`)
+    this.name = 'NotPdfError'
+    this.what = what
+    this.size = bytes.length
   }
 }
 
@@ -54,7 +89,7 @@ const isPdf = (b: Uint8Array): boolean => Buffer.from(b.subarray(0, 5)).toString
 export function pdfFromUpload(raw: Uint8Array): { bytes: Uint8Array; filename: string | null } {
   const part = parseMultipartFile(raw)
   const bytes = part?.bytes ?? raw
-  if (!isPdf(bytes)) throw new NotPdfError()
+  if (!isPdf(bytes)) throw new NotPdfError(bytes)
   return { bytes, filename: part?.filename ?? null }
 }
 

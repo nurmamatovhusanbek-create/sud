@@ -3,7 +3,7 @@ import type { StoredOrder } from '@/core/public-orders'
 import { parseBucket } from './db-buckets'
 import { allChecked, allOrders, appendOrders, markChecked } from './public-orders/store'
 import { readPdf, writePdf } from './public-orders/pdf-store'
-import { purgeOrders, readPurged } from './public-orders/purged-store'
+import { activePurged, purgeOrders, restorePurged } from './public-orders/purged-store'
 
 /**
  * The way back for the court orders in a backup (`orders:<yy>` records, `pdf:<id>` files): they go into THIS computer's orders folder
@@ -55,17 +55,22 @@ export async function importOrdersBucket(name: string, text: Uint8Array): Promis
   // the orders the app removed on purpose (tombstones) come first: this computer learns them, and their records are not brought back
   const gone = new Set<string>()
   const tombs: Array<{ pdfId: string; caseNumber: string }> = []
+  const back: string[] = []
   for (const l of Buffer.from(text).toString('utf8').split('\n')) {
     try {
       const r = JSON.parse(l) as unknown[]
       if (r[0] === 'x' && typeof r[1] === 'string') {
-        gone.add(r[1].toLowerCase())
-        tombs.push({ pdfId: r[1], caseNumber: typeof r[3] === 'string' ? r[3] : '' })
+        if (Number(r[4]) === 1) back.push(r[1]) // the person brought it back (a later line than the tombstone)
+        else {
+          gone.add(r[1].toLowerCase())
+          tombs.push({ pdfId: r[1], caseNumber: typeof r[3] === 'string' ? r[3] : '' })
+        }
       }
     } catch { /* not a line */ }
   }
   if (tombs.length) await purgeOrders(tombs)
-  const already = await readPurged()
+  if (back.length) await restorePurged(back) // only those this computer still has removed: the file stays append-only
+  const already = await activePurged()
   for (const l of Buffer.from(text).toString('utf8').split('\n')) {
     if (!l) continue
     let r: unknown[]

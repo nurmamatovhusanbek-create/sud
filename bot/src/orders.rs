@@ -37,7 +37,7 @@ fn text(v: &[Value], i: usize) -> String {
 pub fn parse(bytes: &[u8]) -> Vec<Order> {
     let rows: Vec<Vec<Value>> = String::from_utf8_lossy(bytes).lines().filter_map(|l| serde_json::from_str::<Vec<Value>>(l).ok()).collect();
     // tombstones: ["x", pdf id, when, case]: an order the app removed because its file can never be downloaded; it is in no list any more
-    let gone: std::collections::HashSet<String> = rows.iter().filter(|r| r.first().and_then(Value::as_str) == Some("x")).filter_map(|r| r.get(1).and_then(Value::as_str)).map(str::to_lowercase).collect();
+    let gone: std::collections::HashSet<String> = rows.iter().filter(|r| r.first().and_then(Value::as_str) == Some("x") && r.get(4).and_then(Value::as_i64) != Some(1)).filter_map(|r| r.get(1).and_then(Value::as_str)).map(str::to_lowercase).collect();
     rows.into_iter()
         .filter_map(|r| {
             let o = Order { id: text(&r, 0), case: text(&r, 1), instance: text(&r, 2), result: text(&r, 3), court: text(&r, 4), judge: text(&r, 5), category: text(&r, 6), pdf_id: text(&r, 7), pdf_name: text(&r, 8), size: r.get(9).and_then(Value::as_u64).unwrap_or(0), saved: r.get(11).and_then(Value::as_i64).unwrap_or(1) > 0, court_type: text(&r, 10), saved_at: r.get(11).and_then(Value::as_i64).unwrap_or(0).max(0) };

@@ -43,7 +43,7 @@ export function orderLine(o: StoredOrder, savedAt: number): string {
 }
 
 /** a tombstone: an order the app removed because its file can never be downloaded ("x", file id, when): the merge drops the order from every copy, the bot forgets it */
-export const purgeLine = (pdfId: string, atMs: number, caseNumber = ''): string => JSON.stringify(['x', pdfId.toLowerCase(), Math.round(atMs), caseNumber])
+export const purgeLine = (pdfId: string, atMs: number, caseNumber = '', restored = false): string => JSON.stringify(['x', pdfId.toLowerCase(), Math.round(atMs), caseNumber, restored ? 1 : 0])
 
 /** a «checked, nothing published» line */
 export const checkLine = (caseNumber: string, atMs: number): string => JSON.stringify(['k', caseNumber, Math.round(atMs)])
@@ -72,7 +72,7 @@ export async function orderBuckets(): Promise<Map<string, ExtraBucket>> {
     if (Number.isFinite(at)) slot(orderYear(c.caseNumber)).checks.push({ n: c.caseNumber, line: checkLine(c.caseNumber, at) })
   }
   // the tombstones of removed orders, in the year of their case
-  for (const p of (await readPurged()).values()) if (p.caseNumber) slot(orderYear(p.caseNumber)).gone.push({ p: p.pdfId, line: purgeLine(p.pdfId, p.at, p.caseNumber) })
+  for (const p of (await readPurged()).values()) if (p.caseNumber) slot(orderYear(p.caseNumber)).gone.push({ p: p.pdfId, line: purgeLine(p.pdfId, p.at, p.caseNumber, !!p.restored) })
   const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
   for (const y of [...byYear.keys()].sort((a, b) => a - b)) {
     const s = byYear.get(y)!

@@ -55,6 +55,27 @@ describe('the download job', () => {
     expect(s).toMatchObject({ phase: 'done', ok: 2, removed: 1, done: 3 })
     expect(s.problems).toEqual([expect.objectContaining({ pdfId: ID(2), kind: 'removed', caseNumber: '2-1-25/2' })])
   })
+  test('a real file of another kind (Word, an image) is NEVER removed: listed with what it is, and the job goes on', async () => {
+    const r = rig((id) => {
+      if (id === ID(1)) throw new NotPdfError(Buffer.from('PK\x03\x04 word/document.xml', 'latin1'))
+      return ok
+    })
+    r.job.start([ID(1), ID(2)])
+    await r.job.settled()
+    expect(r.purged).toEqual([])
+    expect(r.job.state()).toMatchObject({ ok: 1, removed: 0 })
+    expect(r.job.state().problems).toEqual([expect.objectContaining({ kind: 'other', message: expect.stringContaining('Word hujjati') })])
+  })
+  test('an error page twice: removed, and the report says what the site sent', async () => {
+    const r = rig(() => {
+      throw new NotPdfError(Buffer.from('{"message":"Fayl topilmadi"}'))
+    })
+    r.job.start([ID(1)])
+    await r.job.settled()
+    expect(r.purged).toHaveLength(1)
+    expect(r.job.state().problems[0]!.message).toContain('JSON javob')
+    expect(r.job.state().problems[0]!.message).toContain('Fayl topilmadi')
+  })
   test('a second attempt that works is a plain success: nothing is removed', async () => {
     const r = rig((_id, n) => {
       if (n === 1) throw new NotPdfError()
