@@ -1,8 +1,8 @@
 /* NAVIGATION: the shell (the sticky header with the home tile and the search field) and the bottom tab bar. */
-.shell-head { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg-canvas); padding: calc(var(--space-3) + var(--tg-safe-top) + var(--tg-content-safe-top)) calc(var(--space-4) + var(--tg-safe-right)) var(--space-2) calc(var(--space-4) + var(--tg-safe-left)); }
+.shell-head { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg-canvas); padding: calc(var(--space-3) + var(--inset-top)) calc(var(--space-4) + var(--inset-right)) var(--space-2) calc(var(--space-4) + var(--inset-left)); }
 .shell-bar { display: flex; gap: var(--space-2); align-items: center; max-width: var(--size-content); margin: 0 auto; }
 .shell-hint { display: flex; justify-content: space-between; gap: var(--space-2); max-width: var(--size-content); margin: 0 auto; padding: var(--space-2) var(--space-1) 0; color: var(--text-2); font-size: var(--text-xs); }
-.shell-main { max-width: var(--size-content); margin: 0 auto; padding: var(--space-1) calc(var(--space-4) + var(--tg-safe-right)) var(--space-3) calc(var(--space-4) + var(--tg-safe-left)); }
+.shell-main { max-width: var(--size-content); margin: 0 auto; padding: var(--space-1) calc(var(--space-4) + var(--inset-right)) var(--space-3) calc(var(--space-4) + var(--inset-left)); }
 .screen { display: block; }
 .screen__top { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-1) 0 var(--space-3); }
 .screen__lead { font-size: var(--text-sm); color: var(--text-2); margin: var(--space-1) 0 0; }

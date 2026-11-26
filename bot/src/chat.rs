@@ -701,6 +701,11 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
         "/company" => show(&sh, chat, "k", arg).await,
         "/find" => search_reply(&sh, chat, arg).await,
         "/orders" | "/qarorlar" => orders_reply(&sh, chat, arg).await,
+        // not in the menu: the Mini App with its diagnostics panel (what Telegram told the page: version, fullscreen, safe areas, events)
+        "/debug" => match &sh.cfg.public_url {
+            Some(u) => sh.outbox.send(chat, "Mini App diagnostikasi:", Some(json!({ "inline_keyboard": [[{ "text": "Diagnostikani ochish", "web_app": { "url": format!("{u}/app?debug=1") } }]] }))).await,
+            None => sh.outbox.send(chat, "Mini App manzili sozlanmagan (PUBLIC_URL).", None).await,
+        },
         _ if body.starts_with('/') => sh.outbox.send_html(chat, HELP, None).await,
         _ => search_reply(&sh, chat, body).await,
     }

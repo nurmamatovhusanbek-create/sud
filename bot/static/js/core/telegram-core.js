@@ -21,6 +21,10 @@ export function createTelegram({ win, hash, storage, doc }) {
   const watchers = new Set()
   let fullscreen = false
   let started = false
+  let requested = false
+  const got = { safe: false, content: false }
+  /** the last events the client sent (type + data), for the diagnostics page (`/app?debug=1`) */
+  const events = []
 
   const read = () => { try { return storage.getItem(PREF) } catch { return null } }
   const write = (v) => { try { storage.setItem(PREF, v) } catch { /* private mode: the choice just is not remembered */ } }
@@ -36,6 +40,8 @@ export function createTelegram({ win, hash, storage, doc }) {
   function receive(type, data) {
     let d = data
     if (typeof d === 'string') { try { d = JSON.parse(d) } catch { /* keep the text */ } }
+    events.push({ type: String(type), data: JSON.stringify(d ?? null).slice(0, 120) })
+    if (events.length > 30) events.shift()
     const fn = handlers.get(type)
     if (fn) fn(d && typeof d === 'object' ? d : {})
   }
@@ -58,11 +64,15 @@ export function createTelegram({ win, hash, storage, doc }) {
   handlers.set('fullscreen_changed', (d) => setFullscreen(!!d.is_fullscreen))
   // `ALREADY_FULLSCREEN` is an answer to a request made when it already was: the state is known, not a failure
   handlers.set('fullscreen_failed', (d) => { if (d.error === 'ALREADY_FULLSCREEN') setFullscreen(true) })
-  handlers.set('safe_area_changed', (d) => insets('safe', d))
-  handlers.set('content_safe_area_changed', (d) => insets('content-safe', d))
+  handlers.set('safe_area_changed', (d) => { got.safe = true; delete doc.documentElement.dataset.safe; insets('safe', d) })
+  handlers.set('content_safe_area_changed', (d) => { got.content = true; insets('content-safe', d) })
 
+  // Where the client hands its answers over differs by app: Telegram's own library defines all of these, so a page that does not may hear nothing
+  // (Android calls `Telegram.WebView.receiveEvent`, iOS `TelegramGameProxy.receiveEvent`, some builds the flat `TelegramGameProxy_receiveEvent`)
   win.Telegram = win.Telegram || {}
   win.Telegram.WebView = { ...(win.Telegram.WebView || {}), receiveEvent: receive }
+  win.TelegramGameProxy = { ...(win.TelegramGameProxy || {}), receiveEvent: receive }
+  win.TelegramGameProxy_receiveEvent = receive
   win.addEventListener('message', (e) => {
     if (e.source !== win.parent) return // only the client that frames this page
     try {
@@ -70,6 +80,31 @@ export function createTelegram({ win, hash, storage, doc }) {
       if (m && typeof m.eventType === 'string') receive(m.eventType, m.eventData)
     } catch { /* not for us */ }
   })
+
+  // ---- when the client does not answer ------------------------------------------------------------------------------------------------------------
+  // The layout must stay out of the status bar and Telegram's own buttons even if the answer never comes. After a short wait, on a phone that was asked for
+  // fullscreen and whose page really is as tall as the screen, a guess is used (the browser's own `env()` value when it gives one, else a typical one); the
+  // client's real numbers replace it the moment they arrive.
+  const GUESS = { ios: { top: 52, bottom: 34 }, android: { top: 28, bottom: 0 } }
+  const CONTENT_TOP = 56 // the row of Telegram's own buttons (Close, the arrow, the dots) under the status bar
+  function envPx(side) {
+    try {
+      const el = doc.createElement('div')
+      el.style.paddingTop = `env(safe-area-inset-${side})`
+      doc.body.append(el)
+      const v = parseFloat(win.getComputedStyle(el).paddingTop) || 0
+      el.remove()
+      return v
+    } catch { return 0 }
+  }
+  const tall = () => !!(win.screen && win.screen.height > 0 && win.innerHeight >= win.screen.height - 12)
+  function guess() {
+    if (got.safe || !phone || !can.fullscreen || !requested || !(fullscreen || tall())) return
+    const g = GUESS[platform]
+    doc.documentElement.dataset.safe = 'guess'
+    insets('safe', { top: envPx('top') || g.top, bottom: envPx('bottom') || g.bottom, left: 0, right: 0 })
+    if (!got.content) insets('content-safe', { top: CONTENT_TOP, right: 0, bottom: 0, left: 0 })
+  }
 
   /** does this client's person want fullscreen now: their own earlier choice, else yes on a phone */
   const wanted = () => (read() === '1' ? true : read() === '0' ? false : phone)
@@ -83,6 +118,7 @@ export function createTelegram({ win, hash, storage, doc }) {
     toggleFullscreen() {
       if (!can.fullscreen) return
       write(fullscreen ? '0' : '1')
+      if (!fullscreen) requested = true
       post(fullscreen ? 'web_app_exit_fullscreen' : 'web_app_request_fullscreen')
     },
     /** call once, as soon as the page is up */
@@ -93,9 +129,13 @@ export function createTelegram({ win, hash, storage, doc }) {
       post('web_app_expand')
       post('web_app_set_header_color', { color_key: 'bg_color' })
       if (can.safeArea) { post('web_app_request_safe_area'); post('web_app_request_content_safe_area') }
-      if (can.fullscreen && wanted()) post('web_app_request_fullscreen')
+      if (can.fullscreen && wanted()) { requested = true; post('web_app_request_fullscreen') }
+      if (typeof win.setTimeout === 'function') win.setTimeout(guess, 1500)
     },
-    /** for tests: what the client would send us */
+    /** what the page knows about the client, for the diagnostics page */
+    diagnostics: () => ({ version, platform, can, fullscreen, requested, gotSafe: got.safe, gotContent: got.content, events: events.slice(-12) }),
+    /** for tests: what the client would send us, and the fallback guess now */
     receive,
+    guess,
   }
 }

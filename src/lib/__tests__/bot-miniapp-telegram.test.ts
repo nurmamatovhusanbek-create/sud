@@ -17,12 +17,14 @@ const core = (await import(path)) as {
     toggleFullscreen: () => void
     start: () => void
     receive: (type: string, data: unknown) => void
+    guess: () => void
+    diagnostics: () => { version: number; platform: string; fullscreen: boolean; requested: boolean; gotSafe: boolean; gotContent: boolean; events: Array<{ type: string; data: string }> }
   }
 }
 
 type Sent = { type: string; data: unknown }
 
-function setup(opts: { hash: string; stored?: string | null; proxy?: boolean; framed?: boolean; storageThrows?: boolean }) {
+function setup(opts: { hash: string; stored?: string | null; proxy?: boolean; framed?: boolean; storageThrows?: boolean; inner?: number; screenH?: number }) {
   const sent: Sent[] = []
   const vars = new Map<string, string>()
   const dataset: Record<string, string> = {}
@@ -30,7 +32,11 @@ function setup(opts: { hash: string; stored?: string | null; proxy?: boolean; fr
   const parent = { postMessage: (m: string) => { const j = JSON.parse(m) as { eventType: string; eventData: unknown }; sent.push({ type: j.eventType, data: j.eventData }) } }
   const store = new Map<string, string>()
   if (opts.stored != null) store.set('sud.fullscreen', opts.stored)
+  const timers: Array<() => void> = []
   const win: Record<string, unknown> = {
+    setTimeout: (fn: () => void) => { timers.push(fn); return timers.length },
+    innerHeight: opts.inner ?? 800,
+    screen: { height: opts.screenH ?? 800 },
     parent: opts.framed === false ? undefined : parent,
     addEventListener: (_: string, fn: (e: { source: unknown; data: string }) => void) => listeners.push(fn),
   }
@@ -41,7 +47,7 @@ function setup(opts: { hash: string; stored?: string | null; proxy?: boolean; fr
     ? { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') } }
     : { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) }
   const tg = core.createTelegram({ win, hash: opts.hash, storage, doc })
-  return { tg, sent, vars, dataset, store, win, parent, message: (source: unknown, data: unknown) => listeners.forEach((fn) => fn({ source, data: typeof data === 'string' ? data : JSON.stringify(data) })) }
+  return { tg, sent, vars, dataset, store, win, parent, timers, message: (source: unknown, data: unknown) => listeners.forEach((fn) => fn({ source, data: typeof data === 'string' ? data : JSON.stringify(data) })) }
 }
 
 const types = (s: Sent[]) => s.map((x) => x.type)
@@ -174,3 +180,82 @@ describe('the person\'s button', () => {
     expect(() => t.tg.toggleFullscreen()).not.toThrow()
   })
 })
+
+describe('every place the clients hand their answers over', () => {
+  test('Android\'s Telegram.WebView, iOS\'s TelegramGameProxy and the flat function all reach the page', () => {
+    const t = setup({ hash: H('8.0', 'ios') })
+    const win = t.win as {
+      Telegram: { WebView: { receiveEvent: (a: string, b: unknown) => void } }
+      TelegramGameProxy: { receiveEvent: (a: string, b: unknown) => void }
+      TelegramGameProxy_receiveEvent: (a: string, b: unknown) => void
+    }
+    win.TelegramGameProxy.receiveEvent('safe_area_changed', { top: 59, bottom: 34, left: 0, right: 0 })
+    expect(t.vars.get('--tg-safe-top')).toBe('59px')
+    win.TelegramGameProxy_receiveEvent('content_safe_area_changed', JSON.stringify({ top: 44, bottom: 0, left: 0, right: 0 }))
+    expect(t.vars.get('--tg-content-safe-top')).toBe('44px')
+    win.Telegram.WebView.receiveEvent('fullscreen_changed', { is_fullscreen: true })
+    expect(t.tg.isFullscreen()).toBe(true)
+    // and the diagnostics page can say what came
+    const d = t.tg.diagnostics()
+    expect(d.gotSafe && d.gotContent && d.fullscreen).toBe(true)
+    expect(d.events.map((e) => e.type)).toEqual(['safe_area_changed', 'content_safe_area_changed', 'fullscreen_changed'])
+  })
+})
+
+describe('when the client does not answer: a guess keeps the page out of the status bar and Telegram\'s buttons', () => {
+  test('a phone asked for fullscreen, whose page is as tall as the screen, gets typical insets after the wait', () => {
+    const t = setup({ hash: H('8.0', 'ios'), inner: 844, screenH: 844 })
+    t.tg.start()
+    expect(t.timers).toHaveLength(1)
+    t.timers[0]!()
+    expect(t.dataset.safe).toBe('guess')
+    expect(t.vars.get('--tg-safe-top')).toBe('52px')
+    expect(t.vars.get('--tg-safe-bottom')).toBe('34px')
+    expect(t.vars.get('--tg-content-safe-top')).toBe('56px')
+    // the client's real numbers replace the guess, and the mark goes
+    t.tg.receive('safe_area_changed', { top: 59, bottom: 34, left: 0, right: 0 })
+    expect(t.vars.get('--tg-safe-top')).toBe('59px')
+    expect(t.dataset.safe).toBeUndefined()
+  })
+
+  test('Android has its own typical status bar, and no bottom inset', () => {
+    const t = setup({ hash: H('8.0', 'android'), inner: 800, screenH: 800 })
+    t.tg.start()
+    t.timers[0]!()
+    expect(t.vars.get('--tg-safe-top')).toBe('28px')
+    expect(t.vars.get('--tg-safe-bottom')).toBe('0px')
+  })
+
+  test('no guess when the client DID answer, when the page is not fullscreen-sized, on a desktop client, or when fullscreen was not asked for', () => {
+    const answered = setup({ hash: H('8.0', 'ios'), inner: 844, screenH: 844 })
+    answered.tg.start()
+    answered.tg.receive('safe_area_changed', { top: 47, bottom: 34, left: 0, right: 0 })
+    answered.timers[0]!()
+    expect(answered.vars.get('--tg-safe-top')).toBe('47px')
+    expect(answered.dataset.safe).toBeUndefined()
+
+    const sheet = setup({ hash: H('8.0', 'ios'), inner: 650, screenH: 844 }) // the sheet that leaves a strip of the chat visible
+    sheet.tg.start()
+    sheet.timers[0]!()
+    expect(sheet.vars.has('--tg-safe-top')).toBe(false)
+
+    const desktop = setup({ hash: H('8.0', 'tdesktop'), inner: 800, screenH: 800 })
+    desktop.tg.start()
+    desktop.timers[0]!()
+    expect(desktop.vars.has('--tg-safe-top')).toBe(false)
+
+    const declined = setup({ hash: H('8.0', 'ios'), stored: '0', inner: 844, screenH: 844 })
+    declined.tg.start()
+    declined.timers[0]!()
+    expect(declined.vars.has('--tg-safe-top')).toBe(false)
+  })
+
+  test('a fullscreen the client confirmed counts even when the page does not look as tall as the screen', () => {
+    const t = setup({ hash: H('8.0', 'ios'), inner: 700, screenH: 844 })
+    t.tg.start()
+    t.tg.receive('fullscreen_changed', { is_fullscreen: true })
+    t.timers[0]!()
+    expect(t.dataset.safe).toBe('guess')
+  })
+})
+

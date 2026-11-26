@@ -1099,7 +1099,10 @@ mod assets {
         }
         // the shell follows the safe areas and shows the toggle only where the client can do fullscreen
         let nav = get("css/components/nav.css");
-        assert!(nav.contains("--tg-safe-top") && nav.contains("--tg-content-safe-top") && nav.contains("--inset-bottom"));
+        let base = get("css/base.css");
+        // the insets are the larger of the browser's and the client's safe area (never summed), plus Telegram's own button row on top; the header and the tab bar read them
+        assert!(base.contains("--inset-top: calc(max(env(safe-area-inset-top), var(--tg-safe-top)) + var(--tg-content-safe-top))") && base.contains("--inset-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-bottom)"));
+        assert!(nav.contains("var(--inset-top)") && nav.contains("var(--inset-bottom)"), "the header and the tab bar keep clear of the insets");
         assert!(get("js/shell.js").contains("telegram.can.fullscreen"));
         // a splash and a skeleton only ever move with transform and opacity
         let splash = get("css/components/splash.css");
@@ -1457,6 +1460,21 @@ mod the_app_link {
         call(&sh, "/link/pull", "{}", now(), None).await;
         handle_update(sh.clone(), message(999, &format!("/refresh {TIN}"))).await;
         assert!(sh.link.lock().unwrap().jobs.is_empty());
+    }
+}
+
+mod debug_command {
+    use super::*;
+    use crate::chat::handle_update;
+
+    #[tokio::test]
+    async fn debug_sends_a_button_to_the_mini_app_with_its_diagnostics_and_is_not_in_the_menu() {
+        let (sh, _b) = ready_bot().await;
+        handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/debug" } })).await;
+        let m = &sh.outbox.captured()[0];
+        assert!(m.markup.clone().unwrap().to_string().contains("https://bot.example/app?debug=1"), "{:?}", m.markup);
+        handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/help" } })).await;
+        assert!(!sh.outbox.captured()[1].text.contains("/debug"));
     }
 }
 
