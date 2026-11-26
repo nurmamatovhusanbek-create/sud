@@ -16,9 +16,24 @@ export interface TgError {
 }
 export type TgReply<T> = { ok: true; result: T } | TgError
 
-async function post<T>(token: string, method: string, body: unknown, timeoutMs = 20_000, tries = 3): Promise<TgReply<T>> {
+/**
+ * Telegram's flood control (429 «retry after N») is a fact of life for a backup that sends hundreds of pieces: it is WAITED OUT, not failed on. The
+ * listener (set by the backup job) is told how long, so the screen says «Telegram kutishni soʻradi» instead of looking hung.
+ */
+/** tests shorten every wait (`SUD_TG_WAIT_SCALE=0.001`); real runs use 1 */
+const scaled = (ms: number): number => ms * (process.env.SUD_TG_WAIT_SCALE !== undefined && process.env.SUD_TG_WAIT_SCALE !== '' ? Number(process.env.SUD_TG_WAIT_SCALE) || 0 : 1)
+
+let floodListener: ((seconds: number) => void) | null = null
+export const setFloodListener = (fn: ((seconds: number) => void) | null): void => {
+  floodListener = fn
+}
+
+/** `patient`: a backup call: a 429 is waited out in full (up to 10 minutes each, 8 times) instead of giving up after three short waits; a person's click keeps the short limits */
+async function post<T>(token: string, method: string, body: unknown, timeoutMs = 20_000, tries = 3, patient = false): Promise<TgReply<T>> {
   let last: TgError = { ok: false, code: 0, description: 'Telegramga ulanib boʻlmadi' }
-  for (let attempt = 0; attempt < tries; attempt++) {
+  let floods = 0
+  const maxFloods = patient ? 8 : tries - 1
+  for (let attempt = 0; attempt < tries + (patient ? maxFloods : 0); attempt++) {
     try {
       const isForm = body instanceof FormData
       const res = await fetch(`${HOST}/bot${token}/${method}`, {
@@ -31,20 +46,24 @@ async function post<T>(token: string, method: string, body: unknown, timeoutMs =
       const j = (await res.json().catch(() => null)) as { ok?: boolean; result?: T; error_code?: number; description?: string; parameters?: { retry_after?: number } } | null
       if (j?.ok) return { ok: true, result: j.result as T }
       last = { ok: false, code: j?.error_code ?? res.status, description: String(j?.description ?? '') }
-      if (last.code === 429 && attempt < tries - 1) {
-        // Telegram says how long to wait; never longer than a minute
-        await new Promise((r) => setTimeout(r, Math.min(60, Math.max(1, j?.parameters?.retry_after ?? 5)) * 1000))
+      if (last.code === 429 && floods < maxFloods) {
+        floods++
+        // Telegram says how long to wait: a click waits at most a minute, a backup the whole time (up to ten minutes)
+        const wait = Math.min(patient ? 600 : 60, Math.max(1, j?.parameters?.retry_after ?? 5))
+        floodListener?.(wait)
+        await new Promise((r) => setTimeout(r, scaled(wait * 1000)))
         continue
       }
       if (last.code >= 500 && attempt < tries - 1) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+        await new Promise((r) => setTimeout(r, scaled(1500 * (attempt + 1))))
         continue
       }
       return last
     } catch (e) {
       const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
       last = { ok: false, code: 0, description: timeout ? 'javob kelmadi (vaqt tugadi)' : 'Telegramga ulanib boʻlmadi' }
-      if (attempt < tries - 1) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+      if (attempt < tries - 1) await new Promise((r) => setTimeout(r, scaled(1500 * (attempt + 1))))
+      else return last
     }
   }
   return last
@@ -73,12 +92,19 @@ export interface FoundChannel {
   username: string
 }
 
+export const WEBHOOK_NOTE =
+  'Bot Render’da webhook bilan ishlayapti, shuning uchun Telegram kanallarni qidirishga (getUpdates) ruxsat bermaydi. Bu normal: webhook oʻchirilmadi. Kanalni qoʻlda kiriting: ommaviy kanal uchun @nom; yopiq kanal uchun -100… raqami (kanalni web.telegram.org da oching: manzildagi #-100… raqami). Soʻng «Sinash» ni bosing.'
+
 /** Channels the bot has been added to or that posted since: from `getUpdates` (Telegram keeps them 24 h). */
 export async function findChannels(token: string): Promise<{ ok: true; channels: FoundChannel[]; botUsername: string } | { ok: false; error: string }> {
   const me = await post<{ username?: string }>(token, 'getMe', {})
   if (!me.ok) return { ok: false, error: telegramFailure(me.code, me.description) }
+  // The deployed bot (Render) receives its updates by WEBHOOK, and Telegram refuses getUpdates while one is set. The webhook is NEVER deleted from here (that would
+  // silently switch the bot off): the person is told to give the channel by hand.
+  const hook = await post<{ url?: string }>(token, 'getWebhookInfo', {})
+  if (hook.ok && hook.result.url) return { ok: false, error: WEBHOOK_NOTE }
   const up = await post<Array<Record<string, { chat?: Chat } | number>>>(token, 'getUpdates', { limit: 100, timeout: 0, allowed_updates: ['channel_post', 'my_chat_member'] })
-  if (!up.ok) return { ok: false, error: telegramFailure(up.code, up.description) }
+  if (!up.ok) return { ok: false, error: up.code === 409 ? WEBHOOK_NOTE : telegramFailure(up.code, up.description) }
   const seen = new Map<string, FoundChannel>()
   for (const u of up.result) {
     for (const v of Object.values(u)) {
@@ -176,7 +202,7 @@ export async function sendFile(token: string, chat: string, bytes: Uint8Array, f
   form.append('disable_notification', 'true')
   form.append('caption', caption)
   form.append('document', new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename)
-  const r = await post<{ message_id: number; document?: { file_id: string } }>(token, 'sendDocument', form, 180_000)
+  const r = await post<{ message_id: number; document?: { file_id: string } }>(token, 'sendDocument', form, 180_000, 3, true)
   if (!r.ok) return { ok: false, error: telegramFailure(r.code, r.description) }
   if (!r.result.document?.file_id) return { ok: false, error: 'Telegram fayl identifikatorini bermadi' }
   return { ok: true, value: { messageId: r.result.message_id, fileId: r.result.document.file_id } }
@@ -184,19 +210,19 @@ export async function sendFile(token: string, chat: string, bytes: Uint8Array, f
 
 /** Bytes of a file the bot can read (Telegram lets a bot read up to 20 MB). */
 export async function getFileBytes(token: string, fileId: string): Promise<TgResult<Uint8Array>> {
-  const f = await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId })
+  const f = await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId }, 20_000, 3, true)
   if (!f.ok) return { ok: false, error: telegramFailure(f.code, f.description) }
   if (!f.result.file_path) return { ok: false, error: 'Telegram fayl manzilini bermadi' }
   for (let attempt = 0; attempt < 3; attempt++) {
     const bytes = await downloadFile(token, f.result.file_path)
     if (bytes) return { ok: true, value: bytes }
-    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+    await new Promise((r) => setTimeout(r, scaled(1500 * (attempt + 1))))
   }
   return { ok: false, error: 'Faylni yuklab boʻlmadi' }
 }
 
 export async function pinMessage(token: string, chat: string, messageId: number): Promise<TgResult<true>> {
-  const r = await post<boolean>(token, 'pinChatMessage', { chat_id: chat, message_id: messageId, disable_notification: true })
+  const r = await post<boolean>(token, 'pinChatMessage', { chat_id: chat, message_id: messageId, disable_notification: true }, 20_000, 3, true)
   return r.ok ? { ok: true, value: true } : { ok: false, error: telegramFailure(r.code, r.description) }
 }
 
@@ -212,9 +238,15 @@ export async function pinnedDocument(token: string, chat: string): Promise<TgRes
   return { ok: true, value: d ? { fileId: d.file_id, name: d.file_name ?? '', messageId: r.result.pinned_message!.message_id } : null }
 }
 
-/** does Telegram still hold this file (a reused backup piece may have been deleted from the channel)? */
-export async function fileExists(token: string, fileId: string): Promise<boolean> {
-  return (await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId })).ok
+/**
+ * Does Telegram still hold this file (a reused backup piece may have been deleted from the channel)? THREE answers, because «could not ask» is not «gone»:
+ * a definite «wrong file_id» is `no`; flood control, a timeout or a 5xx (after waiting it out) is `unknown`. The caller must not re-upload on `unknown`
+ * (that is how a flood wait used to turn into hundreds of duplicate pieces).
+ */
+export async function fileExists(token: string, fileId: string): Promise<'yes' | 'no' | 'unknown'> {
+  const r = await post<{ file_path?: string }>(token, 'getFile', { file_id: fileId }, 20_000, 3, true)
+  if (r.ok) return 'yes'
+  return r.code === 400 || /wrong file_id|file not found/i.test(r.description) ? 'no' : 'unknown'
 }
 
 /** Send one plain text message to a chat or a person (the Kuzatuv's messages). No markup, so a name with any character is safe. */

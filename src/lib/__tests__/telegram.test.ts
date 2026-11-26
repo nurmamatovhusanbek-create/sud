@@ -135,6 +135,62 @@ describe('test path', () => {
   })
 })
 
+describe('a webhook bot, flood control and «could not ask» are not «gone»', () => {
+  const reply = (v: unknown) => new Response(JSON.stringify(v))
+  test('«Kanalni topish» with a webhook set explains it, never calls getUpdates and never deletes the webhook', async () => {
+    const calls: string[] = []
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const m = String(url).split('/').pop()!
+      calls.push(m)
+      if (m === 'getMe') return reply({ ok: true, result: { id: 1, username: 'tbot' } })
+      if (m === 'getWebhookInfo') return reply({ ok: true, result: { url: 'https://bot.onrender.com/hook' } })
+      return reply({ ok: false, error_code: 409, description: 'Conflict: can\'t use getUpdates method while webhook is active; use deleteWebhook to delete the webhook first' })
+    }) as typeof fetch
+    const r = await client.findChannels(TOKEN)
+    expect(r).toEqual({ ok: false, error: client.WEBHOOK_NOTE })
+    expect(calls).toEqual(['getMe', 'getWebhookInfo'])
+    expect(calls).not.toContain('deleteWebhook')
+    expect(client.WEBHOOK_NOTE).toContain('qoʻlda')
+    // a 409 that slips past the check says the same
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const m = String(url).split('/').pop()!
+      if (m === 'getMe') return reply({ ok: true, result: { id: 1, username: 'tbot' } })
+      if (m === 'getWebhookInfo') return reply({ ok: true, result: { url: '' } })
+      return reply({ ok: false, error_code: 409, description: 'Conflict: webhook is active' })
+    }) as typeof fetch
+    expect(await client.findChannels(TOKEN)).toEqual({ ok: false, error: client.WEBHOOK_NOTE })
+  })
+  test('fileExists: a definite «wrong file_id» is no, flood control and a server error are unknown, never «gone»', async () => {
+    process.env.SUD_TG_WAIT_SCALE = '0.001'
+    const answer = (v: unknown) => (globalThis.fetch = (async () => reply(v)) as unknown as typeof fetch)
+    answer({ ok: true, result: { file_path: 'x' } })
+    expect(await client.fileExists(TOKEN, 'F1')).toBe('yes')
+    answer({ ok: false, error_code: 400, description: 'Bad Request: wrong file_id or the file is temporarily unavailable' })
+    expect(await client.fileExists(TOKEN, 'F1')).toBe('no')
+    answer({ ok: false, error_code: 500, description: 'Internal Server Error' })
+    expect(await client.fileExists(TOKEN, 'F1')).toBe('unknown')
+    answer({ ok: false, error_code: 429, description: 'Too Many Requests: retry after 1', parameters: { retry_after: 1 } })
+    expect(await client.fileExists(TOKEN, 'F1')).toBe('unknown')
+    delete process.env.SUD_TG_WAIT_SCALE
+  })
+  test('a backup call waits a 429 out and tells the listener; a click gives up after short waits', async () => {
+    process.env.SUD_TG_WAIT_SCALE = '0.001'
+    let n = 0
+    globalThis.fetch = (async () => (++n <= 4 ? reply({ ok: false, error_code: 429, description: 'Too Many Requests', parameters: { retry_after: 30 } }) : reply({ ok: true, result: { message_id: 7, document: { file_id: 'F7' } } }))) as unknown as typeof fetch
+    const waits: number[] = []
+    client.setFloodListener((s) => waits.push(s))
+    const sent = await client.sendFile(TOKEN, '@my_channel', new Uint8Array([1]), 'a.bin', 'c')
+    client.setFloodListener(null)
+    expect(sent).toEqual({ ok: true, value: { messageId: 7, fileId: 'F7' } }) // four floods waited out, the fifth try went through
+    expect(waits).toEqual([30, 30, 30, 30])
+    // an operator's click (Sinash, Kanalni topish) does not wait minutes: three tries, then the 429 is reported
+    n = 0
+    const t = await client.testTelegram(TOKEN, '@my_channel')
+    expect(t.ok).toBe(false)
+    delete process.env.SUD_TG_WAIT_SCALE
+  })
+})
+
 describe('find channels', () => {
   test('collects channels from updates', async () => {
     globalThis.fetch = (async (url: string | URL | Request) => {

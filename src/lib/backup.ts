@@ -20,7 +20,7 @@ import { forgetBillsSummary } from './bills-store'
 import { readCompany } from './company-meta'
 import { buildCatalog, saveCatalog, type Catalog } from './telegram-catalog'
 import { syncIndex, type SyncResult } from './telegram-index'
-import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile } from './telegram-client'
+import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile, setFloodListener } from './telegram-client'
 import { readTelegram } from './telegram-config'
 
 /**
@@ -133,7 +133,16 @@ const rm = (...files: string[]): void => {
     }
   }
 }
-const gapMs = (): number => (process.env.SUD_BACKUP_GAP_MS !== undefined && process.env.SUD_BACKUP_GAP_MS !== '' ? Math.max(0, Number(process.env.SUD_BACKUP_GAP_MS) || 0) : 1100)
+/**
+ * The rest between two sent pieces. 1.1 s normally (Telegram's advice: about one message a second per chat); after Telegram has said «too fast» once in
+ * this run it is widened to 3.2 s (about 20 a minute, the per-chat limit of groups and channels) for the rest of the run, so a mirror that follows the main channel does
+ * not run into the same wall. `SUD_BACKUP_GAP_MS` fixes it (tests use 0).
+ */
+let widened = false
+const gapMs = (): number => {
+  if (process.env.SUD_BACKUP_GAP_MS !== undefined && process.env.SUD_BACKUP_GAP_MS !== '') return Math.max(0, Number(process.env.SUD_BACKUP_GAP_MS) || 0)
+  return widened ? 3200 : 1100
+}
 const pause = (ms: number): Promise<void> => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve())
 
 async function sha256File(file: string): Promise<string> {
@@ -219,6 +228,20 @@ function unionCompanies(a: ManifestV2['companies'], b: ManifestV2['companies']):
  * in turn; a channel that fails does not stop the others (a banned main channel is exactly when the mirror matters), and the result says which worked.
  */
 async function runBackupAll(passphrase: string, token: string, chats: string[]): Promise<void> {
+  widened = false
+  // Telegram's flood control is waited out (telegram-client), the screen says so, and the rest of the run goes slower
+  setFloodListener((sec) => {
+    widened = true
+    set({ message: `Telegram kutishni soʻradi (${sec} soniya): zaxira davom etadi…` })
+  })
+  try {
+    await runBackupChannels(passphrase, token, chats)
+  } finally {
+    setFloodListener(null)
+  }
+}
+
+async function runBackupChannels(passphrase: string, token: string, chats: string[]): Promise<void> {
   const outcomes: Array<{ chat: string; ok: boolean; message: string; result: BackupResult | null }> = []
   // the first channel that worked is the DONOR of the ones after it: what it holds and a later channel lacks is copied across (see runBackup)
   let donor: Donor | null = null
@@ -370,7 +393,11 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
       // an unchanged bucket is reused when the channel still holds all of its pieces
       if (old && old.name === name) {
         let alive = true
-        for (const p of old.parts) if (!(await fileExists(token, p.fileId))) { alive = false; break }
+        for (const p of old.parts) {
+          const e = await fileExists(token, p.fileId)
+          if (e === 'unknown') return bail('Telegram vaqtincha javob bermadi (zaxiradagi boʻlaklar tekshirilmadi): hech narsa qayta yuklanmadi, birozdan keyin urinib koʻring')
+          if (e === 'no') { alive = false; break }
+        }
         if (alive) {
           refs.push(old)
           reused++
@@ -654,7 +681,7 @@ export async function inspectChannels(passphrase: string): Promise<{ ok: true; c
       for (;;) {
         const k = next++
         if (k >= ids.length) return
-        if (!(await fileExists(pre.token, ids[k]!))) missing++
+        if ((await fileExists(pre.token, ids[k]!)) === 'no') missing++
       }
     }
     await Promise.all(Array.from({ length: 6 }, worker))

@@ -763,6 +763,33 @@ describe('company names in the backup', () => {
   })
 })
 
+describe('a Telegram that cannot be asked is not a Telegram that lost the pieces', () => {
+  test('when the existence check cannot be answered the backup stops with a clear line and re-uploads NOTHING; a later run (asked again) reuses the pieces', async () => {
+    process.env.SUD_TG_WAIT_SCALE = '0.001'
+    cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
+    const ch = fakeChannel()
+    await runBackup()
+    const sentBefore = ch.sent.length
+    // from now on the existence check hits «Internal Server Error» (not «wrong file_id»)
+    const real = globalThis.fetch
+    const manifests = new Set([...ch.msgs.values()].filter((m) => m.name.endsWith('manifest.bin')).map((m) => m.fileId))
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      // the manifest still reads (the chain is found); only the pieces' existence checks hit the server error
+      if (String(url).endsWith('/getFile') && !manifests.has(JSON.parse(String(init!.body)).file_id)) return new Response(JSON.stringify({ ok: false, error_code: 500, description: 'Internal Server Error' }))
+      return real(url, init)
+    }) as typeof fetch
+    const r = await runBackup()
+    expect(r.phase).toBe('error')
+    expect(r.message).toContain('hech narsa qayta yuklanmadi')
+    expect(ch.sent.length).toBe(sentBefore) // not one duplicate piece
+    globalThis.fetch = real
+    const again = await runBackup()
+    expect(again.phase).toBe('done')
+    expect(ch.sent.length).toBe(sentBefore + 1) // only the new manifest
+    delete process.env.SUD_TG_WAIT_SCALE
+  })
+})
+
 describe('downloaded court orders travel with the backup (for the bot)', () => {
   const ORD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'orders-bk-'))
   const ID1 = '11111111-2222-3333-4444-555555555555'

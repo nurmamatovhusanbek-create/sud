@@ -409,6 +409,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SUD_BACKUP_PASS_FILE` | lib/auto-backup.ts |
 | `SUD_DB` | lib/db.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
+| `SUD_TG_WAIT_SCALE` | lib/telegram-client.ts |
 | `TELEGRAM_CONFIG_FILE` | lib/telegram-config.ts |
 | `TOR_ENABLED` | server/config.ts |
 | `TOR_SOCKS_PORT` | server/config.ts |
