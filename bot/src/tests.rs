@@ -1087,6 +1087,29 @@ mod assets {
     }
 
     #[test]
+    fn the_loading_screen_and_fullscreen_are_wired_without_an_external_script() {
+        let get = |p: &str| String::from_utf8_lossy(ASSETS.get_file(p).unwrap().contents()).into_owned();
+        let index = get("index.html");
+        // the loading screen is plain markup in the page (it shows from the first byte), before the shell
+        assert!(index.contains("id=\"splash\"") && index.contains("id=\"splash-msg\"") && index.find("id=\"splash\"").unwrap() < index.find("id=\"head\"").unwrap());
+        assert!(!index.contains("telegram.org") && !index.contains("telegram-web-app"), "the page must not load Telegram's script: the bridge is js/core/telegram-core.js");
+        let main = get("js/main.js");
+        for needle in ["telegram.start()", "waitForBackup", "splashDone()", "splashFail("] {
+            assert!(main.contains(needle), "main.js: {needle}");
+        }
+        // the shell follows the safe areas and shows the toggle only where the client can do fullscreen
+        let nav = get("css/components/nav.css");
+        assert!(nav.contains("--tg-safe-top") && nav.contains("--tg-content-safe-top") && nav.contains("--inset-bottom"));
+        assert!(get("js/shell.js").contains("telegram.can.fullscreen"));
+        // a splash and a skeleton only ever move with transform and opacity
+        let splash = get("css/components/splash.css");
+        for kf in splash.split("@keyframes").skip(1) {
+            let body: String = kf.chars().take_while(|c| *c != '}').chain(kf.chars().skip_while(|c| *c != '}').skip(1).take_while(|c| *c != '}')).collect();
+            assert!(body.contains("transform") && !body.contains("width") && !body.contains("left") && !body.contains("box-shadow"), "{body}");
+        }
+    }
+
+    #[test]
     fn the_mini_app_is_latin_only() {
         for (p, t) in texts() {
             if p.ends_with("translit.js") {

@@ -8,6 +8,7 @@ let current = { name: 'home' }
 let outlet = null
 let token = 0
 let controller = null
+let skeletonTimer = 0
 
 const listeners = new Set()
 export const register = (name, fn) => { screens[name] = fn }
@@ -35,7 +36,10 @@ async function render() {
   controller?.abort()
   controller = new AbortController()
   const fn = screens[current.name] || screens.home
-  outlet.replaceChildren(Skeletons(3))
+  // a thin bar at the top says «loading» at once (after a short delay: a fast answer shows no flicker); the skeleton replaces the old screen only if the answer is not quick
+  document.documentElement.dataset.busy = '1'
+  clearTimeout(skeletonTimer)
+  skeletonTimer = setTimeout(() => { if (mine === token) outlet.replaceChildren(Skeletons(3)) }, 120)
   try {
     const node = await fn(current, { signal: controller.signal })
     if (mine === token && node) outlet.replaceChildren(node)
@@ -43,6 +47,11 @@ async function render() {
     if (e?.name === 'AbortError' || mine !== token) return
     // a failed screen keeps its back button and offers a retry
     outlet.replaceChildren(h('div', { class: 'screen' }, h('div', { class: 'screen__top' }, h('button', { type: 'button', class: 'btn', on: { click: back } }, '← Orqaga')), ErrorBox(e.message || 'Xato', render)))
+  } finally {
+    if (mine === token) {
+      clearTimeout(skeletonTimer)
+      delete document.documentElement.dataset.busy
+    }
   }
 }
 
@@ -51,5 +60,5 @@ export function start(el, first) {
   current = first
   history.replaceState(first, '')
   window.addEventListener('popstate', (e) => { current = e.state || { name: 'home' }; render() })
-  render()
+  return render() // resolves when the first screen is drawn (or its error): the splash goes away then
 }

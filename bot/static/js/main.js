@@ -1,5 +1,8 @@
 // Bootstrap: theme, shell, routes, first route. Nothing else lives here.
 import { launched, launchRoute, themeName } from './core/auth.js'
+import { waitForBackup } from './core/api.js'
+import { telegram } from './core/telegram.js'
+import { splashDone, splashFail, splashText } from './core/boot.js'
 import { register, start } from './core/router.js'
 import { mountShell, syncSearchBox } from './shell.js'
 import { h } from './ui/h.js'
@@ -14,9 +17,20 @@ document.documentElement.dataset.theme = themeName()
 const head = document.getElementById('head')
 const main = document.getElementById('main')
 
-if (!launched) {
-  main.replaceChildren(h('div', { class: 'screen' }, Empty('Bu sahifa Telegram ichida, botning «Qidiruv» tugmasi orqali ochilishi kerak.')))
-} else {
+async function boot() {
+  if (!launched) {
+    main.replaceChildren(h('div', { class: 'screen' }, Empty('Bu sahifa Telegram ichida, botning «Qidiruv» tugmasi orqali ochilishi kerak.')))
+    splashDone()
+    return
+  }
+  // tell Telegram the page is up (its own placeholder goes), ask for fullscreen, follow the safe areas; our loading screen is what the person sees now
+  telegram.start()
+  // a bot that has just woken is still reading the backup: wait for it here, with a line that says so, instead of opening a screen that can only fail
+  const backup = await waitForBackup({ onStatus: splashText })
+  if (!backup.ready && backup.error) {
+    splashFail(backup.error, () => location.reload())
+    return
+  }
   mountShell(head)
   register('home', home)
   register('search', search)
@@ -24,5 +38,8 @@ if (!launched) {
   register('bill', bill)
   register('company', company)
   window.addEventListener('popstate', syncSearchBox)
-  start(main, launchRoute())
+  await start(main, launchRoute())
+  splashDone()
 }
+
+boot()

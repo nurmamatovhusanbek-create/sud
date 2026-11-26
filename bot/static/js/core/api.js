@@ -16,6 +16,31 @@ export async function get(path, { signal } = {}) {
   return body
 }
 
+/**
+ * Wait until the bot has read the backup. A host that has just woken from sleep needs a few seconds (sometimes a minute) to read it, and the first screen would
+ * only say «Zaxira hali yuklanmagan». `/health` is public and cheap. Resolves `{ ready: true }`, or `{ ready: false, error }` when the bot says it cannot read
+ * the backup (waiting will not help), or `{ ready: false, timeout: true }` after `maxMs` (the screens then show their own error with a retry).
+ */
+export async function waitForBackup({ onStatus, maxMs = 75_000 } = {}) {
+  const t0 = Date.now()
+  for (;;) {
+    let info = null
+    try {
+      const c = new AbortController()
+      const stop = setTimeout(() => c.abort(), 8000)
+      const res = await fetch('/health', { signal: c.signal, cache: 'no-store' })
+      clearTimeout(stop)
+      info = await res.json()
+    } catch { info = null }
+    if (info?.ready) return { ready: true }
+    const waited = Date.now() - t0
+    if (info && info.error && info.failures >= 3) return { ready: false, error: info.error }
+    if (waited > maxMs) return { ready: false, timeout: true }
+    onStatus?.(info ? (waited > 20_000 ? 'Zaxira katta: oʻqilmoqda, biroz kuting…' : 'Zaxira oʻqilmoqda…') : 'Server uygʻonmoqda…')
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+}
+
 const q = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== '' && v != null).map(([k, v]) => [k, String(v)])).toString()
 
 export const api = {

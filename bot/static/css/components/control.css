@@ -13,6 +13,9 @@
 .field__clear { border: 0; background: transparent; color: var(--text-3); padding: var(--space-1); display: none; }
 .field--filled .field__clear { display: inline-flex; }
 
+.iconbtn { flex: none; width: var(--size-tap); height: var(--size-tap); display: inline-flex; align-items: center; justify-content: center; border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); color: var(--text-2); }
+.iconbtn:active { background: var(--surface-hover); }
+
 .tabs { display: flex; gap: var(--space-2); }
 .tabs button { flex: 1; min-height: var(--size-control); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); color: var(--text-2); font-size: var(--text-sm); }
 .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }

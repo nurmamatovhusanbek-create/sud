@@ -1,12 +1,19 @@
 /* Reset, document, typography and layout helpers. Reads tokens only. */
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { -webkit-text-size-adjust: 100%; }
+
+/* Telegram's safe areas (see js/core/telegram-core.js): the status bar and Telegram's own buttons float over a fullscreen page. 0 until the client says otherwise. */
+:root {
+  --tg-safe-top: 0px; --tg-safe-right: 0px; --tg-safe-bottom: 0px; --tg-safe-left: 0px;
+  --tg-content-safe-top: 0px; --tg-content-safe-right: 0px; --tg-content-safe-bottom: 0px; --tg-content-safe-left: 0px;
+  --inset-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-bottom), var(--tg-content-safe-bottom));
+}
 body {
   margin: 0;
   font: var(--weight-regular) var(--text-md) / var(--leading-body) var(--font-sans);
   background: var(--bg-canvas);
   color: var(--text-1);
-  padding-bottom: calc(var(--size-tabbar) + var(--space-6) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--size-tabbar) + var(--space-6) + var(--inset-bottom));
   font-variant-numeric: tabular-nums;
 }
 button, input { font: inherit; color: inherit; }

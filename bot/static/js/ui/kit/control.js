@@ -5,6 +5,10 @@ import { icon } from '../icons.js'
 export const Button = ({ label, onClick, variant, size, block }) =>
   h('button', { type: 'button', class: ['btn', variant && `btn--${variant}`, size && `btn--${size}`, block && 'btn--block'].filter(Boolean).join(' '), on: { click: onClick } }, label)
 
+/** a square button with one icon (an `aria-label` names it for a screen reader) */
+export const IconButton = ({ name, label, onClick }) =>
+  h('button', { type: 'button', class: 'iconbtn', 'aria-label': label, on: { click: onClick } }, icon(name, 20))
+
 export function Chips(options, value, onPick, { scroll = false } = {}) {
   return h('div', { class: scroll ? 'chips chips--scroll' : 'chips' }, ...options.map((o) => h('button', { type: 'button', class: 'chip', 'aria-pressed': String(o.value === value), on: { click: () => onPick(o.value) } }, o.label)))
 }

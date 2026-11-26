@@ -1,7 +1,8 @@
 // The frame around every screen: home button, search field, the one-line hint. It owns the search box (a search is a route of its own).
 import { h } from './ui/h.js'
-import { Field } from './ui/components.js'
-import { logo } from './ui/icons.js'
+import { Field, IconButton } from './ui/components.js'
+import { telegram } from './core/telegram.js'
+import { logo, icon } from './ui/icons.js'
 import { dmyIso, num } from './core/format.js'
 import { go, onRoute, remember, route, rerender } from './core/router.js'
 import { TabBar } from './ui/components.js'
@@ -39,7 +40,15 @@ export function mountShell(headEl) {
   const homeBtn = h('button', { type: 'button', class: 'brand', 'aria-label': 'Bosh sahifa', on: { click: () => go({ name: 'home' }) } }, logo(28))
   hint = h('span', {})
   hintRight = h('span', {})
-  headEl.append(h('div', { class: 'shell-bar' }, homeBtn, field.el), h('div', { class: 'shell-hint' }, hint, hintRight))
+  // the fullscreen switch: only where the Telegram client can do it (Bot API 8.0+); the icon follows the state the client reports
+  const fs = telegram.can.fullscreen ? IconButton({ name: 'expand', label: 'Toʻliq ekran', onClick: () => telegram.toggleFullscreen() }) : null
+  if (fs) {
+    const show = (on) => { fs.replaceChildren(icon(on ? 'shrink' : 'expand', 20)); fs.setAttribute('aria-label', on ? 'Toʻliq ekrandan chiqish' : 'Toʻliq ekran') }
+    telegram.onFullscreen(show)
+    show(telegram.isFullscreen()) // the client may have answered before the shell was drawn (the loading screen was up)
+  }
+  headEl.append(h('div', { class: 'shell-bar' }, homeBtn, field.el, fs), h('div', { class: 'shell-hint' }, hint, hintRight))
+  document.body.append(h('div', { class: 'loadbar', 'aria-hidden': 'true' }))
 }
 
 /** the search box shows what the current search route asks (back / forward) */
