@@ -60,6 +60,9 @@ pub fn router(sh: Arc<Shared>) -> Router {
         .route("/api/company", get(api::company))
         .route("/api/company/cases", get(api::company_cases))
         .route("/api/company/bills", get(api::company_bills))
+        .route("/api/orders", get(api::orders))
+        .route("/api/orders/send", post(api::orders_send))
+        .route("/api/orders/download", post(api::orders_download))
         .fallback(|| async { StatusCode::NOT_FOUND })
         .with_state(sh)
 }

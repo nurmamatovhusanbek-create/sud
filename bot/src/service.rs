@@ -357,6 +357,58 @@ impl Shared {
         Ok(orders::newest_case_first(out))
     }
 
+    /// Every order the backup knows, the newest case first (the Qarorlar tab). The `orders:<yy>` buckets are small (one per registration year) and cached.
+    pub async fn orders_all(&self) -> AppResult<Vec<Order>> {
+        let mut names: Vec<String> = { self.st.read().await.manifest.as_ref().map(|m| m.buckets.iter().filter(|b| b.name.starts_with("orders:")).map(|b| b.name.clone()).collect()).unwrap_or_default() };
+        names.sort_by(|a, b| b.cmp(a));
+        let mut out = Vec::new();
+        for n in names {
+            if let Some(t) = self.bucket_text(&n).await.map_err(Self::upstream)? {
+                out.extend(orders::parse(&t));
+            }
+        }
+        Ok(orders::newest_case_first(out))
+    }
+
+    /// One page of the filtered orders, with the counts behind the filter chips (of everything that matches the other filters).
+    pub async fn orders_page(&self, q: &orders::Query, offset: usize, limit: usize) -> AppResult<Value> {
+        let all = self.orders_all().await?;
+        // years come out as the registration year of the case, newest first, for the year chips
+        let mut years: Vec<u32> = all.iter().filter_map(|o| orders::year_of(&o.case)).collect();
+        years.sort_unstable_by(|a, b| b.cmp(a));
+        years.dedup();
+        let mut courts: BTreeMap<String, usize> = BTreeMap::new();
+        for o in all.iter().filter(|o| orders::Query { court: String::new(), ..q.clone() }.matches(o)) {
+            *courts.entry(o.court_type.to_lowercase()).or_default() += 1;
+        }
+        // the result chips count what the other filters leave, like the court chips; «result» → how many (the word is added by the screen from `resultWord` of a row)
+        let mut results: BTreeMap<String, usize> = BTreeMap::new();
+        for o in all.iter().filter(|o| orders::Query { result: String::new(), ..q.clone() }.matches(o)).filter(|o| !o.result.is_empty()) {
+            *results.entry(o.result.to_uppercase()).or_default() += 1;
+        }
+        let results: Vec<Value> = results.into_iter().map(|(k, n)| serde_json::json!({ "value": k, "word": orders::result_word(&k), "count": n })).collect();
+        let rows: Vec<&Order> = all.iter().filter(|o| q.matches(o)).collect();
+        let saved = rows.iter().filter(|o| o.saved).count();
+        Ok(serde_json::json!({
+            "total": rows.len(), "saved": saved, "unsaved": rows.len() - saved, "years": years, "courts": courts, "results": results,
+            "rows": rows.iter().skip(offset).take(limit).map(|o| orders::to_json(o)).collect::<Vec<_>>(),
+        }))
+    }
+
+    /// Ask the app to download one order that was found but never downloaded (the same queue as `/refresh`). Only an id the backup's own records know is queued.
+    pub async fn request_order_download(&self, pdf_id: &str, chat: i64) -> Result<(crate::link::Queued, Order), AppError> {
+        if !orders::is_pdf_id(pdf_id) {
+            return Err(AppError::BadRequest("Qaror identifikatori notoʻgʻri".into()));
+        }
+        let o = self.order_meta(pdf_id).await.ok_or_else(|| AppError::NotFound("Bu qaror zaxirada yoʻq: ilovada ishni tekshirib, zaxira oling.".into()))?;
+        if o.saved {
+            return Ok((crate::link::Queued::Recent(0), o)); // it has been downloaded since: nothing to ask
+        }
+        let what = crate::link::What::Order { pdf_id: pdf_id.to_string(), case: o.case.clone(), instance: o.instance.clone() };
+        let asked = self.link.lock().unwrap().ask(what, chat, crate::state::now());
+        Ok((asked, o))
+    }
+
     /// The record of an order by its file id (the buckets `orders:*` the backup names are small), for a caption.
     pub async fn order_meta(&self, pdf_id: &str) -> Option<Order> {
         let names: Vec<String> = { self.st.read().await.manifest.as_ref().map(|m| m.buckets.iter().filter(|b| b.name.starts_with("orders:")).map(|b| b.name.clone()).collect()).unwrap_or_default() };

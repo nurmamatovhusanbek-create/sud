@@ -16,6 +16,20 @@ export async function get(path, { signal } = {}) {
   return body
 }
 
+/** a POST with a JSON body (the two order actions); the same envelope and the same refusals as `get` */
+export async function post(path, body, { signal } = {}) {
+  let res
+  try {
+    res = await fetch(path, { method: 'POST', headers: { 'x-init-data': initData, 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e
+    throw new ApiError('Serverga ulanib boʻlmadi')
+  }
+  const out = await res.json().catch(() => null)
+  if (!out || out.ok !== true) throw new ApiError(out?.error || `Server javob bermadi (${res.status})`)
+  return out
+}
+
 /**
  * Wait until the bot has read the backup. A host that has just woken from sleep needs a few seconds (sometimes a minute) to read it, and the first screen would
  * only say «Zaxira hali yuklanmagan». `/health` is public and cheap. Resolves `{ ready: true }`, or `{ ready: false, error }` when the bot says it cannot read
@@ -54,4 +68,10 @@ export const api = {
   company: (tin, o) => get(`/api/company?${q({ tin })}`, o),
   companyCases: (p, o) => get(`/api/company/cases?${q(p)}`, o),
   companyBills: (p, o) => get(`/api/company/bills?${q(p)}`, o),
+  /** court orders: `{ case }` one case, `{ tin, offset, limit }` a company, or the filtered page `{ q, court, result, saved, year, offset, limit }` → { orders } */
+  orders: (p, o) => get(`/api/orders?${q(p)}`, o),
+  /** «Botga yuborish»: the bot sends the order's PDF to the person's chat */
+  ordersSend: (pdfId, o) => post('/api/orders/send', { pdfId }, o),
+  /** «Yuklash»: ask the app to download an order that was found but not downloaded → { status, message } */
+  ordersDownload: (pdfId, o) => post('/api/orders/download', { pdfId }, o),
 }

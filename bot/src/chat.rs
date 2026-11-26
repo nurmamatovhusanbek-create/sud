@@ -444,9 +444,18 @@ async fn orders_reply(sh: &Arc<Shared>, chat: i64, arg: &str) {
 }
 
 /// a press on an order button: the PDF is opened from the backup in memory and sent
-async fn order_file(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
+pub async fn order_file(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
+    if let Err(message) = deliver_order(sh, chat, pdf_id).await {
+        if !message.is_empty() {
+            sh.outbox.send(chat, &message, None).await;
+        }
+    }
+}
+
+/// Send one order's PDF to a chat: opened from the backup in memory, sent with `sendDocument`. The error is a sentence for the person (empty = nothing to say: not an id).
+pub async fn deliver_order(sh: &Arc<Shared>, chat: i64, pdf_id: &str) -> Result<(), String> {
     if !crate::orders::is_pdf_id(pdf_id) {
-        return;
+        return Err(String::new());
     }
     let meta = sh.order_meta(pdf_id).await;
     match sh.order_pdf(pdf_id).await {
@@ -455,14 +464,14 @@ async fn order_file(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
                 Some(o) => (crate::orders::file_name(o), format!("<code>{}</code> · {}", esc(&o.case), esc(crate::orders::instance_word(&o.instance)))),
                 None => ("qaror.pdf".to_string(), String::new()),
             };
-            if !sh.outbox.send_document(chat, &name, &bytes, &caption).await {
-                sh.outbox.send(chat, "Faylni yuborib boʻlmadi: Telegram qabul qilmadi. Birozdan soʻng qayta urining.", None).await;
+            if sh.outbox.send_document(chat, &name, &bytes, &caption).await {
+                Ok(())
+            } else {
+                Err("Faylni yuborib boʻlmadi: Telegram qabul qilmadi. Birozdan soʻng qayta urining.".into())
             }
         }
-        Ok(None) => {
-            sh.outbox.send(chat, "Bu qaror fayli zaxirada yoʻq. Ilovada qarorni qayta yuklab, zaxira oling.", None).await;
-        }
-        Err(e) => sh.outbox.send(chat, &e.message(), None).await,
+        Ok(None) => Err("Bu qaror fayli zaxirada yoʻq. Ilovada qarorni qayta yuklab, zaxira oling.".into()),
+        Err(e) => Err(e.message()),
     }
 }
 
@@ -530,7 +539,7 @@ async fn settings_press(sh: &Arc<Shared>, user: i64, chat: i64, msg_id: i64, res
 }
 
 /// what to tell a person whose request went to the app's queue (or could not): the same words for a company and for an order
-fn queued_text(asked: crate::link::Queued, what: &str, done: &str) -> String {
+pub fn queued_text(asked: crate::link::Queued, what: &str, done: &str) -> String {
     use crate::link::Queued;
     match asked {
         Queued::New => format!("⏳ {what} navbatga qoʻyildi. Ilova uni bajaradi, zaxiraga yozadi va men sizga xabar beraman (odatda bir necha daqiqa)."),
@@ -558,18 +567,17 @@ async fn order_download(sh: &Arc<Shared>, chat: i64, pdf_id: &str) {
     if !crate::orders::is_pdf_id(pdf_id) {
         return;
     }
-    let Some(o) = sh.order_meta(pdf_id).await else {
-        sh.outbox.send(chat, "Bu qaror zaxirada yoʻq: ilovada ishni tekshirib, zaxira oling.", None).await;
-        return;
-    };
-    if o.saved {
-        order_file(sh, chat, pdf_id).await; // it has been downloaded since the list was shown: just send it
-        return;
+    match sh.request_order_download(pdf_id, chat).await {
+        // it has been downloaded since the list was shown: just send it
+        Ok((_, o)) if o.saved => {
+            order_file(sh, chat, pdf_id).await;
+        }
+        Ok((asked, o)) => {
+            let label = format!("Qaror <code>{}</code> · {}", esc(&o.case), esc(crate::orders::instance_word(&o.instance)));
+            sh.outbox.send_html(chat, &queued_text(asked, &label, "yuklangan"), None).await;
+        }
+        Err(e) => sh.outbox.send(chat, &e.message(), None).await,
     }
-    let what = crate::link::What::Order { pdf_id: pdf_id.to_string(), case: o.case.clone(), instance: o.instance.clone() };
-    let asked = sh.link.lock().unwrap().ask(what, chat, crate::state::now());
-    let label = format!("Qaror <code>{}</code> · {}", esc(&o.case), esc(crate::orders::instance_word(&o.instance)));
-    sh.outbox.send_html(chat, &queued_text(asked, &label, "yuklangan"), None).await;
 }
 
 pub async fn handle_update(sh: Arc<Shared>, u: Value) {

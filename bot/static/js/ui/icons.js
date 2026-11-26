@@ -6,6 +6,7 @@ const PATHS = {
   bill: ['M6 3h12v18l-3-2-3 2-3-2-3 2z', 'M9 8h6', 'M9 12h6'],
   company: ['M4 21V5l8-2v18', 'M12 9h8v12', 'M2 21h20', 'M8 8v.01', 'M8 12v.01', 'M8 16v.01'],
   calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4'],
+  order: ['M6 3h9l4 4v14H6z', 'M14 3v5h5', 'M9 13h6', 'M9 17h6'],
   chevron: ['M9 6l6 6-6 6'],
   back: ['M15 6l-6 6 6 6'],
   close: ['M6 6l12 12', 'M18 6L6 18'],

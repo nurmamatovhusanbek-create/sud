@@ -13,8 +13,8 @@ export function TopBar(...extra) {
 
 export const STAGE = { first: '1-instansiya', appeal: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' }
 
-/** the three tabs of the home screen (the bottom bar) */
-export const TABS = [{ value: 'hearings', label: 'Majlislar', icon: 'calendar' }, { value: 'bills', label: 'Toʻlovlar', icon: 'bill' }, { value: 'companies', label: 'Kompaniyalar', icon: 'company' }]
+/** the four tabs of the home screen (the bottom bar) */
+export const TABS = [{ value: 'hearings', label: 'Majlislar', icon: 'calendar' }, { value: 'bills', label: 'Toʻlovlar', icon: 'bill' }, { value: 'orders', label: 'Qarorlar', icon: 'order' }, { value: 'companies', label: 'Kompaniyalar', icon: 'company' }]
 
 /** a company's name in Latin, or its STIR when the backup does not know the name */
 export const companyTitle = (c) => d(c?.name) || c?.tin || ''

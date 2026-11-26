@@ -13,6 +13,7 @@ import { search } from './screens/search.js'
 import { caseScreen } from './screens/case.js'
 import { bill } from './screens/bill.js'
 import { company } from './screens/company.js'
+import { orderScreen } from './screens/order.js'
 
 document.documentElement.dataset.theme = themeName()
 const head = document.getElementById('head')
@@ -39,6 +40,7 @@ async function boot() {
   register('case', caseScreen)
   register('bill', bill)
   register('company', company)
+  register('order', orderScreen)
   window.addEventListener('popstate', syncSearchBox)
   await start(main, launchRoute())
   splashDone()

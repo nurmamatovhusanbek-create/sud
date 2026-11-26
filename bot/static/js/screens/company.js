@@ -6,6 +6,7 @@ import { go, remember } from '../core/router.js'
 import { dmy, has, money, num } from '../core/format.js'
 import { d } from '../core/text.js'
 import { COURT, companyTitle, courtName, TopBar } from './common.js'
+import { orderRow } from './orders.js'
 
 const PAGE = 30
 
@@ -64,6 +65,15 @@ function casesPane(tin, route, signal) {
   return host
 }
 
+function ordersPane(tin, signal) {
+  return Paged({
+    fetch: (offset) => api.orders({ tin, offset, limit: PAGE }, { signal }).then((j) => j.orders),
+    row: (o) => orderRow(o),
+    summary: (r) => `${num(r.total)} ta qaror · yuklangan ${num(r.saved)}, yuklanmagan ${num(r.unsaved)}`,
+    empty: 'Bu kompaniya ishlari boʻyicha qaror zaxirada yoʻq.',
+  })
+}
+
 function billsPane(tin, years, route, signal) {
   const st = { year: route.year || String(years[0] || ''), q: route.q || '' }
   if (!st.year) return Empty('Kvitansiyalar zaxirada yoʻq.')
@@ -110,6 +120,6 @@ export async function company(route, { signal }) {
     TopBar(),
     Hero({ caption: o.name ? `Kompaniya · STIR ${o.tin}` : 'Kompaniya · STIR', id: companyTitle(o), line: dates, name: !!o.name }),
     Stats([num(o.cases), 'ish'], [num(o.bills), 'toʻlov'], [String(o.byYear.length), 'yil']),
-    Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
-    tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : billsPane(o.tin, years, route, signal))
+    Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }, { value: 'orders', label: 'Qarorlar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
+    tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : tab === 'orders' ? ordersPane(o.tin, signal) : billsPane(o.tin, years, route, signal))
 }

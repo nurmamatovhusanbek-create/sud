@@ -1212,6 +1212,108 @@ mod orders {
 
     const UNSAVED_PDF: &str = "88888888-8888-8888-8888-888888888888";
 
+    async fn post_json(sh: &std::sync::Arc<crate::state::Shared>, uri: &str, body: Value, init: Option<&str>) -> (StatusCode, Value) {
+        let mut r = Request::builder().method("POST").uri(uri).header("content-type", "application/json");
+        if let Some(i) = init {
+            r = r.header("x-init-data", i);
+        }
+        let res = crate::http::router(sh.clone()).oneshot(r.body(Body::from(body.to_string())).unwrap()).await.unwrap();
+        let status = res.status();
+        let bytes = axum::body::to_bytes(res.into_body(), 10_000_000).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    }
+
+    #[tokio::test]
+    async fn the_api_lists_one_case_a_company_and_the_filtered_pages() {
+        let (sh, _b) = with_orders().await;
+        let me = signed(4242);
+        // a case: every instance, the words in Uzbek, saved or not
+        let (st, j) = get(&sh, &format!("/api/orders?case={CASE}"), Some(&me)).await;
+        assert_eq!(st, StatusCode::OK);
+        let rows = j["orders"]["rows"].as_array().unwrap();
+        assert_eq!(rows.iter().map(|r| r["instanceWord"].as_str().unwrap()).collect::<Vec<_>>(), vec!["Birinchi instansiya", "Apellyatsiya", "Apellyatsiya"]);
+        assert_eq!(rows[0]["resultWord"], "qanoatlantirildi");
+        assert!(rows.iter().all(|r| r["saved"] == true && r["pdfId"].as_str().unwrap().len() == 36 && r["name"].as_str().unwrap().ends_with(".pdf")));
+        // a case checked with no order says when; a never-checked one says nothing
+        let (_, c) = get(&sh, &format!("/api/orders?case={CHECKED_CASE}"), Some(&me)).await;
+        assert_eq!((c["orders"]["total"].as_i64(), c["orders"]["check"].as_i64()), (Some(0), Some(CHECKED_AT)));
+        let (_, n) = get(&sh, "/api/orders?case=2-1004-2503/9999", Some(&me)).await;
+        assert!(n["orders"]["check"].is_null());
+        // a company
+        let (_, co) = get(&sh, &format!("/api/orders?tin={TIN}"), Some(&me)).await;
+        assert_eq!((co["orders"]["total"].as_i64(), co["orders"]["saved"].as_i64()), (Some(4), Some(4)));
+        // the list: everything, newest case first, with the counts behind the chips
+        let (_, all) = get(&sh, "/api/orders", Some(&me)).await;
+        assert_eq!((all["orders"]["total"].as_i64(), all["orders"]["saved"].as_i64(), all["orders"]["unsaved"].as_i64()), (Some(8), Some(6), Some(2)));
+        assert_eq!(all["orders"]["years"], json!([25]));
+        assert_eq!(all["orders"]["courts"], json!({ "economic": 8 }));
+        let chips = all["orders"]["results"].as_array().unwrap();
+        assert!(chips.iter().all(|c| c["value"].as_str().unwrap().chars().all(|ch| ch.is_ascii_uppercase() || ch == '_') && !c["word"].as_str().unwrap().is_empty()));
+        assert_eq!(chips.iter().map(|c| c["count"].as_i64().unwrap()).sum::<i64>(), 8 - all["orders"]["rows"].as_array().unwrap().iter().filter(|r| r["result"] == "").count() as i64 - 0, "every order with a result is counted once");
+        let cases: Vec<&str> = all["orders"]["rows"].as_array().unwrap().iter().map(|r| r["caseNumber"].as_str().unwrap()).collect();
+        let mut sorted = cases.clone();
+        sorted.sort_by(|a, b| b.cmp(a));
+        assert_eq!(cases, sorted, "newest case number first");
+        // filters
+        let count = |j: &Value| j["orders"]["total"].as_i64().unwrap();
+        assert_eq!(count(&get(&sh, "/api/orders?saved=0", Some(&me)).await.1), 2);
+        assert_eq!(count(&get(&sh, "/api/orders?saved=1", Some(&me)).await.1), 6);
+        assert_eq!(count(&get(&sh, "/api/orders?result=refused", Some(&me)).await.1), 2);
+        assert_eq!(count(&get(&sh, "/api/orders?q=8020", Some(&me)).await.1), 3);
+        assert_eq!(count(&get(&sh, "/api/orders?q=andijon+viloyat", Some(&me)).await.1), 1, "a word of the court");
+        assert_eq!(count(&get(&sh, "/api/orders?court=civil", Some(&me)).await.1), 0);
+        assert_eq!(count(&get(&sh, "/api/orders?year=25", Some(&me)).await.1), 8);
+        assert_eq!(count(&get(&sh, "/api/orders?year=26", Some(&me)).await.1), 0);
+        // paging
+        let (_, p2) = get(&sh, "/api/orders?limit=3&offset=3", Some(&me)).await;
+        assert_eq!((p2["orders"]["rows"].as_array().unwrap().len(), p2["orders"]["total"].as_i64()), (3, Some(8)));
+        // nobody without Telegram's launch data
+        assert_eq!(get(&sh, "/api/orders", None).await.0, StatusCode::UNAUTHORIZED);
+        assert_eq!(get(&sh, &format!("/api/orders?case={CASE}"), Some(&signed(999))).await.0, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn botga_yuborish_sends_the_pdf_to_the_persons_own_chat_and_refuses_what_it_cannot() {
+        let (sh, _b) = with_orders().await;
+        let me = signed(4242);
+        let (st, j) = post_json(&sh, "/api/orders/send", json!({ "pdfId": PDF_APPEAL }), Some(&me)).await;
+        assert_eq!((st, j["ok"].as_bool()), (StatusCode::OK, Some(true)));
+        let docs = sh.outbox.docs();
+        assert_eq!(docs.len(), 1);
+        assert_eq!((docs[0].0, docs[0].2.clone()), (4242, pdf_text(PDF_APPEAL).into_bytes()));
+        // a malformed id, an id the backup has no file for, no launch data, a stranger
+        assert_eq!(post_json(&sh, "/api/orders/send", json!({ "pdfId": "../x" }), Some(&me)).await.0, StatusCode::BAD_REQUEST);
+        assert_eq!(post_json(&sh, "/api/orders/send", json!({}), Some(&me)).await.0, StatusCode::BAD_REQUEST);
+        let (st, j) = post_json(&sh, "/api/orders/send", json!({ "pdfId": "99999999-9999-9999-9999-999999999999" }), Some(&me)).await;
+        assert_eq!(st, StatusCode::BAD_GATEWAY);
+        assert!(j["error"].as_str().unwrap().contains("zaxirada yoʻq"), "{j}");
+        assert_eq!(post_json(&sh, "/api/orders/send", json!({ "pdfId": PDF_APPEAL }), None).await.0, StatusCode::UNAUTHORIZED);
+        assert_eq!(post_json(&sh, "/api/orders/send", json!({ "pdfId": PDF_APPEAL }), Some(&signed(999))).await.0, StatusCode::FORBIDDEN);
+        assert_eq!(sh.outbox.docs().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn yuklash_from_the_mini_app_queues_through_the_same_link_and_says_what_happened() {
+        let (sh, _b) = with_orders().await;
+        let me = signed(4242);
+        let ask = |id: &str| post_json(&sh, "/api/orders/download", json!({ "pdfId": id }), Some(&me));
+        let (st, j) = ask(UNSAVED_PDF).await;
+        assert_eq!((st, j["status"].as_str()), (StatusCode::OK, Some("not_linked")));
+        assert!(j["message"].as_str().unwrap().contains("Ilova ulanmagan") && !j["message"].as_str().unwrap().contains('<'), "{j}");
+        sh.link.lock().unwrap().pull(crate::state::now());
+        let (_, q) = ask(UNSAVED_PDF).await;
+        assert_eq!(q["status"], "queued");
+        assert!(q["message"].as_str().unwrap().contains(UNSAVED_CASE) && q["message"].as_str().unwrap().contains("navbatga qoʻyildi"), "{q}");
+        assert_eq!(ask(UNSAVED_PDF).await.1["status"], "joined");
+        let got = sh.link.lock().unwrap().pull(crate::state::now());
+        assert_eq!(crate::link::pull_json(&got)["jobs"][0]["kind"], "order");
+        // an order that already has its PDF: nothing to ask; unknown and malformed ids are refused
+        assert_eq!(ask(PDF_FIRST).await.1["status"], "saved");
+        assert_eq!(ask("99999999-9999-9999-9999-999999999999").await.0, StatusCode::NOT_FOUND);
+        assert_eq!(ask("../x").await.0, StatusCode::BAD_REQUEST);
+        assert_eq!(post_json(&sh, "/api/orders/download", json!({ "pdfId": UNSAVED_PDF }), None).await.0, StatusCode::UNAUTHORIZED);
+    }
+
     #[tokio::test]
     async fn yuklash_asks_the_app_and_the_pdf_comes_to_the_person_once_the_backup_has_it() {
         let (sh, b) = with_orders().await;

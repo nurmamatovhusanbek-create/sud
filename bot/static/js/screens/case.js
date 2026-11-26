@@ -3,9 +3,10 @@ import { Button, Callout, Card, Hero, Kv, List, Parties, Row, SectionLabel, Tabs
 import { BillStatus, billWord, CourtStatus } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go } from '../core/router.js'
-import { dmyKey, has, money, todayKey } from '../core/format.js'
+import { dmy, dmyKey, has, money, todayKey } from '../core/format.js'
 import { d } from '../core/text.js'
 import { companyTitle, courtName, ROLE, TopBar } from './common.js'
+import { orderRow } from './orders.js'
 
 const INSTANCE = { first: '1-instansiya', appellate: 'Apellyatsiya', cassation: 'Kassatsiya', inspection: 'Taftish' }
 
@@ -42,7 +43,8 @@ function nextHearing(detail, row) {
 }
 
 export async function caseScreen(route, { signal }) {
-  const { case: c } = await api.caseOf(route.key, { signal })
+  // the orders are a second, softer question: a case screen never fails because the orders could not be read
+  const [{ case: c }, found] = await Promise.all([api.caseOf(route.key, { signal }), api.orders({ case: route.key }, { signal }).then((j) => j.orders).catch((e) => { if (e?.name === 'AbortError') throw e; return null })])
   const detail = c.detail || {}
   const g = detail.general
   const row = c.row
@@ -67,6 +69,9 @@ export async function caseScreen(route, { signal }) {
     instances.length > 0 && [
       instances.length > 1 && Tabs(instances.map((k) => ({ value: k, label: INSTANCE[k] })), tab, (v) => go({ name: 'case', key: c.num, tab: v }, { replace: true })),
       instance(INSTANCE[tab], detail[KEYS[tab]])],
+    found && (found.rows.length > 0
+      ? [SectionLabel(`Qarorlar (${found.rows.length})`), List(...found.rows.map((o) => orderRow(o, { withCase: false })))]
+      : found.check ? h('p', { class: 'muted small hint' }, `Qaror eʼlon qilinmagan: ilova ${dmy(found.check)} da tekshirgan.`) : null),
     bills.length > 0 && [SectionLabel(`Kvitansiyalar (${bills.length}) · jami ${money(total)}`),
       List(...bills.map((b) => Row({ icon: 'bill', title: b.number, sub: `${d(b.cat)} · ${money(b.amount)} · ${billWord(b.status)}`, onOpen: () => go({ name: 'bill', key: b.number }) })))])
 }

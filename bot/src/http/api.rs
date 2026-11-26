@@ -73,3 +73,75 @@ pub async fn hearings(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<Value
     let page = sh.hearing_page(today, days, tin, get(&q, "q"), num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100)).await?;
     Ok(Json(json!({ "ok": true, "page": page })))
 }
+
+fn order_query(q: &HashMap<String, String>) -> crate::orders::Query {
+    crate::orders::Query {
+        q: get(q, "q").to_string(),
+        court: get(q, "court").to_lowercase(),
+        result: get(q, "result").to_string(),
+        saved: match get(q, "saved") {
+            "1" => Some(true),
+            "0" => Some(false),
+            _ => None,
+        },
+        year: q.get("year").and_then(|y| y.parse::<u32>().ok()).filter(|y| *y < 100),
+    }
+}
+
+/// The court orders (the app's backup): `case=<number>` one case with all its instances and, when it has none, when the app checked it; `tin=<STIR>` a company's
+/// orders; otherwise the filtered, paged list for the Qarorlar tab (`q`, `court`, `result`, `saved=1|0`, `year=26`, `offset`, `limit`, 30 by default, at most 100).
+pub async fn orders(_u: AuthUser, sh: Sh, Query(q): Q) -> AppResult<Json<Value>> {
+    let case = get(&q, "case");
+    if !case.is_empty() {
+        let n = crate::orders::norm(case);
+        let rows = sh.orders_of_case(&n).await?;
+        let check = if rows.is_empty() { sh.order_check_of(&n).await } else { None };
+        return Ok(Json(json!({ "ok": true, "orders": { "total": rows.len(), "rows": rows.iter().map(crate::orders::to_json).collect::<Vec<_>>(), "check": check } })));
+    }
+    let t = get(&q, "tin");
+    if !t.is_empty() {
+        let rows = sh.orders_of_company(&tin(&q)?).await?;
+        let saved = rows.iter().filter(|o| o.saved).count();
+        let (offset, limit) = (num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100));
+        return Ok(Json(json!({ "ok": true, "orders": { "total": rows.len(), "saved": saved, "unsaved": rows.len() - saved, "rows": rows.iter().skip(offset).take(limit).map(crate::orders::to_json).collect::<Vec<_>>() } })));
+    }
+    let page = sh.orders_page(&order_query(&q), num(&q, "offset", 0, 100_000), num(&q, "limit", 30, 100)).await?;
+    Ok(Json(json!({ "ok": true, "orders": page })))
+}
+
+fn pdf_id_of(body: &Value) -> AppResult<String> {
+    let id = body["pdfId"].as_str().unwrap_or("");
+    if crate::orders::is_pdf_id(id) {
+        Ok(id.to_string())
+    } else {
+        Err(AppError::BadRequest("Qaror identifikatori notoʻgʻri".into()))
+    }
+}
+
+/// «Botga yuborish»: the bot sends that order's PDF to the person's own chat (the Mini App cannot open a PDF reliably inside Telegram's web view)
+pub async fn orders_send(u: AuthUser, sh: Sh, Json(body): Json<Value>) -> AppResult<Json<Value>> {
+    let id = pdf_id_of(&body)?;
+    crate::chat::deliver_order(&sh, u.0, &id).await.map_err(|m| AppError::Upstream(if m.is_empty() { "Qaror yuborilmadi".into() } else { m }))?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// «Yuklash»: ask the app to download an order that was found but never downloaded (the same queue as the chat button). The answer says what became of the request
+pub async fn orders_download(u: AuthUser, sh: Sh, Json(body): Json<Value>) -> AppResult<Json<Value>> {
+    use crate::link::Queued;
+    let id = pdf_id_of(&body)?;
+    let (asked, o) = sh.request_order_download(&id, u.0).await?;
+    if o.saved {
+        return Ok(Json(json!({ "ok": true, "status": "saved", "message": "Qaror allaqachon yuklangan: «Botga yuborish» ni bosing." })));
+    }
+    let status = match &asked {
+        Queued::New => "queued",
+        Queued::Joined => "joined",
+        Queued::NotLinked => "not_linked",
+        Queued::Full => "full",
+        Queued::TooMany => "too_many",
+        Queued::Recent(_) => "recent",
+    };
+    let message = crate::format::plain(&crate::chat::queued_text(asked, &format!("Qaror {} · {}", o.case, crate::orders::instance_word(&o.instance)), "yuklangan"));
+    Ok(Json(json!({ "ok": true, "status": status, "message": message })))
+}
+

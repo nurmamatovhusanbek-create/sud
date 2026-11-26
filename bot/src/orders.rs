@@ -23,6 +23,10 @@ pub struct Order {
     pub size: u64,
     /// the PDF is in the backup (`pdf:<id>`); false = found, not downloaded
     pub saved: bool,
+    /// ECONOMIC | CIVIL | ADMINISTRATIVE | CRIMINAL, as the app stored it
+    pub court_type: String,
+    /// when the PDF was saved on the computer (ms); 0 = not downloaded
+    pub saved_at: i64,
 }
 
 fn text(v: &[Value], i: usize) -> String {
@@ -35,7 +39,7 @@ pub fn parse(bytes: &[u8]) -> Vec<Order> {
         .lines()
         .filter_map(|l| serde_json::from_str::<Vec<Value>>(l).ok())
         .filter_map(|r| {
-            let o = Order { id: text(&r, 0), case: text(&r, 1), instance: text(&r, 2), result: text(&r, 3), court: text(&r, 4), judge: text(&r, 5), category: text(&r, 6), pdf_id: text(&r, 7), pdf_name: text(&r, 8), size: r.get(9).and_then(Value::as_u64).unwrap_or(0), saved: r.get(11).and_then(Value::as_i64).unwrap_or(1) > 0 };
+            let o = Order { id: text(&r, 0), case: text(&r, 1), instance: text(&r, 2), result: text(&r, 3), court: text(&r, 4), judge: text(&r, 5), category: text(&r, 6), pdf_id: text(&r, 7), pdf_name: text(&r, 8), size: r.get(9).and_then(Value::as_u64).unwrap_or(0), saved: r.get(11).and_then(Value::as_i64).unwrap_or(1) > 0, court_type: text(&r, 10), saved_at: r.get(11).and_then(Value::as_i64).unwrap_or(0).max(0) };
             (!o.id.is_empty() && is_pdf_id(&o.pdf_id) && !o.case.is_empty()).then_some(o)
         })
         .collect()
@@ -105,6 +109,46 @@ pub fn result_word(r: &str) -> String {
         "CASE_ENDED" => "tugatildi".into(),
         "" => String::new(),
         other => other.to_lowercase().replace('_', " "),
+    }
+}
+
+/// an order as the Mini App reads it (camelCase, the words already in Uzbek)
+pub fn to_json(o: &Order) -> Value {
+    json!({
+        "id": o.id, "caseNumber": o.case, "instance": o.instance, "instanceWord": instance_word(&o.instance), "result": o.result, "resultWord": result_word(&o.result),
+        "court": o.court, "judge": o.judge, "category": o.category, "courtType": o.court_type.to_lowercase(), "pdfId": o.pdf_id, "name": file_name(o),
+        "size": o.size, "sizeLabel": size_label(o.size), "saved": o.saved, "savedAt": o.saved_at,
+    })
+}
+
+/// what the Qarorlar tab filters by
+#[derive(Debug, Default, Clone)]
+pub struct Query {
+    /// a case number (any part), or a word of the court, the judge or the category
+    pub q: String,
+    /// economic | civil | administrative | criminal
+    pub court: String,
+    /// qanoatlantirildi … : the result enum (`FULFILLED`) as stored, case-insensitive
+    pub result: String,
+    /// Some(true) = downloaded only, Some(false) = not downloaded only
+    pub saved: Option<bool>,
+    /// the case's registration year, two digits
+    pub year: Option<u32>,
+}
+
+impl Query {
+    pub fn matches(&self, o: &Order) -> bool {
+        if !self.court.is_empty() && !o.court_type.eq_ignore_ascii_case(&self.court) {
+            return false;
+        }
+        if !self.result.is_empty() && !o.result.eq_ignore_ascii_case(&self.result) {
+            return false;
+        }
+        if self.saved.is_some_and(|s| s != o.saved) || self.year.is_some_and(|y| year_of(&o.case) != Some(y)) {
+            return false;
+        }
+        let q = self.q.trim().to_lowercase();
+        q.is_empty() || o.case.to_lowercase().contains(&q) || crate::translit::to_latin(&format!("{} {} {}", o.court, o.judge, o.category)).to_lowercase().contains(&crate::translit::to_latin(&q).to_lowercase())
     }
 }
 
@@ -217,7 +261,7 @@ mod tests {
     use super::*;
 
     fn o(id: &str, case: &str, inst: &str, result: &str) -> Order {
-        Order { id: id.into(), case: case.into(), instance: inst.into(), result: result.into(), court: "Andijon iqtisodiy sudi".into(), judge: "J. J.".into(), category: "Qarz".into(), pdf_id: format!("pdf-{id}"), pdf_name: "qaror.pdf".into(), size: 412 * 1024, saved: true }
+        Order { id: id.into(), case: case.into(), instance: inst.into(), result: result.into(), court: "Andijon iqtisodiy sudi".into(), judge: "J. J.".into(), category: "Qarz".into(), pdf_id: format!("pdf-{id}"), pdf_name: "qaror.pdf".into(), size: 412 * 1024, saved: true, court_type: "ECONOMIC".into(), saved_at: 1 }
     }
 
     #[test]
