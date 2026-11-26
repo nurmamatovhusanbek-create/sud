@@ -441,6 +441,49 @@ mod hearings {
     }
 
     #[tokio::test]
+    async fn without_a_company_the_bot_asks_which_one_and_each_button_shows_only_that_company() {
+        let (b, cfg) = (backup(), crate::config::Config::for_tests());
+        let t = today(now());
+        let rows = |case: &str, n: usize| -> String { (0..n).map(|i| json!([format!("{case}{i}"), "civil", add_days(t, (i % 5) as i64), "10:00", "first", "Тайинлаш", "Универсал Савдо МЧЖ", "ANOR TEXTILE МЧЖ", 1]).to_string() + "\n").collect() };
+        let mut content = buckets(false);
+        content.retain(|(name, _)| !name.starts_with("hearings:"));
+        content.push((format!("hearings:{TIN}"), rows("2-1004-2503/", 3)));
+        content.push((format!("hearings:{OTHER_TIN}"), rows("2-1005-2504/", 2)));
+        publish(&b.channel, MAIN, &b.pass, 2, &content);
+        let sh = bot_with(cfg, &b);
+        sh.sync().await.unwrap();
+        let tap = |data: &str| crate::chat::handle_update(sh.clone(), json!({ "callback_query": { "id": "1", "from": { "id": 4242 }, "message": { "chat": { "id": 4242 } }, "data": data } }));
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": "/hearings" } })).await;
+        let ask = sh.outbox.captured()[0].clone();
+        assert!(ask.text.contains("Qaysi kompaniyaning majlislari") && ask.text.contains("<b>2</b> ta kompaniyada jami <b>5</b>"), "{}", ask.text);
+        let kb = ask.markup.unwrap();
+        let rows_kb = kb["inline_keyboard"].as_array().unwrap();
+        assert_eq!(rows_kb[0][0]["callback_data"], "h:14::0"); // «Hammasi»
+        assert!(rows_kb[0][0]["text"].as_str().unwrap().contains("Hammasi · 5"));
+        let by_tin: Vec<(String, String)> = rows_kb[1..3].iter().map(|r| (r[0]["callback_data"].as_str().unwrap().to_string(), r[0]["text"].as_str().unwrap().to_string())).collect();
+        assert_eq!(by_tin[0].0, format!("h:14:{TIN}:0"), "the company with more hearings first");
+        assert!(by_tin[0].1.ends_with("· 3") && by_tin[1].1.ends_with("· 2"), "{by_tin:?}");
+        assert!(by_tin.iter().all(|(d, _)| d.len() <= 64));
+        let days_row = rows_kb.last().unwrap().as_array().unwrap();
+        assert_eq!(days_row.iter().map(|b| b["callback_data"].as_str().unwrap()).collect::<Vec<_>>(), vec!["hc:7", "hc:14", "hc:30"]);
+        assert!(days_row[1]["text"].as_str().unwrap().starts_with('•'), "the current range is marked");
+        // a company button: only that company's hearings, with a way back to the choice
+        tap(&format!("h:14:{OTHER_TIN}:0")).await;
+        let one = sh.outbox.captured().last().unwrap().clone();
+        assert!(one.text.contains("<b>2</b> ta") && one.text.contains("2-1005-2504/") && !one.text.contains("2-1004-2503/"), "{}", one.text);
+        assert!(one.markup.unwrap()["inline_keyboard"].to_string().contains("hc:14"), "«Boshqa kompaniya» returns to the choice");
+        // «Hammasi»: everything; the range buttons re-ask with another range
+        tap("h:14::0").await;
+        assert!(sh.outbox.captured().last().unwrap().text.contains("<b>5</b> ta"));
+        tap("hc:30").await;
+        let again = sh.outbox.captured().last().unwrap().clone();
+        assert!(again.text.contains("30 kun") && again.markup.unwrap()["inline_keyboard"][0][0]["callback_data"] == "h:30::0");
+        // a STIR in the command skips the choice
+        crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": format!("/hearings {TIN}") } })).await;
+        assert!(sh.outbox.captured().last().unwrap().text.contains(&format!("STIR {TIN}")));
+    }
+
+    #[tokio::test]
     async fn the_command_takes_days_and_a_company() {
         let (sh, _b) = ready_bot().await;
         let say = |text: &str| crate::chat::handle_update(sh.clone(), json!({ "message": { "from": { "id": 4242 }, "chat": { "id": 4242 }, "text": text } }));

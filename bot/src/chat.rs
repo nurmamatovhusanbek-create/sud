@@ -14,7 +14,7 @@ Telegramdagi shifrlangan zaxiradan qidiradi. Sud saytlariga kirmaydi: maʼlumot 
 <b>Qidirish</b>\n\
 Shunchaki yozing: ish raqami (<code>2-1004-2603/8020</code>), kvitansiya raqami, STIR yoki kompaniya nomi.\n\n\
 <b>Buyruqlar</b>\n\
-/hearings [kun] [STIR]: yaqin majlislar (14 kun)\n\
+/hearings [kun] [STIR]: yaqin majlislar (14 kun); STIRsiz yozsangiz kompaniyani tanlaysiz\n\
 /stats [STIR]: sonlar, kompaniyalar va ishlar\n\
 /company STIR: kompaniya\n\
 /refresh STIR: kompaniyani sud saytlaridan qayta yigʻdirish (ilova yoqilgan boʻlsa)\n\
@@ -344,6 +344,30 @@ fn clip_html(s: &str, max: usize) -> String {
     clip(s, max)
 }
 
+/// «/hearings» with no company: when several companies have hearings in the range, ask WHICH one (a button each, with its count, and «Hammasi»), plus the range
+/// (7 / 14 / 30 days). With one company (or none) there is nothing to choose and the list itself is sent.
+async fn hearings_choose(sh: &Arc<Shared>, chat: i64, days: u32) {
+    let today = crate::date::today(crate::state::now());
+    let days = days.clamp(1, crate::service::MAX_HEARING_DAYS);
+    let page = match sh.hearing_page(today, days, "", "", 0, 0).await {
+        Ok(p) => p,
+        Err(e) => return sh.outbox.send(chat, &e.message(), None).await,
+    };
+    if page.companies.len() < 2 {
+        return hearings_reply(sh, chat, days, "", 0).await;
+    }
+    let total: usize = page.companies.iter().map(|c| c.count).sum();
+    let mut keys: Vec<Value> = vec![json!([{ "text": format!("📋 Hammasi · {total}"), "callback_data": format!("h:{days}::0") }])];
+    for c in page.companies.iter().take(60) {
+        let name = crate::translit::to_latin(&sh.name_of(&c.tin).await);
+        let name: String = if name.is_empty() { c.tin.clone() } else { name.chars().take(28).collect() };
+        keys.push(json!([{ "text": format!("{name} · {}", c.count), "callback_data": format!("h:{days}:{}:0", c.tin) }]));
+    }
+    keys.push(json!([7u32, 14, 30].map(|d| json!({ "text": if d == days { format!("• {d} kun") } else { format!("{d} kun") }, "callback_data": format!("hc:{d}") }))));
+    let more = if page.companies.len() > 60 { format!("\n<i>Eng koʻp majlisli 60 ta kompaniya koʻrsatildi; boshqasi uchun /hearings STIR.</i>") } else { String::new() };
+    sh.outbox.send_html(chat, &format!("📋 <b>Qaysi kompaniyaning majlislari?</b> · {days} kun\n<b>{}</b> ta kompaniyada jami <b>{total}</b> ta majlis{more}", page.companies.len()), Some(json!({ "inline_keyboard": keys }))).await;
+}
+
 /// One page of the hearings: the rows, a «next» button while there are more, and a button that opens the same list in the Mini App.
 async fn hearings_reply(sh: &Arc<Shared>, chat: i64, days: u32, tin: &str, offset: usize) {
     let today = crate::date::today(crate::state::now());
@@ -363,6 +387,10 @@ async fn hearings_reply(sh: &Arc<Shared>, chat: i64, days: u32, tin: &str, offse
     let mut keys: Vec<Value> = Vec::new();
     if shown_to < page.total {
         keys.push(json!([{ "text": format!("Keyingi {} ›", (page.total - shown_to).min(CHAT_PAGE)), "callback_data": format!("h:{days}:{tin}:{shown_to}") }]));
+    }
+    // several companies have hearings: a way back to the choice, so the person can look at another company without typing a STIR
+    if page.companies.len() > 1 {
+        keys.push(json!([{ "text": "🏢 Boshqa kompaniya", "callback_data": format!("hc:{days}") }]));
     }
     if let Some(base) = sh.cfg.public_url.as_ref() {
         keys.push(json!([{ "text": "Hammasi Mini Appʼda", "web_app": { "url": format!("{base}/app?tab=hearings") } }]));
@@ -617,6 +645,11 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
             orders_reply(&sh, chat, case).await;
             return;
         }
+        // «hc:<days>»: choose the company whose hearings to see
+        if let Some(days) = data.strip_prefix("hc:") {
+            hearings_choose(&sh, chat, days.parse().unwrap_or(14)).await;
+            return;
+        }
         // «h:<days>:<tin>:<offset>»: the next page of the hearings list
         if let Some(rest) = data.strip_prefix("h:") {
             let p: Vec<&str> = rest.split(':').collect();
@@ -702,7 +735,11 @@ pub async fn handle_update(sh: Arc<Shared>, u: Value) {
                     days = n.clamp(1, crate::service::MAX_HEARING_DAYS);
                 }
             }
-            hearings_reply(&sh, chat, days, &tin, 0).await;
+            if tin.is_empty() {
+                hearings_choose(&sh, chat, days).await;
+            } else {
+                hearings_reply(&sh, chat, days, &tin, 0).await;
+            }
         }
         "/case" => show(&sh, chat, "c", arg).await,
         "/bill" => show(&sh, chat, "b", arg).await,
