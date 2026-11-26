@@ -132,8 +132,21 @@ describe('what changed, said in the message', () => {
     ])
     expect(changeLines(prev, row({ caseStatus: 'Кўриб чиқиш жараёнида', hearingDate: '12.03.2030', hearingTime: '10:00' }))).toEqual([])
     expect(changeLines(undefined, row())).toEqual([])
-    // a hearing taken off the calendar
-    expect(changeLines(prev, row({ caseStatus: 'Кўриб чиқиш жараёнида' }))).toEqual(['<b>Majlis:</b> 12.03.2030 10:00 → <b>belgilanmagan</b>'])
+    // a hearing taken off the calendar is «something → nothing»: not news, no line
+    expect(changeLines(prev, row({ caseStatus: 'Кўриб чиқиш жараёнида' }))).toEqual([])
+  })
+  test('«something → yoʻq» is skipped: a blanked cell sends nothing, and a real change next to it still says only the real one', () => {
+    const was = sigOf({ caseStatus: 'Кўриб чиқиш жараёнида', result: 'Талаб қаноатлантирилди', hearingDate: '12.03.2030', hearingTime: '10:00' })
+    // the result and the hearing blanked, status the same: no event at all
+    expect(diffRow({ sig: was, ins: '' }, row({ caseStatus: 'Кўриб чиқиш жараёнида' }))).toEqual({ kind: null, recheck: false })
+    // the status blanked: nothing either
+    expect(diffRow({ sig: was, ins: '' }, row({ caseStatus: '', result: 'Талаб қаноатлантирилди', hearingDate: '12.03.2030', hearingTime: '10:00' }))).toEqual({ kind: null, recheck: false })
+    // the result blanked while the hearing really moved: a hearing event, and the message has the new hearing only
+    const moved = row({ caseStatus: 'Кўриб чиқиш жараёнида', hearingDate: '20.03.2030', hearingTime: '11:00' })
+    expect(diffRow({ sig: was, ins: '' }, moved)).toEqual({ kind: 'hearing', recheck: true })
+    expect(changeLines(was, moved)).toEqual(['<b>Majlis:</b> 12.03.2030 10:00 → <b>20.03.2030 11:00</b>'])
+    // nothing → something is still news
+    expect(diffRow({ sig: sigOf({ caseStatus: 'Кўриб чиқиш жараёнида' }), ins: '' }, row({ caseStatus: 'Кўриб чиқиш жараёнида', result: 'Талаб қаноатлантирилди' })).kind).toBe('status')
   })
   test('a status message shows the change instead of a bare status, and escapes it', () => {
     const r = row({ caseStatus: 'Архивга топширилган <x>' })

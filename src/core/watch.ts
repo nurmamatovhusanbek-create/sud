@@ -55,8 +55,12 @@ export function diffRow(prev: SeenRow | undefined, row: CourtCase): { kind: Watc
   if (sig === prev.sig || normSig(sig) === normSig(prev.sig)) return { kind: null, recheck: false }
   const old = normSig(prev.sig).split('|')
   const now = normSig(sig).split('|')
+  // a field that went from something to NOTHING («Qanoatlantirildi → yoʻq», a hearing cleared) is the court blanking a cell, not news: it is skipped, and when it is
+  // the only change nothing is sent (the remembered signature stays, so a later real change still reads «old → new»)
+  const real = old.map((o, i) => o !== (now[i] ?? '') && !(o !== '' && (now[i] ?? '') === ''))
+  if (!real.some(Boolean)) return { kind: null, recheck: false }
   // status (0) / result (1) changed → status; the hearing (2, 3, 4) moved → hearing; either way the detail is read again (an appeal shows there)
-  const kind: WatchKind = old[0] !== now[0] || old[1] !== now[1] ? 'status' : 'hearing'
+  const kind: WatchKind = real[0] || real[1] ? 'status' : 'hearing'
   return { kind, recheck: true }
 }
 
@@ -140,11 +144,12 @@ export function changeLines(prevSig: string | undefined, row: CourtCase): string
   const [nStatus, nResult] = [lat(clean(row.caseStatus)), lat(clean(row.result))]
   const same = (a: string, b: string): boolean => normSig(a) === normSig(b)
   const out: string[] = []
-  if (!same(pStatus, nStatus)) out.push(`<b>Holati:</b> ${arrow(pStatus, nStatus)}`)
-  if (!same(pResult, nResult)) out.push(`<b>Natija:</b> ${arrow(pResult, nResult)}`)
+  // «something → yoʻq» is not news (see diffRow): that line is left out, the others still say what really changed
+  if (!same(pStatus, nStatus) && nStatus) out.push(`<b>Holati:</b> ${arrow(pStatus, nStatus)}`)
+  if (!same(pResult, nResult) && nResult) out.push(`<b>Natija:</b> ${arrow(pResult, nResult)}`)
   const pHear = [pDate, pTime].filter(Boolean).join(' ')
   const nHear = [clean(row.hearingDate), clean(row.hearingTime)].filter(Boolean).join(' ')
-  if (!same(pHear, nHear)) out.push(`<b>Majlis:</b> ${pHear ? arrow(pHear, nHear || 'belgilanmagan') : `<b>${escapeHtml(nHear)}</b> (yangi)`}`)
+  if (!same(pHear, nHear) && nHear) out.push(`<b>Majlis:</b> ${pHear ? arrow(pHear, nHear) : `<b>${escapeHtml(nHear)}</b> (yangi)`}`)
   return out
 }
 

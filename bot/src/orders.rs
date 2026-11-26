@@ -129,7 +129,10 @@ pub fn result_word(r: &str) -> String {
                     "partially" => "qisman",
                     "ended" => "tugatildi",
                     "returned" => "qaytarildi",
-                    "refused" => "rad etildi",
+                    "refused" | "rejected" | "dismissed" => "rad etildi",
+                    "accepted" | "approved" | "satisfied" => "qabul qilindi",
+                    "terminated" | "stopped" => "tugatildi",
+                    "left" | "without" => "",
                     "fulfilled" => "qanoatlantirildi",
                     "to" | "of" | "the" => "",
                     x => x,
@@ -330,7 +333,9 @@ mod tests {
         assert_eq!(instance_word("inspection"), "Taftish");
         assert_eq!(instance_word("???"), "Qaror");
         assert_eq!(result_word("PARTIALLY_FULFILLED"), "qisman qanoatlantirildi");
-        assert_eq!(result_word("CASSATION_REJECTED"), "kassatsiya rejected", "known words are Uzbek, an unknown one is left as it is");
+        assert_eq!(result_word("CASSATION_REJECTED"), "kassatsiya rad etildi");
+        assert_eq!(result_word("REJECTED"), "rad etildi");
+        assert_eq!(result_word("SOMETHING_ODD"), "something odd", "an unknown word is left as it is");
         assert_eq!(result_word("CASSATION_UNCHANGED"), "kassatsiya: oʻzgarishsiz qoldirildi");
         assert_eq!(result_word("JOINED_TO_OTHER_CASE"), "boshqa ish bilan birlashtirildi");
         assert_eq!(result_word("CASSATION_CANCELLED"), "kassatsiya bekor qilindi");

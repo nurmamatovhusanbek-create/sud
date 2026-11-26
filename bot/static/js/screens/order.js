@@ -3,11 +3,28 @@
 import { h } from '../ui/h.js'
 import { Button, Card, Hero, Kv, List, Row, SectionLabel } from '../ui/components.js'
 import { api } from '../core/api.js'
-import { go } from '../core/router.js'
+import { go, rerender } from '../core/router.js'
 import { dmy } from '../core/format.js'
 import { d } from '../core/text.js'
 import { courtName, TopBar } from './common.js'
 import { orderRow } from './orders.js'
+
+/**
+ * After «Yuklash» the app downloads the file and the bot sends it to the chat; this page also notices: every 20 s (for up to 20 minutes, only while the page is
+ * open) it asks whether the order is saved now and, when it is, draws the page again with «Botga yuborish». The router aborts `signal` when another screen opens.
+ */
+function watchDownload(o, signal) {
+  let n = 0
+  const tick = async () => {
+    if (signal.aborted || ++n > 60) return
+    try {
+      const { orders } = await api.orders({ case: o.caseNumber }, { signal })
+      if (orders.rows.some((x) => x.pdfId === o.pdfId && x.saved)) { rerender(); return }
+    } catch (e) { if (e?.name === 'AbortError') return }
+    setTimeout(tick, 20_000)
+  }
+  setTimeout(tick, 20_000)
+}
 
 /** a button that runs one request, shows what is happening and what came of it in the line under it (the person never presses twice) */
 function Action({ label, busy, run }) {
@@ -35,7 +52,7 @@ export async function orderScreen(route, { signal }) {
   const others = set.rows.filter((x) => x.pdfId !== o.pdfId)
   const action = o.saved
     ? Action({ label: 'Botga yuborish', busy: 'Yuborilmoqda…', run: async () => { await api.ordersSend(o.pdfId, { signal }); return { message: 'Qaror botning chatiga yuborildi: Telegramda botni oching.', again: true } } })
-    : Action({ label: 'Yuklash', busy: 'Soʻralmoqda…', run: async () => { const r = await api.ordersDownload(o.pdfId, { signal }); return { message: r.message, again: r.status === 'saved' || r.status === 'full' || r.status === 'too_many' || r.status === 'not_linked' } } })
+    : Action({ label: 'Yuklash', busy: 'Soʻralmoqda…', run: async () => { const r = await api.ordersDownload(o.pdfId, { signal }); if (r.status === 'queued' || r.status === 'joined' || r.status === 'recent') watchDownload(o, signal); return { message: r.message, again: r.status === 'saved' || r.status === 'full' || r.status === 'too_many' || r.status === 'not_linked' } } })
   return h('div', { class: 'screen stack' },
     TopBar(Button({ label: 'Ish ›', size: 'small', onClick: () => go({ name: 'case', key: o.caseNumber }) })),
     Hero({ caption: `${o.instanceWord} · ${courtName(o.courtType)} ish`, id: o.caseNumber, line: o.resultWord || 'Natija maʼlum emas' }),
@@ -43,6 +60,6 @@ export async function orderScreen(route, { signal }) {
       Kv('Sud', d(o.court)), Kv('Sudya', d(o.judge)), Kv('Turkum', d(o.category)), Kv('Natija', o.resultWord),
       o.saved && Kv('Hajmi', o.sizeLabel, { raw: true }), o.saved && o.savedAt > 1e11 && Kv('Yuklangan', dmy(o.savedAt), { raw: true }),
       action),
-    !o.saved && h('p', { class: 'muted small hint' }, 'Sud saytidan yuklashni ilova bajaradi (u yoqilgan va botga ulangan boʻlishi kerak). Yuklangach, zaxiraga tushadi va shu yerda «Botga yuborish» chiqadi.'),
+    !o.saved && h('p', { class: 'muted small hint' }, 'Sud saytidan yuklashni ilova bajaradi (u yoqilgan va botga ulangan boʻlishi kerak). Yuklangach bot faylni oʻzi chatga yuboradi, bu sahifa ham yangilanib «Botga yuborish» chiqadi (sahifa ochiq tursa).'),
     others.length > 0 && [SectionLabel(`Shu ishning boshqa qarorlari (${others.length})`), List(...others.map((x) => orderRow(x, { withCase: false })))])
 }
