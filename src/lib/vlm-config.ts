@@ -8,7 +8,7 @@ import { keyHint, validateVlmInput, vlmId, type VlmInput, type VlmProvider } fro
 /**
  * The captcha readers (vision models, «VLM») the operator saved in Settings. Each person who runs the app brings their
  * own keys, so they live with THEM, outside the project and never in git: `~/.sud-tizimi/vlm.json` (0600, folder 0700;
- * `VLM_CONFIG_FILE` overrides). SEVERAL providers can be saved: the solver takes them in turn and falls over to the next
+ * `VLM_CONFIG_FILE` overrides). SEVERAL providers, and several KEYS of one provider, can be saved: the solver takes them in turn and falls over to the next
  * when one fails (lib/vlm-pool.ts). A key is never sent back to the browser (only its last four characters), and a key
  * set in the environment (VLM_API_KEY + VLM_BASE_URL) still works when nothing is saved.
  * File: `{ providers: [...] }`; the first version wrote ONE provider as a bare object, which is still read.
@@ -31,7 +31,7 @@ export function readSavedVlmList(): VlmInput[] {
   }
 }
 
-/** the saved provider with this id (for «keep the saved key» when a form is sent without one) */
+/** the saved entry with this id (for «keep the saved key» when a form is sent without one) */
 export const savedVlm = (id: string): VlmInput | null => readSavedVlmList().find((v) => vlmId(v) === id) ?? null
 
 function writeList(list: VlmInput[]): void {
@@ -46,12 +46,20 @@ function writeList(list: VlmInput[]): void {
   fs.renameSync(tmp, file) // never a half-written key
 }
 
-/** add a provider, or replace the saved one with the same id (keeping its place in the list) */
-export function upsertVlm(v: VlmInput): void {
-  const list = readSavedVlmList()
-  const i = list.findIndex((x) => vlmId(x) === vlmId(v))
-  if (i >= 0) list[i] = v
-  else list.push(v)
+/**
+ * Add an entry (a provider with a key). The same key again replaces its entry; `replaceId` names the entry being edited
+ * (a new key for it, or a new model), which keeps its place in the list. A second KEY of the same provider is added next to it.
+ */
+export function upsertVlm(v: VlmInput, replaceId?: string): void {
+  let list = readSavedVlmList()
+  const i = list.findIndex((x) => vlmId(x) === (replaceId ?? vlmId(v)))
+  if (i >= 0) {
+    list[i] = v
+    list = list.filter((x, j) => j === i || vlmId(x) !== vlmId(v)) // the edit must not leave a twin of the same key
+  } else {
+    list = list.filter((x) => vlmId(x) !== vlmId(v))
+    list.push(v)
+  }
   writeList(list)
 }
 

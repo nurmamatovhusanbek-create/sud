@@ -9,6 +9,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sud-vlm-'))
 process.env.VLM_CONFIG_FILE = path.join(dir, 'vlm.json')
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }))
 
+const { vlmId } = await import('@/core/vlm')
 const { mathImage, encodePng, renderText } = await import('../vlm-test-image')
 const { testVision, parseIntegerAnswer } = await import('../vlm-test')
 const { callVision, VlmError } = await import('../vlm-client')
@@ -156,7 +157,7 @@ describe('saved settings (several providers)', () => {
   test('remove one / remove all (the file goes away)', () => {
     cfgMod.upsertVlm(g)
     cfgMod.upsertVlm(m)
-    cfgMod.removeVlm('groq')
+    cfgMod.removeVlm(vlmId(g))
     expect(cfgMod.readSavedVlmList().map((v) => v.provider)).toEqual(['gemini'])
     cfgMod.removeVlm()
     expect(cfgMod.readSavedVlmList()).toEqual([])
@@ -172,7 +173,29 @@ describe('saved settings (several providers)', () => {
   })
   test('savedVlm finds the key of a provider by id', () => {
     cfgMod.upsertVlm(m)
-    expect(cfgMod.savedVlm('gemini')?.apiKey).toBe('AQ.abcdefgh9999')
-    expect(cfgMod.savedVlm('groq')).toBeNull()
+    expect(cfgMod.savedVlm(vlmId(m))?.apiKey).toBe('AQ.abcdefgh9999')
+    expect(cfgMod.savedVlm(vlmId(g))).toBeNull()
+  })
+  test('several keys of ONE provider are saved side by side (each Google project has its own quota)', () => {
+    const m2 = { ...m, apiKey: 'AQ.second-project-key' }
+    cfgMod.upsertVlm(m)
+    cfgMod.upsertVlm(m2)
+    expect(cfgMod.readSavedVlmList().map((v) => v.apiKey)).toEqual([m.apiKey, m2.apiKey])
+    expect(vlmId(m)).not.toBe(vlmId(m2))
+    expect(vlmId(m)).toMatch(/^gemini#[0-9a-f]{6}$/)
+    expect(vlmId(m)).not.toContain('abcdefgh')
+    // the same key again replaces its entry (a model change), it does not add a third
+    cfgMod.upsertVlm({ ...m2, model: 'other' })
+    expect(cfgMod.readSavedVlmList().map((v) => v.model)).toEqual(['gm', 'other'])
+    // forgetting one leaves the other
+    cfgMod.removeVlm(vlmId(m))
+    expect(cfgMod.readSavedVlmList().map((v) => v.apiKey)).toEqual([m2.apiKey])
+  })
+  test('editing an entry with a NEW key keeps its place and leaves no twin', () => {
+    const m2 = { ...m, apiKey: 'AQ.second-project-key' }
+    cfgMod.upsertVlm(m)
+    cfgMod.upsertVlm(g)
+    cfgMod.upsertVlm(m2, vlmId(m))
+    expect(cfgMod.readSavedVlmList().map((v) => v.apiKey)).toEqual([m2.apiKey, g.apiKey])
   })
 })

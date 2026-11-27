@@ -1,5 +1,5 @@
 import type { VlmFailure, VlmInput } from '@/core/vlm'
-import { vlmId } from '@/core/vlm'
+import { keyHint, vlmId, vlmKind } from '@/core/vlm'
 import { VlmError, type VisionRequest } from './vlm-client'
 
 /**
@@ -41,7 +41,10 @@ export interface VlmAnswer {
   via: string
 }
 
-const label = (v: VlmInput): string => `${vlmId(v)} · ${v.model}`
+/** «gemini»; when one provider is saved with several keys, «gemini ••••9999» tells them apart */
+const nameIn = (all: VlmInput[], v: VlmInput): string =>
+  all.filter((x) => vlmKind(x) === vlmKind(v)).length > 1 ? `${vlmKind(v)} ${keyHint(v.apiKey)}` : vlmKind(v)
+const label = (all: VlmInput[], v: VlmInput): string => `${nameIn(all, v)} · ${v.model}`
 
 export function createVlmPool(deps: VlmPoolDeps) {
   let next = 0 // the id-less position to start from: «after the one that answered last»
@@ -63,14 +66,14 @@ export function createVlmPool(deps: VlmPoolDeps) {
           const text = await deps.call(v, req)
           resting.delete(id)
           next = all.findIndex((x) => vlmId(x) === id) + 1
-          return { text, via: label(v) }
+          return { text, via: label(all, v) }
         } catch (e) {
           const kind: VlmFailure | 'other' = e instanceof VlmError ? e.kind : 'other'
           const msg = e instanceof Error ? e.message : String(e)
-          failures.push({ id, kind, message: msg })
+          failures.push({ id: nameIn(all, v), kind, message: msg })
           if (kind !== 'other') resting.set(id, deps.now() + COOLDOWN_MS[kind])
           const more = order.indexOf(v) < order.length - 1
-          deps.log(`[captcha] VLM ${label(v)} failed (${kind}: ${msg.slice(0, 120)})${more ? ' → trying the next provider' : ''}`)
+          deps.log(`[captcha] VLM ${label(all, v)} failed (${kind}: ${msg.slice(0, 120)})${more ? ' → trying the next provider' : ''}`)
         }
       }
       next = (start + 1) % all.length // do not start on the same failing one next time

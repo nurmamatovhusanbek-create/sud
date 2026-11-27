@@ -578,3 +578,7 @@ Endi (`lib/backup.ts`, `backup-pending.ts`):
 - **`full` manifest.** Barcha paqirlarni oʻzida olgan manifest `full: true` bilan yoziladi; keyingi zaxira eski manifestlar zanjirini yurmaydi, faqat oxirgisini oʻqiydi. Eski (`full` boʻlmagan) kanalda birinchi zaxira zanjirni bir marta yuradi.
 - **PDF paqirlar** (oʻzgarmas): manifestda bor va kanalda tasdiqlangan boʻlsa diskdan oʻqilmaydi.
 - «Kanallar holatini tekshirish» tugmasi hamon **hammasini** tekshiradi. Testlarda `SUD_BACKUP_VERIFY_DAYS=0` eski qoidani beradi.
+
+## Captcha oʻqish: bitta taʼminotchining bir nechta kaliti (Nov 2026)
+
+Gemini/Groq/Z.ai bepul limiti kalitga emas, Google (va h.k.) **loyihasiga** bogʻliq. Shuning uchun saqlangan yozuv endi «taʼminotchi + kalit»: `vlmId` = `gemini#3fa1c2` (kalitning qisqa belgisi, kalit emas). Yangi kalit shu taʼminotchining yoniga **qoʻshiladi**, xuddi shu kalit qayta saqlansa oʻrnini almashtiradi; «Tahrirlash» yozuvning `id`sini yuboradi (boʻsh kalit = oʻzining kalitini saqlash, yangi kalit = kalitni almashtirish, joyi oʻzgarmaydi). Pool hammasini navbatma-navbat oladi; xabarlarda bitta taʼminotchining bir nechta kaliti `gemini ••••9999` deb ajratiladi. Eski fayllar (har taʼminotchi bitta kalit) oʻzgarishsiz oʻqiladi.

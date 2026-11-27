@@ -78,14 +78,36 @@ export function validateVlmInput(i: Partial<VlmInput>): { ok: true; value: VlmIn
   return { ok: true, value: { provider, baseUrl, model, apiKey } }
 }
 
-/** One saved provider is identified by its kind (a custom endpoint by its host): saving it again replaces it, a different one is added. */
-export const vlmId = (v: Pick<VlmInput, 'provider' | 'baseUrl'>): string => {
+/** The kind of a provider (a custom endpoint is told by its host): several keys can share it. */
+export const vlmKind = (v: Pick<VlmInput, 'provider' | 'baseUrl'>): string => {
   if (v.provider !== 'custom') return v.provider
   try {
     return `custom:${new URL(v.baseUrl).hostname.toLowerCase()}`
   } catch {
     return 'custom'
   }
+}
+
+/** a short, stable tag of a key (never the key): two keys of one provider get two ids; 32 bits tell nothing about a secret */
+const keyTag = (key: string): string => {
+  let a = 0x811c9dc5
+  let b = 5381
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i)
+    a = Math.imul(a ^ c, 0x01000193) >>> 0
+    b = (Math.imul(b, 33) + c) >>> 0
+  }
+  return ((a ^ b) >>> 0).toString(16).padStart(8, '0').slice(0, 6)
+}
+
+/**
+ * One saved entry = one KEY of one provider («gemini#3fa1c2»): the same provider can be saved with several keys (each Google
+ * project has its own free quota), they are taken in turn like different providers. Saving the same key again replaces
+ * its entry. Without a key (the form before it is filled) the id is just the kind.
+ */
+export const vlmId = (v: Pick<VlmInput, 'provider' | 'baseUrl'> & { apiKey?: string }): string => {
+  const kind = vlmKind(v)
+  return v.apiKey ? `${kind}#${keyTag(v.apiKey)}` : kind
 }
 
 /** «sk-…abcd» for display: never more than the last four characters. */

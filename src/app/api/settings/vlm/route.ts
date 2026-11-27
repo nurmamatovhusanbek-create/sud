@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 /**
  * /api/settings/vlm — the captcha reader (VLM) key of THIS operator.
  *   GET    → status: the saved providers (id, kind, base URL, model, last four characters of the key; never the key)
- *   POST   → add or replace one { provider, baseUrl, model, apiKey } (empty apiKey keeps its saved key)  [privileged]
+ *   POST   → add one { provider, baseUrl, model, apiKey } (a new key of a saved provider is added next to it; `id` = the entry being edited, an empty apiKey keeps its key)  [privileged]
  *   DELETE → forget one (?id=) or all of them                                                             [privileged]
  * The solver takes the saved providers in turn and fails over to the next (lib/vlm-pool.ts).
  */
@@ -19,7 +19,7 @@ export const POST = guard(
   async (req) => {
     const v = await readVlmBody(req)
     if (!v.ok) return jsonFail(VLM_ERROR_TEXT[v.error] ?? 'xato', v.error, 400)
-    upsertVlm(v.value)
+    upsertVlm(v.value, v.editId)
     return jsonOk(vlmStatus())
   },
   { privileged: true },

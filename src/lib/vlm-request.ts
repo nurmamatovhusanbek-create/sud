@@ -1,14 +1,14 @@
 import 'server-only'
 import { checkPublicHost } from '@/lib/net/public-host'
-import { validateVlmInput, vlmId, type VlmInput, type VlmInputError } from '@/core/vlm'
+import { validateVlmInput, type VlmInput, type VlmInputError } from '@/core/vlm'
 import { savedVlm } from './vlm-config'
 
 /**
- * The form's body → a setting the server may use. An empty key field means «keep the saved key of this provider» (so a model
+ * The form's body → a setting the server may use. An empty key field means «keep the saved key of the entry being edited» (`id`) (so a model
  * can be changed without retyping the secret). The base URL's address is resolved and must be a public one: this server
  * sends the key there, so a name that points inside this machine is refused.
  */
-export async function readVlmBody(req: Request): Promise<{ ok: true; value: VlmInput } | { ok: false; error: VlmInputError | 'bad_body' | 'private_host'; detail?: string }> {
+export async function readVlmBody(req: Request): Promise<{ ok: true; value: VlmInput; editId?: string } | { ok: false; error: VlmInputError | 'bad_body' | 'private_host'; detail?: string }> {
   let raw: Partial<VlmInput>
   try {
     raw = (await req.json()) as Partial<VlmInput>
@@ -16,12 +16,13 @@ export async function readVlmBody(req: Request): Promise<{ ok: true; value: VlmI
     return { ok: false, error: 'bad_body' }
   }
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'bad_body' }
-  const apiKey = typeof raw.apiKey === 'string' && raw.apiKey.trim() ? raw.apiKey : (raw.provider ? (savedVlm(vlmId({ provider: raw.provider, baseUrl: raw.baseUrl ?? '' }))?.apiKey ?? '') : '')
+  const editId = typeof (raw as { id?: unknown }).id === 'string' ? ((raw as { id: string }).id) : undefined
+  const apiKey = typeof raw.apiKey === 'string' && raw.apiKey.trim() ? raw.apiKey : (editId ? (savedVlm(editId)?.apiKey ?? '') : '')
   const v = validateVlmInput({ provider: raw.provider, baseUrl: raw.baseUrl, model: raw.model, apiKey })
   if (!v.ok) return v
   const host = await checkPublicHost(new URL(v.value.baseUrl).hostname)
   if (!host.ok) return { ok: false, error: host.reason === 'private' ? 'private_host' : 'bad_url', detail: host.detail }
-  return v
+  return { ...v, editId }
 }
 
 export const VLM_ERROR_TEXT: Record<string, string> = {
