@@ -1,7 +1,7 @@
 // The «Qarorlar» tab: every court order the backup knows (found by the app on public.sud.uz), newest case first, narrowed by text, by what was downloaded, by court,
 // by result and by the case's year. A row opens the order's own screen (send to chat / ask for the download). Also the row and the pane the case and company screens reuse.
 import { h } from '../ui/h.js'
-import { CardRow, Empty, ErrorBox, Field, Row, Select, Skeletons } from '../ui/components.js'
+import { Empty, ErrorBox, Field, Picker, Row, Select, Skeletons } from '../ui/components.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { num } from '../core/format.js'
@@ -24,7 +24,7 @@ export function orderRow(o, { withCase = true } = {}) {
 }
 
 /** the company's name for a card: Latin, short; its STIR when the backup does not know the name */
-const cardName = (c) => (d(c.name) || c.tin).slice(0, 26)
+const companyName = (c) => d(c.name) || c.tin
 
 export function ordersTab(route, { signal }) {
   const st = { q: route.q || '', tin: route.tin || '', saved: route.saved || '', court: route.court || '', instance: route.instance || '', result: route.result || '', year: route.year || '' }
@@ -40,10 +40,11 @@ export function ordersTab(route, { signal }) {
   const withCount = (label, n) => (n == null ? label : `${label} · ${num(n)}`)
 
   const drawFacets = (f) => {
-    // the company cards: «Hammasi» and one per company, scrolling sideways (the same cards as the Majlislar tab)
+    // the company choice: a bar with the current company and a list of all of them (full names, counts, a search when there are many)
     cardsHost.replaceChildren(f.companies.length > 1 || st.tin
-      ? CardRow([{ value: '', title: 'Hammasi', big: num(f.allCompanies), sub: `${f.companies.length} kompaniya` },
-        ...f.companies.map((c) => ({ value: c.tin, title: cardName(c), big: num(c.count), sub: 'qaror' }))], st.tin, (v) => pick('tin', v))
+      ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => pick('tin', v),
+        items: [{ value: '', title: 'Hammasi', big: num(f.allCompanies), sub: `${f.companies.length} kompaniya` },
+          ...f.companies.map((c) => ({ value: c.tin, title: companyName(c), big: num(c.count), sub: `STIR ${c.tin}` }))] })
       : '')
     const one = (key, label, all, opts) => Select({ label, value: st[key], options: [{ value: '', label: all }, ...opts], onPick: (v) => pick(key, v) })
     selectsHost.replaceChildren(h('div', { class: 'filters-grid' },

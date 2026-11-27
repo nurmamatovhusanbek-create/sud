@@ -1,7 +1,7 @@
 // The «Majlislar» tab: the upcoming hearings, narrowed by range, by company and by a text, a page at a time. A hundred hearings are never one long scroll:
 // the range chips and the company cards narrow the list with one tap, and only 30 rows are drawn until «Yana» is pressed.
 import { h } from '../ui/h.js'
-import { CardRow, Chips, Empty, ErrorBox, Field, Row, Skeletons } from '../ui/components.js'
+import { Chips, Empty, ErrorBox, Field, Picker, Row, Skeletons } from '../ui/components.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { dayDmy, nextDay, num } from '../core/format.js'
@@ -48,8 +48,9 @@ export function hearingsTab(route, { signal }) {
       chipsHost.replaceChildren(Chips(RANGES.map(([days, label]) => ({ value: days, label: `${label} · ${num(page.ranges[days] ?? 0)}` })), st.days, (v) => { st.days = v; keep(); load(true) }, { scroll: true }))
       const total = page.companies.reduce((a, c) => a + c.count, 0)
       cardsHost.replaceChildren(page.companies.length > 1 || st.tin
-        ? CardRow([{ value: '', title: 'Hammasi', big: num(total), sub: `${page.companies.length} kompaniya` },
-          ...page.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, page.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))], st.tin, (v) => { st.tin = v; keep(); load(true) })
+        ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => { st.tin = v; keep(); load(true) },
+          items: [{ value: '', title: 'Hammasi', big: num(total), sub: `${page.companies.length} kompaniya` },
+            ...page.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, page.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))] })
         : '')
       listHost.replaceChildren()
       lastDay = 0

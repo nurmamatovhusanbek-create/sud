@@ -9,3 +9,24 @@
 .mcard__sub { font-size: var(--text-xs); opacity: 0.7; }
 .mcard--small { min-width: 84px; padding: var(--space-2) var(--space-3); }
 .mcard--small .mcard__big { font-size: var(--text-md); }
+
+/* PICKER: «which company?» as a bar + a vertical list (no sideways scrolling, names in full). Tokens only. */
+.picker { border: var(--border-width) solid var(--border-default); border-radius: var(--radius-2); background: var(--surface); overflow: hidden; }
+.picker--open { border-color: var(--border-focus); }
+.picker__head { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--size-tap); padding: var(--space-2) var(--space-3); border: 0; background: transparent; color: var(--text-1); text-align: left; }
+.picker__label { flex: none; font-size: var(--text-xs); color: var(--text-2); }
+.picker__cur { flex: 1; min-width: 0; font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker__num { flex: none; color: var(--text-2); }
+.picker__head svg { flex: none; color: var(--text-3); transform: rotate(90deg); }
+.picker--open .picker__head svg { transform: rotate(-90deg); }
+.picker__list { border-top: var(--border-width) solid var(--border-default); }
+.picker__list .field { margin: var(--space-2); }
+.picker__rows { max-height: 52vh; overflow-y: auto; }
+.picker__row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--size-tap); padding: var(--space-2) var(--space-3); border: 0; border-top: var(--border-width) solid var(--border-default); background: transparent; color: var(--text-1); text-align: left; }
+.picker__row:first-child { border-top: 0; }
+.picker__row[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast); }
+.picker__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.picker__title { overflow-wrap: anywhere; line-height: var(--leading-tight); }
+.picker__sub { font-size: var(--text-xs); opacity: 0.7; }
+.picker__row .picker__num { font-weight: var(--weight-medium); }
+.picker__row[aria-pressed="true"] .picker__num { color: inherit; }

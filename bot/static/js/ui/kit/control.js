@@ -46,3 +46,34 @@ export function Select({ label, options, value, onPick }) {
   box.select = sel
   return box
 }
+
+/**
+ * A CHOICE LIST for «which company?»: one bar showing the current choice (its name in full, its count); a tap opens a vertical list of rows, each with the full
+ * name (up to two lines), a small line under it and the count at the right, and a search field when there are many. No sideways scrolling, nothing cut off.
+ * `items` = [{ value, title, sub?, big }]; the first one is usually «Hammasi». A choice closes the list and calls `onPick(value)`.
+ */
+export function Picker({ label, items, value, onPick, searchAt = 7 }) {
+  const cur = items.find((i) => i.value === value) || items[0]
+  const box = h('div', { class: 'picker' })
+  const head = h('button', { type: 'button', class: 'picker__head', 'aria-expanded': 'false', on: { click: () => toggle() } },
+    h('span', { class: 'picker__label' }, label),
+    h('span', { class: 'picker__cur' }, cur.title),
+    h('span', { class: 'picker__num mono' }, cur.big),
+    icon('chevron', 16))
+  const rows = items.map((i) => ({ i, el: h('button', { type: 'button', class: 'picker__row', 'aria-pressed': String(i.value === value), on: { click: () => { toggle(false); onPick(i.value) } } },
+    h('span', { class: 'picker__main' }, h('span', { class: 'picker__title' }, i.title), i.sub && h('span', { class: 'picker__sub' }, i.sub)),
+    h('span', { class: 'picker__num mono' }, i.big)) }))
+  const search = items.length >= searchAt
+    ? Field({ placeholder: 'Kompaniya qidirish…', compact: true, onInput: (v) => { const q = v.trim().toLowerCase(); for (const r of rows) r.el.classList.toggle('hidden', !!q && !`${r.i.title} ${r.i.sub || ''}`.toLowerCase().includes(q)) } })
+    : null
+  const list = h('div', { class: 'picker__list hidden' }, search && search.el, h('div', { class: 'picker__rows' }, ...rows.map((r) => r.el)))
+  function toggle(force) {
+    const open = force ?? list.classList.contains('hidden')
+    list.classList.toggle('hidden', !open)
+    box.classList.toggle('picker--open', open)
+    head.setAttribute('aria-expanded', String(open))
+    if (open && search) search.input.focus()
+  }
+  box.append(head, list)
+  return box
+}
