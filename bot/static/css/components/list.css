@@ -9,3 +9,15 @@
 .row__sub { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .row__sub--clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row__chev { flex: none; color: var(--text-3); display: inline-flex; }
+
+/* PAGINATION */
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); margin: var(--space-2) 0; }
+.pager--min { justify-content: flex-start; }
+.pager__sizebox { display: inline-flex; align-items: center; gap: var(--space-2); }
+.pager__size { min-height: var(--size-control-sm); padding: 0 var(--space-2); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-1); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
+.pager__range { flex: 1; min-width: 0; text-align: center; }
+.pager__nav { display: inline-flex; align-items: center; gap: var(--space-1); }
+.pager__btn { display: inline-flex; align-items: center; justify-content: center; width: var(--size-control); height: var(--size-control-sm); border: var(--border-width) solid var(--border-default); border-radius: var(--radius-1); background: var(--surface); color: var(--text-1); }
+.pager__btn:disabled { color: var(--text-3); opacity: 0.5; cursor: default; }
+.pager__page { min-width: 64px; text-align: center; font-size: var(--text-sm); }
+.pager-anchor { scroll-margin-top: calc(var(--size-tabbar) + var(--space-8) + var(--inset-top)); }

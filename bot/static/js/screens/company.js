@@ -1,39 +1,40 @@
 import { h } from '../ui/h.js'
-import { Bars, Button, Card, Chips, Columns, Empty, ErrorBox, Field, Hero, Row, Stats, Tabs } from '../ui/components.js'
+import { Bars, Card, Chips, Columns, Empty, ErrorBox, Field, Hero, Pager, Row, Skeletons, Stats, Tabs } from '../ui/components.js'
 import { billWord } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
+import { pageSize, setPageSize } from '../core/page-size.js'
 import { dmy, has, money, num } from '../core/format.js'
 import { d } from '../core/text.js'
 import { COURT, companyTitle, courtName, TopBar } from './common.js'
 import { orderRow } from './orders.js'
 
-const PAGE = 30
-
-/** a paged, filterable list: `fetch(offset)` → { total, rows, head? }, `row(x)` → node. Replaces its own body; "more" appends. */
+/**
+ * a paged list: `fetch(offset, limit)` → { total, rows }, `row(x)` → node, `summary(r)` → the line above. Pages of 10 / 30 / 50 / 100 (one choice for every list,
+ * kept on this phone) with ‹ › and first / last, above AND below the rows. Replaces its own body.
+ */
 function Paged({ fetch, row, summary, empty }) {
-  const body = h('div', {})
-  const list = h('div', { class: 'list' })
-  const more = h('div', { class: 'screen__more' })
-  let offset = 0
-  async function load(first) {
+  const body = h('div', { class: 'pager-anchor' })
+  let page = 1
+  let size = pageSize()
+  async function load() {
+    body.replaceChildren(Skeletons(2))
     try {
-      const r = await fetch(offset)
-      if (first) {
-        body.replaceChildren()
-        if (!r.rows.length) { body.append(Empty(empty)); return }
-        body.append(h('div', { class: 'section-label' }, summary(r)), list, more)
-        list.replaceChildren()
-      }
-      list.append(...r.rows.map(row))
-      offset += r.rows.length
-      more.replaceChildren(offset < r.total ? Button({ label: `Yana ${Math.min(PAGE, r.total - offset)} ta…`, block: true, onClick: () => load(false) }) : '')
+      const r = await fetch((page - 1) * size, size)
+      const pages = Math.max(1, Math.ceil(r.total / size))
+      if (page > pages) { page = pages; return load() }
+      body.replaceChildren()
+      if (!r.rows.length) { body.append(Empty(empty)); return }
+      const turn = (n) => { page = n; load(); body.scrollIntoView({ block: 'start' }) }
+      const resize = (n) => { size = n; setPageSize(n); page = 1; load() }
+      const pager = () => Pager({ page, size, total: r.total, onPage: turn, onSize: resize })
+      body.append(h('div', { class: 'section-label' }, summary(r)), pager(), h('div', { class: 'list' }, ...r.rows.map(row)), pager())
     } catch (e) {
       if (e?.name === 'AbortError') return
-      body.replaceChildren(ErrorBox(e.message, () => { offset = 0; load(true) }))
+      body.replaceChildren(ErrorBox(e.message, load))
     }
   }
-  load(true)
+  load()
   return body
 }
 
@@ -45,7 +46,7 @@ function casesPane(tin, route, signal) {
   const keep = () => remember({ ...route, name: 'company', tab: 'cases', court: st.court, q: st.q })
   const show = () => {
     results.replaceChildren(Paged({
-      fetch: (offset) => api.companyCases({ tin, court: st.court, q: st.q, offset, limit: PAGE }, { signal }).then((j) => j.cases),
+      fetch: (offset, limit) => api.companyCases({ tin, court: st.court, q: st.q, offset, limit }, { signal }).then((j) => j.cases),
       row: (x) => Row({ icon: 'case', title: x.key, sub: `${courtName(x.court)} · 20${x.year}`, onOpen: () => go({ name: 'case', key: x.key }) }),
       summary: (r) => `${num(r.total)} ta ish`,
       empty: 'Ish topilmadi.',
@@ -67,22 +68,23 @@ function casesPane(tin, route, signal) {
 
 function ordersPane(tin, signal) {
   return Paged({
-    fetch: (offset) => api.orders({ tin, offset, limit: PAGE }, { signal }).then((j) => j.orders),
+    fetch: (offset, limit) => api.orders({ tin, offset, limit }, { signal }).then((j) => j.orders),
     row: (o) => orderRow(o),
     summary: (r) => `${num(r.total)} ta qaror · yuklangan ${num(r.saved)}, yuklanmagan ${num(r.unsaved)}`,
     empty: 'Bu kompaniya ishlari boʻyicha qaror zaxirada yoʻq.',
   })
 }
 
-function billsPane(tin, years, route, signal) {
+/** `where` = the route this pane lives in: a company screen's tab, or the home «Toʻlovlar» tab (which also remembers its company) */
+export function billsPane(tin, years, route, signal, where = { name: 'company', tab: 'bills' }) {
   const st = { year: route.year || String(years[0] || ''), q: route.q || '' }
   if (!st.year) return Empty('Kvitansiyalar zaxirada yoʻq.')
   const filters = h('div', { class: 'screen__filters' })
   const results = h('div', {})
-  const keep = () => remember({ ...route, name: 'company', tab: 'bills', year: st.year, q: st.q })
+  const keep = () => remember({ ...route, ...where, year: st.year, q: st.q })
   const show = () => {
     results.replaceChildren(Paged({
-      fetch: (offset) => api.companyBills({ tin, year: st.year, q: st.q, offset, limit: PAGE }, { signal }).then((j) => j.bills),
+      fetch: (offset, limit) => api.companyBills({ tin, year: st.year, q: st.q, offset, limit }, { signal }).then((j) => j.bills),
       row: (x) => Row({ icon: 'bill', title: x.number, sub: [`${d(x.cat)} · ${money(x.amount)} · ${billWord(x.status)} · ${dmy(x.issued)}`, has(x.caseNumber) && `ish ${x.caseNumber}`].filter(Boolean).join(' · '), onOpen: () => go({ name: 'bill', key: x.number }) }),
       summary: (r) => `${num(r.total)} ta · jami ${money(r.sum)} · toʻlangan ${money(r.paid)}`,
       empty: 'Kvitansiya topilmadi.',

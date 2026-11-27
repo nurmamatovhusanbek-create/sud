@@ -8,6 +8,8 @@ const PATHS = {
   calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4'],
   order: ['M6 3h9l4 4v14H6z', 'M14 3v5h5', 'M9 13h6', 'M9 17h6'],
   chevron: ['M9 6l6 6-6 6'],
+  first: ['M18 6l-6 6 6 6', 'M10 6l-6 6 6 6'],
+  last: ['M6 6l6 6-6 6', 'M14 6l6 6-6 6'],
   back: ['M15 6l-6 6 6 6'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
   expand: ['M4 9V4h5', 'M20 9V4h-5', 'M4 15v5h5', 'M20 15v5h-5'],

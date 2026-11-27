@@ -55,12 +55,13 @@ export function Select({ label, options, value, onPick }) {
 export function Picker({ label, items, value, onPick, searchAt = 7 }) {
   const cur = items.find((i) => i.value === value) || items[0]
   const box = h('div', { class: 'picker' })
+  const curEl = h('span', { class: 'picker__cur' }, cur.title)
+  const curNum = h('span', { class: 'picker__num mono' }, cur.big)
   const head = h('button', { type: 'button', class: 'picker__head', 'aria-expanded': 'false', on: { click: () => toggle() } },
-    h('span', { class: 'picker__label' }, label),
-    h('span', { class: 'picker__cur' }, cur.title),
-    h('span', { class: 'picker__num mono' }, cur.big),
-    icon('chevron', 16))
-  const rows = items.map((i) => ({ i, el: h('button', { type: 'button', class: 'picker__row', 'aria-pressed': String(i.value === value), on: { click: () => { toggle(false); onPick(i.value) } } },
+    h('span', { class: 'picker__label' }, label), curEl, curNum, icon('chevron', 16))
+  // the bar and the marked row follow a choice by themselves (a screen that keeps this Picker, not drawing it again, still shows the right company)
+  const choose = (i) => { curEl.textContent = i.title; curNum.textContent = i.big; for (const r of rows) r.el.setAttribute('aria-pressed', String(r.i === i)) }
+  const rows = items.map((i) => ({ i, el: h('button', { type: 'button', class: 'picker__row', 'aria-pressed': String(i.value === value), on: { click: () => { toggle(false); choose(i); onPick(i.value) } } },
     h('span', { class: 'picker__main' }, h('span', { class: 'picker__title' }, i.title), i.sub && h('span', { class: 'picker__sub' }, i.sub)),
     h('span', { class: 'picker__num mono' }, i.big)) }))
   const search = items.length >= searchAt
