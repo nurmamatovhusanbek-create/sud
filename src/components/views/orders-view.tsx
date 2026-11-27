@@ -22,7 +22,7 @@ import { EmptyBlock, Seg, SkRows } from '@/components/proto/primitives'
 import { HarHowTo, HarPicker, OrderHandover } from '@/components/proto/order-handover'
 import { ListPagination, clampPage } from '@/components/ui-custom/list-pagination'
 import { useDownloadJob } from '@/hooks/use-download-job'
-import { getPublicOrdersLibrary, getPurgedOrders, restorePurgedOrders, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
+import { getPublicOrdersLibrary, getPurgedOrders, restorePurgedOrders, purgeHiddenOrders, importPublicOrderPdf, importPublicOrdersHar, setOrdersHidden, ManualOrderError, openPublicOrderPdf, type LibraryPage } from '@/lib/api-client'
 import { ORDERS_FILE_GAP_SECONDS_DEFAULT, PUBLIC_INSTANCE_LABEL, PUBLIC_RESULT_LABEL, type LibraryItem, type LibraryStatus } from '@/core/public-orders'
 
 const COURT_SEG: { key: string; label: string }[] = [
@@ -83,6 +83,20 @@ export function OrdersView() {
     }
     toast.success(`${r.data.restored} ta qaror roʻyxatga qaytarildi`)
     setTick((n) => n + 1)
+  }
+  /** «Tozalangan» › «Butunlay oʻchirish»: every cleared order goes entirely (record and PDF file) */
+  const purgeCleared = async () => {
+    const n = data?.counts.hidden ?? 0
+    if (!n) return
+    if (!window.confirm(`Tozalangan ${n} ta qaror butunlay oʻchiriladi: yozuvlari maʼlumotlardan chiqariladi va yuklangan PDF fayllari diskdan oʻchiriladi (Telegram zaxirasida ham keyingi zaxiradan boshlab yoʻq boʻladi). Fayllarni qaytarib boʻlmaydi: kerak boʻlsa saytdan qayta yuklanadi. Davom etamizmi?`)) return
+    const r = await purgeHiddenOrders()
+    if (!r.ok) {
+      toast.error(r.error)
+      return
+    }
+    setSel(new Map())
+    setTick((t) => t + 1)
+    toast.success(`${r.data.purged} ta qaror butunlay oʻchirildi`, { description: `${r.data.files} ta PDF fayl diskdan olib tashlandi.` })
   }
   const bulk = dl.job?.phase === 'running' ? { done: dl.job.done, total: dl.job.total } : null
   // the lists and counts move while the job works: every finished order leaves «Yuklanmagan» now, not at the end
@@ -360,11 +374,17 @@ export function OrdersView() {
           <>
             {status === 'hidden' && (
               <div className="dw-orders-empty" style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap', margin: '0 0 10px' }}>
-                <span>Tozalangan qarorlar: <b>{data?.counts.hidden ?? 0} ta</b>. Yozuvlari saqlangan; kerak boʻlsa yuklab oling yoki roʻyxatga qaytaring.</span>
-                <button className="btn btn-outline btn-sm" onClick={() => void restore(items.map((o) => o.pdfId))} title="Shu sahifadagilarni roʻyxatga qaytarish">
-                  <RefreshCw />
-                  <span>Sahifadagilarni qaytarish</span>
-                </button>
+                <span>Tozalangan qarorlar: <b>{data?.counts.hidden ?? 0} ta</b>. Yozuvlari saqlangan; kerak boʻlsa yuklab oling yoki roʻyxatga qaytaring, keraksizini «Butunlay oʻchirish» bilan yozuvi va faylidan tozalang.</span>
+                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => void restore(items.map((o) => o.pdfId))} title="Shu sahifadagilarni roʻyxatga qaytarish">
+                    <RefreshCw />
+                    <span>Sahifadagilarni qaytarish</span>
+                  </button>
+                  <button className="btn btn-outline btn-sm" disabled={!!bulk} onClick={() => void purgeCleared()} title="Barcha tozalangan qarorlarni yozuvi va PDF fayli bilan butunlay oʻchirish (barcha sahifalardan)">
+                    <Trash2 />
+                    <span>Butunlay oʻchirish</span>
+                  </button>
+                </span>
               </div>
             )}
             {status === 'saved' && sel.size > 0 && (

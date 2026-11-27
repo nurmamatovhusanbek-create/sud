@@ -7,7 +7,7 @@ import { scheduleMetaBackup } from './meta-backup-runner'
 
 /**
  * Downloaded order PDFs, one file per order: `<data dir>/files/<pdf id>.pdf` (default `~/.sud-tizimi/public-orders/files`).
- * Like the rest of the orders cache it lives outside the project and the app never deletes it. Only a uuid ever becomes
+ * Like the rest of the orders cache it lives outside the project and the app never deletes it on its own (the person's «Butunlay oʻchirish» in Qarorlar › Tozalangan is the one door, `removePdf`). Only a uuid ever becomes
  * a file name; a file is written whole or not at all (temp file + rename), 0600 in a 0700 folder.
  */
 
@@ -22,6 +22,18 @@ export async function readPdf(id: string): Promise<Uint8Array | null> {
     return b.length > 5 && b.subarray(0, 5).toString('latin1') === '%PDF-' ? new Uint8Array(b) : null // a damaged file is fetched again
   } catch {
     return null
+  }
+}
+
+/** Delete one order's PDF (only «Tozalangan» › «Butunlay oʻchirish» does; nothing else ever removes a file). True when a file was there. */
+export async function removePdf(id: string): Promise<boolean> {
+  const f = fileOf(id)
+  if (!f) return false
+  try {
+    await fs.unlink(f)
+    return true
+  } catch {
+    return false
   }
 }
 

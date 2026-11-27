@@ -20,7 +20,7 @@ const routes: string[] = []
 const rel = (p: string) => path.relative(API, p).replace(/\\/g, '/')
 
 // [route, method] pairs that change the machine or the app
-const PRIVILEGED = new Set(['settings/update/route.ts:POST', 'settings/workers/route.ts:POST', 'settings/workers/route.ts:DELETE', 'settings/workers/test/route.ts:POST', 'tor-status/route.ts:POST'])
+const PRIVILEGED = new Set(['settings/update/route.ts:POST', 'settings/workers/route.ts:POST', 'settings/workers/route.ts:DELETE', 'settings/workers/test/route.ts:POST', 'tor-status/route.ts:POST', 'public-orders/purge-hidden/route.ts:POST'])
 
 describe('API routes', () => {
   test('there are routes to check', () => expect(routes.length).toBeGreaterThan(15))

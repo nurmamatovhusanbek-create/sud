@@ -588,6 +588,18 @@ export function getPublicOrdersLibrary(
   return request<LibraryPage>(`/api/public-orders/library?${qs}&_=${Date.now()}`, signal)
 }
 
+/** «Tozalangan» › «Butunlay oʻchirish»: delete every cleared order entirely (record and PDF file). Local only. */
+export async function purgeHiddenOrders(): Promise<ApiResult<{ purged: number; files: number }>> {
+  try {
+    const res = await fetch('/api/public-orders/purge-hidden', { method: 'POST', headers: privilegedHeaders() })
+    const json = await res.json().catch(() => null)
+    if (json?.ok === true && json.data && typeof json.data.purged === 'number') return { ok: true, data: json.data }
+    return { ok: false, error: json?.error || `Server javob bermadi (${res.status})`, status: res.status }
+  } catch {
+    return { ok: false, error: 'Tarmoq xatosi — serverga ulanib boʻlmadi' }
+  }
+}
+
 /** «Tozalash» / «Qaytarish»: clear orders from the Qarorlar lists (their records are kept) or bring them back. Local state only. */
 export async function setOrdersHidden(action: 'hide' | 'restore', ids: string[]): Promise<ApiResult<{ changed: number; total: number }>> {
   try {
