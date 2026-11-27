@@ -1,14 +1,14 @@
-// The «Majlislar» tab: the upcoming hearings, narrowed by range, by company and by a text, a page at a time. A hundred hearings are never one long scroll:
-// the range chips and the company cards narrow the list with one tap, and only 30 rows are drawn until «Yana» is pressed.
+// The «Majlislar» tab: the upcoming hearings, narrowed by range, by company and by a text, in pages of 10 / 30 / 50 / 100 (with ‹ ›), grouped by day inside a page.
+// A hundred hearings are never one long scroll: the range chips and the company bar narrow the list with one tap.
 import { h } from '../ui/h.js'
-import { Chips, Empty, ErrorBox, Field, Picker, Row, Skeletons } from '../ui/components.js'
+import { Chips, Empty, ErrorBox, Field, Pager, Picker, Row, Skeletons } from '../ui/components.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
 import { dayDmy, nextDay, num } from '../core/format.js'
 import { d } from '../core/text.js'
+import { pageSize, setPageSize } from '../core/page-size.js'
 import { courtName, ROLE, STAGE } from './common.js'
 
-const PAGE = 30
 const RANGES = [[1, 'Bugun'], [7, '7 kun'], [14, '14 kun'], [30, '30 kun'], [60, '60 kun']]
 
 const debounce = (fn, ms = 300) => { let t = 0; return (v) => { clearTimeout(t); t = setTimeout(() => fn(v), ms) } }
@@ -30,62 +30,61 @@ function item(x) {
 export function hearingsTab(route, { signal }) {
   const st = { days: Number(route.days) || 14, tin: route.tin || '', q: route.q || '' }
   const names = {} // STIR → name, for the company cards
-  api.companies({ signal }).then((j) => { for (const c of j.companies || []) names[c.tin] = c.name ? d(c.name) : ''; }).catch(() => {})
+  let lastFacets = null // the names arrive after the first page: the company bar is drawn again with them
+  api.companies({ signal }).then((j) => { for (const c of j.companies || []) names[c.tin] = c.name ? d(c.name) : ''; if (lastFacets) drawFacets(lastFacets) }).catch(() => {})
   const chipsHost = h('div', {})
   const cardsHost = h('div', {})
-  const listHost = h('div', { class: 'stack' })
-  const keep = () => remember({ ...route, name: 'home', tab: 'hearings', days: st.days, tin: st.tin, q: st.q })
+  const listHost = h('div', { class: 'stack pager-anchor' })
+  const keep = () => remember({ ...route, name: 'home', tab: 'hearings', days: st.days, tin: st.tin, q: st.q, page })
 
-  let offset = 0
-  let today = 0
-  let lastDay = 0
-  let list = null // the open `.list` of the current day group
-  let more = null
+  let page = Math.max(1, Number(route.page) || 1)
+  let size = pageSize()
 
-  const draw = (page, first) => {
-    today = page.today
-    if (first) {
-      chipsHost.replaceChildren(Chips(RANGES.map(([days, label]) => ({ value: days, label: `${label} · ${num(page.ranges[days] ?? 0)}` })), st.days, (v) => { st.days = v; keep(); load(true) }, { scroll: true }))
-      const total = page.companies.reduce((a, c) => a + c.count, 0)
-      cardsHost.replaceChildren(page.companies.length > 1 || st.tin
-        ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => { st.tin = v; keep(); load(true) },
-          items: [{ value: '', title: 'Hammasi', big: num(total), sub: `${page.companies.length} kompaniya` },
-            ...page.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, page.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))] })
-        : '')
-      listHost.replaceChildren()
-      lastDay = 0
-      list = null
-      if (!page.rows.length) { listHost.append(Empty(st.q || st.tin ? 'Bu filtr boʻyicha majlis yoʻq.' : `Yaqin ${st.days === 1 ? 'bugun' : `${st.days} kunda`} majlis yoʻq (zaxira maʼlumotiga koʻra).`)); return }
-      more = h('div', { class: 'screen__more' })
-      listHost.append(h('div', { class: 'section-label' }, `${num(page.total)} ta majlis`), more)
-    }
-    for (const x of page.rows) {
-      if (x.day !== lastDay) {
-        lastDay = x.day
-        listHost.insertBefore(h('div', { class: 'day-label' }, dayLabel(x.day, today)), more)
-        list = h('div', { class: 'list' })
-        listHost.insertBefore(list, more)
-      }
-      list.append(item(x))
-    }
-    offset += page.rows.length
-    more.replaceChildren(offset < page.total
-      ? h('button', { type: 'button', class: 'btn btn--block', on: { click: () => load(false) } }, `Yana ${Math.min(PAGE, page.total - offset)} ta (${num(offset)}/${num(page.total)})`)
+  /** the filters (not the page) changed: the range chips and the company bar are drawn again */
+  const drawFacets = (r) => {
+    lastFacets = r
+    chipsHost.replaceChildren(Chips(RANGES.map(([days, label]) => ({ value: days, label: `${label} · ${num(r.ranges[days] ?? 0)}` })), st.days, (v) => { st.days = v; page = 1; keep(); load(true) }, { scroll: true }))
+    const total = r.companies.reduce((a, c) => a + c.count, 0)
+    cardsHost.replaceChildren(r.companies.length > 1 || st.tin
+      ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => { st.tin = v; page = 1; keep(); load(true) },
+        items: [{ value: '', title: 'Hammasi', big: num(total), sub: `${r.companies.length} kompaniya` },
+          ...r.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, r.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))] })
       : '')
   }
 
-  async function load(first) {
-    if (first) { offset = 0; listHost.replaceChildren(Skeletons(2)) }
+  async function load(facets) {
+    listHost.replaceChildren(Skeletons(2))
     try {
-      const { page } = await api.hearings({ days: st.days, tin: st.tin, q: st.q, offset, limit: PAGE }, { signal })
-      draw(page, first)
+      const { page: r } = await api.hearings({ days: st.days, tin: st.tin, q: st.q, offset: (page - 1) * size, limit: size }, { signal })
+      const pages = Math.max(1, Math.ceil(r.total / size))
+      if (page > pages) { page = pages; keep(); return load(facets) } // the list got shorter than the page asked for
+      if (facets || !chipsHost.firstChild) drawFacets(r)
+      listHost.replaceChildren()
+      if (!r.rows.length) { listHost.append(Empty(st.q || st.tin ? 'Bu filtr boʻyicha majlis yoʻq.' : `Yaqin ${st.days === 1 ? 'bugun' : `${st.days} kunda`} majlis yoʻq (zaxira maʼlumotiga koʻra).`)); return }
+      const turn = (n) => { page = n; keep(); load(false); listHost.scrollIntoView({ block: 'start' }) }
+      const resize = (n) => { size = n; setPageSize(n); page = 1; keep(); load(false) }
+      const pager = () => Pager({ page, size, total: r.total, onPage: turn, onSize: resize })
+      listHost.append(h('div', { class: 'section-label' }, `${num(r.total)} ta majlis`), pager())
+      // the rows of THIS page, a heading and a card per day
+      let lastDay = 0
+      let list = null
+      for (const x of r.rows) {
+        if (x.day !== lastDay) {
+          lastDay = x.day
+          listHost.append(h('div', { class: 'day-label' }, dayLabel(x.day, r.today)))
+          list = h('div', { class: 'list' })
+          listHost.append(list)
+        }
+        list.append(item(x))
+      }
+      listHost.append(pager())
     } catch (e) {
       if (e?.name === 'AbortError') return
-      listHost.replaceChildren(ErrorBox(e.message, () => load(true)))
+      listHost.replaceChildren(ErrorBox(e.message, () => load(facets)))
     }
   }
 
-  const field = Field({ placeholder: 'Ish raqami yoki tomon…', value: st.q, compact: true, onInput: debounce((v) => { st.q = v.trim(); keep(); load(true) }) })
+  const field = Field({ placeholder: 'Ish raqami yoki tomon…', value: st.q, compact: true, onInput: debounce((v) => { st.q = v.trim(); page = 1; keep(); load(true) }) })
   load(true)
   return h('div', { class: 'stack' }, chipsHost, cardsHost, field.el, listHost)
 }
