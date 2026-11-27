@@ -1,6 +1,6 @@
 import 'server-only'
 import { isConcludedStatus } from '@/core/case-status'
-import { buildMessage, watchKeyboard, diffRow, instanceEvent, instancesOf, normSig, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
+import { buildMessage, watchKeyboard, changeLines, diffRow, instanceEvent, instancesOf, normSig, overflowMessage, rowSig, sidesOf, type WatchConfig, type WatchEvent } from '@/core/watch'
 import type { CourtCase, CourtType, FullCaseData } from './court-case-types'
 import { clearCourtCaseCache, getCaseLean, searchCourtCasesDetailed, type CaseLean, type CourtListResult } from './court-case'
 import { companyNameOf } from './db-buckets'
@@ -107,6 +107,12 @@ async function watchCompany(tin: string, cfg: WatchConfig, d: WatchDeps, run: Wa
           kind = 'instance'
           instance = ie
         }
+      }
+      // a status or hearing alert must SAY what changed («Holati: A → B»). One that cannot (the old value is not remembered in a form that differs from the new one:
+      // the same words in another source's spelling, a cell blanked) is not an alert: it is remembered silently, never sent
+      if (prev && (kind === 'status' || kind === 'hearing') && changeLines(prev.sig, row).length === 0) {
+        writeSeen(tin, row.caseNumber, court, sig, { ...(det ? { ins: instancesOf(det) } : {}), checkedAt: d.now(), now: d.now() })
+        continue
       }
       changed.add(row.caseNumber)
       pending.push({ ev: { kind, ...(instance ? { instance } : {}), tin, companyName: name, courtType: court, row, detail: det, sides: sidesOf(tin, name, row, det), ...(prev ? { prevSig: prev.sig } : {}) }, sig, ins: det ? instancesOf(det) : undefined, ...(prev ? { from: prev.sig } : {}) })

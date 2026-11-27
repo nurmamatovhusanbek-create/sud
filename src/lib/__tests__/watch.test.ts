@@ -109,6 +109,17 @@ describe('the first read and what is new after it', () => {
     expect(sent.find((s) => s.text.includes('holati'))!.text).toContain('<b>Holati:</b> Tayinlash → <b>Koʻrib chiqish jarayonida</b>')
   })
 
+  test('an alert that cannot say what changed is not sent: a change only in the hearing stage has no «old → new» line, so it is remembered silently', async () => {
+    lists[`economic:${TIN}`] = [row(1)]
+    await run()
+    lists[`economic:${TIN}`] = [row(1, { hearingStage: 'appeal' })] // the stage moved: no status, result, date or time line to show
+    const r = await run()
+    expect(r.events).toBe(0)
+    expect(sent).toHaveLength(0)
+    // remembered: the same list again is still nothing
+    expect((await run()).events).toBe(0)
+  })
+
   test('the same case twice in one list is one case: announced once, not every run', async () => {
     lists[`economic:${TIN}`] = [row(1)]
     await run()
