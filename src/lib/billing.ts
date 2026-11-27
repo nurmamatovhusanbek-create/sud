@@ -41,7 +41,7 @@ import { directOriginOf } from './net/direct-route'
 import { config } from '@/server/config'
 import { readSavedVlmList } from './vlm-config'
 import { callVision } from './vlm-client'
-import { createVlmPool } from './vlm-pool'
+import { createVlmPool, VlmPoolError } from './vlm-pool'
 import { MATH_PROMPT, parseIntegerAnswer } from './vlm-test'
 
 /**
@@ -366,6 +366,7 @@ export async function getCaptchaToken(
   worker?: string,
   site: CaptchaSite = BILLING_CAPTCHA,
 ): Promise<string> {
+  let why = '' // the last reason an attempt failed: said in the final error, so «after 3 attempts» is never the whole story
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // 1. PoW challenge
     onPhase?.('captcha_pow', attempt === 0 ? 'Solving proof-of-work challenge…' : `Retrying PoW (attempt ${attempt + 1})…`)
@@ -464,6 +465,11 @@ export async function getCaptchaToken(
         // can still succeed if the captcha score was high enough (no challenge
         // needed). The error falls through to the next attempt.
         const msg = e instanceof Error ? e.message : String(e)
+        why = msg.slice(0, 120)
+        // every reader says «quota used up»: asking again (two more pictures, then the next order's three) only burns what is left and time. Stop NOW, with the way out.
+        if (e instanceof VlmPoolError && e.failures.length > 0 && e.failures.every((f) => f.kind === 'rate_limited')) {
+          throw new Error(`VLM kvotasi tugagan (${e.failures.map((f) => f.id).join(', ')}): Sozlamalar › Captcha da boshqa kalit yoki provayder qoʻshing, yoki kvota tiklanguncha kuting`)
+        }
         if (/Configuration file not found|z-ai-config|VLM sozlanmagan/.test(msg)) {
           console.error('[captcha] math captcha NOT solved: VLM sozlanmagan. Sozlamalar › Captcha da kalit saqlang (yoki .env ga VLM_API_KEY va VLM_BASE_URL ni qoʻying).')
         } else if (msg.includes('ConnectionRefused') || msg.includes('Unable to connect')) {
@@ -477,7 +483,7 @@ export async function getCaptchaToken(
 
     await new Promise((r) => setTimeout(r, 400 + attempt * 150))
   }
-  throw new Error('Failed to obtain captcha token after ' + maxAttempts + ' attempts')
+  throw new Error('Failed to obtain captcha token after ' + maxAttempts + ' attempts' + (why ? `: ${why}` : ''))
 }
 
 // ---- Billing API -------------------------------------------------------

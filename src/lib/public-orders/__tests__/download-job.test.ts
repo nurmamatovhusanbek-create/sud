@@ -157,6 +157,28 @@ describe('the download job', () => {
     await mixed.job.settled()
     expect(mixed.job.state()).toMatchObject({ deferred: 0, done: 5, note: '' })
   })
+  test('the same failure with the routes listed in a different order each time (the rotation) is still the SAME failure: the job stops after three, with the reason once', async () => {
+    const orders = [['a: x', 'b: y', 'c: z'], ['c: z', 'a: x', 'b: y'], ['b: y', 'c: z', 'a: x']]
+    let n = 0
+    const r = rig(() => {
+      throw new Error(`hech bir yoʻl ishlamadi · ${orders[n++ % 3]!.join(' · ')}`)
+    })
+    r.job.start([ID(1), ID(2), ID(3), ID(4), ID(5)])
+    await r.job.settled()
+    expect(r.calls).toEqual([ID(1), ID(2), ID(3)])
+    expect(r.job.state()).toMatchObject({ deferred: 2 })
+    expect(r.job.state().note).toContain('bir xil sabab')
+  })
+  test('a used-up VLM quota or an out-of-date worker is certain to be the same for every order: the job stops at the FIRST', async () => {
+    const r = rig(() => {
+      throw new Error('hech bir yoʻl ishlamadi · bu kompyuter: dam olmoqda (token olinmadi: VLM kvotasi tugagan (gemini): Sozlamalar › Captcha da boshqa kalit qoʻshing)')
+    })
+    r.job.start([ID(1), ID(2), ID(3)])
+    await r.job.settled()
+    expect(r.calls).toEqual([ID(1)])
+    expect(r.job.state()).toMatchObject({ deferred: 2 })
+    expect(r.job.state().note).toContain('VLM kvotasi tugagan')
+  })
   test('a file that arrived but could not be kept stops the job and says why', async () => {
     const r = rig((id) => (id === ID(1) ? { ...ok, saved: false, saveError: 'disk toʻla' } : ok))
     r.job.start([ID(1), ID(2)])

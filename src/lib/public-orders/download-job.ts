@@ -38,6 +38,11 @@ export const MAX_JOB = 5000
 export const MAX_REFUSED_IN_A_ROW = 3
 /** the same failure for this many orders in a row is not about the orders (a worker that is out of date, a captcha host that is down): the rest is left and the reason is said once */
 export const MAX_SAME_FAILURE_IN_A_ROW = 3
+/** reasons that are certain to be the same for every order (a used-up VLM quota, a worker that is out of date): the job stops at the FIRST one */
+const SYSTEMIC = /VLM kvotasi tugagan|eski nusxa|VLM sozlanmagan/
+
+/** the same failure however the routes are listed: each route's reason in its own piece, the pieces in a fixed order (the rotation reorders them every time) */
+export const failureKey = (m: string): string => m.split(' · ').map((x) => x.trim()).sort().join(' · ')
 
 export function createDownloadJob(deps: JobDeps) {
   const now = deps.now ?? Date.now
@@ -102,10 +107,11 @@ export function createDownloadJob(deps: JobDeps) {
         } else {
           const message = e instanceof Error ? e.message : 'yuklab boʻlmadi'
           bad('other', message)
-          sameFailure = sameFailure.message === message ? { message, n: sameFailure.n + 1 } : { message, n: 1 }
-          if (sameFailure.n >= MAX_SAME_FAILURE_IN_A_ROW) {
+          const key = failureKey(message)
+          sameFailure = sameFailure.message === key ? { message: key, n: sameFailure.n + 1 } : { message: key, n: 1 }
+          if (sameFailure.n >= MAX_SAME_FAILURE_IN_A_ROW || SYSTEMIC.test(message)) {
             st.deferred = ids.length - i - 1
-            st.note = `Ketma-ket ${sameFailure.n} ta qaror bir xil sabab bilan yuklanmadi, shuning uchun qolganlari urinib koʻrilmadi. Sabab: ${message}`
+            st.note = SYSTEMIC.test(message) ? `Qolganlari urinib koʻrilmadi: sabab hamma qarorlar uchun bir xil. ${message}` : `Ketma-ket ${sameFailure.n} ta qaror bir xil sabab bilan yuklanmadi, shuning uchun qolganlari urinib koʻrilmadi. Sabab: ${message}`
             st.done++
             break
           }
