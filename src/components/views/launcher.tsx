@@ -131,9 +131,10 @@ export function Launcher() {
   // Nearest known hearing across listed companies (prototype: "Eng yaqini — 16 Sen")
   const nearest = upcomingIsos[0]
 
-  // Prototype KPI 4: total overdue debt across companies with known billing
-  const overdueTotal = companies.reduce((a, c) => a + (c.meta?.overdueTotal ?? 0), 0)
-  const overdueCompanies = companies.filter((c) => (c.meta?.overdueTotal ?? 0) > 0).length
+  // KPI 4: the average win rate of the companies that have one (won ÷ (won + lost), written when a company's stats are read). It replaced «Umumiy qarzdorlik»,
+  // which read `meta.overdueTotal`: nothing has written that for a long time (the bills live on the server now), so it always said «0 mln soʻm / 0 kompaniyada».
+  const rated = companies.filter((c) => typeof c.meta?.winRate === 'number')
+  const avgWin = rated.length ? Math.round(rated.reduce((a, c) => a + (c.meta!.winRate as number), 0) / rated.length) : null
 
   const resolve = async (raw: string) => {
     const d = detectSearchMode(raw)
@@ -185,7 +186,7 @@ export function Launcher() {
 
   const filtered = companies.filter((c) => {
     if (filter === 'active') return isKnownActive(c.meta?.status)
-    if (filter === 'risk') return isKnownInactive(c.meta?.status) || (c.meta?.overdueTotal ?? 0) > 0
+    if (filter === 'risk') return isKnownInactive(c.meta?.status)
     return true
   })
 
@@ -261,9 +262,9 @@ export function Launcher() {
             <span>{searching ? 'Qidirilmoqda…' : 'Ochish'}</span>
           </button>
         </div>
-        <div className="chips">
+        {/* no «Soʻnggi: · hali qidiruv yoʻq» filler: the row exists only when there is something to show */}
+        {recentList.length > 0 && <div className="chips">
           <span className="faint" style={{ fontSize: 12 }}>Soʻnggi:</span>
-          {recentList.length === 0 && <span className="faint" style={{ fontSize: 12 }}>· hali qidiruv yoʻq</span>}
           {recentList.map((r) => (
             <span key={r.stir} className="chip" onClick={() => openCompany(r.stir, { name: r.name })} role="button">
               {grp(r.stir)}
@@ -280,7 +281,7 @@ export function Launcher() {
               </span>
             </span>
           ))}
-        </div>
+        </div>}
       </div>
 
       <div className="kpis" style={{ marginTop: 24 }}>
@@ -314,11 +315,8 @@ export function Launcher() {
         >
           <CountUp value={nearHearings} id="lnch-hearings" />
         </Kpi>
-        <Kpi label="Umumiy qarzdorlik" icon={<SolidIcon name="wallet" />} foot={`${overdueCompanies} kompaniyada`}>
-          <span style={look === 'navy' ? { fontSize: 19 } : undefined}>
-            <CountUp value={Math.round(overdueTotal / 1e6)} suffix="" id="lnch-overdue" />
-            <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: look === 'navy' ? undefined : 400 }}> mln soʻm</span>
-          </span>
+        <Kpi label="Oʻrtacha yutuq" icon={<SolidIcon name="wallet" />} foot={rated.length ? `${rated.length} kompaniya boʻyicha` : 'Statistika hali yuklanmagan'}>
+          {avgWin === null ? <span style={{ color: 'var(--text-3)' }}>–</span> : <CountUp value={avgWin} suffix="%" id="lnch-winrate" />}
         </Kpi>
       </div>
 
