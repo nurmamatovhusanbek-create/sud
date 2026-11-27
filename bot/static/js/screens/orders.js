@@ -25,35 +25,40 @@ export function orderRow(o, { withCase = true } = {}) {
 /** the company's name for a card: Latin, short; its STIR when the backup does not know the name */
 const companyName = (c) => d(c.name) || c.tin
 
-export function ordersTab(route, { signal }) {
-  const st = { q: route.q || '', tin: route.tin || '', saved: route.saved || '', court: route.court || '', instance: route.instance || '', result: route.result || '', year: route.year || '' }
+/**
+ * `opts.tin`: ONE company's orders (the company screen's «Qarorlar» tab): the same filters, counts and pages, no company bar. `opts.where`: the route this lives in
+ * (the home tab by default), so a filter or a page turn is remembered in the right place.
+ */
+export function ordersTab(route, { signal }, opts = {}) {
+  const where = opts.where || { name: 'home', tab: 'orders' }
+  const st = { q: route.q || '', tin: opts.tin ?? (route.tin || ''), saved: route.saved || '', court: route.court || '', instance: route.instance || '', result: route.result || '', year: route.year || '' }
   const cardsHost = h('div', {})
   const selectsHost = h('div', {})
   const resetHost = h('div', {})
   const results = h('div', { class: 'stack pager-anchor' })
-  const keep = () => remember({ ...route, name: 'home', tab: 'orders', ...st, page })
+  const keep = () => remember({ ...route, ...where, ...st, page })
   let page = Math.max(1, Number(route.page) || 1)
   let size = pageSize()
 
-  const any = () => Object.values(st).some((v) => v !== '')
+  const any = () => Object.entries(st).some(([k, v]) => v !== '' && !(k === 'tin' && opts.tin)) // a company fixed by the screen is not a filter the person set
   const pick = (key, v) => { st[key] = v; page = 1; keep(); load(true) }
   const withCount = (label, n) => (n == null ? label : `${label} · ${num(n)}`)
 
   const drawFacets = (f) => {
     // the company choice: a bar with the current company and a list of all of them (full names, counts, a search when there are many)
-    cardsHost.replaceChildren(f.companies.length > 1 || st.tin
+    cardsHost.replaceChildren(!opts.tin && (f.companies.length > 1 || st.tin)
       ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => pick('tin', v),
         items: [{ value: '', title: 'Hammasi', big: num(f.allCompanies), sub: `${f.companies.length} kompaniya` },
           ...f.companies.map((c) => ({ value: c.tin, title: companyName(c), big: num(c.count), sub: `STIR ${c.tin}` }))] })
       : '')
-    const one = (key, label, all, opts) => Select({ label, value: st[key], options: [{ value: '', label: all }, ...opts], onPick: (v) => pick(key, v) })
+    const one = (key, label, all, choices) => Select({ label, value: st[key], options: [{ value: "", label: all }, ...choices], onPick: (v) => pick(key, v) })
     selectsHost.replaceChildren(h('div', { class: 'filters-grid' },
       one('instance', 'Instansiya', 'Hammasi', f.instances.map((x) => ({ value: x.value, label: withCount(x.word, x.count) }))),
       one('result', 'Natija', 'Hammasi', f.results.map((x) => ({ value: x.value, label: withCount(x.word, x.count) }))),
       one('year', 'Yil', 'Hammasi', f.years.map((x) => ({ value: String(x.value), label: withCount(`20${x.value}`, x.count) }))),
       one('court', 'Sud turi', 'Hammasi', Object.entries(f.courts).map(([k, n]) => ({ value: k, label: withCount(COURT[k] || k, n) }))),
       one('saved', 'Fayl', 'Hammasi', [{ value: '1', label: withCount('Yuklangan', f.saved) }, { value: '0', label: withCount('Yuklanmagan', f.unsaved) }])))
-    resetHost.replaceChildren(any() ? h('button', { type: 'button', class: 'btn btn--small', on: { click: () => { for (const k of Object.keys(st)) st[k] = ''; page = 1; field.input.value = ''; field.el.classList.remove('field--filled'); keep(); load(true) } } }, 'Filtrlarni tozalash') : '')
+    resetHost.replaceChildren(any() ? h('button', { type: 'button', class: 'btn btn--small', on: { click: () => { for (const k of Object.keys(st)) if (!(k === 'tin' && opts.tin)) st[k] = ''; page = 1; field.input.value = ''; field.el.classList.remove('field--filled'); keep(); load(true) } } }, 'Filtrlarni tozalash') : '')
   }
 
   /** `facets`: the filters changed, so the drop-downs and company list are drawn again; a page turn only redraws the rows */

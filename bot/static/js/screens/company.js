@@ -1,5 +1,5 @@
 import { h } from '../ui/h.js'
-import { Bars, Card, Chips, Columns, Empty, ErrorBox, Field, Hero, Pager, Row, Skeletons, Stats, Tabs } from '../ui/components.js'
+import { Bars, Card, Columns, Empty, ErrorBox, Field, Hero, Pager, Row, Select, Skeletons, Stats, Tabs } from '../ui/components.js'
 import { billWord } from '../ui/status.js'
 import { api } from '../core/api.js'
 import { go, remember } from '../core/router.js'
@@ -7,7 +7,8 @@ import { pageSize, setPageSize } from '../core/page-size.js'
 import { dmy, has, money, num } from '../core/format.js'
 import { d } from '../core/text.js'
 import { COURT, companyTitle, courtName, TopBar } from './common.js'
-import { orderRow } from './orders.js'
+import { ordersTab } from './orders.js'
+import { hearingsTab } from './hearings.js'
 
 /**
  * a paged list: `fetch(offset, limit)` → { total, rows }, `row(x)` → node, `summary(r)` → the line above. Pages of 10 / 30 / 50 / 100 (one choice for every list,
@@ -54,30 +55,23 @@ function casesPane(tin, route, signal) {
   }
   api.companyCases({ tin, court: '', q: '', offset: 0, limit: 1 }, { signal }).then((j) => {
     const courts = j.cases.courts
-    const options = [{ value: '', label: 'Hammasi' }, ...Object.keys(courts).map((k) => ({ value: k, label: `${COURT[k] || k} ${num(courts[k])}` }))]
-    const chipsHost = h('div', {})
-    const drawChips = () => chipsHost.replaceChildren(Chips(options, st.court, (v) => { st.court = v; keep(); drawChips(); show() }))
-    drawChips()
+    const choose = Select({ label: 'Sud turi', value: st.court, options: [{ value: '', label: `Hammasi · ${num(Object.values(courts).reduce((a, n) => a + n, 0))}` }, ...Object.keys(courts).map((k) => ({ value: k, label: `${COURT[k] || k} · ${num(courts[k])}` }))], onPick: (v) => { st.court = v; keep(); show() } })
     const field = Field({ placeholder: 'Ish raqami boʻyicha filtr…', value: st.q, compact: true, onInput: debounce((v) => { st.q = v.trim(); keep(); show() }) })
-    filters.replaceChildren(field.el, chipsHost)
+    filters.replaceChildren(field.el, h('div', { class: 'filters-grid' }, choose))
     show()
   }).catch((e) => { if (e?.name !== 'AbortError') host.replaceChildren(ErrorBox(e.message)) })
   host.append(filters, results)
   return host
 }
 
-function ordersPane(tin, signal) {
-  return Paged({
-    fetch: (offset, limit) => api.orders({ tin, offset, limit }, { signal }).then((j) => j.orders),
-    row: (o) => orderRow(o),
-    summary: (r) => `${num(r.total)} ta qaror · yuklangan ${num(r.saved)}, yuklanmagan ${num(r.unsaved)}`,
-    empty: 'Bu kompaniya ishlari boʻyicha qaror zaxirada yoʻq.',
-  })
-}
+/** a company's orders and hearings are the SAME screens as the home tabs (filters, counts, pages), fixed to this company */
+const ordersPane = (tin, route, signal) => ordersTab(route, { signal }, { tin, where: { name: 'company', key: tin, tab: 'orders' } })
+const hearingsPane = (tin, route, signal) => hearingsTab(route, { signal }, { tin, where: { name: 'company', key: tin, tab: 'hearings' } })
 
 /** `where` = the route this pane lives in: a company screen's tab, or the home «Toʻlovlar» tab (which also remembers its company) */
 export function billsPane(tin, years, route, signal, where = { name: 'company', tab: 'bills' }) {
-  const st = { year: route.year || String(years[0] || ''), q: route.q || '' }
+  const first = years[0]
+  const st = { year: route.year || String(first?.year ?? first ?? ''), q: route.q || '' }
   if (!st.year) return Empty('Kvitansiyalar zaxirada yoʻq.')
   const filters = h('div', { class: 'screen__filters' })
   const results = h('div', {})
@@ -90,11 +84,9 @@ export function billsPane(tin, years, route, signal, where = { name: 'company', 
       empty: 'Kvitansiya topilmadi.',
     }))
   }
-  const chipsHost = h('div', {})
-  const drawChips = () => chipsHost.replaceChildren(Chips(years.map((y) => ({ value: String(y), label: String(y) })), st.year, (v) => { st.year = v; keep(); drawChips(); show() }))
-  drawChips()
+  const choose = Select({ label: 'Yil', value: st.year, options: years.map((y) => ({ value: String(y.year ?? y), label: y.bills != null ? `${y.year} · ${num(y.bills)}` : String(y) })), onPick: (v) => { st.year = v; keep(); show() } })
   const field = Field({ placeholder: 'Kvitansiya yoki ish raqami, sud…', value: st.q, compact: true, onInput: debounce((v) => { st.q = v.trim(); keep(); show() }) })
-  filters.append(field.el, chipsHost)
+  filters.append(field.el, h('div', { class: 'filters-grid' }, choose))
   show()
   return h('div', { class: 'stack' }, filters, results)
 }
@@ -122,6 +114,6 @@ export async function company(route, { signal }) {
     TopBar(),
     Hero({ caption: o.name ? `Kompaniya · STIR ${o.tin}` : 'Kompaniya · STIR', id: companyTitle(o), line: dates, name: !!o.name }),
     Stats([num(o.cases), 'ish'], [num(o.bills), 'toʻlov'], [String(o.byYear.length), 'yil']),
-    Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }, { value: 'orders', label: 'Qarorlar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
-    tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : tab === 'orders' ? ordersPane(o.tin, signal) : billsPane(o.tin, years, route, signal))
+    Tabs([{ value: 'overview', label: 'Umumiy' }, { value: 'cases', label: 'Ishlar' }, { value: 'bills', label: 'Toʻlovlar' }, { value: 'orders', label: 'Qarorlar' }, { value: 'hearings', label: 'Majlislar' }], tab, (v) => go({ name: 'company', key: o.tin, tab: v }, { replace: true })),
+    tab === 'overview' ? overviewPane(o, years) : tab === 'cases' ? casesPane(o.tin, route, signal) : tab === 'orders' ? ordersPane(o.tin, route, signal) : tab === 'hearings' ? hearingsPane(o.tin, route, signal) : billsPane(o.tin, o.byYear.filter((y) => y.bills > 0).map((y) => ({ year: y.year, bills: y.bills })).sort((a, b) => b.year - a.year), route, signal))
 }

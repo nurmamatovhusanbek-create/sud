@@ -16,7 +16,7 @@ export async function billsTab(route, { signal }) {
   const host = h('div', {})
   const draw = (tin, fresh) => {
     const c = cs.find((x) => x.tin === tin)
-    const years = c.billYears.map((y) => String(y.year)).sort().reverse()
+    const years = c.billYears.slice().sort((a, b) => b.year - a.year) // [{ year, bills }]: the year drop-down shows the counts
     const base = fresh ? { name: 'home', tab: 'bills', tin } : { ...route, name: 'home', tab: 'bills', tin }
     remember(base)
     host.replaceChildren(billsPane(tin, years, base, signal, { name: 'home', tab: 'bills', tin }))

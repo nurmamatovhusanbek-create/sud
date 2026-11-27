@@ -27,15 +27,17 @@ function item(x) {
   return Row({ icon: 'case', title: x.caseNumber, tag: x.time || undefined, sub, sub2: sides, onOpen: () => go({ name: 'case', key: x.caseNumber }) })
 }
 
-export function hearingsTab(route, { signal }) {
-  const st = { days: Number(route.days) || 14, tin: route.tin || '', q: route.q || '' }
+/** `opts.tin`: ONE company's hearings (the company screen's «Majlislar» tab): no company bar; `opts.where`: the route it lives in */
+export function hearingsTab(route, { signal }, opts = {}) {
+  const where = opts.where || { name: 'home', tab: 'hearings' }
+  const st = { days: Number(route.days) || 14, tin: opts.tin ?? (route.tin || ''), q: route.q || '' }
   const names = {} // STIR → name, for the company cards
   let lastFacets = null // the names arrive after the first page: the company bar is drawn again with them
   api.companies({ signal }).then((j) => { for (const c of j.companies || []) names[c.tin] = c.name ? d(c.name) : ''; if (lastFacets) drawFacets(lastFacets) }).catch(() => {})
   const chipsHost = h('div', {})
   const cardsHost = h('div', {})
   const listHost = h('div', { class: 'stack pager-anchor' })
-  const keep = () => remember({ ...route, name: 'home', tab: 'hearings', days: st.days, tin: st.tin, q: st.q, page })
+  const keep = () => remember({ ...route, ...where, days: st.days, tin: st.tin, q: st.q, page })
 
   let page = Math.max(1, Number(route.page) || 1)
   let size = pageSize()
@@ -45,7 +47,7 @@ export function hearingsTab(route, { signal }) {
     lastFacets = r
     chipsHost.replaceChildren(Chips(RANGES.map(([days, label]) => ({ value: days, label: `${label} · ${num(r.ranges[days] ?? 0)}` })), st.days, (v) => { st.days = v; page = 1; keep(); load(true) }, { scroll: true }))
     const total = r.companies.reduce((a, c) => a + c.count, 0)
-    cardsHost.replaceChildren(r.companies.length > 1 || st.tin
+    cardsHost.replaceChildren(!opts.tin && (r.companies.length > 1 || st.tin)
       ? Picker({ label: 'Kompaniya', value: st.tin, onPick: (v) => { st.tin = v; page = 1; keep(); load(true) },
         items: [{ value: '', title: 'Hammasi', big: num(total), sub: `${r.companies.length} kompaniya` },
           ...r.companies.map((c) => ({ value: c.tin, title: names[c.tin] || c.tin, big: num(c.count), sub: `birinchi: ${dayLabel(c.nextDay, r.today).split(',')[0]} ${c.nextTime || ''}`.trim() }))] })
