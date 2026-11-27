@@ -411,6 +411,8 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `SUD_BACKUP_CHUNK` | lib/backup-crypto.ts |
 | `SUD_BACKUP_GAP_MS` | lib/backup.ts |
 | `SUD_BACKUP_PASS_FILE` | lib/auto-backup.ts |
+| `SUD_BACKUP_VERIFY_BUDGET` | lib/backup.ts |
+| `SUD_BACKUP_VERIFY_DAYS` | lib/backup.ts |
 | `SUD_DB` | lib/db.ts |
 | `SUD_SUPERVISED` | app/api/settings/security/route.ts, app/api/settings/update/route.ts |
 | `SUD_TG_WAIT_SCALE` | lib/telegram-client.ts |

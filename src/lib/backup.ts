@@ -22,7 +22,7 @@ import { buildCatalog, saveCatalog, type Catalog } from './telegram-catalog'
 import { syncIndex, type SyncResult } from './telegram-index'
 import { fileExists, getFileBytes, pinMessage, pinnedDocument, sendFile, setFloodListener } from './telegram-client'
 import { readTelegram } from './telegram-config'
-import { localHash, saveBackupSnapshot } from './backup-pending'
+import { localHash, readVerified, saveBackupSnapshot, saveVerified } from './backup-pending'
 
 /**
  * Encrypted copy of the database in the operator's Telegram channel, and the way back.
@@ -134,6 +134,16 @@ const rm = (...files: string[]): void => {
     }
   }
 }
+/**
+ * How often a piece the channel is known to hold is asked about again, and how many such questions one backup may ask. A backup used to ask Telegram (`getFile`)
+ * about EVERY unchanged piece, every time: thousands of requests to learn nothing, and each one a chance to meet flood control. Now a piece this computer sent, or that
+ * answered, is trusted for `SUD_BACKUP_VERIFY_DAYS` (7); each backup re-asks at most `SUD_BACKUP_VERIFY_BUDGET` (150) of the oldest-verified ones (a rolling check that
+ * covers the whole backup over time); and the first piece found MISSING makes that backup check everything (a channel that lost one piece has probably lost more).
+ * «Kanallar holatini tekshirish» still checks every piece on demand. `SUD_BACKUP_VERIFY_DAYS=0` = the old rule (check every piece, every time).
+ */
+const verifyEveryMs = (): number => (process.env.SUD_BACKUP_VERIFY_DAYS !== undefined && process.env.SUD_BACKUP_VERIFY_DAYS !== '' ? Math.max(0, Number(process.env.SUD_BACKUP_VERIFY_DAYS) || 0) : 7) * 86_400_000
+const verifyBudget = (): number => (process.env.SUD_BACKUP_VERIFY_BUDGET !== undefined && process.env.SUD_BACKUP_VERIFY_BUDGET !== '' ? Math.max(0, Number(process.env.SUD_BACKUP_VERIFY_BUDGET) || 0) : 150)
+
 /**
  * The rest between two sent pieces. 1.1 s normally (Telegram's advice: about one message a second per chat); after Telegram has said «too fast» once in
  * this run it is widened to 3.2 s (about 20 a minute, the per-chat limit of groups and channels) for the rest of the run, so a mirror that follows the main channel does
@@ -310,11 +320,38 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
   let since = '' // when this channel's chain began: set from the chain that is there, else it is this backup
   if (prev.value?.m.v === 2) {
     for (const b of prev.value.m.buckets) known.set(b.id, b)
-    set({ phase: 'snapshot', message: 'Kanaldagi zaxira tarixi oʻqilmoqda…' })
-    const chain = await chainBuckets(token, key, prev.value.m)
-    base = chain.buckets
-    since = prev.value.m.since && prev.value.m.since < chain.oldest ? prev.value.m.since : chain.oldest
+    if (prev.value.m.full) {
+      // the newest manifest already lists every bucket of the chain: the older ones are not downloaded (up to 60 requests a backup)
+      base = new Map(prev.value.m.buckets.map((b) => [b.name, b]))
+      since = prev.value.m.since || prev.value.m.created
+    } else {
+      set({ phase: 'snapshot', message: 'Kanaldagi zaxira tarixi oʻqilmoqda…' })
+      const chain = await chainBuckets(token, key, prev.value.m)
+      base = chain.buckets
+      since = prev.value.m.since && prev.value.m.since < chain.oldest ? prev.value.m.since : chain.oldest
+    }
     for (const b of base.values()) known.set(b.id, b)
+  }
+  // which pieces were last proven to be in this channel (see `verifyEveryMs`)
+  const seen = readVerified(chat)
+  const nowMs = Date.now()
+  let budget = verifyBudget()
+  let escalate = false
+  const due = (id: string): boolean => escalate || (budget > 0 && nowMs - (seen.get(id) ?? 0) >= verifyEveryMs())
+  /** does the channel still hold every piece of this bucket? asks only about the ones that are due; the first missing one makes the rest of the run ask about all */
+  const stillThere = async (ref: BucketRef): Promise<'yes' | 'no' | 'unknown'> => {
+    for (const p of ref.parts) {
+      if (!due(p.fileId)) continue
+      if (!escalate) budget--
+      const e = await fileExists(token, p.fileId)
+      if (e === 'unknown') return 'unknown'
+      if (e === 'no') {
+        escalate = true
+        return 'no'
+      }
+      seen.set(p.fileId, nowMs)
+    }
+    return 'yes'
   }
 
   const snap = snapshotFile()
@@ -358,6 +395,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
           return null
         }
         parts.push({ fileId: sent.value.fileId, messageId: sent.value.messageId, size: sealed.length, sha256: sha256(sealed) })
+        seen.set(sent.value.fileId, Date.now()) // just sent: proven
         sentBytes += sealed.length
         sentParts++
         await pause(gapMs())
@@ -368,6 +406,19 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
     for (let n = 0; n < total; n++) {
       const name = names[n]!
       const extra = extras.get(name)
+      // an order PDF never changes and its bucket is named by the file: when the channel's manifest already holds it, the file is not even read from the disk
+      if (name.startsWith('pdf:') && base.has(name)) {
+        const held = base.get(name)!
+        const there = await stillThere(held)
+        if (there === 'unknown') return bail('Telegram vaqtincha javob bermadi (zaxiradagi boʻlaklar tekshirilmadi): hech narsa qayta yuklanmadi, birozdan keyin urinib koʻring')
+        if (there === 'yes') {
+          snapshot[name] = ['', 1]
+          refs.push(held)
+          reused++
+          set({ done: n + 1, message: `Oʻzgarmagan: ${n + 1}/${total}` })
+          continue
+        }
+      }
       const r = extra ? await extra.render().then((t) => (t ? { text: t, rows: extra.rows } : null)) : renderBucket(name, snapDb)
       if (!r) continue
       snapshot[name] = [name.startsWith('pdf:') ? '' : localHash(r.text), r.rows] // a PDF never changes: its name alone says it was sent
@@ -396,13 +447,9 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
       const old = known.get(bid)
       // an unchanged bucket is reused when the channel still holds all of its pieces
       if (old && old.name === name) {
-        let alive = true
-        for (const p of old.parts) {
-          const e = await fileExists(token, p.fileId)
-          if (e === 'unknown') return bail('Telegram vaqtincha javob bermadi (zaxiradagi boʻlaklar tekshirilmadi): hech narsa qayta yuklanmadi, birozdan keyin urinib koʻring')
-          if (e === 'no') { alive = false; break }
-        }
-        if (alive) {
+        const there = await stillThere(old)
+        if (there === 'unknown') return bail('Telegram vaqtincha javob bermadi (zaxiradagi boʻlaklar tekshirilmadi): hech narsa qayta yuklanmadi, birozdan keyin urinib koʻring')
+        if (there === 'yes') {
           refs.push(old)
           reused++
           set({ done: n + 1, message: `Oʻzgarmagan: ${n + 1}/${total}` })
@@ -462,7 +509,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
     for (const tin of Object.keys(companies)) if (!companies[tin]!.name) { const n = companyNameOf(tin, snapDb); if (n) companies[tin] = { ...companies[tin]!, name: n } }
     const created = new Date().toISOString()
     const manifest: ManifestV2 = {
-      v: 2, id, created, since: since || created, app: 'sud-tizimi', companies, buckets: refs,
+      v: 2, id, created, since: since || created, app: 'sud-tizimi', full: true, companies, buckets: refs,
       prev: prev.value ? { messageId: prev.value.pin.messageId, fileId: prev.value.pin.fileId, created: prev.value.m.created } : null,
     }
     const sealedManifest = sealManifest(manifest, salt, key)
@@ -474,6 +521,7 @@ async function runBackup(passphrase: string, token: string, chat: string, donor?
     const result: BackupResult = { id, created, dbBytes: plainBytes, uploadedBytes: sentBytes + sealedManifest.length, chunks: sentParts, buckets: refs.length, reused }
     saveCatalog(buildCatalog(manifest))
     saveBackupSnapshot(chat, created, snapshot)
+    saveVerified(chat, seen, new Set(refs.flatMap((r) => r.parts.map((p) => p.fileId))))
     getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run('last_backup', JSON.stringify({ ...result, pinned: pin.ok, manifestMessageId: m.value.messageId }))
     set({
       phase: 'done',

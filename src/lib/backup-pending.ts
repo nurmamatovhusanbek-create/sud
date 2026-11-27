@@ -125,3 +125,30 @@ export async function pendingBackup(): Promise<PendingReport> {
   })
   return { configured: true, total: now.size, channels }
 }
+
+
+// ---- which pieces were last seen in a channel (so a backup does not ask Telegram about every one of them every time) ----------------------------------
+
+const verifiedKey = (chat: string): string => `backup_seen:${chat}`
+
+/** file id → when this computer last got proof the channel holds it (it just sent it, or `getFile` answered) */
+export function readVerified(chat: string): Map<string, number> {
+  try {
+    const r = getDb().prepare('SELECT v FROM meta WHERE k = ?').get(verifiedKey(chat))
+    const j = r ? (JSON.parse(String(r.v)) as Record<string, number>) : {}
+    return new Map(Object.entries(j).filter(([, t]) => typeof t === 'number'))
+  } catch {
+    return new Map()
+  }
+}
+
+/** kept: only the pieces the newest manifest still names (the record never outgrows the backup) */
+export function saveVerified(chat: string, seen: Map<string, number>, keep: Set<string>): void {
+  try {
+    const out: Record<string, number> = {}
+    for (const [id, t] of seen) if (keep.has(id)) out[id] = t
+    getDb().prepare('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run(verifiedKey(chat), JSON.stringify(out))
+  } catch {
+    /* a convenience: the next backup just checks more */
+  }
+}

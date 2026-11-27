@@ -564,3 +564,17 @@ Owner: «dead code in the main menu of the navy look». The fourth KPI («Umumiy
 
 ## Kuzatuv: an alert that cannot say what changed is not sent (Nov 2026)
 Owner: the bot sent «Ish holati oʻzgardi … Holati: Arxivga topshirilgan» (and «Natija qabul qilingan») with no «old → new», for cases whose status had not really changed. Such a message exists when the remembered signature differs from the new one but the difference is not one of the lines the message can show (the stage of a hearing alone, the same words in another source's spelling, a cell blanked): `lib/watch` now computes `changeLines(prev.sig, row)` before queuing a `status` / `hearing` alert, and when it is empty the row is remembered silently and nothing is sent. Every status alert therefore carries at least one «Holati: A → B», «Natija: …» or «Majlis: …» line (together with «something → yoʻq» skipped, `core/watch.diffRow`). A message in the OLD format (a bare «Holati:» with no change line) can only come from an app that has not been updated: update the monoblock. Test: `lib/__tests__/watch.test.ts`.
+
+## Zaxira narxi: har safar butun kanalni tekshirmaymiz
+
+Oldin har bir zaxira (1) kanaldagi barcha eski manifestlarni bir-bir yuklab chiqardi (`chainBuckets`), (2) qayta ishlatiladigan har bir boʻlak uchun Telegramdan `getFile` soʻradi va (3) har `pdf:` paqirini diskdan oʻqib qayta hash qilardi. Katta kanalda bu yuzlab soʻrov va minglab fayl oʻqish edi, oʻzgarish boʻlmasa ham.
+
+Endi (`lib/backup.ts`, `backup-pending.ts`):
+
+- **Ishonch.** Biz yuborgan boʻlak `backup_seen:<chat>` yozuvida vaqti bilan saqlanadi; `SUD_BACKUP_VERIFY_DAYS` (7) kun ichida u kanalda deb ishoniladi, `getFile` yuborilmaydi.
+- **Aylanma tanlov.** Muddati oʻtgan boʻlaklar bir zaxirada `SUD_BACKUP_VERIFY_BUDGET` (150) tagacha tekshiriladi; qolganlari keyingi zaxiraga qoladi.
+- **Kuchaytirish.** Birinchi yoʻq boʻlak topilsa (`stillThere` → `no`), shu zaxira qolgan hammasini tekshiradi va yoʻqolganini qayta yuboradi.
+- **Telegram javob bermasa** (`unknown`) hech narsa qayta yuklanmaydi: zaxira toʻxtaydi va sababini aytadi (yoʻq deb oʻylab nusxa chiqarib tashlamaymiz).
+- **`full` manifest.** Barcha paqirlarni oʻzida olgan manifest `full: true` bilan yoziladi; keyingi zaxira eski manifestlar zanjirini yurmaydi, faqat oxirgisini oʻqiydi. Eski (`full` boʻlmagan) kanalda birinchi zaxira zanjirni bir marta yuradi.
+- **PDF paqirlar** (oʻzgarmas): manifestda bor va kanalda tasdiqlangan boʻlsa diskdan oʻqilmaydi.
+- «Kanallar holatini tekshirish» tugmasi hamon **hammasini** tekshiradi. Testlarda `SUD_BACKUP_VERIFY_DAYS=0` eski qoidani beradi.

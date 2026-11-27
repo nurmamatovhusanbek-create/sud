@@ -18,8 +18,10 @@ process.env.CASE_STORE_DIR = path.join(DIR, 'cases')
 process.env.TELEGRAM_CONFIG_FILE = path.join(DIR, 'telegram.json')
 process.env.SUD_BACKUP_CHUNK = '4096'
 process.env.SUD_BACKUP_GAP_MS = '0'
+process.env.SUD_BACKUP_VERIFY_DAYS = '0' // the old rule (ask about every piece) unless a test sets another
 const crypt = await import('../backup-crypto')
 const dbm = await import('../db')
+const getDbForTest = () => dbm.getDb()
 const bk = await import('../db-buckets')
 const cfg = await import('../telegram-config')
 const backup = await import('../backup')
@@ -760,6 +762,72 @@ describe('company names in the backup', () => {
     const c = kept.ok ? kept.catalog.companies.find((x) => x.tin === TIN) : undefined
     expect(name(c)).toBe('Boshqa MChJ')
     expect(c?.refreshedAt).toBe(777)
+  })
+})
+
+describe('a backup does not ask Telegram about every piece every time', () => {
+  const withDays = async (days: string, budget: string | undefined, fn: () => Promise<void>) => {
+    const was = [process.env.SUD_BACKUP_VERIFY_DAYS, process.env.SUD_BACKUP_VERIFY_BUDGET]
+    process.env.SUD_BACKUP_VERIFY_DAYS = days
+    if (budget !== undefined) process.env.SUD_BACKUP_VERIFY_BUDGET = budget
+    try {
+      await fn()
+    } finally {
+      process.env.SUD_BACKUP_VERIFY_DAYS = was[0]
+      if (was[1] === undefined) delete process.env.SUD_BACKUP_VERIFY_BUDGET
+      else process.env.SUD_BACKUP_VERIFY_BUDGET = was[1]
+    }
+  }
+  /** getFile calls that are not the manifest chain: the existence checks of reused pieces */
+  const checks = (ch: ReturnType<typeof fakeChannel>) => {
+    const manifests = new Set([...ch.msgs.values()].filter((m) => m.name.endsWith('manifest.bin')).map((m) => m.fileId))
+    return ch.fileCalls.filter((id) => !manifests.has(id)).length
+  }
+
+  test('a second backup with nothing new asks about NO piece (the pieces it sent are trusted for a week), and reads no older manifest', async () => {
+    await withDays('7', undefined, async () => {
+      cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
+      const ch = fakeChannel()
+      await runBackup()
+      await runBackup() // a second manifest, flagged «full»
+      ch.fileCalls.length = 0
+      const r = await runBackup()
+      expect(r.phase).toBe('done')
+      expect(checks(ch)).toBe(0)
+      // the only getFile calls were for the pinned manifest itself: no walk through the older ones
+      expect(ch.fileCalls.length).toBeLessThanOrEqual(1)
+      expect(ch.sent.length).toBeGreaterThan(0)
+    })
+  })
+
+  test('a piece that vanished is found by the rolling check, re-sent, and then the whole run is checked', async () => {
+    await withDays('7', '1000', async () => {
+      cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
+      const ch = fakeChannel()
+      await runBackup()
+      const before = ch.sent.length
+      // pieces not verified for a long time (the record says «never»): every one is due, within the budget
+      getDbForTest().prepare("DELETE FROM meta WHERE k LIKE 'backup_seen:%'").run()
+      const victim = [...ch.files.keys()].find((id) => !ch.msgs.get([...ch.msgs.entries()].find(([, m]) => m.fileId === id)?.[0] ?? -1)?.name.endsWith('manifest.bin'))!
+      ch.files.delete(victim)
+      const r = await runBackup()
+      expect(r.phase).toBe('done')
+      expect(ch.sent.length).toBeGreaterThan(before + 1) // the lost piece went again (plus the manifest)
+    })
+  })
+
+  test('the budget limits how many unchanged pieces one backup asks about', async () => {
+    await withDays('7', '2', async () => {
+      cfg.saveTelegram({ token: TOKEN, chat: '@my_channel', mirrors: [] })
+      const ch = fakeChannel()
+      await runBackup()
+      getDbForTest().prepare("DELETE FROM meta WHERE k LIKE 'backup_seen:%'").run() // nothing is trusted
+      await runBackup() // makes the manifest «full»
+      getDbForTest().prepare("DELETE FROM meta WHERE k LIKE 'backup_seen:%'").run()
+      ch.fileCalls.length = 0
+      await runBackup()
+      expect(checks(ch)).toBe(2)
+    })
   })
 })
 

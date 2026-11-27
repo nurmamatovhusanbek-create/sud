@@ -92,6 +92,8 @@ export interface ManifestV2 {
   prev: { messageId: number; fileId: string; created: string } | null
   /** when THIS channel's chain began (its first backup): carried over from manifest to manifest; absent on manifests older than this field */
   since?: string
+  /** this manifest lists EVERY bucket of the chain (the buckets of older manifests were carried into it): the next backup need not read the older manifests */
+  full?: boolean
   /** every company's first-scrape and «as of» dates at the time of this backup */
   companies: Record<string, { firstAt: number; refreshedAt: number; /** the company's name as its own bills spell it (the courts' spelling); absent when no bill names it */ name?: string }>
   buckets: BucketRef[]
