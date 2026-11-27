@@ -108,7 +108,7 @@ Read this BEFORE changing a file: the right column is everything that can break.
 | `translit.ts` | core/classify.ts, core/public-orders.ts, core/watch.ts, lib/documents/derive.ts, lib/documents/from-case.ts | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/derive.test.ts, lib/documents/__tests__/from-case.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
 | `trend.ts` | components/sections/overview.tsx, lib/report/model.ts, lib/report/render-ink.ts | core/__tests__/trend.test.ts |
 | `uz-alphabet.ts` | api/documents/generate-bulk/route, api/documents/generate/route, api/pretenzia/generate/route, components/proto/doc-preview.tsx, components/views/doc-bulk.tsx, components/views/doc-editor.tsx, components/views/pretenzia-view.tsx, +7 | core/__tests__/translit.test.ts, core/__tests__/uz-alphabet.test.ts, lib/documents/__tests__/script.test.ts, lib/pretenzia/__tests__/script.test.ts |
-| `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts |
+| `vlm.ts` | components/views/vlm-settings.tsx, lib/vlm-client.ts, lib/vlm-config.ts, lib/vlm-pool.ts, lib/vlm-request.ts, lib/vlm-test.ts | core/__tests__/vlm.test.ts, lib/__tests__/vlm-pool.test.ts, lib/__tests__/vlm.test.ts |
 | `watch.ts` | api/settings/watch/route, hooks/use-watch.ts, lib/watch-store.ts, lib/watch.ts | core/__tests__/watch.test.ts, lib/__tests__/watch.test.ts |
 | `worker-trust.ts` | lib/workers-config.ts | core/__tests__/worker-trust.test.ts |
 
