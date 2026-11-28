@@ -582,3 +582,6 @@ Endi (`lib/backup.ts`, `backup-pending.ts`):
 ## Captcha oʻqish: bitta taʼminotchining bir nechta kaliti (Nov 2026)
 
 Gemini/Groq/Z.ai bepul limiti kalitga emas, Google (va h.k.) **loyihasiga** bogʻliq. Shuning uchun saqlangan yozuv endi «taʼminotchi + kalit»: `vlmId` = `gemini#3fa1c2` (kalitning qisqa belgisi, kalit emas). Yangi kalit shu taʼminotchining yoniga **qoʻshiladi**, xuddi shu kalit qayta saqlansa oʻrnini almashtiradi; «Tahrirlash» yozuvning `id`sini yuboradi (boʻsh kalit = oʻzining kalitini saqlash, yangi kalit = kalitni almashtirish, joyi oʻzgarmaydi). Pool hammasini navbatma-navbat oladi; xabarlarda bitta taʼminotchining bir nechta kaliti `gemini ••••9999` deb ajratiladi. Eski fayllar (har taʼminotchi bitta kalit) oʻzgarishsiz oʻqiladi.
+
+## Mini App: toʻliq ekran faqat telefonda (Nov 2026)
+Noutbukda (tdesktop, macos, weba…) Mini App oʻz oynasida qoladi: `telegram-core` `can.fullscreen = versiya ≥ 8.0 && iOS/Android`, shuning uchun toʻliq ekran soʻralmaydi, sarlavhadagi tugma koʻrinmaydi, eski «toʻliq ekran» tanlovi ham eʼtiborga olinmaydi; mijoz baribir toʻliq ekranda ochilsa, sahifa uni `web_app_exit_fullscreen` bilan oynaga qaytaradi. Telefonda oldingidek (standart yoqilgan, tugma bilan oʻchiriladi).

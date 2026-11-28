@@ -16,7 +16,8 @@ export function createTelegram({ win, hash, storage, doc }) {
   const version = versionOf(hash)
   const platform = params.get('tgWebAppPlatform') || 'unknown'
   const phone = platform === 'ios' || platform === 'android'
-  const can = { fullscreen: version >= 8.0, safeArea: version >= 8.0, swipe: version >= 7.7 }
+  // fullscreen is a phone thing: on a laptop the page stays in its window (no request, no toggle)
+  const can = { fullscreen: version >= 8.0 && phone, safeArea: version >= 8.0, swipe: version >= 7.7 }
   const handlers = new Map()
   const watchers = new Set()
   let fullscreen = false
@@ -61,7 +62,10 @@ export function createTelegram({ win, hash, storage, doc }) {
     watchers.forEach((fn) => fn(on))
   }
 
-  handlers.set('fullscreen_changed', (d) => setFullscreen(!!d.is_fullscreen))
+  handlers.set('fullscreen_changed', (d) => {
+    setFullscreen(!!d.is_fullscreen)
+    if (d.is_fullscreen && !phone) post('web_app_exit_fullscreen') // a laptop client that came up fullscreen (an old choice) is put back in its window
+  })
   // `ALREADY_FULLSCREEN` is an answer to a request made when it already was: the state is known, not a failure
   handlers.set('fullscreen_failed', (d) => { if (d.error === 'ALREADY_FULLSCREEN') setFullscreen(true) })
   handlers.set('safe_area_changed', (d) => { got.safe = true; delete doc.documentElement.dataset.safe; insets('safe', d) })

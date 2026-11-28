@@ -62,13 +62,17 @@ describe('what the page tells the client at start', () => {
     expect(t.tg.can).toEqual({ fullscreen: true, safeArea: true, swipe: true })
   })
 
-  test('on a desktop client fullscreen is not forced (it is the person\'s button), unless they chose it before', () => {
+  test('on a desktop client there is no fullscreen at all: no request, no toggle, even if they chose it before', () => {
     const d = setup({ hash: H('8.0', 'tdesktop') })
     d.tg.start()
     expect(types(d.sent)).not.toContain('web_app_request_fullscreen')
+    expect(d.tg.can.fullscreen).toBe(false)
     const chose = setup({ hash: H('8.0', 'tdesktop'), stored: '1' })
     chose.tg.start()
-    expect(types(chose.sent)).toContain('web_app_request_fullscreen')
+    expect(types(chose.sent)).not.toContain('web_app_request_fullscreen')
+    // a laptop client that came up fullscreen anyway is put back in its window
+    chose.tg.receive('fullscreen_changed', { is_fullscreen: true })
+    expect(types(chose.sent)).toContain('web_app_exit_fullscreen')
   })
 
   test('a phone person who left fullscreen is not put back into it on the next launch', () => {
@@ -159,7 +163,7 @@ describe('what the client answers', () => {
 
 describe('the person\'s button', () => {
   test('toggling asks the client for the other state and remembers the choice for the next launch', () => {
-    const t = setup({ hash: H('8.0', 'tdesktop') })
+    const t = setup({ hash: H('8.0', 'ios') })
     t.tg.toggleFullscreen()
     expect(t.sent.at(-1)!.type).toBe('web_app_request_fullscreen')
     expect(t.store.get('sud.fullscreen')).toBe('1')
@@ -167,6 +171,11 @@ describe('the person\'s button', () => {
     t.tg.toggleFullscreen()
     expect(t.sent.at(-1)!.type).toBe('web_app_exit_fullscreen')
     expect(t.store.get('sud.fullscreen')).toBe('0')
+  })
+  test('on a laptop client the button does nothing (fullscreen is for phones)', () => {
+    const t = setup({ hash: H('8.0', 'tdesktop') })
+    t.tg.toggleFullscreen()
+    expect(t.sent).toEqual([])
   })
   test('on a client that cannot do fullscreen the button does nothing', () => {
     const t = setup({ hash: H('7.0', 'ios') })
