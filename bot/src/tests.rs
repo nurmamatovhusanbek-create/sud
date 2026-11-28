@@ -1225,7 +1225,7 @@ mod orders {
             assert!(d.1.ends_with(".pdf") && !d.1.contains('/'), "{}", d.1);
             assert!(d.3.contains(CASE) && (d.3.contains("Apellyatsiya") || d.3.contains("Birinchi")), "{}", d.3);
         }
-        assert_eq!(sh.outbox.docs()[0].1, "apellyatsiya-2.pdf");
+        assert_eq!(sh.outbox.docs()[0].1, format!("{}-Apellyatsiya.pdf", CASE.replace('/', "-")), "named under the case number, not the court's own file name");
     }
 
     #[tokio::test]

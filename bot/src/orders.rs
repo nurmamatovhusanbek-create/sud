@@ -290,9 +290,11 @@ pub fn keyboard(orders: &[Order], max: usize) -> Value {
     json!({ "inline_keyboard": rows })
 }
 
-/// the file name the person gets: the court's own name when it is usable, else the case number; always ends in `.pdf`, no path or quote characters
+/// the file name the person gets: under the CASE NUMBER («2-1004-2603-8020-Birinchi instansiya.pdf»), never the court's own name (a uuid-like or Russian
+/// scan name tells nothing); no case number → the court's name, else «qaror»; always ends in `.pdf`, no path or quote characters
 pub fn file_name(o: &Order) -> String {
-    let base = if o.pdf_name.trim().is_empty() { format!("{}-{}", o.case.replace('/', "-"), instance_word(&o.instance)) } else { o.pdf_name.trim().to_string() };
+    let case = o.case.trim().replace('/', "-");
+    let base = if !case.is_empty() { format!("{case}-{}", instance_word(&o.instance)) } else if !o.pdf_name.trim().is_empty() { o.pdf_name.trim().to_string() } else { "qaror".to_string() };
     let clean: String = base.chars().map(|c| if c.is_control() || matches!(c, '"' | '\\' | '/' | ':' | '*' | '?' | '<' | '>' | '|') { '_' } else { c }).collect();
     let clean = clean.trim().to_string();
     if clean.to_lowercase().ends_with(".pdf") { clean } else { format!("{clean}.pdf") }
@@ -390,14 +392,23 @@ mod tests {
     }
 
     #[test]
-    fn the_file_name_is_safe() {
+    fn the_file_name_is_the_case_number() {
         let mut x = o("a", "2-1004-2603/8020", "FIRST", "");
-        assert_eq!(file_name(&x), "qaror.pdf");
-        x.pdf_name = "  ../a\"b\\c.PDF ".into();
-        assert!(file_name(&x).ends_with(".PDF") && !file_name(&x).contains('/') && !file_name(&x).contains('"') && !file_name(&x).contains('\\'), "{}", file_name(&x));
-        x.pdf_name = String::new();
+        // the court's own name is not used: the file is named after the case
         assert_eq!(file_name(&x), "2-1004-2603-8020-Birinchi instansiya.pdf");
+        x.pdf_name = "  ../a\"b\\c.PDF ".into();
+        assert_eq!(file_name(&x), "2-1004-2603-8020-Birinchi instansiya.pdf");
+        x.instance = "APPEAL".into();
+        assert_eq!(file_name(&x), "2-1004-2603-8020-Apellyatsiya.pdf");
+        // no case number: the court's name (made safe), else «qaror»
+        x.case = String::new();
+        assert!(file_name(&x).ends_with(".PDF") && !file_name(&x).contains('/') && !file_name(&x).contains('"') && !file_name(&x).contains('\\'), "{}", file_name(&x));
         x.pdf_name = "noext".into();
         assert_eq!(file_name(&x), "noext.pdf");
+        x.pdf_name = String::new();
+        assert_eq!(file_name(&x), "qaror.pdf");
+        // a case number with odd characters is made safe too
+        x.case = "2-1/2:3*".into();
+        assert!(!file_name(&x).contains(['/', ':', '*']));
     }
 }

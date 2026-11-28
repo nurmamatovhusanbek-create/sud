@@ -88,3 +88,7 @@ The log showed (1) workers still answering `403 Host adolatapi1.sud.uz not allow
 ## «Tozalangan» › «Butunlay oʻchirish»
 
 «Tozalash» faqat roʻyxatdan yashiradi (yozuv va PDF qoladi). «Tozalangan» boʻlimidagi **«Butunlay oʻchirish»** tugmasi (tasdiqlash bilan, barcha sahifalardan) tozalangan har bir qarorni **butunlay** olib tashlaydi: yozuvi maʼlumotdan chiqadi (`purged-store` qabri: kanallar va bot ham keyingi zaxiradan keyin unutadi), PDF fayli diskdan oʻchadi (`removePdf`: ilovada faylni oʻchiradigan **yagona** eshik), tozalangan roʻyxatdan ham chiqadi. `POST /api/public-orders/purge-hidden` (`privileged`, saytga hech narsa yubormaydi), `lib/public-orders/purge-hidden`. Yozuvlar qatorlari shardlarda qoladi, shuning uchun `restorePurged` yozuvni qaytaradi, lekin oʻchgan fayl qaytmaydi (qaror «yuklanmagan» boʻladi, qayta yuklab olinadi). Test: `public-orders/__tests__/purge-hidden.test.ts`.
+
+## Bot: fayl nomi ish raqami bilan
+
+Botdan (qaror tugmasi, «Yuklash» yakunida avtomatik yuborish, Mini Appdan yuborish) kelgan PDF endi sudning oʻz fayl nomi bilan emas, **ish raqami** bilan nomlanadi: `2-1004-2603-8020-Birinchi instansiya.pdf` (`/` → `-`, instansiya soʻzi oxirida; xavfsiz belgilar). Ish raqami boʻlmasa sudning nomi, u ham boʻlmasa `qaror.pdf` (`bot/src/orders.rs` `file_name`, test `the_file_name_is_the_case_number`).
